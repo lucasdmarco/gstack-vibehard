@@ -8,7 +8,7 @@ import { initCommand } from "../commands/init.js"
 import { sprintCommand } from "../commands/sprint.js"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const pkg = JSON.parse(readFileSync(resolve(__dirname, "../package.json"), "utf-8"))
+const pkg = JSON.parse(readFileSync(resolve(__dirname, "../../package.json"), "utf-8"))
 const VERSION = pkg.version
 
 const COLORS = {
