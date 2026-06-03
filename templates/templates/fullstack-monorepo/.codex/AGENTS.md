@@ -2,6 +2,7 @@
 
 ## Stack Base
 - **Frontend**: React 19 + Vite + Tailwind 4 + shadcn/ui + TanStack Query + React Router
+- **Design System**: taste-skill powered (4 engines: brutalist/soft/minimalist/stitch + 3 dials)
 - **Banco Base**: Supabase PostgreSQL (produção e teste separados)
 - **Deploy Frontend**: Vercel
 - **Package Manager**: pnpm
@@ -18,6 +19,46 @@
 - Para PostgreSQL: use `@my/db` (Drizzle ORM + postgres driver)
 - Para Turso/SQLite: use `@my/db-turso` (Drizzle ORM + libsql driver)
 - Types compartilhados: `@my/shared`
+
+## Design System (taste-skill)
+
+O template inclui design system completo com 4 engines visuais:
+
+| Engine | Estilo | Arquivo tema |
+|--------|--------|-------------|
+| **brutalist** | Swiss industrial + CRT terminal | `src/styles/themes/brutalist.css` |
+| **soft** | Premium UI, spring animations | `src/styles/themes/soft.css` |
+| **minimalist** | Clean editorial (Linear/Notion) | `src/styles/themes/minimalist.css` |
+| **stitch** | Google Stitch semantic design | `src/styles/themes/stitch.css` |
+
+**3 Dials**: DESIGN_VARIANCE (1-10), MOTION_INTENSITY (1-10), VISUAL_DENSITY (1-10)
+**Config**: `src/lib/design-system/config.ts` — leitura/escrita em localStorage + CSS class switching
+**Patterns**: `src/components/patterns/` — heroes, navigation, grids/bento, cards, media, micro-interactions
+
+## Agentes Especialistas (20)
+
+O projeto inclui agentes especialistas com Quality Gate obrigatório antes de cada entrega:
+
+| Agente | Especialidade |
+|--------|--------------|
+| orchestrator | Coordenação multi-agente |
+| frontend-specialist | UI/UX web |
+| backend-specialist | API, rotas, middleware |
+| database-architect | Schema, migrations, queries |
+| debugger | Debug sistemático |
+| devops-engineer | Docker, deploy, infra |
+| security-auditor | OWASP, pentest |
+| qa-automation-engineer | Testes automatizados |
+| performance-optimizer | Bundle, render, queries |
+| +11 mais | Ver `agents/agents/` |
+
+**Regra**: Todo agente executa `python ~/.codex/hooks/qg.py --path . --level 1` antes de entregar output.
+
+## Quality Gate + Security Gate
+
+- **QG** (qg.py): 3 níveis — L1 estrutural+segurança, L2 estados, L3 conteúdo
+- **Security Gate** (stop.py): dockerignore, multi-stage, non-root, CORS, secrets — bloqueante em deploy
+- **Session Start** (session_start.py): identity injection + chronicle index + stack decision framework
 
 ## Comandos
 
@@ -58,7 +99,7 @@ pnpm setup:repo       # Cria repo GitHub + primeiro commit + push
 ## Pastas importantes
 
 ```
-apps/web/                → Frontend React
+apps/web/                → Frontend React + design system (4 engines)
 apps/api/                → Backend Express 5 (default, Supabase + Vercel)
 apps/api-fastify/        → Backend Fastify 5 (Neon + Railway)
 apps/api-hono/           → Backend Hono 4 (Turso + Render)
@@ -72,5 +113,4 @@ scripts/                 → Scripts de setup
 
 ## Workflow
 
-Siga o fluxo definido no AGENTS.md global (~/.codex/AGENTS.md):
-1. Plano → 2. Aprovação → 3. Código → 4. Testes → 5. Review → 6. PR
+1. Plano → 2. Aprovação → 3. Código → 4. QG Gate → 5. Testes → 6. Review
