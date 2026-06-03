@@ -35,6 +35,211 @@ function run(cmd, label) {
   }
 }
 
+function refreshPath() {
+  if (!isWindows()) return
+  try {
+    const sysPath = execSync(
+      'reg query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" /v Path 2>&1 | findstr /i "Path"',
+      { stdio: "pipe", timeout: 5000 }
+    ).toString().trim()
+    const userPath = execSync(
+      'reg query "HKCU\\Environment" /v Path 2>&1 | findstr /i "Path"',
+      { stdio: "pipe", timeout: 5000 }
+    ).toString().trim()
+    const sysMatch = sysPath.match(/REG_\w+\s+(\S.+)/)
+    const userMatch = userPath.match(/REG_\w+\s+(\S.+)/)
+    const merged = [sysMatch?.[1], userMatch?.[1]].filter(Boolean).join(";")
+    if (merged) process.env.Path = merged
+  } catch {}
+}
+
+async function installDeps(run, warn, success, info, report, harnessIds) {
+  section("deps/ — Instalando dependencias globais")
+
+  // ========================================
+  // bun + gbrain
+  // ========================================
+  let bunFound = false
+  try {
+    execSync("bun --version", { stdio: "pipe", timeout: 5000 })
+    bunFound = true
+  } catch {}
+
+  if (!bunFound) {
+    info("bun: nao encontrado. Instalando...")
+    try {
+      if (isWindows()) {
+        execSync('powershell -c "irm bun.sh/install.ps1 | iex"', { stdio: "pipe", timeout: 120000 })
+        refreshPath()
+        const bunPaths = [join(HOME, ".bun", "bin", "bun.exe")]
+        for (const p of [...bunPaths, "bun"]) {
+          try {
+            execSync(`${p} --version`, { stdio: "pipe", timeout: 5000 })
+            bunFound = true
+            break
+          } catch {}
+        }
+      } else {
+        execSync('curl -fsSL https://bun.sh/install | bash', { stdio: "pipe", timeout: 120000 })
+        const bunPaths = [join(HOME, ".bun", "bin", "bun")]
+        for (const p of [...bunPaths, "bun"]) {
+          try {
+            execSync(`${p} --version`, { stdio: "pipe", timeout: 5000 })
+            bunFound = true
+            break
+          } catch {}
+        }
+      }
+      if (bunFound) {
+        success("bun instalado")
+      } else {
+        warn("bun: instalado mas nao encontrado no PATH")
+      }
+    } catch (e) {
+      warn("bun: falha ao instalar. Instale manualmente: https://bun.sh")
+    }
+  }
+
+  if (bunFound) {
+    run("bun install -g github:garrytan/gbrain", "gbrain (bun global)")
+  } else {
+    info("gbrain: pulado (bun nao disponivel)")
+  }
+
+  // ========================================
+  // uv + graphify
+  // ========================================
+  let uvBin = ""
+  const possiblePaths = isWindows()
+    ? [join(HOME, ".local", "bin", "uv.exe"), join(HOME, "AppData", "Local", "uv", "uv.exe")]
+    : [join(HOME, ".local", "bin", "uv"), join(HOME, ".cargo", "bin", "uv"), "/usr/local/bin/uv"]
+
+  for (const p of [...possiblePaths, "uv"]) {
+    try {
+      execSync(`${p} --version`, { stdio: "pipe", timeout: 5000 })
+      uvBin = p
+      break
+    } catch {}
+  }
+
+  if (!uvBin) {
+    info("uv: nao encontrado. Instalando...")
+    try {
+      if (isWindows()) {
+        execSync('powershell -c "irm https://astral.sh/uv/install.ps1 | iex"', { stdio: "pipe", timeout: 60000 })
+      } else {
+        execSync('curl -LsSf https://astral.sh/uv/install.sh | sh', { stdio: "pipe", timeout: 60000 })
+      }
+      refreshPath()
+      for (const p of possiblePaths) {
+        try {
+          execSync(`${p} --version`, { stdio: "pipe", timeout: 5000 })
+          uvBin = p
+          success("uv instalado")
+          break
+        } catch {}
+      }
+      if (!uvBin) {
+        try {
+          execSync("uv --version", { stdio: "pipe", timeout: 5000 })
+          uvBin = "uv"
+          success("uv instalado")
+        } catch {}
+      }
+      if (!uvBin) warn("uv: instalado mas nao encontrado. Tente reiniciar o terminal.")
+    } catch {
+      warn("uv: falha ao instalar. Instale manualmente: https://docs.astral.sh/uv/#installation")
+    }
+  }
+
+  if (uvBin) {
+    run(`${uvBin} tool install graphifyy`, "graphify (uv tool)")
+  } else {
+    info("graphify: pulado (uv nao disponivel)")
+  }
+
+  // ========================================
+  // Rust (rustup) — needed for headroom build
+  // ========================================
+  let rustFound = false
+  try {
+    execSync("rustc --version", { stdio: "pipe", timeout: 5000 })
+    rustFound = true
+    success("Rust encontrado")
+  } catch {}
+
+  if (!rustFound) {
+    info("Rust: nao encontrado. Instalando rustup...")
+    try {
+      if (isWindows()) {
+        try {
+          execSync("winget install Rustlang.Rustup 2>&1", { stdio: "pipe", timeout: 120000 })
+        } catch {
+          info("winget falhou. Tentando rustup-init.exe diretamente...")
+          execSync(
+            'powershell -c "$url = \'https://static.rust-lang.org/rustup/dist/i686-pc-windows-gnu/rustup-init.exe\'; $tmp = \'$env:TEMP\\rustup-init.exe\'; iwr -Uri $url -OutFile $tmp; & $tmp -y --default-toolchain stable --profile minimal"',
+            { stdio: "pipe", timeout: 180000 }
+          )
+        }
+      } else if (isMacOS()) {
+        execSync("brew install rustup-init && rustup-init -y --default-toolchain stable --profile minimal", { stdio: "pipe", timeout: 180000 })
+      } else {
+        execSync('curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y', { stdio: "pipe", timeout: 180000 })
+      }
+      refreshPath()
+      try {
+        execSync("rustc --version", { stdio: "pipe", timeout: 5000 })
+        rustFound = true
+        success("Rust instalado")
+      } catch {
+        if (isWindows()) {
+          info("Rust: MSVC toolchain pode ter falhado. Tentando toolchain GNU...")
+          try {
+            execSync("rustup default stable-gnu 2>&1", { stdio: "pipe", timeout: 30000 })
+            execSync("rustc --version", { stdio: "pipe", timeout: 5000 })
+            rustFound = true
+            success("Rust instalado (toolchain GNU)")
+          } catch {}
+        }
+        if (!rustFound) warn("Rust: instalado mas `rustc` nao encontrado no PATH")
+      }
+    } catch (e) {
+      warn("Rust: falha ao instalar. Instale manualmente: https://rustup.rs")
+    }
+  }
+
+  // ========================================
+  // Playwright
+  // ========================================
+  try {
+    execSync("npx playwright install chromium 2>&1", { stdio: "pipe", timeout: 120000 })
+    success("Playwright: chromium instalado")
+  } catch {
+    warn("Playwright: falha ao instalar chromium. Rode manualmente: npx playwright install chromium")
+  }
+
+  // ========================================
+  // MOM (macOS only)
+  // ========================================
+  if (isMacOS()) {
+    run("brew install momhq/tap/mom", "MOM (brew)")
+  } else {
+    info("MOM: incompativel com este OS (apenas macOS)")
+  }
+
+  // ========================================
+  // Headroom (context compression proxy)
+  // ========================================
+  await installHeadroom({
+    run,
+    warn,
+    success,
+    info,
+    uvBin,
+    selectedHarnessIds: harnessIds,
+  }, report)
+}
+
 export async function install() {
   const report = { added: [], updated: [], skipped: [], errors: [] }
 
@@ -56,6 +261,9 @@ export async function install() {
 
   info(`Harnesses detectados: ${harnesses.map((h) => h.label).join(", ")}`)
 
+  // Step 1: Install global deps ALWAYS — before harness check
+  await installDeps(run, warn, success, info, report, allHarnessIds)
+
   // Check which harnesses already have gstack_vibehard
   const alreadyInstalled = checkAlreadyInstalled(allHarnessIds)
   const availableHarnessIds = allHarnessIds.filter((h) => !alreadyInstalled.includes(h))
@@ -71,9 +279,9 @@ export async function install() {
     }
   }
 
-  // If nothing to install
+  // If nothing to install for harnesses
   if (availableHarnessIds.length === 0) {
-    success("\n  Tudo ja instalado. Nada a fazer.")
+    success("\n  Todos os harnesses ja configurados. Deps globais ja verificadas.")
     info("  Para forcar reinstalação, remova manualmente:")
     for (const h of alreadyInstalled) {
       if (h === "codex") info("    rm ~/.codex/hooks/qg.py")
@@ -97,81 +305,6 @@ export async function install() {
   }
 
   info(`Harnesses selecionados: ${selectedHarnessIds.join(", ")}`)
-
-  // Step 1: Install global dependencies
-  section("deps/ — Instalando dependencias globais")
-
-  // gbrain
-  try {
-    execSync("bun --version", { stdio: "pipe", timeout: 5000 })
-    run("bun install -g github:garrytan/gbrain", "gbrain (bun global)")
-  } catch {
-    warn("bun: nao instalado. Instale com: powershell -c \"irm bun.sh/install.ps1 | iex\"")
-  }
-
-  // uv + graphify
-  let uvBin = ""
-  const possiblePaths = isWindows()
-    ? [join(HOME, ".local", "bin", "uv.exe"), join(HOME, "AppData", "Local", "uv", "uv.exe")]
-    : [join(HOME, ".local", "bin", "uv"), join(HOME, ".cargo", "bin", "uv"), "/usr/local/bin/uv"]
-  for (const p of [...possiblePaths, "uv"]) {
-    try {
-      execSync(`${p} --version`, { stdio: "pipe", timeout: 5000 })
-      uvBin = p
-      break
-    } catch {}
-  }
-  if (!uvBin) {
-    info("uv: nao encontrado. Instalando...")
-    try {
-      if (isWindows()) {
-        execSync('powershell -c "irm https://astral.sh/uv/install.ps1 | iex"', { stdio: "pipe", timeout: 60000 })
-      } else {
-        execSync('curl -LsSf https://astral.sh/uv/install.sh | sh', { stdio: "pipe", timeout: 60000 })
-      }
-      // Try common install paths after installation
-      for (const p of possiblePaths) {
-        try {
-          execSync(`${p} --version`, { stdio: "pipe", timeout: 5000 })
-          uvBin = p
-          success("uv instalado")
-          break
-        } catch {}
-      }
-      if (!uvBin) warn("uv: instalado mas nao encontrado no PATH")
-    } catch {
-      warn("uv: falha ao instalar. Instale manualmente: https://docs.astral.sh/uv/#installation")
-    }
-  }
-  if (uvBin) {
-    run(`${uvBin} tool install graphifyy`, "graphify (uv tool)")
-  } else {
-    info("graphify: pulado (uv nao disponivel)")
-  }
-
-  // Playwright (browser binaries for MCP + auto-testing)
-  try {
-    execSync("npx playwright install chromium 2>&1", { stdio: "pipe", timeout: 120000 })
-    success("Playwright: chromium instalado")
-  } catch {
-    warn("Playwright: falha ao instalar chromium. Rode manualmente: npx playwright install chromium")
-  }
-
-  if (isMacOS()) {
-    run("brew install momhq/tap/mom", "MOM (brew)")
-  } else {
-    info("MOM: incompativel com este OS (apenas macOS)")
-  }
-
-  // Headroom (context compression proxy)
-  await installHeadroom({
-    run,
-    warn,
-    success,
-    info,
-    uvBin,
-    selectedHarnessIds,
-  }, report)
 
   // Step 2: Copy setup scripts to ~/.agents/scripts/
   section("scripts/ — Copiando scripts de setup")

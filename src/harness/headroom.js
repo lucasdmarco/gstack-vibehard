@@ -8,18 +8,51 @@ import { isWindows } from "./detector.js"
 const HOME = homedir()
 const MCP_CONFIG = join(HOME, ".mcp.json")
 
+async function installHeadroomPkg(warn, info, uvBin) {
+  let cmd
+  if (uvBin) {
+    cmd = `${uvBin} pip install --system`
+  } else {
+    cmd = "pip install --break-system-packages"
+  }
+
+  const attempts = [
+    { label: "headroom-ai[proxy] (latest)", pkg: '"headroom-ai[proxy]"' },
+    { label: "headroom-ai[proxy]==0.20.15 (wheel)", pkg: '"headroom-ai[proxy]==0.20.15"' },
+    { label: "headroom-ai==0.20.15 (wheel, sem extras)", pkg: '"headroom-ai==0.20.15"' },
+  ]
+
+  for (const attempt of attempts) {
+    try {
+      execSync(`${cmd} ${attempt.pkg} 2>&1`, { stdio: "pipe", timeout: 120000 })
+      return true
+    } catch {}
+    info(`${attempt.label} — falhou, tentando proxima...`)
+  }
+
+  // Last ditch: try with uv even if uvBin was empty
+  if (!uvBin) {
+    try {
+      execSync('uv pip install --system "headroom-ai==0.20.15" 2>&1', { stdio: "pipe", timeout: 120000 })
+      return true
+    } catch {}
+  }
+
+  return false
+}
+
 export async function installHeadroom(deps, report) {
   const { run, warn, success, info, uvBin } = deps
 
   info("headroom: Instalando...")
 
-  // Install via pip (prefer uv pip since we have uv)
-  let pipCmd = "pip"
-  if (uvBin) {
-    pipCmd = `${uvBin} pip`
-  }
+  const installed = await installHeadroomPkg(warn, info, uvBin)
 
-  run(`${pipCmd} install "headroom-ai[proxy]"`, "headroom-ai[proxy]")
+  if (!installed) {
+    warn("headroom: todas as tentativas falharam. Instale manualmente: uv pip install \"headroom-ai[proxy]\"")
+    info("  Se estiver no Windows Python 3.14, tente: uv pip install --system \"headroom-ai==0.20.15\"")
+    return
+  }
 
   // Verify installation
   try {

@@ -174,5 +174,44 @@ export async function doctor() {
     warn("Playwright: browsers nao instalados. Rode: npx playwright install chromium")
   }
 
+  // Dependencias globais
+  section("Dependencias Globais")
+  const childP = await import("child_process")
+  const missingDeps = []
+
+  try {
+    childP.execSync("bun --version 2>&1", { stdio: "pipe", timeout: 5000 })
+    const bunVer = childP.execSync("bun --version 2>&1", { stdio: "pipe", timeout: 5000 }).toString().trim()
+    success(`bun: ${bunVer}`)
+  } catch { warn("bun: nao instalado"); missingDeps.push("bun + gbrain") }
+
+  try {
+    const gbrainVer = childP.execSync("gbrain --version 2>&1", { stdio: "pipe", timeout: 5000 }).toString().trim()
+    success(`gbrain: ${gbrainVer}`)
+  } catch { warn("gbrain: nao instalado") }
+
+  try {
+    const graphifyVer = childP.execSync("graphify --version 2>&1", { stdio: "pipe", timeout: 5000 }).toString().trim()
+    success(`graphify: ${graphifyVer}`)
+  } catch { warn("graphify: nao instalado"); if (!missingDeps.includes("graphify")) missingDeps.push("graphify") }
+
+  try {
+    childP.execSync("rustc --version 2>&1", { stdio: "pipe", timeout: 5000 })
+    const rustVer = childP.execSync("rustc --version 2>&1", { stdio: "pipe", timeout: 5000 }).toString().trim()
+    success(`Rust: ${rustVer}`)
+  } catch { warn("Rust: nao instalado"); missingDeps.push("Rust") }
+
+  try {
+    const headroomVer = childP.execSync("headroom --version 2>&1", { stdio: "pipe", timeout: 5000 }).toString().trim()
+    success(`headroom: ${headroomVer}`)
+  } catch { warn("headroom: nao instalado"); missingDeps.push("headroom") }
+
+  if (missingDeps.length > 0) {
+    section("Acoes Corretivas")
+    info(`Dependencias faltando: ${missingDeps.join(", ")}`)
+    info("  Rode: gstack_vibehard install")
+    info("  O instalador agora instala todas as deps automaticamente.")
+  }
+
   section("Diagnostico concluido")
 }
