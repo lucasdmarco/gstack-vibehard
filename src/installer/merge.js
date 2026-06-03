@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, copyFileSync, existsSync, mkdirSync, readdirSync } from "fs"
+import { readFileSync, writeFileSync, copyFileSync, cpSync, existsSync, mkdirSync, readdirSync } from "fs"
 import { join, dirname } from "path"
 
 /**
@@ -74,6 +74,14 @@ export function copyWithBackup(src, dst) {
   }
   ensureDir(dirname(dst))
   copyFileSync(src, dst)
+}
+
+export function copyDirSync(src, dst) {
+  if (existsSync(dst)) {
+    backupFile(dst)
+  }
+  ensureDir(dirname(dst))
+  cpSync(src, dst, { recursive: true })
 }
 
 export { readJsonFile } from "../harness/detector.js"

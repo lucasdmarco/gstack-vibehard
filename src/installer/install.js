@@ -8,7 +8,7 @@ import { installCodex } from "../harness/codex.js"
 import { installClaude } from "../harness/claude.js"
 import { installOpenCode } from "../harness/opencode.js"
 import { installHeadroom } from "../harness/headroom.js"
-import { ensureDir, copyWithBackup } from "./merge.js"
+import { ensureDir, copyWithBackup, copyDirSync } from "./merge.js"
 import { checkAlreadyInstalled } from "./check.js"
 import { multiSelect, success, warn, error, info, section } from "../cli/index.js"
 
@@ -220,7 +220,7 @@ export async function install() {
       const src = join(skillsSource, skill.name)
       const dst = join(skillsDir, skill.name)
       if (!existsSync(dst)) {
-        copyWithBackup(src, dst)
+        copyDirSync(src, dst)
         report.added.push(`skill: ${skill.name}`)
       } else {
         report.skipped.push(`skill: ${skill.name} (ja existe)`)

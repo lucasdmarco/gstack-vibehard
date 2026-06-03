@@ -18,3 +18,4 @@ coverage/
 *.bak
 *.gstack_vibehard.bak
 .npmrc
+*.exe
