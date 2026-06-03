@@ -1,0 +1,35 @@
+{
+  "name": "@gstack/installer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GStack VibeHard — Cross-harness installer & fullstack template kit with deep agent integration",
+  "license": "MIT",
+  "type": "module",
+  "main": "src/cli/index.js",
+  "bin": {
+    "gstack": "src/cli/index.js"
+  },
+  "scripts": {
+    "install": "node src/cli/index.js install",
+    "doctor": "node src/cli/index.js doctor",
+    "test": "node --experimental-vm-modules node_modules/.bin/jest",
+    "lint": "eslint src/"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "src/",
+    "hooks/",
+    "skills/",
+    "templates/",
+    "scripts/",
+    "kits/",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/anomalyco/gstack-vibehard"
+  }
+}

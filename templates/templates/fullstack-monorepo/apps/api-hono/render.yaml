@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: api-hono
+    env: node
+    region: oregon
+    buildCommand: cd apps/api-hono && npm run build
+    startCommand: cd apps/api-hono && node dist/index.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: PORT
+        value: 3001

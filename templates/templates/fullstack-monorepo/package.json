@@ -1,0 +1,34 @@
+{
+  "name": "my-project",
+  "private": true,
+  "scripts": {
+    "dev": "turbo dev",
+    "dev:web": "cd apps/web && npm run dev",
+    "dev:api": "cd apps/api && npm run dev",
+    "dev:api-fastify": "cd apps/api-fastify && npm run dev",
+    "dev:api-hono": "cd apps/api-hono && npm run dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo lint",
+    "test": "cd apps/api && npm run test",
+    "test:watch": "cd apps/api && npm run test:watch",
+    "db:generate": "cd packages/db && npx drizzle-kit generate",
+    "db:push": "cd packages/db && npx drizzle-kit push",
+    "db:push:test": "cross-env DB_ENV=test cd packages/db && npx drizzle-kit push",
+    "db:studio": "cd packages/db && npx drizzle-kit studio",
+    "db:seed": "tsx packages/db/src/seed.ts",
+    "db:types": "npx supabase gen types typescript --linked > packages/db/src/supabase.ts",
+    "db-turso:generate": "cd packages/db-turso && npx drizzle-kit generate",
+    "db-turso:push": "cd packages/db-turso && npx drizzle-kit push",
+    "db-turso:seed": "tsx packages/db-turso/src/seed.ts",
+    "setup:repo": "powershell -File scripts/setup-repo.ps1",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "turbo": "^2.4.0",
+    "prettier": "^3.4.0",
+    "typescript": "^5.7.0",
+    "cross-env": "^7.0.3",
+    "tsx": "^4.19.0"
+  }
+}

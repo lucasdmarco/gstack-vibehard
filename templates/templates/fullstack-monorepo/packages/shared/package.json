@@ -1,0 +1,11 @@
+{
+  "name": "@my/shared",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}
