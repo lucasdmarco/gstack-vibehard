@@ -291,13 +291,19 @@ export async function install() {
     return
   }
 
-  // Single prompt: only available harnesses
-  const harnessOptions = [
-    { label: "Todos detectados", value: "__all__", checked: true },
-    ...harnesses.filter((h) => availableHarnessIds.includes(h.id)).map((h) => ({ label: h.label, value: h.id })),
-  ]
-  const harnessAnswer = await multiSelect("Instalar gstack_vibehard em quais harnesses?", harnessOptions)
-  const selectedHarnessIds = harnessAnswer.includes("__all__") ? availableHarnessIds : harnessAnswer
+  // Single prompt or non-interactive fallback
+  let selectedHarnessIds
+  if (!process.stdin.isTTY) {
+    info("Modo nao-interativo: instalando em todos os harnesses detectados")
+    selectedHarnessIds = availableHarnessIds
+  } else {
+    const harnessOptions = [
+      { label: "Todos detectados", value: "__all__", checked: true },
+      ...harnesses.filter((h) => availableHarnessIds.includes(h.id)).map((h) => ({ label: h.label, value: h.id })),
+    ]
+    const harnessAnswer = await multiSelect("Instalar gstack_vibehard em quais harnesses?", harnessOptions)
+    selectedHarnessIds = harnessAnswer.includes("__all__") ? availableHarnessIds : harnessAnswer
+  }
 
   if (selectedHarnessIds.length === 0) {
     error("Nenhum harness selecionado. Instalacao cancelada.")

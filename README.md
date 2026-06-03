@@ -7,8 +7,16 @@ Um instalador que guia voce pela configuracao de hooks Python, skills, template 
 ## Quick Start
 
 ```bash
+# Baixa e executa a instalacao completa automaticamente (modo nao-interativo):
+npm install @gstack-vibehard/installer
+
+# Ou use npx para instalacao interativa (escolhe quais harnesses configurar):
 npx @gstack-vibehard/installer
 ```
+
+> `npm install @gstack-vibehard/installer` baixa o pacote **E** ja executa a instalacao
+> completa em modo nao-interativo (instala em todos os harnesses detectados).
+> Para escolher quais harnesses configurar, use `npx @gstack-vibehard/installer`.
 
 ## Downloads
 
