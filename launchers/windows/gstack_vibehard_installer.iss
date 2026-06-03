@@ -1,9 +1,9 @@
 ; gstack_vibehard — Windows Installer (Inno Setup)
-; Copyright (c) 2026 Lucas Almeida
+; Copyright (c) 2026 Lucas De Marco
 
 #define MyAppName "gstack_vibehard"
 #define MyAppVersion "0.6.0"
-#define MyAppPublisher "Lucas Almeida"
+#define MyAppPublisher "Lucas De Marco"
 #define MyAppURL "https://github.com/lucasdmarco/gstack-vibehard"
 #define MyAppExeName "gstack_vibehard.cmd"
 
