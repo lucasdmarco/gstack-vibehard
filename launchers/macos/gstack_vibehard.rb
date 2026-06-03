@@ -5,7 +5,7 @@ class GstackVibehard < Formula
   desc "gstack_vibehard — Cross-harness installer & fullstack template kit"
   homepage "https://github.com/lucasdmarco/gstack-vibehard"
   url "https://github.com/lucasdmarco/gstack-vibehard/archive/refs/tags/v0.4.0.tar.gz"
-  sha256 "TBD_AFTER_RELEASE" # Will be updated after v0.4.0 release
+  sha256 "A82DF350D5CA5AF63AF11F20FD4A17B03BFEE020CF68BA63F736A47EE45EE95E" # Will be updated after v0.4.0 release
   license "MIT"
 
   depends_on "node"
