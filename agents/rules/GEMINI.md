@@ -281,5 +281,6 @@ When user's prompt is NOT in English:
 - **Scanners**: `security_scan.py`, `dependency_analyzer.py`
 - **Audits**: `ux_audit.py`, `mobile_audit.py`, `lighthouse_audit.py`, `seo_checker.py`
 - **Test**: `playwright_runner.py`, `test_runner.py`
+- **Post-Sprint**: `~/.codex/hooks/post_sprint.py` — Atualiza graphify, gbrain, MOM e chronicle ao final de cada fase
 
 ---

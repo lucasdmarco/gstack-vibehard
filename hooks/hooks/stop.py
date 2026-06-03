@@ -349,6 +349,24 @@ note = "\n".join(note_lines)
 chronicle_file = chronicle_dir / f"{project_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
 chronicle_file.write_text(note, encoding="utf-8")
 
+# Post-sprint: atualiza graphify + gbrain + MOM + chronicle enrich
+try:
+    post_sprint = subprocess.run(
+        ["python", str(Path.home() / ".codex" / "hooks" / "post_sprint.py")],
+        input=sys.stdin.read(), capture_output=True, text=True, timeout=30
+    )
+    if post_sprint.returncode == 0:
+        ps_data = json.loads(post_sprint.stdout)
+        ps_parts = []
+        if ps_data.get("graphify", {}).get("nodes"):
+            ps_parts.append(f"Graphify: {ps_data['graphify']['nodes']}n/{ps_data['graphify']['edges']}e")
+        if ps_data.get("gbrain", {}).get("decisions_added"):
+            ps_parts.append(f"Decisoes: +{ps_data['gbrain']['decisions_added']}")
+        if ps_parts:
+            msg_parts.append(" | ".join(ps_parts))
+except (subprocess.TimeoutExpired, json.JSONDecodeError, OSError) as e:
+    msg_parts.append(f"post_sprint: {e}")
+
 msg_parts = [f"Memorias salvas em {chronicle_file.name} + QG L1 executado"]
 if run_security:
     gate = run_security_gate(root) if (root := find_project_root(cwd)) else None

@@ -2,6 +2,7 @@ import { createInterface } from "readline"
 import { install } from "../installer/install.js"
 import { doctor } from "../installer/doctor.js"
 import { initCommand } from "../commands/init.js"
+import { sprintCommand } from "../commands/sprint.js"
 
 const COLORS = {
   reset: "\x1b[0m",
@@ -70,6 +71,7 @@ export function showHelp() {
   console.log(color("    gstack_vibehard install        Instalar gstack_vibehard no ambiente", COLORS.cyan))
   console.log(color("    gstack_vibehard init <nome>    Criar novo projeto com estrutura completa", COLORS.cyan))
   console.log(color("    gstack_vibehard doctor         Diagnosticar ambiente", COLORS.cyan))
+  console.log(color("    gstack_vibehard sprint --save   Salvar decisoes e atualizar memorias", COLORS.cyan))
   console.log(color("    gstack_vibehard uninstall      Remover gstack_vibehard do ambiente", COLORS.cyan))
   console.log(color("    gstack_vibehard list           Listar componentes instalados", COLORS.cyan))
   console.log(color("    gstack_vibehard help           Mostrar esta ajuda\n", COLORS.cyan))
@@ -110,6 +112,9 @@ export async function runCLI(command, args) {
       break
     case "uninstall":
       console.log(color("  Uninstall ainda nao implementado.", COLORS.yellow))
+      break
+    case "sprint":
+      await sprintCommand(args)
       break
     case "list":
       console.log(color("  List ainda nao implementado.", COLORS.yellow))

@@ -865,6 +865,82 @@ grep license package.json
 
 ---
 
+## TC-11: Post-Sprint e Memoria (8 testes)
+_Testa hooks/hooks/post_sprint.py + src/commands/sprint.js_
+
+### TC-11.1: post_sprint.py — script existe e executavel
+**Arquivo:** `hooks/hooks/post_sprint.py`
+**Propósito:** Verificar que o script existe e tem shebang valido
+**Comando:** `head -1 hooks/hooks/post_sprint.py`
+**Esperado:** `#!/usr/bin/env python3`
+**Criticidade:** ALTO
+
+### TC-11.2: post_sprint.py — graphify update cria .graphify/deps.json
+**Setup:** Diretorio com apps/ e packages/
+**Comando:**
+```bash
+mkdir -p /tmp/test-sprint/apps/web /tmp/test-sprint/packages/db
+echo '{"dependencies":{"react":"^19"}}' > /tmp/test-sprint/apps/web/package.json
+echo '{"dependencies":{"drizzle-orm":"^0.30"}}' > /tmp/test-sprint/packages/db/package.json
+echo '{"cwd":"/tmp/test-sprint","last_assistant_message":"Decisao: Vamos usar React 19"}' | python hooks/hooks/post_sprint.py
+cat /tmp/test-sprint/.graphify/deps.json | head -5
+```
+**Esperado:** .graphify/deps.json criado com nodes e edges
+**Pós-teste:** `rm -rf /tmp/test-sprint`
+**Criticidade:** ALTO
+
+### TC-11.3: post_sprint.py — gbrain update extrai decisoes
+**Setup:** Continuação do teste anterior
+**Comando:**
+```bash
+cat /tmp/test-sprint/.gbrain/context.json | node -e "const d=require('fs').readFileSync('/dev/stdin','utf-8'); const j=JSON.parse(d); console.log(j.decisions.length + ' decisoes')"
+```
+**Esperado:** Pelo menos 1 decisao extraida do texto "Decisao: Vamos usar React 19"
+**Criticidade:** ALTO
+
+### TC-11.4: post_sprint.py — chronicle enrich adiciona decisoes
+**Setup:** Criar um chronicle file falso
+**Comando:**
+```bash
+mkdir -p ~/.codex/chronicle
+echo "# Session: test-sprint\n## Summary\nteste" > ~/.codex/chronicle/test-sprint_20260101_000000.md
+echo '{"cwd":"/tmp/test-sprint","last_assistant_message":"Decisao: Usar vite"}' | python hooks/hooks/post_sprint.py
+grep 'Decisoes do Sprint' ~/.codex/chronicle/test-sprint_20260101_000000.md
+```
+**Esperado:** "## Decisoes do Sprint" adicionado ao chronicle
+**Pós-teste:** `rm ~/.codex/chronicle/test-sprint_20260101_000000.md; rm -rf /tmp/test-sprint`
+**Criticidade:** MEDIO
+
+### TC-11.5: sprint.js — comando gstack_vibehard sprint --save existe
+**Arquivo:** `src/commands/sprint.js`
+**Propósito:** O comando deve ser registrado no CLI
+**Comando:** `node src/index.js sprint --help 2>&1` ou `node src/index.js sprint 2>&1`
+**Esperado:** Mostra "Uso: gstack_vibehard sprint --save" com descricao
+**Criticidade:** MEDIO
+
+### TC-11.6: stop.py — chama post_sprint.py ao final
+**Arquivo:** `hooks/hooks/stop.py`
+**Propósito:** Verificar que stop.py invoca post_sprint.py via subprocess
+**Comando:** `grep -n 'post_sprint' hooks/hooks/stop.py`
+**Esperado:** Pelo menos uma referencia a post_sprint.py (subprocess.run)
+**Criticidade:** ALTO
+
+### TC-11.7: post_sprint.py — MOM record apenas macOS
+**Arquivo:** `hooks/hooks/post_sprint.py`
+**Propósito:** Verificar que MOM so executa em macOS
+**Comando:** `grep -n 'darwin\|sys.platform' hooks/hooks/post_sprint.py`
+**Esperado:** `sys.platform != "darwin"` — guard condicional
+**Criticidade:** BAIXO
+
+### TC-11.8: orchestrator.md — instrucao de finalizacao de sprint
+**Arquivo:** `agents/agents/orchestrator.md`
+**Propósito:** O orquestrador deve instruir a chamada de `gstack_vibehard sprint --save` ao final de cada fase
+**Comando:** `grep -c 'sprint --save' agents/agents/orchestrator.md`
+**Esperado:** Pelo menos 1 ocorrencia de `sprint --save`
+**Criticidade:** MEDIO
+
+---
+
 ## Relatorio Final
 
 Apos executar todos os testes, preencha:
@@ -885,8 +961,9 @@ TC-07 Merge Engine:        ___/8 passaram
 TC-08 Cross-Platform:      ___/10 passaram
 TC-09 Edge Cases:          ___/10 passaram
 TC-10 Launchers+Licenses:  ___/6 passaram
+TC-11 Post-Sprint:          ___/8 passaram
 
-TOTAL: ___/98 passaram
+TOTAL: ___/106 passaram
 
 Bugs encontrados:
 1. [descricao] — TC-XX.Y — CRITICO/ALTO/MEDIO/BAIXO

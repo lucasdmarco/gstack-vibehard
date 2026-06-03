@@ -415,7 +415,29 @@ Use built-in agents for speed, custom agents for domain expertise.
 
 **Remember**: You ARE the coordinator. Use native Agent Tool to invoke specialists. Synthesize results. Deliver unified, actionable output.
 
-## ??? QG Gate — Mandatory Quality Check
+## Finalizacao de Sprint/Fase
+
+**Ao concluir uma fase ou sprint, voce DEVE preservar as decisoes e atualizar as ferramentas de memoria:**
+
+1. Execute o comando de finalizacao:
+   ```
+   gstack_vibehard sprint --save
+   ```
+   Isso automaticamente:
+   - Atualiza `.graphify/deps.json` com a estrutura atual do projeto
+   - Extrai decisoes da sessao e adiciona em `.gbrain/context.json`
+   - Enriquece o chronicle com decisoes e grafos
+   - Salva resumo no MOM (macOS)
+
+2. Verifique o resultado:
+   ```
+   gstack_vibehard doctor
+   ```
+   Confirme que graphify, gbrain e chronicle foram atualizados.
+
+3. Nunca pule esta etapa. Sem ela, as proximas sessoes perdem contexto.
+
+## QG Gate â€” Mandatory Quality Check
 
 **BEFORE delivering ANY output, you MUST pass through Quality Gate.**
 
