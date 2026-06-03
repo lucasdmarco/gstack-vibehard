@@ -27,7 +27,6 @@ export async function installCodex(config, report) {
   }
 
   if (config.template) {
-    // .codex/config.toml com hooks config
     const tomlContent = `# gstack_vibehard — Codex CLI hooks
 [hooks]
 on_session_start = ["python ${hooksDir.replaceAll("\\", "/")}/session_start.py"]
@@ -37,6 +36,11 @@ post_tool_use = ["python ${hooksDir.replaceAll("\\", "/")}/post_tool_use_review.
 
 [agent]
 skills_dir = "${join(HOME, ".agents", "skills").replaceAll("\\", "/")}"
+instructions = """
+Comandos disponiveis:
+  /newproject — Guided Architecture Walkthrough (9 passos)
+  /g_update   — Atualizar gstack_vibehard para versao mais recente
+"""
 
 [mcp_servers.fallow]
 command = "npx"

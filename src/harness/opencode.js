@@ -24,6 +24,8 @@ export async function installOpenCode(config, report) {
             "frontend-design",
             "chronicle",
             "project-init",
+            "newproject",
+            "g_update",
           ],
         },
         {
@@ -39,9 +41,22 @@ export async function installOpenCode(config, report) {
         },
       ],
       hooks: {
-        onStart: ["python ${HOME}/.codex/hooks/session_start.py"],
+        onStart: [
+          "python ${HOME}/.codex/hooks/session_start.py",
+          "python ${HOME}/.codex/hooks/gc.py",
+        ],
         onStop: ["python ${HOME}/.codex/hooks/stop.py"],
+        preToolUse: ["python ${HOME}/.codex/hooks/pre_tool_use_security.py"],
+        postToolUse: ["python ${HOME}/.codex/hooks/post_tool_use_review.py"],
+        prePrompt: ["python ${HOME}/.codex/hooks/user_prompt_submit.py"],
       },
+      instructions: [
+        "Comandos disponiveis:",
+        "  /newproject — Guided Architecture Walkthrough (9 passos de arquitetura)",
+        "  /g_update   — Atualizar gstack_vibehard para versao mais recente",
+        "",
+        "Sempre rode Quality Gate (python ~/.codex/hooks/qg.py) antes de entregar output.",
+      ],
     }
 
     const existing = readJsonFile(OPENCODE_CONFIG)

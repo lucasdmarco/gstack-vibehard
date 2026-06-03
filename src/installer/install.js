@@ -392,7 +392,7 @@ export async function install() {
           await installCodex({ hooks: false, template: true }, report)
           break
         case "claude":
-          await installClaude({ claudeMd: true, ultracode: true, mcp: true }, report)
+          await installClaude({ hooks: true, claudeMd: true, ultracode: true, mcp: true }, report)
           break
         case "opencode":
           await installOpenCode({ hooks: true }, report)

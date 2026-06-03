@@ -2,14 +2,17 @@ import { existsSync } from "fs"
 import { join } from "path"
 import { homedir } from "os"
 import { writeWithBackup, ensureDir, readJsonFile, mergeJson } from "../installer/merge.js"
+import { isWindows } from "./detector.js"
 
 const HOME = homedir()
 
 const CLAUDE_DIR = join(HOME, ".claude")
+const CLAUDE_HOOKS = join(CLAUDE_DIR, "hooks")
 const CLAUDE_SETTINGS = join(CLAUDE_DIR, "settings.json")
 const CLAUDE_MD = join(HOME, "CLAUDE.md")
 const ULTRA_MD = join(CLAUDE_DIR, "rules", "ultracode.md")
 const MCP_CONFIG = join(HOME, ".mcp.json")
+const CODEX_HOOKS = join(HOME, ".codex", "hooks")
 
 const claudeMdContent = `# CLAUDE.md — gstack_vibehard
 
@@ -33,6 +36,8 @@ O padrao e world-class. Inegociavel.
 - frontend-design — interfaces premium com taste-skill (4 engines + 3 dials)
 - chronicle — memoria de sessoes indexada
 - project-init — setup de projeto com variante backend
+- newproject — ativado por /newproject: Guided Architecture Walkthrough (9 passos)
+- g_update — ativado por /g_update: atualizar gstack_vibehard
 
 ## Dream
 Auto-dream ON. Memorias persistentes entre sessoes.
@@ -59,6 +64,21 @@ OWASP Top 10 audit before every deploy.
 export async function installClaude(config, report) {
   ensureDir(CLAUDE_DIR)
   ensureDir(join(CLAUDE_DIR, "rules"))
+
+  // Install hooks to ~/.claude/hooks/
+  if (config.hooks) {
+    ensureDir(CLAUDE_HOOKS)
+    if (existsSync(CODEX_HOOKS)) {
+      const fs = await import("fs")
+      const hooks = fs.readdirSync(CODEX_HOOKS).filter((f) => f.endsWith(".py"))
+      for (const hook of hooks) {
+        const src = join(CODEX_HOOKS, hook)
+        const dst = join(CLAUDE_HOOKS, hook)
+        fs.cpSync(src, dst, { recursive: true })
+        report.added.push(`claude hook: ${hook}`)
+      }
+    }
+  }
 
   if (config.claudeMd) {
     writeWithBackup(CLAUDE_MD, claudeMdContent)
