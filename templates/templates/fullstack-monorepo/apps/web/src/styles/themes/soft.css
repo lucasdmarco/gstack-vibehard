@@ -1,0 +1,38 @@
+/* Soft Engine - Premium soft UI */
+.soft {
+  --background: #fafaf9;
+  --foreground: #1c1917;
+  --card: #ffffff;
+  --card-foreground: #1c1917;
+  --primary: #292524;
+  --primary-foreground: #fafaf9;
+  --secondary: #f5f5f4;
+  --secondary-foreground: #292524;
+  --muted: #f5f5f4;
+  --muted-foreground: #78716c;
+  --accent: #d6d3d1;
+  --accent-foreground: #292524;
+  --destructive: #dc2626;
+  --border: #e7e5e4;
+  --input: #e7e5e4;
+  --ring: #292524;
+  --radius: 1.25rem;
+}
+
+.soft.dark {
+  --background: #1c1917;
+  --foreground: #fafaf9;
+  --card: #292524;
+  --card-foreground: #fafaf9;
+  --primary: #fafaf9;
+  --primary-foreground: #1c1917;
+  --secondary: #292524;
+  --secondary-foreground: #fafaf9;
+  --muted: #292524;
+  --muted-foreground: #a8a29e;
+  --accent: #44403c;
+  --accent-foreground: #fafaf9;
+  --border: #44403c;
+  --input: #44403c;
+  --ring: #fafaf9;
+}

@@ -1,0 +1,38 @@
+/* Brutalist Engine - Swiss Industrial Print / Tactical Telemetry */
+.brutalist {
+  --background: #f4f4f0;
+  --foreground: #050505;
+  --card: #eae8e3;
+  --card-foreground: #050505;
+  --primary: #e61919;
+  --primary-foreground: #f4f4f0;
+  --secondary: #d4d2cd;
+  --secondary-foreground: #050505;
+  --muted: #d4d2cd;
+  --muted-foreground: #555555;
+  --accent: #e61919;
+  --accent-foreground: #f4f4f0;
+  --destructive: #e61919;
+  --border: #050505;
+  --input: #050505;
+  --ring: #e61919;
+  --radius: 0rem;
+}
+
+.brutalist.dark {
+  --background: #0a0a0a;
+  --foreground: #eaeaea;
+  --card: #141414;
+  --card-foreground: #eaeaea;
+  --primary: #e61919;
+  --primary-foreground: #0a0a0a;
+  --secondary: #1a1a1a;
+  --secondary-foreground: #eaeaea;
+  --muted: #1a1a1a;
+  --muted-foreground: #888888;
+  --accent: #e61919;
+  --accent-foreground: #0a0a0a;
+  --border: #333333;
+  --input: #333333;
+  --ring: #e61919;
+}

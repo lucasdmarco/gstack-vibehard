@@ -4,6 +4,13 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ── Engine themes ── */
+@import "./themes/brutalist.css";
+@import "./themes/soft.css";
+@import "./themes/minimalist.css";
+@import "./themes/stitch.css";
+
+/* ── Default theme (minimalist) ── */
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -20,33 +27,10 @@
   --accent: oklch(0.965 0.001 286.375);
   --accent-foreground: oklch(0.205 0.042 265.755);
   --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0.004 286.375);
   --input: oklch(0.922 0.004 286.375);
   --ring: oklch(0.205 0.042 265.755);
   --radius: 0.625rem;
-}
-
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.145 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.145 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.985 0 0);
-  --primary-foreground: oklch(0.205 0.042 265.755);
-  --secondary: oklch(0.269 0.015 286.375);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0.015 286.375);
-  --muted-foreground: oklch(0.708 0.01 286.375);
-  --accent: oklch(0.269 0.015 286.375);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.577 0.245 27.325);
-  --border: oklch(0.269 0.015 286.375);
-  --input: oklch(0.269 0.015 286.375);
-  --ring: oklch(0.708 0.01 286.375);
 }
 
 @theme inline {
@@ -65,7 +49,6 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);

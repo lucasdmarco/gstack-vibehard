@@ -1,0 +1,38 @@
+/* Stitch Engine - Google Stitch-compatible semantic design */
+.stitch {
+  --background: #f8f9fa;
+  --foreground: #1a1a2e;
+  --card: #ffffff;
+  --card-foreground: #1a1a2e;
+  --primary: #0d6efd;
+  --primary-foreground: #ffffff;
+  --secondary: #e9ecef;
+  --secondary-foreground: #1a1a2e;
+  --muted: #e9ecef;
+  --muted-foreground: #6c757d;
+  --accent: #e9ecef;
+  --accent-foreground: #1a1a2e;
+  --destructive: #dc3545;
+  --border: #dee2e6;
+  --input: #dee2e6;
+  --ring: #0d6efd;
+  --radius: 0.75rem;
+}
+
+.stitch.dark {
+  --background: #1a1a2e;
+  --foreground: #f8f9fa;
+  --card: #16213e;
+  --card-foreground: #f8f9fa;
+  --primary: #0d6efd;
+  --primary-foreground: #ffffff;
+  --secondary: #2a2a4a;
+  --secondary-foreground: #f8f9fa;
+  --muted: #2a2a4a;
+  --muted-foreground: #adb5bd;
+  --accent: #2a2a4a;
+  --accent-foreground: #f8f9fa;
+  --border: #2a2a4a;
+  --input: #2a2a4a;
+  --ring: #0d6efd;
+}
