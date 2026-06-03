@@ -1,8 +1,15 @@
+import { readFileSync } from "fs"
+import { resolve, dirname } from "path"
+import { fileURLToPath } from "url"
 import { createInterface } from "readline"
 import { install } from "../installer/install.js"
 import { doctor } from "../installer/doctor.js"
 import { initCommand } from "../commands/init.js"
 import { sprintCommand } from "../commands/sprint.js"
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const pkg = JSON.parse(readFileSync(resolve(__dirname, "../package.json"), "utf-8"))
+const VERSION = pkg.version
 
 const COLORS = {
   reset: "\x1b[0m",
@@ -21,7 +28,7 @@ function color(text, ...codes) {
 function logo() {
   console.log(color("\n  ╔══════════════════════════════════════╗", COLORS.cyan))
   console.log(color("  ║      GStack VibeHard Installer       ║", COLORS.cyan))
-  console.log(color("  ║    @gstack-vibehard/installer — v0.6.1 ║", COLORS.cyan))
+  console.log(color(`  ║    @gstack-vibehard/installer — v${VERSION} ║`, COLORS.cyan))
   console.log(color("  ╚══════════════════════════════════════╝\n", COLORS.cyan))
 }
 
