@@ -2,7 +2,7 @@
 ; Copyright (c) 2026 Lucas De Marco
 
 #define MyAppName "gstack_vibehard"
-#define MyAppVersion "0.6.0"
+#define MyAppVersion "0.6.1"
 #define MyAppPublisher "Lucas De Marco"
 #define MyAppURL "https://github.com/lucasdmarco/gstack-vibehard"
 #define MyAppExeName "gstack_vibehard.cmd"
