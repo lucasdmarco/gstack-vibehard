@@ -37,6 +37,12 @@ Third-Party Components
    Used as an MCP server dependency (npx -y @upstash/context7-mcp).
    Licensed under MIT.
 
+8. headroom-ai
+   Used for context compression (proxy, MCP server, wrap).
+   Licensed under Apache 2.0.
+   Copyright (c) 2026 Tejas Chopra
+   https://github.com/chopratejas/headroom
+
 
 Full License Texts
 ------------------

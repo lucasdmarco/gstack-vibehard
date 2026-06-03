@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "fs"
 import { homedir } from "os"
 import { join } from "path"
+import { execSync } from "child_process"
 
 const HOME = homedir()
 
@@ -28,4 +29,13 @@ export function checkAlreadyInstalled(harnessIds) {
   }
 
   return installed
+}
+
+export function isHeadroomInstalled() {
+  try {
+    execSync("headroom --version 2>&1", { stdio: "pipe", timeout: 5000 })
+    return true
+  } catch {
+    return false
+  }
 }

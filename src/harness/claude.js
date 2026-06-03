@@ -103,6 +103,10 @@ export async function installClaude(config, report) {
           command: "python",
           args: ["-m", "graphify.serve", "graphify-out/graph.json"],
         },
+        headroom: {
+          command: "headroom",
+          args: ["mcp"],
+        },
       },
     }
 

@@ -7,6 +7,7 @@ import { detectHarnesses, isWindows, isMacOS, isLinux } from "../harness/detecto
 import { installCodex } from "../harness/codex.js"
 import { installClaude } from "../harness/claude.js"
 import { installOpenCode } from "../harness/opencode.js"
+import { installHeadroom } from "../harness/headroom.js"
 import { ensureDir, copyWithBackup } from "./merge.js"
 import { checkAlreadyInstalled } from "./check.js"
 import { multiSelect, success, warn, error, info, section } from "../cli/index.js"
@@ -161,6 +162,16 @@ export async function install() {
   } else {
     info("MOM: incompativel com este OS (apenas macOS)")
   }
+
+  // Headroom (context compression proxy)
+  await installHeadroom({
+    run,
+    warn,
+    success,
+    info,
+    uvBin,
+    selectedHarnessIds,
+  }, report)
 
   // Step 2: Copy setup scripts to ~/.agents/scripts/
   section("scripts/ — Copiando scripts de setup")

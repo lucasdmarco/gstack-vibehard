@@ -941,6 +941,67 @@ grep 'Decisoes do Sprint' ~/.codex/chronicle/test-sprint_20260101_000000.md
 
 ---
 
+## TC-12: Headroom Integration (8 testes)
+_Testa src/harness/headroom.js + install + doctor_
+
+### TC-12.1: headroom.js — arquivo existe e exporta installHeadroom
+**Arquivo:** `src/harness/headroom.js`
+**Propósito:** O harness headroom deve existir e exportar a funcao
+**Comando:** `node -e "import('./src/harness/headroom.js').then(m => console.log(typeof m.installHeadroom))"`
+**Esperado:** "function"
+**Criticidade:** ALTO
+
+### TC-12.2: install.js — importa e chama installHeadroom
+**Arquivo:** `src/installer/install.js`
+**Propósito:** O install deve importar e chamar installHeadroom
+**Comando:** `grep -c 'installHeadroom' src/installer/install.js`
+**Esperado:** Pelo menos 2 ocorrencias (import + chamada)
+**Criticidade:** ALTO
+
+### TC-12.3: doctor.js — verifica headroom --version
+**Arquivo:** `src/installer/doctor.js`
+**Propósito:** Doctor deve reportar headroom
+**Comando:** `grep -c 'headroom' src/installer/doctor.js`
+**Esperado:** Pelo menos 2 ocorrencias (check + output)
+**Criticidade:** MEDIO
+
+### TC-12.4: check.js — exporta isHeadroomInstalled
+**Arquivo:** `src/installer/check.js`
+**Propósito:** check.js deve exportar funcao para detectar headroom
+**Comando:** `grep -c 'isHeadroomInstalled' src/installer/check.js`
+**Esperado:** Pelo menos 1 ocorrencia
+**Criticidade:** BAIXO
+
+### TC-12.5: init.js — headroom na lista de tools
+**Arquivo:** `src/commands/init.js`
+**Propósito:** O init deve incluir headroom nos tools do .gstack/config.json
+**Comando:** `grep -c '"headroom"' src/commands/init.js`
+**Esperado:** Pelo menos 1 ocorrencia
+**Criticidade:** BAIXO
+
+### TC-12.6: claude.js — headroom MCP server configurado
+**Arquivo:** `src/harness/claude.js`
+**Propósito:** O MCP config do Claude deve incluir headroom server
+**Comando:** `grep -c 'headroom' src/harness/claude.js`
+**Esperado:** Pelo menos 1 ocorrencia de comand/args headroom
+**Criticidade:** MEDIO
+
+### TC-12.7: NOTICE — headroom-ai listado como third-party
+**Arquivo:** `NOTICE`
+**Propósito:** headroom-ai deve estar no NOTICE com licenca Apache 2.0
+**Comando:** `grep -c 'headroom-ai' NOTICE`
+**Esperado:** Pelo menos 1 ocorrencia
+**Criticidade:** BAIXO
+
+### TC-12.8: install.js — headroom instalado via pip/uv pip
+**Arquivo:** `src/installer/install.js`
+**Propósito:** headroom deve ser instalado com pip (preferencialmente uv pip)
+**Comando:** `grep -c 'headroom-ai' src/installer/install.js`
+**Esperado:** Pelo menos 1 referencia ao pacote headroom-ai
+**Criticidade:** ALTO
+
+---
+
 ## Relatorio Final
 
 Apos executar todos os testes, preencha:
@@ -962,8 +1023,9 @@ TC-08 Cross-Platform:      ___/10 passaram
 TC-09 Edge Cases:          ___/10 passaram
 TC-10 Launchers+Licenses:  ___/6 passaram
 TC-11 Post-Sprint:          ___/8 passaram
+TC-12 Headroom:            ___/8 passaram
 
-TOTAL: ___/106 passaram
+TOTAL: ___/114 passaram
 
 Bugs encontrados:
 1. [descricao] — TC-XX.Y — CRITICO/ALTO/MEDIO/BAIXO

@@ -143,6 +143,11 @@ export async function doctor() {
     }
   } catch { warn("MOM: nao instalado") }
 
+  try {
+    const headroom = (await import("child_process")).execSync("headroom --version 2>&1", { stdio: "pipe", timeout: 5000 }).toString().trim()
+    success(`headroom: ${headroom}`)
+  } catch { warn("headroom: nao instalado") }
+
   // MCP
   section("MCP Servers")
   const mcp = join(HOME, ".mcp.json")

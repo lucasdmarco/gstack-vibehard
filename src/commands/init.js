@@ -113,7 +113,7 @@ export async function initCommand(args) {
     project: projectName,
     node: "latest", npm: "latest", created: new Date().toISOString().split("T")[0],
     stack: v.stack, infra: v.infra, variant, api_dir: v.api_dir, db_package: v.db_package,
-    tools: ["gstack_vibehard", "gbrain", "context7", "superpowers", "graphify"],
+    tools: ["gstack_vibehard", "gbrain", "context7", "superpowers", "graphify", "headroom"],
     quality_gate: { script: "~/.codex/hooks/qg.py", gstack_check: "~/.codex/hooks/gc.py", levels: [1, 2, 3] },
     ecosystem: { gbrain: ".gbrain/context.json", graphify: ".graphify/deps.json", context7: ".context7/stack.json", chronicle: "~/.codex/chronicle" },
   }
