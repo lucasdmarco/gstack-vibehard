@@ -1,13 +1,15 @@
-import { existsSync } from "fs"
+import { existsSync, readdirSync } from "fs"
 import { homedir } from "os"
 import { join, dirname } from "path"
 import { fileURLToPath } from "url"
-import { detectHarnesses, isWindows, isMacOS } from "../harness/detector.js"
+import { execSync } from "child_process"
+import { detectHarnesses, isWindows, isMacOS, isLinux } from "../harness/detector.js"
 import { installCodex } from "../harness/codex.js"
 import { installClaude } from "../harness/claude.js"
 import { installOpenCode } from "../harness/opencode.js"
 import { ensureDir, copyWithBackup } from "./merge.js"
-import { prompt, confirm, select, multiSelect, success, warn, error, info, section } from "../cli/index.js"
+import { checkAlreadyInstalled } from "./check.js"
+import { multiSelect, success, warn, error, info, section } from "../cli/index.js"
 
 const HOME = homedir()
 
@@ -23,220 +25,262 @@ function getProjectRoot() {
 
 const PROJECT_ROOT = getProjectRoot()
 
+function run(cmd, label) {
+  try {
+    execSync(cmd, { stdio: "pipe", timeout: 120000 })
+    success(label)
+  } catch (e) {
+    warn(`${label}: ${e.message}`)
+  }
+}
+
 export async function install() {
-  section("Bem-vindo ao GStack VibeHard Installer")
-  info("Este instalador vai configurar seu ambiente com:")
-  info("  • Hooks Python (Quality Gate, Security Gate, Session Start)")
-  info("  • Skills (frontend-design, chronicle, project-init)")
-  info("  • Fullstack template (Express/Fastify/Hono)")
-  info("  • 20 agentes especialistas com QG Gate")
-  info("  • Design system taste-skill (4 engines + 3 dials)")
-
-  // Step 1: Harness detection
-  section("Passo 1/5 — Detectando Harnesses")
-  const harnesses = detectHarnesses()
-
-  if (harnesses.length === 0) {
-    warn("Nenhum harness detectado.")
-    info("O instalador ainda assim pode copiar hooks e skills.")
-    const proceed = await confirm("Continuar mesmo assim?", true)
-    if (!proceed) {
-      error("Instalacao cancelada.")
-      process.exit(0)
-    }
-  } else {
-    info(`Harnesses detectados: ${harnesses.map((h) => h.label).join(", ")}`)
-  }
-
-  // Step 2: Choose harnesses to configure
-  section("Passo 2/5 — Selecao de Harnesses")
-  const harnessOptions = [
-    { label: "OpenAI Codex CLI", value: "codex", checked: harnesses.some((h) => h.id === "codex") },
-    { label: "Claude Code (Anthropic)", value: "claude", checked: harnesses.some((h) => h.id === "claude") },
-    { label: "OpenCode CLI", value: "opencode", checked: harnesses.some((h) => h.id === "opencode") },
-  ]
-
-  const selectedHarnesses = await multiSelect(
-    "Quais harnesses configurar?",
-    harnessOptions
-  )
-
-  if (selectedHarnesses.length === 0) {
-    error("Nenhum harness selecionado. Instalacao cancelada.")
-    process.exit(0)
-  }
-
-  // Step 3: Components selection
-  section("Passo 3/5 — Componentes")
-  const componentOptions = [
-    { label: "Hooks Python (qg.py, gc.py, session_start.py, stop.py)", value: "hooks", checked: true },
-    { label: "Skills (frontend-design, chronicle, project-init)", value: "skills", checked: true },
-    { label: "Template fullstack (3 variantes backend)", value: "template", checked: true },
-    { label: "Agentes especialistas (20 agents + QG gate)", value: "agents", checked: true },
-    { label: "Design system taste-skill (4 engines + dials)", value: "design", checked: true },
-    { label: "MCP Servers (Fallow + Supabase)", value: "mcp", checked: false },
-  ]
-
-  // Claude-specific options
-  const isClaude = selectedHarnesses.includes("claude")
-  if (isClaude) {
-    componentOptions.push({ label: "CLAUDE.md (identidade + QG gate)", value: "claudeMd", checked: true })
-    componentOptions.push({ label: "Ultracode (regras de qualidade)", value: "ultracode", checked: true })
-  }
-
-  const selectedComponents = await multiSelect(
-    "Quais componentes instalar?",
-    componentOptions
-  )
-
-  // Step 4: Template variant (if template selected)
-  let variant = "express"
-  if (selectedComponents.includes("template")) {
-    section("Passo 4/5 — Variante do Template")
-    variant = await select(
-      "Qual variante backend usar?",
-      ["express (Express 5 + Supabase + Vercel)", "fastify (Fastify 5 + Neon + Railway)", "hono (Hono 4 + Turso + Render)"]
-    )
-    variant = variant.split(" ")[0]
-  }
-
-  // Step 5: Confirm
-  section("Passo 5/5 — Confirmar Instalacao")
-  info("Resumo da instalacao:")
-  selectedHarnesses.forEach((h) => info(`  Harness: ${h}`))
-  const componentLabels = {
-    hooks: "Hooks Python",
-    skills: "Skills",
-    template: `Template (${variant})`,
-    agents: "Agentes especialistas",
-    design: "Design system",
-    mcp: "MCP Servers",
-    claudeMd: "CLAUDE.md",
-    ultracode: "Ultracode",
-  }
-  selectedComponents.forEach((c) => info(`  Componente: ${componentLabels[c] || c}`))
-
-  const confirmed = await confirm("Confirmar instalacao?", true)
-  if (!confirmed) {
-    error("Instalacao cancelada.")
-    process.exit(0)
-  }
-
-  // Execute installation
-  section("Instalando...")
-
   const report = { added: [], updated: [], skipped: [], errors: [] }
 
-  // Install hooks
-  if (selectedComponents.includes("hooks")) {
-    const hooksDir = join(HOME, ".codex", "hooks")
-    ensureDir(hooksDir)
-    const hooksSource = join(PROJECT_ROOT, "hooks", "hooks")
-    if (existsSync(hooksSource)) {
-      const fs = await import("fs")
-      const hooks = fs.readdirSync(hooksSource).filter((f) => f.endsWith(".py"))
-      for (const hook of hooks) {
-        const src = join(hooksSource, hook)
-        const dst = join(hooksDir, hook)
-        copyWithBackup(src, dst)
-        report.added.push(`hook: ${hook}`)
-      }
-      success(`${hooks.length} hooks instalados em ~/.codex/hooks/`)
+  section("gstack_vibehard Installer")
+  info("Instalando pacote completo...")
+
+  // Detect harnesses
+  const harnesses = detectHarnesses()
+  const allHarnessIds = harnesses.map((h) => h.id)
+
+  if (harnesses.length === 0) {
+    error("Nenhum harness detectado.")
+    info("Instale um dos harnesses primeiro:")
+    info("  • OpenAI Codex CLI — pip install codex-cli")
+    info("  • Claude Code     — npm install -g @anthropic-ai/claude-code")
+    info("  • OpenCode CLI    — npm install -g opencode")
+    process.exit(1)
+  }
+
+  info(`Harnesses detectados: ${harnesses.map((h) => h.label).join(", ")}`)
+
+  // Check which harnesses already have gstack_vibehard
+  const alreadyInstalled = checkAlreadyInstalled(allHarnessIds)
+  const availableHarnessIds = allHarnessIds.filter((h) => !alreadyInstalled.includes(h))
+
+  // Show diagnosis
+  info("")
+  info("Diagnostico:")
+  for (const h of harnesses) {
+    if (alreadyInstalled.includes(h.id)) {
+      info(`  ${h.label} — ja instalado (pulado)`)
     } else {
-      warn("Pasta de hooks nao encontrada no pacote")
+      info(`  ${h.label} — disponivel`)
     }
   }
 
-  // Install skills
-  if (selectedComponents.includes("skills")) {
-    const skillsDir = join(HOME, ".agents", "skills")
-    ensureDir(skillsDir)
-    const skillsSource = join(PROJECT_ROOT, "skills", "skills")
-    if (existsSync(skillsSource)) {
-      const fs = await import("fs")
-      const skills = fs.readdirSync(skillsSource, { withFileTypes: true }).filter((d) => d.isDirectory())
-      for (const skill of skills) {
-        const src = join(skillsSource, skill.name)
-        const dst = join(skillsDir, skill.name)
-        if (!existsSync(dst)) {
-          copyWithBackup(src, dst)
-          report.added.push(`skill: ${skill.name}`)
-        } else {
-          report.skipped.push(`skill: ${skill.name} (ja existe)`)
-        }
-      }
-      success(`${skills.length} skills instaladas em ~/.agents/skills/`)
+  // If nothing to install
+  if (availableHarnessIds.length === 0) {
+    success("\n  Tudo ja instalado. Nada a fazer.")
+    info("  Para forcar reinstalação, remova manualmente:")
+    for (const h of alreadyInstalled) {
+      if (h === "codex") info("    rm ~/.codex/hooks/qg.py")
+      if (h === "claude") info("    rm ~/.claude/rules/ultracode.md")
+      if (h === "opencode") info("    rm ~/.config/opencode/opencode.json")
     }
+    return
   }
 
-  // Install template
-  if (selectedComponents.includes("template")) {
-    const templateSource = join(PROJECT_ROOT, "templates", "templates", "fullstack-monorepo")
-    if (existsSync(templateSource)) {
-      info(`Template disponivel em: ${templateSource}`)
-      info("Para copiar para seu projeto, use:")
-      info(`  cp -r "${templateSource}" ./meu-projeto`)
-      report.added.push(`template: fullstack-monorepo (${variant})`)
-      success("Template pronto para uso")
-    }
+  // Single prompt: only available harnesses
+  const harnessOptions = [
+    { label: "Todos detectados", value: "__all__", checked: true },
+    ...harnesses.filter((h) => availableHarnessIds.includes(h.id)).map((h) => ({ label: h.label, value: h.id })),
+  ]
+  const harnessAnswer = await multiSelect("Instalar gstack_vibehard em quais harnesses?", harnessOptions)
+  const selectedHarnessIds = harnessAnswer.includes("__all__") ? availableHarnessIds : harnessAnswer
+
+  if (selectedHarnessIds.length === 0) {
+    error("Nenhum harness selecionado. Instalacao cancelada.")
+    process.exit(1)
   }
 
-  // Install agents
-  if (selectedComponents.includes("agents")) {
-    const agentsSource = join(PROJECT_ROOT, "agents")
-    if (existsSync(agentsSource)) {
-      info("Agentes disponiveis em: agents/")
-      info("Para usar, copie a pasta .agent/ para seu projeto")
-      report.added.push("agentes: 20 especialistas com QG gate")
-      success("Agentes prontos para uso")
-    }
+  info(`Harnesses selecionados: ${selectedHarnessIds.join(", ")}`)
+
+  // Step 1: Install global dependencies
+  section("deps/ — Instalando dependencias globais")
+
+  // gbrain
+  try {
+    execSync("bun --version", { stdio: "pipe", timeout: 5000 })
+    run("bun install -g github:garrytan/gbrain", "gbrain (bun global)")
+  } catch {
+    warn("bun: nao instalado. Instale com: powershell -c \"irm bun.sh/install.ps1 | iex\"")
   }
 
-  // Claude-specific
-  if (selectedComponents.includes("claudeMd") && selectedHarnesses.includes("claude")) {
-    const { installClaude } = await import("../harness/claude.js")
-    await installClaude({ claudeMd: true, ultracode: selectedComponents.includes("ultracode"), mcp: selectedComponents.includes("mcp") }, report)
-    success("CLAUDE.md configurado")
-  }
-
-  if (selectedComponents.includes("ultracode") && selectedHarnesses.includes("claude")) {
-    const { installClaude } = await import("../harness/claude.js")
-    await installClaude({ ultracode: true, mcp: selectedComponents.includes("mcp") }, report)
-    success("Ultracode configurado")
-  }
-
-  // MCP
-  if (selectedComponents.includes("mcp")) {
-    if (selectedHarnesses.includes("claude")) {
-      const { installClaude } = await import("../harness/claude.js")
-      await installClaude({ mcp: true }, report)
-    }
-    success("MCP Servers configurados")
-  }
-
-  // Run harness-specific installers
-  for (const harness of selectedHarnesses) {
-    section(`Configurando ${harness}...`)
+  // uv + graphify
+  let uvBin = ""
+  const possiblePaths = isWindows()
+    ? [join(HOME, ".local", "bin", "uv.exe"), join(HOME, "AppData", "Local", "uv", "uv.exe")]
+    : [join(HOME, ".local", "bin", "uv"), join(HOME, ".cargo", "bin", "uv"), "/usr/local/bin/uv"]
+  for (const p of [...possiblePaths, "uv"]) {
     try {
-      switch (harness) {
+      execSync(`${p} --version`, { stdio: "pipe", timeout: 5000 })
+      uvBin = p
+      break
+    } catch {}
+  }
+  if (!uvBin) {
+    info("uv: nao encontrado. Instalando...")
+    try {
+      if (isWindows()) {
+        execSync('powershell -c "irm https://astral.sh/uv/install.ps1 | iex"', { stdio: "pipe", timeout: 60000 })
+      } else {
+        execSync('curl -LsSf https://astral.sh/uv/install.sh | sh', { stdio: "pipe", timeout: 60000 })
+      }
+      // Try common install paths after installation
+      for (const p of possiblePaths) {
+        try {
+          execSync(`${p} --version`, { stdio: "pipe", timeout: 5000 })
+          uvBin = p
+          success("uv instalado")
+          break
+        } catch {}
+      }
+      if (!uvBin) warn("uv: instalado mas nao encontrado no PATH")
+    } catch {
+      warn("uv: falha ao instalar. Instale manualmente: https://docs.astral.sh/uv/#installation")
+    }
+  }
+  if (uvBin) {
+    run(`${uvBin} tool install graphifyy`, "graphify (uv tool)")
+  } else {
+    info("graphify: pulado (uv nao disponivel)")
+  }
+
+  // Playwright (browser binaries for MCP + auto-testing)
+  try {
+    execSync("npx playwright install chromium 2>&1", { stdio: "pipe", timeout: 120000 })
+    success("Playwright: chromium instalado")
+  } catch {
+    warn("Playwright: falha ao instalar chromium. Rode manualmente: npx playwright install chromium")
+  }
+
+  if (isMacOS()) {
+    run("brew install momhq/tap/mom", "MOM (brew)")
+  } else {
+    info("MOM: incompativel com este OS (apenas macOS)")
+  }
+
+  // Step 2: Copy setup scripts to ~/.agents/scripts/
+  section("scripts/ — Copiando scripts de setup")
+  const scriptsDir = join(HOME, ".agents", "scripts")
+  ensureDir(scriptsDir)
+  const scriptsSource = join(PROJECT_ROOT, "scripts", "scripts")
+  if (existsSync(scriptsSource)) {
+    const scripts = readdirSync(scriptsSource).filter((f) => f.endsWith(".ps1"))
+    for (const script of scripts) {
+      const src = join(scriptsSource, script)
+      const dst = join(scriptsDir, script)
+      copyWithBackup(src, dst)
+      report.added.push(`script: ${script}`)
+    }
+    success(`${scripts.length} scripts copiados para ~/.agents/scripts/`)
+  } else {
+    warn("scripts/scripts/ nao encontrado no pacote")
+  }
+
+  // Step 3: Install hooks
+  section("hooks/ — Quality & Security Gates")
+  const hooksDir = join(HOME, ".codex", "hooks")
+  ensureDir(hooksDir)
+  const hooksSource = join(PROJECT_ROOT, "hooks", "hooks")
+  if (existsSync(hooksSource)) {
+    const hooks = readdirSync(hooksSource).filter((f) => f.endsWith(".py"))
+    for (const hook of hooks) {
+      const src = join(hooksSource, hook)
+      const dst = join(hooksDir, hook)
+      copyWithBackup(src, dst)
+      report.added.push(`hook: ${hook}`)
+    }
+    success(`${hooks.length} hooks instalados em ~/.codex/hooks/`)
+  } else {
+    warn("hooks/hooks/ nao encontrado no pacote")
+  }
+
+  // Step 4: Install skills
+  section("skills/ — Frontend Design, Chronicle, Init e mais")
+  const skillsDir = join(HOME, ".agents", "skills")
+  ensureDir(skillsDir)
+  const skillsSource = join(PROJECT_ROOT, "skills", "skills")
+  if (existsSync(skillsSource)) {
+    const skillDirs = readdirSync(skillsSource, { withFileTypes: true }).filter((d) => d.isDirectory())
+    for (const skill of skillDirs) {
+      const src = join(skillsSource, skill.name)
+      const dst = join(skillsDir, skill.name)
+      if (!existsSync(dst)) {
+        copyWithBackup(src, dst)
+        report.added.push(`skill: ${skill.name}`)
+      } else {
+        report.skipped.push(`skill: ${skill.name} (ja existe)`)
+      }
+    }
+    success(`${skillDirs.length} skills instaladas em ~/.agents/skills/`)
+  }
+
+  // Step 5: Template info
+  section("template/ — Fullstack Monorepo (Express)")
+  const templateSource = join(PROJECT_ROOT, "templates", "templates", "fullstack-monorepo")
+  if (existsSync(templateSource)) {
+    info("Template disponivel para copia:")
+    info(`  cp -r "${templateSource}" ./meu-projeto`)
+    report.added.push("template: fullstack-monorepo (express)")
+    success("Template pronto para uso")
+  }
+
+  // Step 6: Agents info
+  section("agents/ — 20 Especialistas com QG Gate")
+  const agentsSource = join(PROJECT_ROOT, "agents")
+  if (existsSync(agentsSource)) {
+    info("Agentes disponiveis em: agents/")
+    report.added.push("agentes: 20 especialistas com QG gate")
+    success("Agentes prontos para uso")
+  }
+
+  // Step 7: Configure each harness
+  section("harness/ — Configurando ambientes selecionados")
+
+  for (const harnessId of selectedHarnessIds) {
+    section(`Configurando ${harnessId}...`)
+    try {
+      switch (harnessId) {
         case "codex":
-          await installCodex({ hooks: selectedComponents.includes("hooks"), template: selectedComponents.includes("template") }, report)
+          await installCodex({ hooks: false, template: true }, report)
           break
         case "claude":
-          await installClaude({
-            claudeMd: selectedComponents.includes("claudeMd"),
-            ultracode: selectedComponents.includes("ultracode"),
-            mcp: selectedComponents.includes("mcp"),
-          }, report)
+          await installClaude({ claudeMd: true, ultracode: true, mcp: true }, report)
           break
         case "opencode":
-          await installOpenCode({ hooks: selectedComponents.includes("hooks") }, report)
+          await installOpenCode({ hooks: true }, report)
           break
       }
-      success(`${harness} configurado`)
+      success(`${harnessId} configurado`)
     } catch (e) {
-      report.errors.push(`${harness}: ${e.message}`)
-      warn(`Falha ao configurar ${harness}: ${e.message}`)
+      report.errors.push(`${harnessId}: ${e.message}`)
+      warn(`Falha ao configurar ${harnessId}: ${e.message}`)
+    }
+  }
+
+  // Step 8: OS-aware launcher
+  section("os/ — Instalando launcher para este sistema")
+  if (isWindows()) {
+    const launcherSrc = join(PROJECT_ROOT, "launchers", "windows", "install.bat")
+    const launcherDst = join(HOME, "gstack_vibehard-install.bat")
+    if (existsSync(launcherSrc)) {
+      copyWithBackup(launcherSrc, launcherDst)
+      report.added.push("launcher: gstack_vibehard-install.bat")
+      success("Launcher Windows copiado para ~/gstack_vibehard-install.bat")
+    }
+  } else if (isMacOS()) {
+    info("macOS: brew install gstack_vibehard (via Homebrew tap)")
+    report.added.push("launcher: Homebrew formula gstack_vibehard")
+  } else if (isLinux()) {
+    const launcherSrc = join(PROJECT_ROOT, "launchers", "cross", "install.sh")
+    const launcherDst = join(HOME, "gstack_vibehard-install.sh")
+    if (existsSync(launcherSrc)) {
+      copyWithBackup(launcherSrc, launcherDst)
+      report.added.push("launcher: gstack_vibehard-install.sh")
+      success("Launcher Linux copiado para ~/gstack_vibehard-install.sh")
     }
   }
 
@@ -261,9 +305,10 @@ export async function install() {
 
   section("Instalacao Concluida!")
   info("Comandos uteis:")
-  info("  gstack doctor    — diagnosticar ambiente")
-  info("  gstack uninstall — remover GStack do ambiente")
-  if (selectedHarnesses.includes("claude")) {
+  info("  gstack_vibehard doctor    — diagnosticar ambiente")
+  info("  gstack_vibehard uninstall — remover gstack_vibehard do ambiente")
+  info("  gstack_vibehard init      — criar novo projeto com estrutura completa")
+  if (selectedHarnessIds.includes("claude")) {
     info("")
     info("Claude Code: novas regras ativas na proxima sessao")
   }

@@ -1,9 +1,9 @@
-; GStack VibeHard — Inno Setup installer for Windows
+; gstack_vibehard — Inno Setup installer for Windows
 ; Compile with Inno Setup 6+
 
-#define MyAppName "GStack VibeHard"
+#define MyAppName "gstack_vibehard"
 #define MyAppVersion "0.1.0"
-#define MyAppPublisher "GStack"
+#define MyAppPublisher "gstack_vibehard"
 #define MyAppURL "https://github.com/anomalyco/gstack-vibehard"
 
 [Setup]
@@ -12,11 +12,11 @@ AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
-DefaultDirName={userappdata}\GStack
+DefaultDirName={userappdata}\gstack_vibehard
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 OutputDir=.
-OutputBaseFilename=GStackInstaller-{#MyAppVersion}
+OutputBaseFilename=gstack_vibehard-Installer-{#MyAppVersion}
 SetupIconFile=..\..\assets\icon.ico
 UninstallDisplayIcon={app}\icon.ico
 Compression=lzma
@@ -37,12 +37,14 @@ Source: "..\..\hooks\*"; DestDir: "{app}\hooks"; Flags: ignoreversion recursesub
 Source: "..\..\skills\*"; DestDir: "{app}\skills"; Flags: ignoreversion recursesubdirs
 Source: "..\..\agents\*"; DestDir: "{app}\agents"; Flags: ignoreversion recursesubdirs
 Source: "..\..\templates\*"; DestDir: "{app}\templates"; Flags: ignoreversion recursesubdirs
+Source: "..\..\scripts\*"; DestDir: "{app}\scripts"; Flags: ignoreversion recursesubdirs
+Source: "..\..\launchers\*"; DestDir: "{app}\launchers"; Flags: ignoreversion recursesubdirs
 Source: "..\..\package.json"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [Run]
-Filename: "cmd.exe"; Parameters: "/c npm install -g @gstack/installer"; Description: "Install npm package"; StatusMsg: "Installing npm package..."
-Filename: "cmd.exe"; Parameters: "/c npx @gstack/installer install"; Description: "Run installer"; StatusMsg: "Configuring your environment..."; Flags: postinstall
+Filename: "cmd.exe"; Parameters: "/c npm install -g @gstack_vibehard/installer"; Description: "Install npm package"; StatusMsg: "Installing npm package..."
+Filename: "cmd.exe"; Parameters: "/c npx @gstack_vibehard/installer install"; Description: "Run installer"; StatusMsg: "Configuring your environment..."; Flags: postinstall
 
 [UninstallRun]
-Filename: "cmd.exe"; Parameters: "/c npm uninstall -g @gstack/installer"
+Filename: "cmd.exe"; Parameters: "/c npm uninstall -g @gstack_vibehard/installer"

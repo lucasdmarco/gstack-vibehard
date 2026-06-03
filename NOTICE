@@ -1,0 +1,44 @@
+gstack_vibehard — NOTICE
+=========================
+Copyright (c) 2026 Lucas Almeida
+
+Licensed under the MIT License (see LICENSE file).
+
+
+Third-Party Components
+----------------------
+
+1. highermind-code-skills
+   License: MIT
+   Copyright (c) 2026 Rodrigo Lopes
+   https://github.com/rodrigolopes/highermind-code-skills
+
+2. frontend-design (skill)
+   License: Apache License 2.0
+   Modifications have been made to the original work.
+   https://www.apache.org/licenses/LICENSE-2.0
+
+3. taste-skill
+   Source: https://github.com/Leonxlnx/taste-skill
+   No explicit license provided. All rights reserved by the original author.
+
+4. agentsantigravity
+   No license file found. Verify with original source before redistribution.
+
+5. @playwright/mcp
+   Used as an MCP server dependency (npx -y @playwright/mcp).
+   Licensed under Apache 2.0.
+
+6. @supabase/mcp-server
+   Used as an MCP server dependency (npx -y @supabase/mcp-server).
+   Licensed under MIT.
+
+7. @upstash/context7-mcp
+   Used as an MCP server dependency (npx -y @upstash/context7-mcp).
+   Licensed under MIT.
+
+
+Full License Texts
+------------------
+- MIT License: see LICENSE file in the root of this project.
+- Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0

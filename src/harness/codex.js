@@ -28,15 +28,15 @@ export async function installCodex(config, report) {
 
   if (config.template) {
     // .codex/config.toml com hooks config
-    const tomlContent = `# GStack VibeHard — Codex CLI hooks
+    const tomlContent = `# gstack_vibehard — Codex CLI hooks
 [hooks]
-on_session_start = ["python ${hooksDir}\\session_start.py"]
-on_stop = ["python ${hooksDir}\\stop.py"]
-pre_tool_use = ["python ${hooksDir}\\pre_tool_use_security.py"]
-post_tool_use = ["python ${hooksDir}\\post_tool_use_review.py"]
+on_session_start = ["python ${hooksDir.replaceAll("\\", "/")}/session_start.py"]
+on_stop = ["python ${hooksDir.replaceAll("\\", "/")}/stop.py"]
+pre_tool_use = ["python ${hooksDir.replaceAll("\\", "/")}/pre_tool_use_security.py"]
+post_tool_use = ["python ${hooksDir.replaceAll("\\", "/")}/post_tool_use_review.py"]
 
 [agent]
-skills_dir = "${join(HOME, ".agents", "skills")}"
+skills_dir = "${join(HOME, ".agents", "skills").replaceAll("\\", "/")}"
 
 [mcp_servers.fallow]
 command = "npx"

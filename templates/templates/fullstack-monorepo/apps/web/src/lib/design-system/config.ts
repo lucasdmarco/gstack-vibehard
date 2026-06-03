@@ -18,7 +18,7 @@ export interface DesignSystemConfig {
   fontFamily?: string
 }
 
-const STORAGE_KEY = "gstack-design-system"
+const STORAGE_KEY = "gstack_vibehard-design-system"
 
 const defaultConfig: DesignSystemConfig = {
   engine: "minimalist",

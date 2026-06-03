@@ -1,6 +1,7 @@
 import { createInterface } from "readline"
 import { install } from "../installer/install.js"
 import { doctor } from "../installer/doctor.js"
+import { initCommand } from "../commands/init.js"
 
 const COLORS = {
   reset: "\x1b[0m",
@@ -19,7 +20,7 @@ function color(text, ...codes) {
 function logo() {
   console.log(color("\n  ╔══════════════════════════════════════╗", COLORS.cyan))
   console.log(color("  ║      GStack VibeHard Installer       ║", COLORS.cyan))
-  console.log(color("  ║    @gstack/installer — v0.1.0        ║", COLORS.cyan))
+  console.log(color("  ║    @gstack_vibehard/installer — v0.1.0 ║", COLORS.cyan))
   console.log(color("  ╚══════════════════════════════════════╝\n", COLORS.cyan))
 }
 
@@ -66,11 +67,12 @@ export async function multiSelect(question, options) {
 export function showHelp() {
   logo()
   console.log(color("  Comandos:", COLORS.bold))
-  console.log(color("    gstack install        Instalar GStack no ambiente", COLORS.cyan))
-  console.log(color("    gstack doctor         Diagnosticar ambiente", COLORS.cyan))
-  console.log(color("    gstack uninstall      Remover GStack do ambiente", COLORS.cyan))
-  console.log(color("    gstack list           Listar componentes instalados", COLORS.cyan))
-  console.log(color("    gstack help           Mostrar esta ajuda\n", COLORS.cyan))
+  console.log(color("    gstack_vibehard install        Instalar gstack_vibehard no ambiente", COLORS.cyan))
+  console.log(color("    gstack_vibehard init <nome>    Criar novo projeto com estrutura completa", COLORS.cyan))
+  console.log(color("    gstack_vibehard doctor         Diagnosticar ambiente", COLORS.cyan))
+  console.log(color("    gstack_vibehard uninstall      Remover gstack_vibehard do ambiente", COLORS.cyan))
+  console.log(color("    gstack_vibehard list           Listar componentes instalados", COLORS.cyan))
+  console.log(color("    gstack_vibehard help           Mostrar esta ajuda\n", COLORS.cyan))
 }
 
 export function success(msg) {
@@ -99,6 +101,9 @@ export async function runCLI(command, args) {
   switch (command) {
     case "install":
       await install()
+      break
+    case "init":
+      await initCommand(args)
       break
     case "doctor":
       await doctor()

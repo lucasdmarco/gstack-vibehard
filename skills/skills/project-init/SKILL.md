@@ -1,6 +1,6 @@
 ---
 name: project-init
-description: "Configura o ecossistema de desenvolvimento em qualquer projeto. Pergunta uma a uma as ferramentas (gstack, gbrain, context7, superpowers, graphifhy, mom) e instala apenas as que o usuário confirmar."
+description: "Configura o ecossistema de desenvolvimento em qualquer projeto. Pergunta uma a uma as ferramentas (gstack, gbrain, context7, superpowers, graphify, mom) e instala apenas as que o usuário confirmar."
 ---
 
 # Project Init — Setup do Ecossistema
@@ -80,15 +80,15 @@ Se for PostgreSQL (express/fastify), use `@my/db`. Se for Turso (hono), use `@my
 
 ---
 
-### 5. graphifhy — Grafos de Dependência
+### 5. graphify — Grafos de Dependência
 
 ```bash
-# Pergunta: "Instalar graphifhy? (visualização de dependências do projeto)"
+# Pergunta: "Instalar graphify? (visualização de dependências do projeto)"
 # Se Sim:
-& "$env:USERPROFILE\.agents\scripts\setup-graphifhy.ps1" -ProjectDir "<diretorio-do-projeto>"
+& "$env:USERPROFILE\.agents\scripts\setup-graphify.ps1" -ProjectDir "<diretorio-do-projeto>"
 ```
 
-**O que cria:** `.graphifhy/deps.json` + `.graphifhy/index.html` (grafo visual)
+**O que cria:** `.graphify/deps.json` + `.graphify/index.html` (grafo visual)
 
 ---
 
@@ -127,8 +127,8 @@ Agente:
    → Se sim: executa setup-context7.ps1
 9. PERGUNTA: "Instalar superpowers?"
    → Se sim: executa setup-superpowers.ps1
-10. PERGUNTA: "Instalar graphifhy?"
-   → Se sim: executa setup-graphifhy.ps1
+10. PERGUNTA: "Instalar graphify?"
+   → Se sim: executa setup-graphify.ps1
 11. PERGUNTA: "Instalar MOM?" (⚠️ só no Linux/macOS — Windows usa chronicle)
 12. Iniciar dev server + abrir navegador
 13. "Projeto pronto! Use .\scripts\run.ps1 dev para comandos rápidos"
@@ -136,7 +136,7 @@ Agente:
 
 ## Para Projetos Existentes
 
-Se o usuário abrir um projeto existente e as pastas `.gstack`, `.gbrain`, `.context7`, `.graphifhy` ou `scripts/` não existirem, o agente PERGUNTA se quer instalar cada ferramenta faltante.
+Se o usuário abrir um projeto existente e as pastas `.gstack`, `.gbrain`, `.context7`, `.graphify` ou `scripts/` não existirem, o agente PERGUNTA se quer instalar cada ferramenta faltante.
 
 ## Comportamento do Agente
 

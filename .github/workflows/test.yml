@@ -1,0 +1,36 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  doctor:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node: [18, 20, 22]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: node src/index.js doctor
+        name: "Doctor check"
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check ESM imports
+        run: grep -rn 'require(' src/ --include='*.js' && exit 1 || exit 0
+      - name: Check no hardcoded paths
+        run: grep -rn '/Users/\|/home/' src/ --include='*.js' && exit 1 || exit 0
+      - name: Check shebang
+        run: head -1 src/index.js | grep -q '#!/usr/bin/env node'

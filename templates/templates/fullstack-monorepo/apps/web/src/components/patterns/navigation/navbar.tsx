@@ -4,7 +4,7 @@ export function NavigationBar() {
       <div className="flex items-center justify-between px-6 h-16 max-w-[1400px] mx-auto">
         <div className="flex items-center gap-8">
           <a href="/" className="text-lg font-bold tracking-tight">
-            gstack
+            gstack_vibehard
           </a>
           <div className="hidden md:flex items-center gap-6">
             {["Features", "Docs", "Blog", "Pricing"].map((item) => (

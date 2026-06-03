@@ -18,8 +18,8 @@ export async function installOpenCode(config, report) {
       },
       plugins: [
         {
-          name: "gstack-vibehard",
-          description: "GStack VibeHard — fullstack template + quality gates + agent orchestration",
+          name: "gstack_vibehard",
+          description: "gstack_vibehard — fullstack template + quality gates + agent orchestration",
           skills: [
             "frontend-design",
             "chronicle",

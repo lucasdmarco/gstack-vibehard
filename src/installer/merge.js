@@ -11,7 +11,7 @@ import { join, dirname } from "path"
 
 export function backupFile(filePath) {
   if (!existsSync(filePath)) return false
-  const bakPath = filePath + ".gstack.bak"
+  const bakPath = filePath + ".gstack_vibehard.bak"
   if (!existsSync(bakPath)) {
     copyFileSync(filePath, bakPath)
   }
@@ -24,12 +24,10 @@ export function ensureDir(dirPath) {
   }
 }
 
-export function mergeJson(existing, gstackConfig) {
-  if (!existing) return gstackConfig
-
+export function mergeJson(existing, gvConfig) {
+  if (!existing) return gvConfig
   const merged = { ...existing }
-
-  for (const [key, value] of Object.entries(gstackConfig)) {
+  for (const [key, value] of Object.entries(gvConfig)) {
     if (key in merged) {
       if (Array.isArray(merged[key]) && Array.isArray(value)) {
         const existingSet = new Set(merged[key])
@@ -49,15 +47,13 @@ export function mergeJson(existing, gstackConfig) {
   return merged
 }
 
-export function mergeArray(existing, gstackItems, marker) {
+export function mergeArray(existing, gvItems, marker) {
   if (!Array.isArray(existing)) existing = []
-  if (!Array.isArray(gstackItems)) gstackItems = []
-
+  if (!Array.isArray(gvItems)) gvItems = []
   const merged = existing.filter(
-    (item) => !gstackItems.includes(item)
+    (item) => !gvItems.includes(item)
   )
-
-  merged.push(...gstackItems)
+  merged.push(...gvItems)
 
   if (marker) {
     merged.push(`# GStack: ${marker}`)

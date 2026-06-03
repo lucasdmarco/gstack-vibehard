@@ -1,8 +1,8 @@
 param([string]$ProjectDir)
-# graphifhy - Visualização de dependências do projeto
-Write-Host "=== Instalando graphifhy ===" -ForegroundColor Cyan
+# graphify - Visualização de dependências do projeto
+Write-Host "=== Instalando graphify ===" -ForegroundColor Cyan
 
-New-Item -ItemType Directory -Path "$ProjectDir\.graphifhy" -Force | Out-Null
+New-Item -ItemType Directory -Path "$ProjectDir\.graphify" -Force | Out-Null
 
 # Gerar grafo de dependências do projeto
 function Get-DependencyGraph {
@@ -80,7 +80,7 @@ function Get-DependencyGraph {
 }
 
 $graph = Get-DependencyGraph -Dir $ProjectDir
-$graph | ConvertTo-Json -Depth 10 | Set-Content "$ProjectDir\.graphifhy\deps.json"
+$graph | ConvertTo-Json -Depth 10 | Set-Content "$ProjectDir\.graphify\deps.json"
 
 # Visualização HTML do grafo (dinâmica baseada nos nodes/edges reais)
 $projectName = Split-Path $ProjectDir -Leaf
@@ -134,15 +134,15 @@ $mermaidContent = $graphLines -join "`n"
 </head>
 <body>
   <h1>$projectName</h1>
-  <div class="meta">Dependências do projeto — gerado por graphifhy</div>
+  <div class="meta">Dependências do projeto — gerado por graphify</div>
   <div class="mermaid">
     $mermaidContent
   </div>
   <script>mermaid.initialize({ startOnLoad: true })</script>
 </body>
 </html>
-"@ | Set-Content "$ProjectDir\.graphifhy\index.html"
+"@ | Set-Content "$ProjectDir\.graphify\index.html"
 
-Write-Host "  ✓ .graphifhy/deps.json criado" -ForegroundColor Green
-Write-Host "  ✓ .graphifhy/index.html criado" -ForegroundColor Green
-Write-Host "  → Abra .graphifhy/index.html no navegador para ver o grafo" -ForegroundColor Gray
+Write-Host "  ✓ .graphify/deps.json criado" -ForegroundColor Green
+Write-Host "  ✓ .graphify/index.html criado" -ForegroundColor Green
+Write-Host "  → Abra .graphify/index.html no navegador para ver o grafo" -ForegroundColor Gray

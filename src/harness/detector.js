@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "fs"
 import { homedir, platform } from "os"
 import { join } from "path"
+import { execSync } from "child_process"
 
 const HOME = homedir()
 
@@ -13,7 +14,8 @@ const HARNESS_PATHS = {
     detect: () => {
       const cfg = join(HOME, ".codex", "config.toml")
       const hooks = join(HOME, ".codex", "hooks")
-      return existsSync(cfg) || existsSync(hooks)
+      if (existsSync(cfg) || existsSync(hooks)) return true
+      try { execSync("codex --version", { stdio: "pipe", timeout: 3000 }); return true } catch { return false }
     },
   },
   claude: {
@@ -25,7 +27,8 @@ const HARNESS_PATHS = {
       try {
         const settings = join(HOME, ".claude", "settings.json")
         const claudeMd = join(HOME, "CLAUDE.md")
-        return existsSync(settings) || existsSync(claudeMd)
+        if (existsSync(settings) || existsSync(claudeMd)) return true
+        execSync("claude --version", { stdio: "pipe", timeout: 3000 }); return true
       } catch {
         return false
       }
@@ -38,7 +41,8 @@ const HARNESS_PATHS = {
     detect: () => {
       try {
         const cfg = join(HOME, ".config", "opencode", "opencode.json")
-        return existsSync(cfg)
+        if (existsSync(cfg)) return true
+        execSync("opencode --version", { stdio: "pipe", timeout: 3000 }); return true
       } catch {
         return false
       }

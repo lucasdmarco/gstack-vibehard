@@ -1,17 +1,17 @@
 #!/bin/bash
-# GStack VibeHard Installer — macOS/Linux Launcher
+# gstack_vibehard Installer — macOS/Linux Launcher
 # Usage: ./install.sh [install|doctor|help]
 
 set -e
 
 if ! command -v node &> /dev/null; then
-    echo "[GStack] Node.js not found."
-    echo "[GStack] Install with: brew install node"
+    echo "[gstack_vibehard] Node.js not found."
+    echo "[gstack_vibehard] Install with: brew install node"
     exit 1
 fi
 
 CMD=${1:-install}
 
-npx @gstack/installer "$CMD"
+npx @gstack_vibehard/installer "$CMD"
 
-echo "[GStack] Done."
+echo "[gstack_vibehard] Done."

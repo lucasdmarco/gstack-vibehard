@@ -11,7 +11,7 @@ const CLAUDE_MD = join(HOME, "CLAUDE.md")
 const ULTRA_MD = join(CLAUDE_DIR, "rules", "ultracode.md")
 const MCP_CONFIG = join(HOME, ".mcp.json")
 
-const claudeMdContent = `# CLAUDE.md — GStack VibeHard
+const claudeMdContent = `# CLAUDE.md — gstack_vibehard
 
 ## Identity
 Sou fundador e CTO. Construo porque nao consigo nao construir.
@@ -38,7 +38,7 @@ O padrao e world-class. Inegociavel.
 Auto-dream ON. Memorias persistentes entre sessoes.
 `
 
-const ultracodeContent = `# Ultracode — GStack VibeHard quality standards
+const ultracodeContent = `# Ultracode — gstack_vibehard quality standards
 
 ## Engineering Standards
 - Zero bare except/ catch
@@ -83,6 +83,25 @@ export async function installClaude(config, report) {
           env: {
             SUPABASE_ACCESS_TOKEN: "${SUPABASE_ACCESS_TOKEN}",
           },
+        },
+        playwright: {
+          command: "npx",
+          args: ["-y", "@playwright/mcp"],
+        },
+        context7: {
+          command: "npx",
+          args: ["-y", "@upstash/context7-mcp", "--api-key", "${CONTEXT7_API_KEY}"],
+          env: {
+            CONTEXT7_API_KEY: "${CONTEXT7_API_KEY}",
+          },
+        },
+        gbrain: {
+          command: "gbrain",
+          args: ["serve"],
+        },
+        graphify: {
+          command: "python",
+          args: ["-m", "graphify.serve", "graphify-out/graph.json"],
         },
       },
     }

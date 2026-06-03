@@ -1,24 +1,24 @@
 @echo off
-REM GStack VibeHard Installer — Windows Launcher
+REM gstack_vibehard Installer — Windows Launcher
 REM Usage: install.bat [install|doctor|help]
 
 where /q node
 if %ERRORLEVEL% neq 0 (
-    echo [GStack] Node.js nao encontrado.
-    echo [GStack] Baixe em: https://nodejs.org/
+    echo [gstack_vibehard] Node.js nao encontrado.
+    echo [gstack_vibehard] Baixe em: https://nodejs.org/
     pause
     exit /b 1
 )
 
 if "%1"=="" (
-    npx @gstack/installer
+    npx @gstack_vibehard/installer
 ) else (
-    npx @gstack/installer %*
+    npx @gstack_vibehard/installer %*
 )
 
 if %ERRORLEVEL% equ 0 (
-    echo [GStack] Comando concluido.
+    echo [gstack_vibehard] Comando concluido.
 ) else (
-    echo [GStack] Erro ao executar comando.
+    echo [gstack_vibehard] Erro ao executar comando.
     pause
 )

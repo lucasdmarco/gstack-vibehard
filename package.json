@@ -1,17 +1,18 @@
 {
-  "name": "@gstack/installer",
+  "name": "@gstack_vibehard/installer",
   "version": "0.1.0",
-  "description": "GStack VibeHard — Cross-harness installer & fullstack template kit with deep agent integration (Codex, Claude Code, OpenCode)",
+  "description": "gstack_vibehard — Cross-harness installer & fullstack template kit with deep agent integration (Codex, Claude Code, OpenCode)",
   "license": "MIT",
   "type": "module",
   "main": "src/index.js",
   "bin": {
-    "gstack": "src/index.js"
+    "gstack_vibehard": "src/index.js"
   },
   "scripts": {
-    "gstack": "node src/index.js",
+    "gstack_vibehard": "node src/index.js",
     "install": "node src/index.js install",
-    "doctor": "node src/index.js doctor"
+    "doctor": "node src/index.js doctor",
+    "test": "node src/index.js doctor"
   },
   "engines": {
     "node": ">=18"
@@ -32,7 +33,7 @@
     "url": "https://github.com/anomalyco/gstack-vibehard"
   },
   "keywords": [
-    "gstack",
+    "gstack_vibehard",
     "claude-code",
     "codex-cli",
     "opencode",

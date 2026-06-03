@@ -87,7 +87,7 @@ Após o scaffold, SIGA a **project-init** skill para perguntar sobre cada ferram
 2. gbrain (contexto) → `setup-gbrain.ps1`
 3. context7 (stack) → `setup-context7.ps1`
 4. superpowers (utils) → `setup-superpowers.ps1`
-5. graphifhy (grafos) → `setup-graphifhy.ps1`
+5. graphify (grafos) → `setup-graphify.ps1`
 
 Pergunte uma a uma, espere a resposta, só instale se o usuário confirmar.
 

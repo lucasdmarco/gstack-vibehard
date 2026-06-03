@@ -52,7 +52,7 @@ $variantMap = @{
   }
 }
 $v = $variantMap[$Variant]
-$toolsList = @("gstack", "gbrain", "context7", "superpowers", "graphifhy")
+$toolsList = @("gstack", "gbrain", "context7", "superpowers", "graphify")
 
 @{
   project = Split-Path $ProjectDir -Leaf
@@ -72,7 +72,7 @@ $toolsList = @("gstack", "gbrain", "context7", "superpowers", "graphifhy")
   }
   ecosystem = @{
     gbrain = "$ProjectDir\.gbrain\context.json"
-    graphifhy = "$ProjectDir\.graphifhy\deps.json"
+    graphify = "$ProjectDir\.graphify\deps.json"
     context7 = "$ProjectDir\.context7\stack.json"
     chronicle = "$env:USERPROFILE\.codex\chronicle"
   }

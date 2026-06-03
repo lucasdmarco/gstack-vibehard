@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""GStack Check — Diagnóstico do ecossistema no início da sessão.
+"""gstack_vibehard — Diagnóstico do ecossistema no início da sessão.
 
 Lê e valida:
   .gstack/config.json     → stack + infra + versões
-  .graphifhy/deps.json    → topologia do monorepo
+  .graphify/deps.json    → topologia do monorepo
   .context7/stack.json    → documentação da stack
   $HOME/.mom/mom.db       → memórias (MOM Windows-incompatível — fallback chronicle)
   ~/.codex/chronicle/     → índice de busca com memórias relevantes
@@ -55,11 +55,11 @@ def check_gstack(root: Path) -> dict:
     }
 
 
-def check_graphifhy(root: Path) -> dict:
-    """Lê .graphifhy/deps.json — mapa de dependências."""
-    deps = read_json(root / ".graphifhy" / "deps.json")
+def check_graphify(root: Path) -> dict:
+    """Lê .graphify/deps.json — mapa de dependências."""
+    deps = read_json(root / ".graphify" / "deps.json")
     if not deps:
-        return {"present": False, "error": ".graphifhy/deps.json não encontrado"}
+        return {"present": False, "error": ".graphify/deps.json não encontrado"}
     nodes = deps.get("nodes", [])
     edges = deps.get("edges", [])
     return {
@@ -233,7 +233,7 @@ def main():
 
     # Executar todos os checks
     gstack = check_gstack(root)
-    graphifhy = check_graphifhy(root)
+    graphify = check_graphify(root)
     context7 = check_context7(root)
     mom = check_mom(root)
     chronicle = check_chronicle(root)
@@ -245,8 +245,8 @@ def main():
         f"{k}→{v}" for k, v in gstack.get("infra", {}).items()
     ) if gstack.get("infra") else "n/a"
 
-    topo_str = "; ".join(graphifhy.get("topology", [])) if graphifhy.get("topology") else "n/a"
-    edges_str = "; ".join(graphifhy.get("edges", [])) if graphifhy.get("edges") else "n/a"
+        topo_str = "; ".join(graphify.get("topology", [])) if graphify.get("topology") else "n/a"
+        edges_str = "; ".join(graphify.get("edges", [])) if graphify.get("edges") else "n/a"
 
     mom_recall = ""
     if mom.get("present") and mom.get("recent"):
@@ -275,7 +275,7 @@ def main():
         f"  API: {api_dir}",
         f"  DB: {db_pkg}",
         f"  Modo: {mode.upper()}",
-        f"Graphifhy: {'✓' if graphifhy.get('present') else '✗'}",
+        f"Graphify: {'✓' if graphify.get('present') else '✗'}",
         f"  Topologia: {topo_str}",
         f"  Dependências: {edges_str}",
         f"Context7: {'✓' if context7.get('present') else '✗'}",
@@ -294,10 +294,9 @@ def main():
         "mode": mode,
         "stack": gstack.get("stack", []),
         "infra": gstack.get("infra", {}),
-        "topology": graphifhy.get("topology", []),
-        "edges": graphifhy.get("edges", []),
-        "gstack": gstack,
-        "graphifhy": graphifhy,
+        "topology": graphify.get("topology", []),
+        "edges": graphify.get("edges", []),
+        "graphify": graphify,
         "context7": context7,
         "mom": mom,
         "chronicle": chronicle,
