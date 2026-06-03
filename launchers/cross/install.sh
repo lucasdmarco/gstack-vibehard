@@ -12,6 +12,6 @@ fi
 
 CMD=${1:-install}
 
-npx @gstack_vibehard/installer "$CMD"
+npx @gstack-vibehard/installer "$CMD"
 
 echo "[gstack_vibehard] Done."

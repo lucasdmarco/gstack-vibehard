@@ -11,9 +11,9 @@ if %ERRORLEVEL% neq 0 (
 )
 
 if "%1"=="" (
-    npx @gstack_vibehard/installer
+    npx @gstack-vibehard/installer
 ) else (
-    npx @gstack_vibehard/installer %*
+    npx @gstack-vibehard/installer %*
 )
 
 if %ERRORLEVEL% equ 0 (

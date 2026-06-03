@@ -17,3 +17,4 @@ coverage/
 .turbo/
 *.bak
 *.gstack_vibehard.bak
+.npmrc

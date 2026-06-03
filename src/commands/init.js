@@ -43,12 +43,12 @@ export async function initCommand(args) {
 
   // Version check
   try {
-    const local = execSync("npm list -g @gstack_vibehard/installer --depth=0 2>&1", { encoding: "utf-8", timeout: 10000 }).trim()
-    const latest = execSync("npm view @gstack_vibehard/installer version 2>&1", { encoding: "utf-8", timeout: 10000 }).trim()
+    const local = execSync("npm list -g @gstack-vibehard/installer --depth=0 2>&1", { encoding: "utf-8", timeout: 10000 }).trim()
+    const latest = execSync("npm view @gstack-vibehard/installer version 2>&1", { encoding: "utf-8", timeout: 10000 }).trim()
     const localVer = local.includes("@") ? local.split("@").pop()?.trim() : local
     if (latest !== localVer) {
       warn(`gstack_vibehard: versao ${localVer} instalada, ${latest} disponivel`)
-      info("Para atualizar: npm update -g @gstack_vibehard/installer")
+      info("Para atualizar: npm update -g @gstack-vibehard/installer")
     } else {
       info(`gstack_vibehard ${localVer} — atualizado`)
     }

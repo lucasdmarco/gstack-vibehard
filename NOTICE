@@ -20,10 +20,12 @@ Third-Party Components
 
 3. taste-skill
    Source: https://github.com/Leonxlnx/taste-skill
-   No explicit license provided. All rights reserved by the original author.
+   License: MIT License
+   Copyright (c) 2025 GRUPORPE
 
-4. agentsantigravity
-   No license file found. Verify with original source before redistribution.
+4. agentsantigravity (agent kit)
+   Part of gstack_vibehard. Licensed under MIT License (see LICENSE).
+   Source: https://github.com/lucasdmarco/gstack-vibehard
 
 5. @playwright/mcp
    Used as an MCP server dependency (npx -y @playwright/mcp).

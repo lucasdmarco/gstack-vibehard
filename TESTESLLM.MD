@@ -1,6 +1,6 @@
 # TESTESLLM.MD — Bateria de Testes para Agentes LLM
 
-**Projeto:** @gstack_vibehard/installer v0.1.0
+**Projeto:** @gstack-vibehard/installer v0.1.0
 **Propósito:** Verificar se o instalador funciona em todos os cenários e encontrar pontas soltas
 **Execução estimada:** ~45min
 **Total de testes:** 98
@@ -815,7 +815,7 @@ _Verificacoes finais para lancamento_
 **Propósito:** Argumentos devem ser passados para o npx
 **Setup:** Ter node no PATH
 **Comando:** `launchers\windows\install.bat doctor 2>&1`
-**Esperado:** Executa `npx @gstack_vibehard/installer doctor`
+**Esperado:** Executa `npx @gstack-vibehard/installer doctor`
 **Criticidade:** MEDIO
 
 ### TC-10.3: Homebrew formula — class name e deps corretos

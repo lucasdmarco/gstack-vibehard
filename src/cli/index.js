@@ -21,7 +21,7 @@ function color(text, ...codes) {
 function logo() {
   console.log(color("\n  ╔══════════════════════════════════════╗", COLORS.cyan))
   console.log(color("  ║      GStack VibeHard Installer       ║", COLORS.cyan))
-  console.log(color("  ║    @gstack_vibehard/installer — v0.3.0 ║", COLORS.cyan))
+  console.log(color("  ║    @gstack-vibehard/installer — v0.4.0 ║", COLORS.cyan))
   console.log(color("  ╚══════════════════════════════════════╝\n", COLORS.cyan))
 }
 
