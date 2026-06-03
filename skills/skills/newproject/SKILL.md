@@ -15,6 +15,22 @@ Siga **TODOS os passos em ordem**. So avance quando o usuario confirmar cada pas
 
 ---
 
+### PASSO 0: Verificar atualizacao do gstack_vibehard
+
+Leia o arquivo `~/.gstack_vibehard/update_status.json`.
+
+Se `latest > local` (ou o arquivo nao existir):
+  - Informe: "Ha uma atualizacao disponivel (latest vX.Y.Z, local vA.B.C). Deseja atualizar?"
+  - Se sim: execute `/g_update` e depois prossiga
+  - Se nao: anote a versao desatualizada e continue
+
+Se o arquivo nao existe:
+  - Rode: `npm view @gstack-vibehard/installer version` para obter a latest
+  - Compare com: `gstack_vibehard --version` para obter a local
+  - Se desatualizado: pergunte se quer atualizar
+
+---
+
 ### PASSO 1: Analise de requisitos
 
 Pergunte ao usuario:

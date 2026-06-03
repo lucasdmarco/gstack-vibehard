@@ -6,7 +6,7 @@ Integrates highermind patterns:
   2. Weighted stack decision framework — helps agents choose optimal tech stack
   3. Security-first awareness — reminds security baseline checks
 """
-import json, sys, os, subprocess
+import json, sys, os, subprocess, time
 from pathlib import Path
 
 
@@ -205,6 +205,36 @@ ctx_parts.append(STACK_DECISION_FRAMEWORK)
 
 # 5. Security baseline reminder (highermind)
 ctx_parts.append(SECURITY_BASELINE)
+
+# 6. Update check (1x/24h)
+UPDATE_FILE = Path.home() / ".gstack_vibehard" / "update_status.json"
+if not UPDATE_FILE.parent.exists():
+    UPDATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+last_check = 0
+if UPDATE_FILE.exists():
+    try:
+        last_check = json.loads(UPDATE_FILE.read_text()).get("checked_at", 0)
+    except Exception:
+        pass
+
+if time.time() - last_check > 86400:
+    try:
+        latest = subprocess.run(
+            ["npm", "view", "@gstack-vibehard/installer", "version"],
+            capture_output=True, text=True, timeout=10
+        ).stdout.strip()
+        local = subprocess.run(
+            ["gstack_vibehard", "--version"],
+            capture_output=True, text=True, timeout=5
+        ).stdout.strip() or "0.0.0"
+        UPDATE_FILE.write_text(json.dumps({
+            "latest": latest,
+            "local": local,
+            "checked_at": int(time.time())
+        }))
+    except Exception:
+        pass
 
 additional_context = "\n\n".join(ctx_parts) if ctx_parts else ""
 output = {

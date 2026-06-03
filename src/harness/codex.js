@@ -40,6 +40,8 @@ instructions = """
 Comandos disponiveis:
   /newproject — Guided Architecture Walkthrough (9 passos)
   /g_update   — Atualizar gstack_vibehard para versao mais recente
+
+Se ~/.gstack_vibehard/update_status.json mostrar latest > local, avise e sugira /g_update
 """
 
 [mcp_servers.fallow]

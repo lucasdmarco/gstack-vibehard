@@ -39,6 +39,9 @@ O padrao e world-class. Inegociavel.
 - newproject — ativado por /newproject: Guided Architecture Walkthrough (9 passos)
 - g_update — ativado por /g_update: atualizar gstack_vibehard
 
+## Nota de versao
+Se ~/.gstack_vibehard/update_status.json mostrar latest > local, avise e sugira /g_update
+
 ## Dream
 Auto-dream ON. Memorias persistentes entre sessoes.
 `
