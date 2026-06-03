@@ -1,19 +1,17 @@
 {
   "name": "@gstack/installer",
   "version": "0.1.0",
-  "private": true,
-  "description": "GStack VibeHard — Cross-harness installer & fullstack template kit with deep agent integration",
+  "description": "GStack VibeHard — Cross-harness installer & fullstack template kit with deep agent integration (Codex, Claude Code, OpenCode)",
   "license": "MIT",
   "type": "module",
-  "main": "src/cli/index.js",
+  "main": "src/index.js",
   "bin": {
-    "gstack": "src/cli/index.js"
+    "gstack": "src/index.js"
   },
   "scripts": {
-    "install": "node src/cli/index.js install",
-    "doctor": "node src/cli/index.js doctor",
-    "test": "node --experimental-vm-modules node_modules/.bin/jest",
-    "lint": "eslint src/"
+    "gstack": "node src/index.js",
+    "install": "node src/index.js install",
+    "doctor": "node src/index.js doctor"
   },
   "engines": {
     "node": ">=18"
@@ -22,14 +20,25 @@
     "src/",
     "hooks/",
     "skills/",
+    "agents/",
     "templates/",
     "scripts/",
-    "kits/",
+    "launchers/",
     "README.md",
     "LICENSE"
   ],
   "repository": {
     "type": "git",
     "url": "https://github.com/anomalyco/gstack-vibehard"
-  }
+  },
+  "keywords": [
+    "gstack",
+    "claude-code",
+    "codex-cli",
+    "opencode",
+    "agent-skills",
+    "fullstack-template",
+    "taste-skill",
+    "quality-gate"
+  ]
 }
