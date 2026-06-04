@@ -1,7 +1,7 @@
 import { existsSync } from "fs"
 import { join } from "path"
 import { homedir } from "os"
-import { writeWithBackup, ensureDir, readJsonFile, mergeJson } from "../installer/merge.js"
+import { writeWithBackup, ensureDir, readJsonFile } from "../installer/merge.js"
 import { isWindows } from "./detector.js"
 
 const HOME = homedir()
@@ -94,48 +94,54 @@ export async function installClaude(config, report) {
   }
 
   if (config.mcp) {
-    const mcpSettings = {
-      mcpServers: {
-        fallow: {
-          command: "npx",
-          args: ["-y", "fallow", "mcp"],
+    const defaultMcpServers = {
+      fallow: {
+        command: "npx",
+        args: ["-y", "fallow", "mcp"],
+      },
+      supabase: {
+        command: "npx",
+        args: ["-y", "@supabase/mcp-server", "--project-ref", "${SUPABASE_PROJECT_REF}"],
+        env: {
+          SUPABASE_ACCESS_TOKEN: "${SUPABASE_ACCESS_TOKEN}",
         },
-        supabase: {
-          command: "npx",
-          args: ["-y", "@supabase/mcp-server", "--project-ref", "${SUPABASE_PROJECT_REF}"],
-          env: {
-            SUPABASE_ACCESS_TOKEN: "${SUPABASE_ACCESS_TOKEN}",
-          },
+      },
+      playwright: {
+        command: "npx",
+        args: ["-y", "@playwright/mcp"],
+      },
+      context7: {
+        command: "npx",
+        args: ["-y", "@upstash/context7-mcp", "--api-key", "${CONTEXT7_API_KEY}"],
+        env: {
+          CONTEXT7_API_KEY: "${CONTEXT7_API_KEY}",
         },
-        playwright: {
-          command: "npx",
-          args: ["-y", "@playwright/mcp"],
-        },
-        context7: {
-          command: "npx",
-          args: ["-y", "@upstash/context7-mcp", "--api-key", "${CONTEXT7_API_KEY}"],
-          env: {
-            CONTEXT7_API_KEY: "${CONTEXT7_API_KEY}",
-          },
-        },
-        gbrain: {
-          command: "gbrain",
-          args: ["serve"],
-        },
-        graphify: {
-          command: "python",
-          args: ["-m", "graphify.serve", "graphify-out/graph.json"],
-        },
-        headroom: {
-          command: "headroom",
-          args: ["mcp"],
-        },
+      },
+      gbrain: {
+        command: "gbrain",
+        args: ["serve"],
+      },
+      graphify: {
+        command: "python",
+        args: ["-m", "graphify.serve", "graphify-out/graph.json"],
+      },
+      headroom: {
+        command: "headroom",
+        args: ["mcp"],
       },
     }
 
     const existing = readJsonFile(MCP_CONFIG)
-    const merged = mergeJson(existing, mcpSettings)
-    writeWithBackup(MCP_CONFIG, JSON.stringify(merged, null, 2))
+    const existingServers = existing?.mcpServers || {}
+    const userKeys = Object.keys(existingServers).filter(
+      (k) => !(k in defaultMcpServers)
+    )
+    const userMcpServers = {}
+    for (const k of userKeys) {
+      userMcpServers[k] = existingServers[k]
+    }
+    const finalMcpServers = { ...defaultMcpServers, ...userMcpServers }
+    writeWithBackup(MCP_CONFIG, JSON.stringify({ mcpServers: finalMcpServers }, null, 2))
     report.updated.push("~/.mcp.json")
   }
 

@@ -25,7 +25,7 @@ export const GstackSession = async ({ $ }) => {
         try {
           const result = await $`npm view @gstack-vibehard/installer version`
           const latest = result.stdout?.toString().trim() || "unknown"
-          const local = "0.7.4"
+          const local = "0.7.5"
           if (latest !== "unknown" && latest !== local) {
             status = { latest, local, checked_at: now, has_update: true }
           } else {
