@@ -1,4 +1,4 @@
-# gstack-vibehard 2.0
+# gstack-vibehard 2.0.1
 
 **O Ecossistema Definitivo de Engenharia CLI para Agentes de IA.**
 
@@ -15,6 +15,7 @@ Nenhuma interface grafica. Nenhum gargalo de contexto. Paralelismo absoluto.
 - **Compressao de Transporte (Headroom):** o proxy integrado comprime RAG, logs e buscas web antes de chegar na LLM.
 - **Sandboxing e Governanca:** codigo gerado e testado em Docker efemero. A injecao de contexto suporta Permit.io, Composio e LiteLLM.
 - **Sinfonia Assincrona:** hooks emitem sinais sonoros quando tarefas falham ou terminam.
+- **Create Omniharness:** `gstack_vibehard create <nome>` cria um workspace runtime completo com template, MCP, Docker sandbox, scripts locais e regras para Claude/Codex/Cursor/Windsurf/Cline/OpenCode.
 
 ## Instalacao Universal
 
@@ -82,6 +83,7 @@ Rode o Agente Deployer. Ele aciona Fallow para aprovacao de QA e usa GitHub CLI 
 
 ```bash
 gstack_vibehard install        # Instalar no ambiente
+gstack_vibehard create <nome>  # Criar workspace runtime omniharness
 gstack_vibehard doctor         # Diagnosticar ambiente
 gstack_vibehard init <nome>    # Criar novo projeto com template
 gstack_vibehard sprint --save  # Rodar post-sprint

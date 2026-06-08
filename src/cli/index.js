@@ -4,6 +4,7 @@ import { fileURLToPath } from "url"
 import { createInterface } from "readline"
 import { install } from "../installer/install.js"
 import { doctor } from "../installer/doctor.js"
+import { createCommand } from "./create.js"
 import { initCommand } from "../commands/init.js"
 import { sprintCommand } from "../commands/sprint.js"
 
@@ -76,6 +77,7 @@ export function showHelp() {
   logo()
   console.log(color("  Comandos:", COLORS.bold))
   console.log(color("    gstack_vibehard install        Instalar gstack_vibehard no ambiente", COLORS.cyan))
+  console.log(color("    gstack_vibehard create <nome>  Criar workspace runtime omniharness", COLORS.cyan))
   console.log(color("    gstack_vibehard init <nome>    Criar novo projeto com estrutura completa", COLORS.cyan))
   console.log(color("    gstack_vibehard doctor         Diagnosticar ambiente", COLORS.cyan))
   console.log(color("    gstack_vibehard sprint --save   Salvar decisoes e atualizar memorias", COLORS.cyan))
@@ -110,6 +112,9 @@ export async function runCLI(command, args) {
   switch (command) {
     case "install":
       await install()
+      break
+    case "create":
+      await createCommand(args)
       break
     case "init":
       await initCommand(args)
