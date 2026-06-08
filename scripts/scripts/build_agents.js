@@ -3,10 +3,22 @@ import { existsSync } from "node:fs"
 import fs from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
+import { execSync } from "node:child_process"
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url))
 const DEFAULT_ROOT = path.resolve(SCRIPT_DIR, "..", "..")
 const GENERATED_DIR = path.join("agents", "generated")
+
+const PROMPT_INJECTION_PATTERNS = [
+  { pattern: /ignore all previous instructions/i, severity: "CRITICO", description: "Instruction override attempt" },
+  { pattern: /disregard (your|all) (previous|prior)/i, severity: "CRITICO", description: "Disregard directive" },
+  { pattern: /you are (not |no longer )?(gpt|claude|ai|assistant)/i, severity: "ALTO", description: "Identity override" },
+  { pattern: /system.?prompt.?override/i, severity: "CRITICO", description: "System prompt override" },
+  { pattern: /DANGER.?TOOL/i, severity: "ALTO", description: "Dangerous tool pattern" },
+  { pattern: /exfiltrat(e|ion)/i, severity: "CRITICO", description: "Exfiltration keyword" },
+  { pattern: /curl.*(--data|-d).*env/i, severity: "ALTO", description: "Env data exfiltration via curl" },
+  { pattern: /process\.env/i, severity: "BAIXO", description: "Env access in output (review context)" },
+]
 
 function parseArgs(argv) {
   const options = {
@@ -361,7 +373,111 @@ async function generate(options) {
   if (await writeText(path.join(generatedRoot, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`, options)) changed += 1
 
   log(`concluido: ${agents.length} agente(s), ${changed} arquivo(s) alterado(s)`)
+
+  await securityScanGenerated(root, generatedRoot, options)
 }
+
+async function securityScanGenerated(root, generatedRoot, options) {
+  const reportDir = path.join(root, "dist", "agents")
+  const reportPath = path.join(reportDir, "security-report.json")
+  const findings = []
+
+  log("Running AgentShield prompt injection scan...")
+
+  // Try ecc-agentshield first
+  if (!options.check && !options.dryRun) {
+    try {
+      const scanCmd = `npx ecc-agentshield scan --dir ${path.join(root, "core")} --json 2>&1`
+      const scanOutput = execSync(scanCmd, { timeout: 60000, encoding: "utf8", stdio: "pipe" })
+      const scanResult = JSON.parse(scanOutput)
+      findings.push(...(scanResult.findings || []))
+      log(`ecc-agentshield: ${scanResult.summary || "scan complete"}`)
+    } catch (scanErr) {
+      log(`ecc-agentshield not available (${scanErr.message}), using built-in scanner...`)
+      // Fallback: built-in static scan on core/ and generated agents
+      const scanDirs = [
+        path.join(root, "core"),
+        path.join(root, "knowledge"),
+        generatedRoot,
+      ]
+      for (const dir of scanDirs) {
+        if (!existsSync(dir)) continue
+        const files = await listMarkdownFiles(dir)
+        for (const file of files) {
+          const content = await readText(file)
+          const relPath = path.relative(root, file).replaceAll("\\", "/")
+          for (const rule of PROMPT_INJECTION_PATTERNS) {
+            const match = content.match(rule.pattern)
+            if (match) {
+              findings.push({
+                file: relPath,
+                severity: rule.severity,
+                description: rule.description,
+                match: match[0].slice(0, 120),
+                line: findLineNumber(content, match.index),
+              })
+            }
+          }
+        }
+      }
+    }
+  }
+
+  const critical = findings.filter((f) => f.severity === "CRITICO")
+  const high = findings.filter((f) => f.severity === "ALTO")
+  const blocked = critical.length > 0
+
+  const report = {
+    schemaVersion: 1,
+    scannedAt: new Date().toISOString(),
+    scanner: "ecc-agentshield + built-in static analysis",
+    summary: {
+      total: findings.length,
+      critical: critical.length,
+      high: high.length,
+      blocked,
+    },
+    findings,
+    verdict: blocked ? "BLOQUEADO" : "APROVADO",
+  }
+
+  if (!options.dryRun && !options.check) {
+    await fs.mkdir(reportDir, { recursive: true })
+    await fs.writeFile(reportPath, JSON.stringify(report, null, 2), "utf8")
+    log(`Security report saved to ${path.relative(root, reportPath)}`)
+  }
+
+  if (options.check) {
+    const existingReport = existsSync(reportPath)
+      ? JSON.parse(await fs.readFile(reportPath, "utf8"))
+      : null
+    if (existingReport && existingReport.summary.blocked !== blocked) {
+      throw new Error(`Security report desatualizado: verdict changed to ${report.verdict}`)
+    }
+  }
+
+  if (blocked) {
+    const msg = `AgentShield: ${critical.length} CRITICO injection(s) detected — build blocked`
+    log(msg)
+    for (const f of critical) {
+      console.error(`  [CRITICO] ${f.file}: ${f.description}`)
+    }
+    if (!options.dryRun) {
+      throw new Error(msg)
+    }
+  } else {
+    log(`AgentShield scan passed: ${findings.length} finding(s), ${critical.length} CRITICO`)
+  }
+
+  return report
+}
+
+function findLineNumber(content, index) {
+  if (index === undefined || index === null) return -1
+  const before = content.slice(0, index)
+  return (before.match(/\n/g) || []).length + 1
+}
+
 
 async function main() {
   const options = parseArgs(process.argv.slice(2))

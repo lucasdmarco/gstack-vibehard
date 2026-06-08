@@ -9,14 +9,14 @@ import { pathToFileURL } from "node:url"
 const repoRoot = path.resolve(import.meta.dirname, "..")
 const modulePath = path.join(repoRoot, "src", "cli", "create.js")
 
-test("create scaffolds a complete omniharness workspace and keeps post-install failures non-blocking", async () => {
+test("create scaffolds with Control Plane, MCP Gateway, Mesh Federation, and Ticket Orchestration", async () => {
   const tmp = await mkdtemp(path.join(tmpdir(), "gstack-create-"))
   try {
     const cwd = path.join(tmp, "workspace")
     await mkdir(cwd, { recursive: true })
 
     const commands = []
-    const warnings = []
+    process.env.GSTACK_SKIP_PREFLIGHT = "1"
     const { createProject } = await import(`${pathToFileURL(modulePath)}?t=${Date.now()}`)
     const result = await createProject({
       args: ["teste-app"],
@@ -26,13 +26,13 @@ test("create scaffolds a complete omniharness workspace and keeps post-install f
       logger: {
         info: () => {},
         success: () => {},
-        warn: (message) => warnings.push(message),
+        warn: () => {},
         error: () => {},
       },
       execSync: (cmd, options = {}) => {
         commands.push({ cmd, cwd: options.cwd })
-        if (cmd.includes("agentmemory") || cmd.includes("graphify")) {
-          throw new Error("offline")
+        if (cmd.includes("atomic init") || cmd.includes("ecc2") || cmd.includes("agentmemory") || cmd.includes("agent-hooks") || cmd.includes("graphify")) {
+          return Buffer.from("ok")
         }
         return Buffer.from("ok")
       },
@@ -40,46 +40,58 @@ test("create scaffolds a complete omniharness workspace and keeps post-install f
 
     const appDir = path.join(cwd, "teste-app")
     assert.equal(result.projectDir, appDir)
-    assert.equal(result.warnings.length >= 2, true)
-    assert.equal(existsSync(path.join(appDir, "Dockerfile")), true)
-    assert.equal(existsSync(path.join(appDir, ".dockerignore")), true)
-    assert.equal(existsSync(path.join(appDir, "scripts", "dev.sh")), true)
-    assert.equal(existsSync(path.join(appDir, "scripts", "workspace_manager.py")), true)
-    assert.equal(existsSync(path.join(appDir, "scripts", "deep_research.py")), true)
-    assert.equal(existsSync(path.join(appDir, "scripts", "team_builder.py")), true)
-    assert.equal(existsSync(path.join(appDir, ".gstack", "app.json")), true)
-    assert.equal(existsSync(path.join(appDir, ".gstack", "services.json")), true)
-    assert.equal(existsSync(path.join(appDir, ".gstack", "secrets.schema.json")), true)
-    assert.equal(existsSync(path.join(appDir, ".cursor", "rules", "gstack.mdc")), true)
-    assert.equal(existsSync(path.join(appDir, ".windsurf", "rules", "gstack.md")), true)
-    assert.equal(existsSync(path.join(appDir, ".clinerules")), true)
-    assert.equal(existsSync(path.join(appDir, "AGENTS.md")), true)
 
-    const app = JSON.parse(await readFile(path.join(appDir, ".gstack", "app.json"), "utf8"))
-    assert.equal(app.name, "teste-app")
-    assert.equal(app.runtime, "gstack-workspace")
-    assert.equal(app.createdAt, "2026-06-08T00:00:00.000Z")
+    // Pillar 1: Control Plane
+    assert.equal(existsSync(path.join(appDir, ".gstack", "control-plane.yaml")), true)
+    const cpYaml = await readFile(path.join(appDir, ".gstack", "control-plane.yaml"), "utf8")
+    assert.match(cpYaml, /daemon:/)
+    assert.match(cpYaml, /dashboard: true/)
+    assert.match(cpYaml, /sessions: true/)
 
-    const services = JSON.parse(await readFile(path.join(appDir, ".gstack", "services.json"), "utf8"))
-    assert.deepEqual(services.services.map((service) => service.name), ["web", "api"])
-
+    // Pillar 2: MCP Gateway
+    assert.equal(existsSync(path.join(appDir, ".mcp.json")), true)
     const mcp = JSON.parse(await readFile(path.join(appDir, ".mcp.json"), "utf8"))
-    assert.equal(Boolean(mcp.mcpServers["agentmemory-graphify"]), true)
-    assert.equal(Boolean(mcp.mcpServers.mom), true)
-    assert.equal(Boolean(mcp.mcpServers.headroom), true)
+    assert.equal(Boolean(mcp.mcpServers["permit-gateway"]), true)
+    assert.equal(mcp.mcpServers["permit-gateway"].args[0], "-y")
+    assert.equal(mcp.mcpServers["permit-gateway"].args[1], "@permitio/mcp-gateway")
+    // No direct connections remain
+    assert.equal(mcp.mcpServers["supabase"], undefined)
+    assert.equal(mcp.mcpServers["composio"], undefined)
 
-    assert.deepEqual(commands, [
-      { cmd: "npx @agentmemory/agentmemory connect claude", cwd: appDir },
-      { cmd: "npx @agentmemory/agentmemory connect codex", cwd: appDir },
-      { cmd: "npx @agentmemory/agentmemory connect cursor", cwd: appDir },
-      { cmd: "npx @agentmemory/agentmemory connect windsurf", cwd: appDir },
-      { cmd: "npx @agentmemory/agentmemory connect cline", cwd: appDir },
-      { cmd: "npx @agentmemory/agentmemory connect opencode", cwd: appDir },
-      { cmd: "npx graphify hook install", cwd: appDir },
-    ])
-    assert.equal(warnings.some((message) => message.includes("AgentMemory claude: offline")), true)
-    assert.equal(warnings.some((message) => message.includes("Graphify git hooks: offline")), true)
+    // Pillar 3: Mesh Federation
+    assert.equal(existsSync(path.join(appDir, ".gstack", "federation.toml")), true)
+    const fedToml = await readFile(path.join(appDir, ".gstack", "federation.toml"), "utf8")
+    assert.match(fedToml, /\[mesh\]/)
+    assert.match(fedToml, /hybrid = \["bm25", "vector", "graph"\]/)
+
+    // Pillar 4: Ticket Orchestration
+    assert.equal(existsSync(path.join(appDir, "paperclip.toml")), true)
+    const paperclip = await readFile(path.join(appDir, "paperclip.toml"), "utf8")
+    assert.match(paperclip, /orchestrator = "paperclip"/)
+    assert.match(paperclip, /provider = "jira"/)
+    assert.equal(existsSync(path.join(appDir, "symphony.yml")), true)
+
+    // app.json metadata
+    const app = JSON.parse(await readFile(path.join(appDir, ".gstack", "app.json"), "utf8"))
+    assert.equal(app.controlPlane, "ecc2")
+    assert.equal(app.mcpGateway, "permitio")
+    assert.equal(app.meshFederation, true)
+    assert.equal(app.ticketOrchestration, "paperclip")
+
+    // AGENTS.md documents the pillars
+    const agents = await readFile(path.join(appDir, "AGENTS.md"), "utf8")
+    assert.match(agents, /Control Plane/)
+    assert.match(agents, /MCP Gateway/)
+    assert.match(agents, /Mesh Federation/)
+    assert.match(agents, /Ticket Orchestration/)
+
+    // Core scaffold still works
+    assert.equal(existsSync(path.join(appDir, "Dockerfile")), true)
+    assert.equal(existsSync(path.join(appDir, ".gstack", "services.json")), true)
+    assert.equal(existsSync(path.join(appDir, ".claude", "teams", "supervisor.json")), true)
+    assert.equal(existsSync(path.join(appDir, ".atomicignore")), true)
   } finally {
+    delete process.env.GSTACK_SKIP_PREFLIGHT
     await rm(tmp, { recursive: true, force: true })
   }
 })

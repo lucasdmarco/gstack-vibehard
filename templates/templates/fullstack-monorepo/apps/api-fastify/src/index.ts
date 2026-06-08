@@ -3,11 +3,11 @@ import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import swagger from '@fastify/swagger'
 import swaggerUi from '@fastify/swagger-ui'
-import { userRoutes } from './routes/users'
-import { healthRoutes } from './routes/health'
+import { userRoutes } from './routes/users.js'
+import { healthRoutes } from './routes/health.js'
 
 const app = Fastify({ logger: true })
-const port = parseInt(process.env.PORT || '3001', 10)
+const port = parseInt(process.env.API_PORT || '3001', 10)
 
 await app.register(cors, { origin: true })
 

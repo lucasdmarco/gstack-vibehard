@@ -11,50 +11,30 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 STOP = REPO_ROOT / "hooks" / "hooks" / "stop.py"
 
 
-def write_fake_python(bin_dir: Path, marker_file: Path | None = None) -> None:
-    marker_code = ""
-    if marker_file:
-        marker_code = f"open({str(marker_file)!r}, 'w', encoding='utf-8').write('called')\n"
-    if os.name == "nt":
-        runner = bin_dir / "fake_python.py"
-        runner.write_text(f"{marker_code}raise SystemExit(2)\n", encoding="utf-8")
-        (bin_dir / "python.cmd").write_text(
-            "@echo off\r\n"
-            f'"{sys.executable}" "{runner}" %*\r\n'
-            "exit /b %ERRORLEVEL%\r\n",
-            encoding="utf-8",
-        )
-    else:
-        fake = bin_dir / "python"
-        fake.write_text(
-            "#!/usr/bin/env sh\n"
-            + (f"printf called > \"{marker_file}\"\n" if marker_file else "")
-            + "exit 2\n",
-            encoding="utf-8",
-        )
-        fake.chmod(0o755)
-
-
-def write_fake_docker(bin_dir: Path, exit_code: int) -> None:
-    runner = bin_dir / "fake_docker.py"
+def write_fake_openhands(bin_dir: Path, exit_code: int) -> None:
+    runner = bin_dir / "fake_openhands.py"
     runner.write_text(
         "import json, os, sys\n"
-        "args_file = os.environ.get('DOCKER_ARGS_FILE')\n"
+        "args_file = os.environ.get('OPENHANDS_ARGS_FILE')\n"
         "if args_file:\n"
         "    open(args_file, 'w', encoding='utf-8').write(json.dumps(sys.argv[1:]))\n"
         f"sys.exit({exit_code})\n",
         encoding="utf-8",
     )
     if os.name == "nt":
-        (bin_dir / "docker.cmd").write_text(
+        (bin_dir / "openhands.cmd").write_text(
             "@echo off\r\n"
             f'"{sys.executable}" "{runner}" %*\r\n'
             "exit /b %ERRORLEVEL%\r\n",
             encoding="utf-8",
         )
     else:
-        fake = bin_dir / "docker"
-        fake.write_text(f"#!/usr/bin/env sh\nexec \"{sys.executable}\" \"{runner}\" \"$@\"\n", encoding="utf-8")
+        fake = bin_dir / "openhands"
+        fake.write_text(
+            "#!/usr/bin/env sh\n"
+            f'exec "{sys.executable}" "{runner}" "$@"\n',
+            encoding="utf-8",
+        )
         fake.chmod(0o755)
 
 
@@ -79,12 +59,12 @@ class StopSandboxTest(unittest.TestCase):
             timeout=20,
         )
 
-    def test_docker_sandbox_failure_blocks_stop_with_json_and_audio(self):
+    def test_openhands_sandbox_failure_blocks_stop_with_json_and_audio(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "repo"
             home = Path(tmp) / "home"
             bin_dir = Path(tmp) / "bin"
-            args_file = Path(tmp) / "docker_args.json"
+            args_file = Path(tmp) / "openhands_args.json"
             post_sprint_marker = Path(tmp) / "post_sprint_called.txt"
             root.mkdir()
             home.mkdir()
@@ -98,37 +78,34 @@ class StopSandboxTest(unittest.TestCase):
                 "print(json.dumps({}))\n",
                 encoding="utf-8",
             )
-            write_fake_docker(bin_dir, 7)
+            write_fake_openhands(bin_dir, 7)
 
             result = self.run_stop(
                 {"cwd": str(root), "last_assistant_message": "done", "flags": {}},
                 home,
                 bin_dir,
-                {"DOCKER_ARGS_FILE": str(args_file)},
+                {"OPENHANDS_ARGS_FILE": str(args_file)},
                 include_original_path=True,
             )
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("audio-cue:error", result.stderr)
             data = json.loads(result.stdout)
-            self.assertEqual(data["error"], "Docker sandbox failed")
+            self.assertEqual(data["error"], "OpenHands sandbox failed")
             self.assertEqual(data["exitStatus"], 1)
-            self.assertIn("Sandbox Docker: FALHOU", data["systemMessage"])
-            self.assertFalse(post_sprint_marker.exists(), "sandbox failure must short-circuit post_sprint/QG python calls")
-            docker_args = json.loads(args_file.read_text(encoding="utf-8"))
-            self.assertEqual(docker_args, [
-                "run",
-                "--rm",
-                "-v",
-                f"{root.resolve()}:/workspace",
-                "-w",
-                "/workspace",
-                "node:20-alpine",
-                "npm",
-                "test",
+            self.assertIn("Sandbox OpenHands: FALHOU", data["systemMessage"])
+            self.assertFalse(post_sprint_marker.exists(),
+                             "sandbox failure must short-circuit post_sprint/QG python calls")
+            openhands_args = json.loads(args_file.read_text(encoding="utf-8"))
+            self.assertEqual(openhands_args, [
+                "--headless",
+                "-t",
+                "Validar entrega e executar testes",
+                "--path",
+                str(root.resolve()),
             ])
 
-    def test_missing_docker_skips_sandbox_without_breaking_json(self):
+    def test_missing_openhands_reports_failure(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "repo"
             home = Path(tmp) / "home"
@@ -137,15 +114,13 @@ class StopSandboxTest(unittest.TestCase):
             home.mkdir()
             bin_dir.mkdir()
             (root / "package.json").write_text("{}\n", encoding="utf-8")
-            write_fake_python(bin_dir)
 
             result = self.run_stop({"cwd": str(root), "last_assistant_message": "done", "flags": {}}, home, bin_dir)
 
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("sandbox: docker not found, skipped", result.stderr)
-            self.assertIn("audio-cue:success", result.stderr)
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("audio-cue:error", result.stderr)
             data = json.loads(result.stdout)
-            self.assertIn("systemMessage", data)
+            self.assertIn("OpenHands sandbox failed", data["error"])
 
 
 if __name__ == "__main__":

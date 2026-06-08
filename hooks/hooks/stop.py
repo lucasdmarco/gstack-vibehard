@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Stop hook: save session chronicle + QG L1 + Security Gate (highermind patterns).
 
+Sandboxing is handled exclusively by OpenHands headless mode.
+Docker sandbox has been removed — OpenHands manages its own isolation.
+
 Security Gate checks (BLOCKING before deploy):
   1. .dockerignore exists and covers .env, .git, node_modules
   2. Multi-stage Dockerfile (no dev server in prod)
@@ -70,51 +73,40 @@ def play_audio_cue(kind: str) -> None:
         pass
 
 
-def run_docker_sandbox(cwd: str) -> dict:
-    """Run project tests in an ephemeral Docker container when explicitly enabled."""
+def run_sandbox(cwd: str) -> dict:
+    """Run validation in OpenHands headless mode.
+
+    OpenHands is the only supported sandbox engine. It manages Docker
+    isolation internally. If the CLI is not found, this hook fails hard.
+    """
     if os.environ.get("GSTACK_SANDBOX_TEST") != "1":
         return {"status": "disabled"}
 
     if not cwd:
-        sys.stderr.write("sandbox: cwd missing, skipped\n")
-        sys.stderr.flush()
         return {"status": "skipped", "reason": "cwd missing"}
 
-    docker_bin = shutil.which("docker")
-    if not docker_bin:
-        sys.stderr.write("sandbox: docker not found, skipped\n")
-        sys.stderr.flush()
-        return {"status": "skipped", "reason": "docker not found"}
+    openhands_bin = shutil.which("openhands")
+    if not openhands_bin:
+        return {"status": "failed", "reason": "openhands CLI not found in PATH. Install: pip install openhands"}
 
     root = find_project_root(cwd) or Path(cwd).resolve()
-    cmd = [
-        docker_bin,
-        "run",
-        "--rm",
-        "-v",
-        f"{root.resolve()}:/workspace",
-        "-w",
-        "/workspace",
-        "node:20-alpine",
-        "npm",
-        "test",
-    ]
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        result = subprocess.run(
+            [openhands_bin, "--headless", "-t", "Validar entrega e executar testes", "--path", str(root)],
+            capture_output=True,
+            text=True,
+            timeout=600,
+        )
     except FileNotFoundError:
-        sys.stderr.write("sandbox: docker not found, skipped\n")
-        sys.stderr.flush()
-        return {"status": "skipped", "reason": "docker not found"}
+        return {"status": "failed", "reason": "openhands binary not found"}
     except OSError as e:
-        sys.stderr.write(f"sandbox: docker unavailable, skipped: {e}\n")
-        sys.stderr.flush()
-        return {"status": "skipped", "reason": str(e)}
+        return {"status": "failed", "reason": str(e)}
     except subprocess.TimeoutExpired as e:
         return {
             "status": "failed",
             "returncode": 124,
             "stdout": e.stdout or "",
-            "stderr": e.stderr or "Docker sandbox timed out",
+            "stderr": e.stderr or "OpenHands sandbox timed out",
         }
 
     if result.returncode != 0:
@@ -226,10 +218,8 @@ def dockerfile_check_non_root(root: Path) -> bool:
             text = dockerfile.read_text(encoding="utf-8", errors="ignore")
             if "USER" not in text:
                 return False
-            # Se USER root ou USER 0, falha
             if re.search(r"USER\s+(root|0)\b", text, re.IGNORECASE):
                 return False
-            # USER alguem (appuser, node, etc) — passa
             return True
     return True
 
@@ -308,8 +298,6 @@ def swagger_check(root: Path) -> bool:
                 text = f.read_text(encoding="utf-8", errors="ignore")
                 if re.search(r'(swagger|openapi|docs|redoc)', text, re.IGNORECASE):
                     if not re.search(r'(environment|env|app_env|NODE_ENV|APP_ENV)', text, re.IGNORECASE):
-                        # swagger mencionado mas sem gate de ambiente — pode estar exposto
-                        # So reportamos se for producao
                         return False
             except Exception:
                 continue
@@ -398,18 +386,21 @@ note_lines = [
     f"- Working directory: {cwd}",
 ]
 
-# Docker sandbox (explicit opt-in): isolate test execution from the host.
-sandbox_result = run_docker_sandbox(cwd)
+# Sandbox: OpenHands headless mode (the only supported sandbox engine).
+sandbox_result = run_sandbox(cwd)
 if sandbox_result.get("status") == "passed":
     note_lines.append("")
-    note_lines.append("## Docker Sandbox")
-    note_lines.append("Sandbox Docker: OK")
+    note_lines.append("## OpenHands Sandbox")
+    note_lines.append("Sandbox OpenHands: OK")
 elif sandbox_result.get("status") == "failed":
     stop_failed = True
     stop_exit_status = 1
     note_lines.append("")
-    note_lines.append("## Docker Sandbox")
-    note_lines.append(f"Sandbox Docker: FALHOU (exit {sandbox_result.get('returncode')})")
+    note_lines.append("## OpenHands Sandbox")
+    note_lines.append(f"Sandbox OpenHands: FALHOU (exit {sandbox_result.get('returncode', 'N/A')})")
+    reason = sandbox_result.get("reason", "")
+    if reason:
+        note_lines.append(f"Motivo: {reason}")
     if sandbox_result.get("stdout"):
         note_lines.append("stdout:")
         note_lines.append(str(sandbox_result["stdout"])[-4000:])
@@ -421,16 +412,16 @@ elif sandbox_result.get("status") == "failed":
     chronicle_file.write_text("\n".join(note_lines), encoding="utf-8")
     play_audio_cue("error")
     output = {
-        "systemMessage": f"Memorias salvas em {chronicle_file.name} + Sandbox Docker: FALHOU ({sandbox_result.get('returncode')})",
-        "error": "Docker sandbox failed",
+        "systemMessage": f"Memorias salvas em {chronicle_file.name} + Sandbox OpenHands: FALHOU ({sandbox_result.get('returncode', 'N/A')})",
+        "error": "OpenHands sandbox failed",
         "exitStatus": stop_exit_status,
     }
     sys.stdout.write(json.dumps(output))
     sys.exit(stop_exit_status)
 elif sandbox_result.get("status") == "skipped":
     note_lines.append("")
-    note_lines.append("## Docker Sandbox")
-    note_lines.append(f"Sandbox Docker: pulado ({sandbox_result.get('reason', 'unknown')})")
+    note_lines.append("## OpenHands Sandbox")
+    note_lines.append(f"Sandbox OpenHands: pulado ({sandbox_result.get('reason', 'unknown')})")
 
 # Security Gate (so roda se detectar deploy ou se explicitamente chamado)
 if run_security:
@@ -507,9 +498,9 @@ chronicle_file.write_text(note, encoding="utf-8")
 
 msg_parts = [f"Memorias salvas em {chronicle_file.name} + QG L1 executado"]
 if sandbox_result and sandbox_result.get("status") == "passed":
-    msg_parts.append("Sandbox Docker: OK")
+    msg_parts.append("Sandbox OpenHands: OK")
 elif sandbox_result and sandbox_result.get("status") == "failed":
-    msg_parts.append(f"Sandbox Docker: FALHOU ({sandbox_result.get('returncode')})")
+    msg_parts.append(f"Sandbox OpenHands: FALHOU ({sandbox_result.get('returncode', 'N/A')})")
 
 # Post-sprint: atualiza graphify + gbrain + MOM + chronicle enrich
 try:
@@ -541,7 +532,7 @@ output = {
     "systemMessage": " | ".join(msg_parts)
 }
 if stop_exit_status:
-    output["error"] = "Docker sandbox failed"
+    output["error"] = "OpenHands sandbox failed"
     output["exitStatus"] = stop_exit_status
 sys.stdout.write(json.dumps(output))
 sys.exit(stop_exit_status)

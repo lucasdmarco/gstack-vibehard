@@ -11,7 +11,7 @@
   "scripts": {
     "gstack_vibehard": "node src/index.js",
     "build:agents": "node scripts/scripts/build_agents.js",
-    "install": "node src/index.js install",
+    "setup": "node src/index.js install",
     "doctor": "node src/index.js doctor",
     "test": "node src/index.js doctor"
   },
@@ -25,6 +25,9 @@
     "agents/",
     "templates/",
     "scripts/",
+    "mcp-configs/",
+    "core/",
+    "knowledge/",
     "launchers/cross/install.sh",
     "launchers/macos/gstack_vibehard.rb",
     "launchers/windows/install.bat",
