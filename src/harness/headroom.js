@@ -81,19 +81,22 @@ export async function installHeadroom(deps, report) {
     }
   }
 
-  // Add headroom to MCP servers
-  const mcpSettings = {
-    mcpServers: {
-      headroom: {
-        command: "headroom",
-        args: ["mcp"],
-      },
-    },
-  }
-
+  // Add headroom to MCP servers (evitar duplicacao)
   const existing = readJsonFile(MCP_CONFIG)
-  const merged = mergeJson(existing, mcpSettings)
-  writeWithBackup(MCP_CONFIG, JSON.stringify(merged, null, 2))
-  success("headroom MCP server adicionado ao .mcp.json")
-  report.updated.push("~/.mcp.json (headroom)")
+  if (existing?.mcpServers?.headroom) {
+    info("headroom MCP ja configurado em ~/.mcp.json (pulado)")
+  } else {
+    const mcpSettings = {
+      mcpServers: {
+        headroom: {
+          command: "headroom",
+          args: ["mcp"],
+        },
+      },
+    }
+    const merged = mergeJson(existing, mcpSettings)
+    writeWithBackup(MCP_CONFIG, JSON.stringify(merged, null, 2))
+    success("headroom MCP server adicionado ao .mcp.json")
+    report.updated.push("~/.mcp.json (headroom)")
+  }
 }

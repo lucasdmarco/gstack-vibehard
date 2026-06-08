@@ -22,6 +22,7 @@ O padrao e world-class. Inegociavel.
 
 ## Quality Gate
 - Antes de entregar output, rode: python ~/.codex/hooks/qg.py --path . --level 1
+- (Se Codex nao estiver instalado, use: python ~/.claude/hooks/qg.py --path . --level 1)
 - Se CRITICO/ALTO blocker: pare, corrija, re-execute QG, so entao entregue
 - Se MEDIO/BAIXO: documente e entregue com notas
 
@@ -33,11 +34,16 @@ O padrao e world-class. Inegociavel.
 - Zero secrets hardcoded
 
 ## Skills disponiveis
-- frontend-design — interfaces premium com taste-skill (4 engines + 3 dials)
+- frontend-design — interfaces premium com taste-skill (4 engines + 3 dials) + design system detection
 - chronicle — memoria de sessoes indexada
 - project-init — setup de projeto com variante backend
-- newproject — ativado por /newproject: Guided Architecture Walkthrough (9 passos)
+- newproject — ativado por /newproject: Guided Architecture Walkthrough (10 passos)
 - g_update — ativado por /g_update: atualizar gstack_vibehard
+
+## Design System
+ANTES de escrever qualquer codigo de frontend, pergunte ao usuario se ele tem um design system proprio.
+Se sim, carregue a skill frontend-design para aplicar os tokens. Se nao, gere um.
+O hook pre_tool_use_security.py bloqueia escrita de UI ate essa pergunta ser respondida.
 
 ## Nota de versao
 Se ~/.gstack_vibehard/update_status.json mostrar latest > local, avise e sugira /g_update
@@ -133,14 +139,26 @@ export async function installClaude(config, report) {
 
     const existing = readJsonFile(MCP_CONFIG)
     const existingServers = existing?.mcpServers || {}
-    const userKeys = Object.keys(existingServers).filter(
-      (k) => !(k in defaultMcpServers)
-    )
-    const userMcpServers = {}
-    for (const k of userKeys) {
-      userMcpServers[k] = existingServers[k]
+    // Deep merge: preserve user's custom servers AND their custom configs for default-named servers
+    const finalMcpServers = {}
+    for (const [key, defaultValue] of Object.entries(defaultMcpServers)) {
+      if (key in existingServers) {
+        const userVal = existingServers[key]
+        if (typeof userVal === "object" && typeof defaultValue === "object") {
+          finalMcpServers[key] = { ...defaultValue, ...userVal }
+        } else {
+          finalMcpServers[key] = userVal
+        }
+      } else {
+        finalMcpServers[key] = defaultValue
+      }
     }
-    const finalMcpServers = { ...defaultMcpServers, ...userMcpServers }
+    // Add user servers that aren't in defaults
+    for (const [key, val] of Object.entries(existingServers)) {
+      if (!(key in defaultMcpServers)) {
+        finalMcpServers[key] = val
+      }
+    }
     writeWithBackup(MCP_CONFIG, JSON.stringify({ mcpServers: finalMcpServers }, null, 2))
     report.updated.push("~/.mcp.json")
   }

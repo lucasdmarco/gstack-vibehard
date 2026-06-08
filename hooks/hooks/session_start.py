@@ -6,7 +6,7 @@ Integrates highermind patterns:
   2. Weighted stack decision framework — helps agents choose optimal tech stack
   3. Security-first awareness — reminds security baseline checks
 """
-import json, sys, os, subprocess, time
+import json, sys, os, subprocess, time, getpass, socket, shutil, urllib.request
 from pathlib import Path
 
 
@@ -86,6 +86,110 @@ def run_gc_check(cwd: str) -> str | None:
     return None
 
 
+def first_env(names: list[str], default: str = "") -> str:
+    """Return the first non-empty environment variable from names."""
+    for name in names:
+        value = os.environ.get(name, "").strip()
+        if value:
+            return value
+    return default
+
+
+def csv_env(name: str, default: str) -> list[str]:
+    raw = os.environ.get(name, default)
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
+def detect_subject() -> str:
+    return first_env(["GSTACK_USER_ID", "PERMIT_USER_ID", "USER", "USERNAME"], getpass.getuser() or "unknown")
+
+
+def build_permit_context(cwd: str) -> dict:
+    project = Path(cwd).resolve().name if cwd else "unknown"
+    context = {
+        "subject": detect_subject(),
+        "roles": csv_env("GSTACK_RBAC_ROLES", "developer"),
+        "tenant": first_env(["PERMIT_TENANT_ID", "GSTACK_TENANT_ID"], "local"),
+        "project": project,
+        "machine": socket.gethostname(),
+        "filter_mode": "payload",
+    }
+    os.environ["PERMIT_CONTEXT"] = json.dumps(context, ensure_ascii=False)
+    os.environ["GSTACK_RAG_FILTER"] = os.environ["PERMIT_CONTEXT"]
+    return context
+
+
+def check_composio_status() -> tuple[str, str]:
+    """Detect user-delegated Composio auth without failing session start."""
+    if first_env(["COMPOSIO_API_KEY", "COMPOSIO_TOKEN"]):
+        return "active", "env token present"
+    cli = shutil.which("composio")
+    if not cli:
+        return "not configured", "composio CLI not found and no COMPOSIO_API_KEY"
+    try:
+        result = subprocess.run([cli, "whoami", "--json"], capture_output=True, text=True, timeout=5)
+        if result.returncode == 0:
+            return "active", "local CLI session detected"
+        return "not authenticated", (result.stderr or result.stdout or "whoami failed")[:160]
+    except (subprocess.TimeoutExpired, OSError) as exc:
+        return "unknown", str(exc)[:160]
+
+
+def configure_litellm() -> tuple[str, str, str]:
+    """Prepare local LiteLLM routing hints for the current hook process."""
+    base_url = first_env(["LITELLM_BASE_URL", "ANTHROPIC_BASE_URL"], "http://localhost:4000").rstrip("/")
+    skip_healthcheck = os.environ.get("LITELLM_SKIP_HEALTHCHECK", "").lower() in {"1", "true", "yes"}
+    status = "configured"
+    detail = "healthcheck skipped"
+
+    if not skip_healthcheck:
+        try:
+            with urllib.request.urlopen(f"{base_url}/health", timeout=1.5) as response:
+                if response.status >= 400:
+                    status = "offline"
+                    detail = f"/health returned {response.status}"
+                else:
+                    detail = f"/health returned {response.status}"
+        except Exception as exc:
+            status = "offline"
+            detail = f"{type(exc).__name__}: {str(exc)[:120]}"
+
+    os.environ["ANTHROPIC_BASE_URL"] = base_url
+    os.environ["OPENAI_BASE_URL"] = base_url
+    os.environ["LITELLM_BASE_URL"] = base_url
+    return status, base_url, detail
+
+
+def build_governance_context(cwd: str) -> str:
+    permit = build_permit_context(cwd)
+    composio_status, composio_detail = check_composio_status()
+    litellm_status, litellm_base_url, litellm_detail = configure_litellm()
+    roles = ", ".join(permit["roles"])
+    permit_json = json.dumps(permit, ensure_ascii=False)
+
+    return f"""## Governance Context
+
+### Permit.io Payload Filtering
+- subject: {permit['subject']}
+- roles: {roles}
+- tenant: {permit['tenant']}
+- project: {permit['project']}
+- PERMIT_CONTEXT={permit_json}
+- RAG policy: MCP/RAG tools must filter documents by subject, roles, tenant and project before returning payloads.
+
+### Composio User-Delegated Auth
+- Composio: {composio_status}
+- detail: {composio_detail}
+- External tools must execute with user-delegated credentials, never shared service identity by default.
+
+### LiteLLM Cost Routing
+- LiteLLM: {litellm_status}
+- ANTHROPIC_BASE_URL={litellm_base_url}
+- OPENAI_BASE_URL={litellm_base_url}
+- detail: {litellm_detail}
+- Routing policy: send architecture/high-risk work to paid frontier models; allow local/Ollama fallback for formatting and trivial transformations."""
+
+
 # ═══════════════════════════════════════════════════════════════
 #  IDENTITY INJECTION (highermind CLAUDE.md.template pattern)
 # ═══════════════════════════════════════════════════════════════
@@ -159,13 +263,49 @@ Checklist obrigatorio para todo projeto:
 #  MAIN
 # ═══════════════════════════════════════════════════════════════
 
-inp = json.loads(sys.stdin.read())
+raw_input = sys.stdin.read()
+try:
+    inp = json.loads(raw_input) if raw_input.strip() else {}
+except json.JSONDecodeError:
+    inp = {}
 cwd = inp.get("cwd", "")
 project_name = Path(cwd).name if cwd else "unknown"
 
 ctx_parts = []
 
-# 0. Identity injection (highermind)
+# 0. Governance, payload filtering and cost routing
+try:
+    ctx_parts.append(build_governance_context(cwd))
+except Exception as e:
+    ctx_parts.append(f"## Governance Context\nGovernance bootstrap warning: {type(e).__name__}: {str(e)[:200]}")
+
+# 0b. Session state — design system + workflow preconditions
+session_file = Path(cwd) / ".gstack" / "session_state.json" if cwd else Path()
+if not session_file.exists():
+    for parent in [Path(cwd)] if cwd else []:
+        for _ in range(5):
+            candidate = parent / ".gstack" / "session_state.json"
+            if candidate.exists():
+                session_file = candidate
+                break
+            parent = parent.parent
+
+if session_file.exists():
+    try:
+        ss = json.loads(session_file.read_text(encoding="utf-8"))
+        ds_status = ""
+        if ss.get("asked_about_design_system") is True:
+            ds_path = ss.get("design_system_path") or ss.get("design_system_engine") or "configurado"
+            ds_status = f"Design system: {ds_path}"
+        elif ss.get("asked_about_design_system") is False:
+            ds_status = "Design system: NAO PERGUNTADO — bloqueando escrita de frontend"
+        else:
+            ds_status = "Design system: nao configurado"
+        ctx_parts.append(f"## Session State\n{ds_status}")
+    except (json.JSONDecodeError, OSError):
+        pass
+
+# 1. Identity injection (highermind)
 ctx_parts.append(IDENTITY_BLOCK)
 
 # 1. GStack Check (gc.py)
@@ -224,10 +364,19 @@ if time.time() - last_check > 86400:
             ["npm", "view", "@gstack-vibehard/installer", "version"],
             capture_output=True, text=True, timeout=10
         ).stdout.strip()
-        local = subprocess.run(
-            ["gstack_vibehard", "--version"],
-            capture_output=True, text=True, timeout=5
-        ).stdout.strip() or "0.0.0"
+        # Try multiple paths for local binary
+        local = "0.0.0"
+        for candidate in [["gstack_vibehard", "--version"], ["npx", "gstack_vibehard", "--version"], ["bun", "x", "gstack_vibehard", "--version"]]:
+            try:
+                r = subprocess.run(
+                    candidate,
+                    capture_output=True, text=True, timeout=5
+                )
+                if r.returncode == 0 and r.stdout.strip():
+                    local = r.stdout.strip()
+                    break
+            except Exception:
+                continue
         UPDATE_FILE.write_text(json.dumps({
             "latest": latest,
             "local": local,

@@ -24,27 +24,32 @@ export function ensureDir(dirPath) {
   }
 }
 
-export function mergeJson(existing, gvConfig) {
-  if (!existing) return gvConfig
-  const merged = { ...existing }
-  for (const [key, value] of Object.entries(gvConfig)) {
-    if (key in merged) {
-      if (Array.isArray(merged[key]) && Array.isArray(value)) {
-        const existingSet = new Set(merged[key])
+export function deepMerge(target, source) {
+  const output = { ...target }
+  for (const [key, value] of Object.entries(source)) {
+    if (key in output) {
+      if (Array.isArray(output[key]) && Array.isArray(value)) {
+        const existingSet = new Set(output[key])
         for (const item of value) {
           if (!existingSet.has(item)) {
-            merged[key].push(item)
+            output[key].push(item)
           }
         }
-      } else if (typeof merged[key] === "object" && typeof value === "object" && !Array.isArray(merged[key])) {
-        merged[key] = { ...merged[key], ...value }
+      } else if (typeof output[key] === "object" && typeof value === "object" && !Array.isArray(output[key])) {
+        output[key] = deepMerge(output[key], value)
+      } else {
+        output[key] = value
       }
     } else {
-      merged[key] = value
+      output[key] = value
     }
   }
+  return output
+}
 
-  return merged
+export function mergeJson(existing, gvConfig) {
+  if (!existing) return gvConfig
+  return deepMerge(existing, gvConfig)
 }
 
 export function mergeArray(existing, gvItems, marker) {

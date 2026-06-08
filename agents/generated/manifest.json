@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/scripts/build_agents.js",
+  "agents": 21,
+  "core": [
+    "core/01-regras-base.md",
+    "core/02-quality-gates.md"
+  ],
+  "knowledge": [
+    "knowledge/deployer.md",
+    "knowledge/frontend.md"
+  ],
+  "outputs": [
+    "agents/generated/claude/<agent>/SKILL.md",
+    "agents/generated/codex/<agent>.toml",
+    "agents/generated/cursor/AGENTS.md",
+    "agents/generated/cursor/rules/<agent>.mdc"
+  ]
+}

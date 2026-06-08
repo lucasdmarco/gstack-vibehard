@@ -1,0 +1,70 @@
+{
+  "mcpServers": {
+    "mom": {
+      "command": "mom",
+      "args": ["mcp"],
+      "env": {
+        "MOM_SCOPE": "project",
+        "MOM_CONSTITUTION": ".gbrain/context.json"
+      }
+    },
+    "agentmemory-graphify": {
+      "command": "npx",
+      "args": ["-y", "agentmemory", "mcp"],
+      "env": {
+        "AGENTMEMORY_BACKEND": "graphify",
+        "GRAPHIFY_GRAPH": "graphify-out/graph.json",
+        "GRAPHIFY_MODE": "ast-local",
+        "OBSIDIAN_EXPORT": "true",
+        "OBSIDIAN_VAULT": "${OBSIDIAN_VAULT}"
+      }
+    },
+    "headroom": {
+      "command": "headroom",
+      "args": ["mcp"],
+      "env": {
+        "HEADROOM_MODE": "proxy",
+        "HEADROOM_CCR": "true",
+        "HEADROOM_COMPRESSORS": "CodeCompressor,SmartCrusher,KompressBase",
+        "HEADROOM_MIN_COMPRESSION": "0.60",
+        "HEADROOM_TARGET_COMPRESSION": "0.95"
+      }
+    },
+    "composio": {
+      "command": "npx",
+      "args": ["-y", "@composio/mcp"],
+      "env": {
+        "COMPOSIO_API_KEY": "${COMPOSIO_API_KEY}",
+        "COMPOSIO_AUTH_MODE": "user-delegated"
+      }
+    },
+    "supabase": {
+      "command": "npx",
+      "args": ["-y", "@supabase/mcp-server"],
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "${SUPABASE_ACCESS_TOKEN}",
+        "SUPABASE_PROJECT_REF": "${SUPABASE_PROJECT_REF}",
+        "SUPABASE_DB_TOOLS": "ler_schema_tabelas,executar_query_sql"
+      }
+    },
+    "permit-rbac": {
+      "command": "npx",
+      "args": ["-y", "@permitio/mcp"],
+      "env": {
+        "PERMIT_API_KEY": "${PERMIT_API_KEY}",
+        "PERMIT_TENANT_ID": "${PERMIT_TENANT_ID}",
+        "PERMIT_CONTEXT_ENV": "PERMIT_CONTEXT",
+        "PERMIT_FILTER_MODE": "payload"
+      }
+    },
+    "litellm": {
+      "command": "npx",
+      "args": ["-y", "litellm-mcp"],
+      "env": {
+        "LITELLM_BASE_URL": "${LITELLM_BASE_URL}",
+        "LITELLM_DEFAULT_BASE_URL": "http://localhost:4000",
+        "OLLAMA_BASE_URL": "${OLLAMA_BASE_URL}"
+      }
+    }
+  }
+}

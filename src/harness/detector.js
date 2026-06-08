@@ -4,6 +4,9 @@ import { join } from "path"
 import { execSync } from "child_process"
 
 const HOME = homedir()
+const OPENCODE_HOME_DIR = join(HOME, ".opencode")
+const OPENCODE_CONFIG_DIR = join(HOME, ".config", "opencode")
+const OPENCODE_DIR = existsSync(OPENCODE_HOME_DIR) ? OPENCODE_HOME_DIR : OPENCODE_CONFIG_DIR
 
 const HARNESS_PATHS = {
   codex: {
@@ -14,7 +17,7 @@ const HARNESS_PATHS = {
     detect: () => {
       const cfg = join(HOME, ".codex", "config.toml")
       const hooks = join(HOME, ".codex", "hooks")
-      if (existsSync(cfg) || existsSync(hooks)) return true
+      if (existsSync(join(HOME, ".codex")) || existsSync(cfg) || existsSync(hooks)) return true
       try { execSync("codex --version", { stdio: "pipe", timeout: 3000 }); return true } catch { return false }
     },
   },
@@ -27,21 +30,29 @@ const HARNESS_PATHS = {
       try {
         const settings = join(HOME, ".claude", "settings.json")
         const claudeMd = join(HOME, "CLAUDE.md")
-        if (existsSync(settings) || existsSync(claudeMd)) return true
+        if (existsSync(join(HOME, ".claude")) || existsSync(settings) || existsSync(claudeMd)) return true
         execSync("claude --version", { stdio: "pipe", timeout: 3000 }); return true
       } catch {
         return false
       }
     },
   },
+  cursor: {
+    label: "Cursor",
+    configDir: join(process.cwd(), ".cursor"),
+    configFile: join(process.cwd(), ".cursor", "mcp.json"),
+    detect: () => {
+      return existsSync(join(process.cwd(), ".cursor"))
+    },
+  },
   opencode: {
     label: "OpenCode CLI",
-    configDir: join(HOME, ".config", "opencode"),
-    configFile: join(HOME, ".config", "opencode", "opencode.json"),
+    configDir: OPENCODE_DIR,
+    configFile: join(OPENCODE_DIR, "opencode.json"),
     detect: () => {
       try {
-        const cfg = join(HOME, ".config", "opencode", "opencode.json")
-        if (existsSync(cfg)) return true
+        const cfg = join(OPENCODE_CONFIG_DIR, "opencode.json")
+        if (existsSync(OPENCODE_HOME_DIR) || existsSync(OPENCODE_CONFIG_DIR) || existsSync(cfg)) return true
         execSync("opencode --version", { stdio: "pipe", timeout: 3000 }); return true
       } catch {
         return false

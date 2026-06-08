@@ -1,86 +1,99 @@
-# gstack_vibehard
+# gstack-vibehard 2.0
 
-**Cross-harness installer** for Codex CLI, Claude Code, and OpenCode CLI.
+**O Ecossistema Definitivo de Engenharia CLI para Agentes de IA.**
 
-Um instalador que guia voce pela configuracao de hooks Python, skills, template fullstack, design system taste-skill, e 20 agentes especialistas — tudo com Quality Gate obrigatorio.
+O `gstack-vibehard` evoluiu. Ele deixou de ser apenas um kit de templates para se tornar uma **Plataforma de Orquestracao Agentic Cross-Harness**. Construido para desenvolvedores que se recusam a sair do terminal, ele integra ferramentas corporativas de IA como Graphify, Fallow, Headroom, AgentMemory e Harness em um unico instalador.
 
-## Quick Start
+Nenhuma interface grafica. Nenhum gargalo de contexto. Paralelismo absoluto.
+
+## Superpoderes da v2.0
+
+- **Fabrica de Agentes (Omnistack):** escreva a inteligencia do seu projeto uma vez nas pastas `core/` e `knowledge/`. O compilador gera **21 agentes especialistas** adaptados nativamente para Claude Code, Codex, Cursor e OpenCode.
+- **Paralelismo Absoluto (Git Worktrees):** trabalhe em multiplas features ao mesmo tempo. O `workspace_manager.py` isola os agentes em Git Worktrees separadas, clonando automaticamente seus segredos via `.worktreeinclude` para evitar colisoes.
+- **Quality Gates Deterministicos (Fallow):** os agentes sao barrados por analise estatica deterministica antes do codigo chegar ao commit.
+- **Memoria a Custo Zero (Graphify + AgentMemory):** o sistema mapeia o codigo usando AST via tree-sitter. A IA le a topologia do projeto sem consumir API, economizando contexto.
+- **Compressao de Transporte (Headroom):** o proxy integrado comprime RAG, logs e buscas web antes de chegar na LLM.
+- **Sandboxing e Governanca:** codigo gerado e testado em Docker efemero. A injecao de contexto suporta Permit.io, Composio e LiteLLM.
+- **Sinfonia Assincrona:** hooks emitem sinais sonoros quando tarefas falham ou terminam.
+
+## Instalacao Universal
 
 ```bash
-# Baixa e executa a instalacao completa automaticamente (modo nao-interativo):
-npm install @gstack-vibehard/installer
+npm install -g @gstack-vibehard/installer
+gstack_vibehard install
+```
 
-# Ou use npx para instalacao interativa (escolhe quais harnesses configurar):
+Uso interativo via `npx`:
+
+```bash
 npx @gstack-vibehard/installer
 ```
 
-> `npm install @gstack-vibehard/installer` baixa o pacote **E** ja executa a instalacao
-> completa em modo nao-interativo (instala em todos os harnesses detectados).
-> Para escolher quais harnesses configurar, use `npx @gstack-vibehard/installer`.
+## Como Usar o Ecossistema (CLI-First)
 
-## Downloads
+### 1. Criar um ambiente paralelo seguro
 
-Os instaladores estao hospedados no [GitHub Releases](https://github.com/lucasdmarco/gstack-vibehard/releases).
+Nao use a branch principal. Crie uma worktree para o agente trabalhar:
 
-| Platform | Download | Descricao |
-|----------|----------|-----------|
-| Windows | [gstack_vibehard_setup_v0.4.0.exe](https://github.com/lucasdmarco/gstack-vibehard/releases/download/v0.4.0/gstack_vibehard_setup_v0.4.0.exe) | Instalador Inno Setup (.exe) |
-| Windows (script) | [install.bat](https://github.com/lucasdmarco/gstack-vibehard/releases/download/v0.4.0/install.bat) | Script batch portatil |
-| macOS / Linux | [install.sh](https://github.com/lucasdmarco/gstack-vibehard/releases/download/v0.4.0/install.sh) | Script shell portatil |
-| macOS (Homebrew) | `brew install lucasdmarco/gstack-vibehard/gstack_vibehard` | Formula no Homebrew tap |
+```bash
+python scripts/scripts/workspace_manager.py create feature-x --repo .
+```
+
+### 2. Pesquisa Profunda (Deep Research)
+
+Deixe o agente parametrizar a investigacao web com Playwright MCP, Context7 e compressao Headroom:
+
+```bash
+python scripts/scripts/deep_research.py "Como implementar OAuth2 no Fastify"
+```
+
+O comando gera um dossie em `.gstack/research/` e imprime apenas o caminho do arquivo para o agente principal abrir e executar.
+
+### 3. Evocar um Time de Agentes (Harness)
+
+Monte equipes locais no padrao Agent Teams:
+
+```bash
+python scripts/scripts/team_builder.py producer-reviewer
+```
+
+Padroes suportados:
+
+- `producer-reviewer`
+- `pipeline`
+- `fan-out`
+
+### 4. Deploy a Jato
+
+Rode o Agente Deployer. Ele aciona Fallow para aprovacao de QA e usa GitHub CLI e Vercel CLI quando autorizado.
 
 ## O que instala
 
 | Componente | Descricao |
 |------------|-----------|
-| **Hooks Python** | qg.py (Quality Gate 3 niveis), gc.py (gstack_vibehard Check), session_start.py (chronicle + identity), stop.py (Security Gate), post_sprint.py |
-| **Skills** | frontend-design (taste-skill: 4 engines + 3 dials), chronicle (memoria indexada), project-init (setup de variante) |
-| **Template** | fullstack-monorepo com 3 variantes backend (Express + Supabase, Fastify + Neon, Hono + Turso) |
-| **Design System** | 4 engines visuais (brutalist/soft/minimalist/stitch) + 3 dials (DESIGN_VARIANCE, MOTION_INTENSITY, VISUAL_DENSITY) |
-| **Agentes** | 20 especialistas (orchestrator, frontend, backend, security, QA, etc.) com QG Gate obrigatorio antes de cada entrega |
-| **Ferramentas** | gbrain (IA semantica), graphify (grafos de dependencia), Playwright (chromium), Headroom (governanca) |
-| **MCP** | fallow + supabase + playwright + context7 + gbrain + graphify + headroom (7 servidores) |
+| Hooks Python | `qg.py`, `gc.py`, `session_start.py`, `stop.py`, `post_sprint.py` |
+| Skills | frontend-design, chronicle, project-init e biblioteca completa de skills |
+| Template | fullstack-monorepo com variantes backend |
+| Agentes | 21 especialistas cross-harness |
+| Ferramentas | gbrain, graphify, Playwright, Headroom, Fallow, AgentMemory |
+| MCP | servidores base para RAG, browser, memoria, governanca e integracoes |
 
 ## Comandos
 
 ```bash
-gstack_vibehard install     # Instalar gstack_vibehard no ambiente
-gstack_vibehard doctor      # Diagnosticar ambiente
-gstack_vibehard init <nome> # Iniciar novo projeto com template
-gstack_vibehard sprint --save # Executar post-sprint (graphify + gbrain + chronicle)
-gstack_vibehard uninstall   # Remover gstack_vibehard
-gstack_vibehard list        # Listar componentes instalados
-gstack_vibehard help        # Mostrar ajuda
+gstack_vibehard install        # Instalar no ambiente
+gstack_vibehard doctor         # Diagnosticar ambiente
+gstack_vibehard init <nome>    # Criar novo projeto com template
+gstack_vibehard sprint --save  # Rodar post-sprint
+gstack_vibehard help           # Mostrar ajuda
 ```
 
-## Instaladores
+## Filosofia
 
-### Windows
-Baixe o [.exe installer](https://github.com/lucasdmarco/gstack-vibehard/releases/download/v0.4.0/gstack_vibehard_setup_v0.4.0.exe) ou use o script portatil:
-```batch
-curl -LO https://github.com/lucasdmarco/gstack-vibehard/releases/download/v0.4.0/install.bat
-install.bat
-```
-
-### macOS (Homebrew)
-```bash
-brew install lucasdmarco/gstack-vibehard/gstack_vibehard
-```
-
-### macOS / Linux (script)
-```bash
-curl -LO https://github.com/lucasdmarco/gstack-vibehard/releases/download/v0.4.0/install.sh
-chmod +x install.sh
-./install.sh
-```
-
-### npm (todas as plataformas)
-```bash
-npx @gstack-vibehard/installer
-```
+A inteligencia artificial nao deve remover o engenheiro do controle; deve dar a ele um exercito de terminal.
 
 ## Licenca
 
-MIT — see [LICENSE](LICENSE).
+MIT - see [LICENSE](LICENSE).
 
 Third-party attributions in [NOTICE](NOTICE).

@@ -13,7 +13,7 @@ Security Gate checks (BLOCKING before deploy):
 Security Gate only runs when invoked explicitly (--security-gate) or
 via deploy command detection in the session.
 """
-import json, sys, subprocess, os, re
+import json, sys, subprocess, os, re, shutil, platform
 from pathlib import Path
 from datetime import datetime
 
@@ -28,6 +28,104 @@ def find_project_root(cwd: str) -> Path | None:
             return p
         p = p.parent
     return None
+
+
+def play_audio_cue(kind: str) -> None:
+    """Best-effort audio cue without writing to stdout or blocking hook JSON."""
+    try:
+        marker = "success" if kind == "success" else "error"
+        if os.environ.get("GSTACK_AUDIO_CUES_TEST") == "1":
+            sys.stderr.write(f"audio-cue:{marker}\n")
+            sys.stderr.flush()
+            return
+
+        system = platform.system().lower()
+        if system == "windows":
+            try:
+                import winsound
+                if kind == "success":
+                    winsound.MessageBeep(winsound.MB_ICONASTERISK)
+                else:
+                    winsound.MessageBeep(winsound.MB_ICONHAND)
+                return
+            except Exception:
+                pass
+        elif system == "darwin":
+            sound = "/System/Library/Sounds/Glass.aiff" if kind == "success" else "/System/Library/Sounds/Basso.aiff"
+            if shutil.which("afplay"):
+                subprocess.Popen(["afplay", sound], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return
+        else:
+            for player, args in [
+                ("paplay", ["/usr/share/sounds/freedesktop/stereo/complete.oga" if kind == "success" else "/usr/share/sounds/freedesktop/stereo/dialog-error.oga"]),
+                ("canberra-gtk-play", ["-i", "complete" if kind == "success" else "dialog-error"]),
+            ]:
+                if shutil.which(player):
+                    subprocess.Popen([player, *args], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    return
+
+        sys.stderr.write("\a")
+        sys.stderr.flush()
+    except Exception:
+        pass
+
+
+def run_docker_sandbox(cwd: str) -> dict:
+    """Run project tests in an ephemeral Docker container when explicitly enabled."""
+    if os.environ.get("GSTACK_SANDBOX_TEST") != "1":
+        return {"status": "disabled"}
+
+    if not cwd:
+        sys.stderr.write("sandbox: cwd missing, skipped\n")
+        sys.stderr.flush()
+        return {"status": "skipped", "reason": "cwd missing"}
+
+    docker_bin = shutil.which("docker")
+    if not docker_bin:
+        sys.stderr.write("sandbox: docker not found, skipped\n")
+        sys.stderr.flush()
+        return {"status": "skipped", "reason": "docker not found"}
+
+    root = find_project_root(cwd) or Path(cwd).resolve()
+    cmd = [
+        docker_bin,
+        "run",
+        "--rm",
+        "-v",
+        f"{root.resolve()}:/workspace",
+        "-w",
+        "/workspace",
+        "node:20-alpine",
+        "npm",
+        "test",
+    ]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    except FileNotFoundError:
+        sys.stderr.write("sandbox: docker not found, skipped\n")
+        sys.stderr.flush()
+        return {"status": "skipped", "reason": "docker not found"}
+    except OSError as e:
+        sys.stderr.write(f"sandbox: docker unavailable, skipped: {e}\n")
+        sys.stderr.flush()
+        return {"status": "skipped", "reason": str(e)}
+    except subprocess.TimeoutExpired as e:
+        return {
+            "status": "failed",
+            "returncode": 124,
+            "stdout": e.stdout or "",
+            "stderr": e.stderr or "Docker sandbox timed out",
+        }
+
+    if result.returncode != 0:
+        return {
+            "status": "failed",
+            "returncode": result.returncode,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+        }
+
+    return {"status": "passed", "returncode": 0, "stdout": result.stdout, "stderr": result.stderr}
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -277,6 +375,10 @@ last_msg = inp.get("last_assistant_message", "")
 turn_id = inp.get("turn_id", "")
 flags = inp.get("flags", {})
 run_security = flags.get("security_gate", False) or "deploy" in last_msg.lower()[:200]
+run_qg_level = flags.get("qg_level", 0)
+stop_failed = False
+stop_exit_status = 0
+sandbox_result = None
 
 project_name = Path(cwd).name if cwd else "unknown"
 chronicle_dir = Path.home() / ".codex" / "chronicle"
@@ -296,6 +398,40 @@ note_lines = [
     f"- Working directory: {cwd}",
 ]
 
+# Docker sandbox (explicit opt-in): isolate test execution from the host.
+sandbox_result = run_docker_sandbox(cwd)
+if sandbox_result.get("status") == "passed":
+    note_lines.append("")
+    note_lines.append("## Docker Sandbox")
+    note_lines.append("Sandbox Docker: OK")
+elif sandbox_result.get("status") == "failed":
+    stop_failed = True
+    stop_exit_status = 1
+    note_lines.append("")
+    note_lines.append("## Docker Sandbox")
+    note_lines.append(f"Sandbox Docker: FALHOU (exit {sandbox_result.get('returncode')})")
+    if sandbox_result.get("stdout"):
+        note_lines.append("stdout:")
+        note_lines.append(str(sandbox_result["stdout"])[-4000:])
+    if sandbox_result.get("stderr"):
+        note_lines.append("stderr:")
+        note_lines.append(str(sandbox_result["stderr"])[-4000:])
+    note_lines.append("")
+    chronicle_file = chronicle_dir / f"{project_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
+    chronicle_file.write_text("\n".join(note_lines), encoding="utf-8")
+    play_audio_cue("error")
+    output = {
+        "systemMessage": f"Memorias salvas em {chronicle_file.name} + Sandbox Docker: FALHOU ({sandbox_result.get('returncode')})",
+        "error": "Docker sandbox failed",
+        "exitStatus": stop_exit_status,
+    }
+    sys.stdout.write(json.dumps(output))
+    sys.exit(stop_exit_status)
+elif sandbox_result.get("status") == "skipped":
+    note_lines.append("")
+    note_lines.append("## Docker Sandbox")
+    note_lines.append(f"Sandbox Docker: pulado ({sandbox_result.get('reason', 'unknown')})")
+
 # Security Gate (so roda se detectar deploy ou se explicitamente chamado)
 if run_security:
     root = find_project_root(cwd)
@@ -308,29 +444,49 @@ if run_security:
             if c["status"] == "FAILED":
                 note_lines.append(f"- [{c['severity']}] {c['title']}: {c['fail']}")
         if gate["blocked"]:
+            stop_failed = True
             note_lines.append("")
             note_lines.append("**DEPLOY BLOQUEADO** — resolva os itens acima antes.")
 
-# Quality Gate L1 (log only — nao bloqueia)
+# Quality Gate (modo log-only por default; blocking se qg_level > 0)
 qg_path = Path.home() / ".codex" / "hooks" / "qg.py"
 if qg_path.exists() and cwd:
+    qg_level = run_qg_level if run_qg_level > 0 else 1
+    qg_log_only = run_qg_level <= 0
+    qg_label = "log only" if qg_log_only else f"blocking (level {qg_level})"
     try:
-        result = subprocess.run(
-            ["python", str(qg_path), "--path", cwd, "--level", "1", "--log-only"],
-            capture_output=True, text=True, timeout=30
-        )
-        if result.returncode == 0:
-            qg_data = json.loads(result.stdout)
+        args = ["python", str(qg_path), "--path", cwd, "--level", str(qg_level)]
+        if qg_log_only:
+            args.append("--log-only")
+        result = subprocess.run(args, capture_output=True, text=True, timeout=60)
+        if result.returncode == 0 or qg_log_only:
+            try:
+                qg_data = json.loads(result.stdout)
+                note_lines.append("")
+                note_lines.append(f"## Quality Gate ({qg_label})")
+                note_lines.append(qg_data.get("summary", "N/A"))
+                if qg_data.get("issues"):
+                    note_lines.append("Issues:")
+                    for i in qg_data["issues"][:5]:
+                        note_lines.append(f"  - {i.get('file')}: {i.get('type')} [{i.get('severity', 'N/A')}]")
+                if not qg_log_only and not qg_data.get("pass"):
+                    stop_failed = True
+                    note_lines.append("")
+                    note_lines.append(f"**QUALITY GATE BLOQUEADO** — resolva CRITICO/ALTO antes de continuar.")
+            except json.JSONDecodeError:
+                if not qg_log_only:
+                    stop_failed = True
+                note_lines.append("")
+                note_lines.append(f"## Quality Gate ({qg_label})\nErro: saida invalida")
+        elif not qg_log_only:
+            stop_failed = True
             note_lines.append("")
-            note_lines.append("## Quality Gate (log only)")
-            note_lines.append(qg_data.get("summary", "N/A"))
-            if qg_data.get("issues"):
-                note_lines.append("Issues:")
-                for i in qg_data["issues"][:5]:
-                    note_lines.append(f"  - {i.get('file')}: {i.get('type')} [{i.get('severity', 'N/A')}]")
+            note_lines.append(f"## Quality Gate ({qg_label})\nBLOQUEADO: retorno {result.returncode}")
     except (subprocess.TimeoutExpired, json.JSONDecodeError, OSError) as e:
+        if not qg_log_only:
+            stop_failed = True
         note_lines.append("")
-        note_lines.append(f"## Quality Gate (log only)\nErro: {e}")
+        note_lines.append(f"## Quality Gate ({qg_label})\nErro: {e}")
 
 # Keywords para busca indexada
 keywords = []
@@ -349,11 +505,17 @@ note = "\n".join(note_lines)
 chronicle_file = chronicle_dir / f"{project_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
 chronicle_file.write_text(note, encoding="utf-8")
 
+msg_parts = [f"Memorias salvas em {chronicle_file.name} + QG L1 executado"]
+if sandbox_result and sandbox_result.get("status") == "passed":
+    msg_parts.append("Sandbox Docker: OK")
+elif sandbox_result and sandbox_result.get("status") == "failed":
+    msg_parts.append(f"Sandbox Docker: FALHOU ({sandbox_result.get('returncode')})")
+
 # Post-sprint: atualiza graphify + gbrain + MOM + chronicle enrich
 try:
     post_sprint = subprocess.run(
         ["python", str(Path.home() / ".codex" / "hooks" / "post_sprint.py")],
-        input=sys.stdin.read(), capture_output=True, text=True, timeout=30
+        input=json.dumps(inp), capture_output=True, text=True, timeout=30
     )
     if post_sprint.returncode == 0:
         ps_data = json.loads(post_sprint.stdout)
@@ -365,15 +527,21 @@ try:
         if ps_parts:
             msg_parts.append(" | ".join(ps_parts))
 except (subprocess.TimeoutExpired, json.JSONDecodeError, OSError) as e:
+    stop_failed = True
     msg_parts.append(f"post_sprint: {e}")
 
-msg_parts = [f"Memorias salvas em {chronicle_file.name} + QG L1 executado"]
 if run_security:
     gate = run_security_gate(root) if (root := find_project_root(cwd)) else None
     if gate:
         msg_parts.append(f"Security Gate: {gate['verdict']} ({gate['critical']}C/{gate['high']}H)")
 
+play_audio_cue("error" if stop_failed else "success")
+
 output = {
     "systemMessage": " | ".join(msg_parts)
 }
+if stop_exit_status:
+    output["error"] = "Docker sandbox failed"
+    output["exitStatus"] = stop_exit_status
 sys.stdout.write(json.dumps(output))
+sys.exit(stop_exit_status)

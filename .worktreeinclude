@@ -1,0 +1,11 @@
+# Files copied from the primary checkout into every agent worktree.
+# Keep this list small and explicit: these files are intentionally untracked.
+.env
+.env.local
+.env.development
+.env.test
+.env.*.local
+!.env.example
+!.env.*.example
+config/*.secret
+config/**/*.secret

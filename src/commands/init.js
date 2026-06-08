@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, writeFileSync, readdirSync, copyFileSync } from 
 import { join, dirname, basename } from "path"
 import { fileURLToPath } from "url"
 import { execSync } from "child_process"
-import { success, warn, error, info } from "../cli/index.js"
+import { success, warn, error, info, confirm, prompt } from "../cli/index.js"
 
 function getProjectRoot() {
   const __filename = fileURLToPath(import.meta.url)
@@ -25,6 +25,7 @@ export async function initCommand(args) {
   }
 
   let variant = "express"
+  let shadcn = false
   const variantIdx = args.indexOf("--variant")
   if (variantIdx !== -1 && args[variantIdx + 1]) {
     variant = args[variantIdx + 1].toLowerCase()
@@ -33,6 +34,7 @@ export async function initCommand(args) {
       process.exit(1)
     }
   }
+  if (args.includes("--shadcn")) shadcn = true
 
   const projectDir = join(process.cwd(), projectName)
 
@@ -169,6 +171,56 @@ switch ($Command) {
     success(`Template fullstack copiado para ${projectName}/`)
   } else {
     warn("Template nao encontrado no pacote")
+  }
+
+  // Design system (skip se --shadcn passado)
+  if (shadcn) {
+    writeFileSync(join(gstackDir, "session_state.json"), JSON.stringify({
+      asked_about_design_system: true,
+      design_system_path: "shadcn",
+      workflow: "fullstack",
+      created_at: new Date().toISOString().split("T")[0]
+    }, null, 2))
+    info("shadcn/ui registrado como design system (--shadcn)")
+  } else {
+  const hasDS = await confirm("Voce ja tem um design system proprio?", false)
+  if (hasDS) {
+    const dsPath = await prompt("Caminho da pasta do design system (ou deixe em branco)")
+    if (dsPath) {
+      writeFileSync(join(gstackDir, "session_state.json"), JSON.stringify({
+        asked_about_design_system: true,
+        design_system_path: dsPath,
+        workflow: "fullstack",
+        created_at: new Date().toISOString().split("T")[0]
+      }, null, 2))
+      info("Design system registrado. Os hooks vao respeitar seus tokens.")
+    }
+  } else {
+    const wantDS = await confirm("Quer gerar um design system agora (frontend-design)?", false)
+    if (wantDS) {
+      info("Para gerar o design system, carregue a skill frontend-design:")
+      info("  Em qualquer harness (Codex/Claude/OpenCode), peça para carregar a skill frontend-design")
+      info("  Ou edite manualmente o arquivo gerado em design-system/MASTER.md")
+      // Criar diretorio design-system/
+      const dsDir = join(projectDir, "design-system")
+      mkdirSync(dsDir, { recursive: true })
+      writeFileSync(join(dsDir, "MASTER.md"), "# Design System\n\n<!-- Gerado automaticamente. Edite ou use a skill frontend-design para preencher. -->\n")
+      success("design-system/MASTER.md criado (edite ou use skill frontend-design)")
+      writeFileSync(join(gstackDir, "session_state.json"), JSON.stringify({
+        asked_about_design_system: true,
+        design_system_path: "design-system/",
+        workflow: "fullstack",
+        created_at: new Date().toISOString().split("T")[0]
+      }, null, 2))
+    } else {
+      writeFileSync(join(gstackDir, "session_state.json"), JSON.stringify({
+        asked_about_design_system: false,
+        workflow: "fullstack",
+        created_at: new Date().toISOString().split("T")[0]
+      }, null, 2))
+      info("Design system nao configurado. O hook pre_tool_use vai lembrar de perguntar antes de escrever UI.")
+    }
+  }
   }
 
   console.log()

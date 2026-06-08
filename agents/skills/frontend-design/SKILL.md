@@ -11,6 +11,30 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 
 ---
 
+## 0. DESIGN SYSTEM DETECTION (MANDATORY — Run this BEFORE any frontend code)
+
+**Before generating anything, ask the user:**
+
+> *"Voce ja tem um design system proprio? (caminho da pasta com tokens, ou package npm)"*
+
+### If user provides a design system:
+1. **Carregar tokens** — ler arquivos de tema/design system (cores, tipografia, spacing, componentes)
+2. **Adaptar os 3 dials** — DESIGN_VARIANCE, MOTION_INTENSITY, VISUAL_DENSITY ajustam-se ao DS existente
+3. **Ignorar taste-skill engines** — brutalist/soft/minimalist/stitch nao se aplicam; usar tom e estilo do DS do usuario
+4. **Respeitar tokens existentes** — nao sobrescrever cores, fontes, ou componentes ja definidos
+5. **Salvar** em `.gstack/session_state.json`: `asked_about_design_system: true`, `design_system_path: "<caminho>"`
+
+### If user does NOT have a design system:
+1. Perguntar: *"Qual engine de estilo? (brutalist / soft / minimalist / stitch)"*
+2. Perguntar: *"Prefere light ou dark mode?"*
+3. Aplicar seção de dials + engine escolhida para **gerar um design system completo**
+4. Salvar em `.gstack/session_state.json`: `asked_about_design_system: true`, `design_system_engine: "<engine>"`
+
+### If user says "skip for now":
+Salvar `asked_about_design_system: false` — hooks vao bloquear ate responder.
+
+---
+
 ## 🎯 Selective Reading Rule (MANDATORY)
 
 **Read REQUIRED files always, OPTIONAL only when needed:**

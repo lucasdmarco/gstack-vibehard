@@ -23,7 +23,9 @@ Para cada ferramenta abaixo, o agente PERGUNTA antes de instalar:
 # Se Sim, perguntar variante primeiro:
 # "Qual variante de backend? (express / fastify / hono)"
 # Default: express
-& "$env:USERPROFILE\.agents\scripts\setup-gstack.ps1" -ProjectDir "<diretorio-do-projeto>" -Variant "<variante>"
+# DETECTAR SO:
+# - Windows: & "$env:USERPROFILE\.agents\scripts\setup-gstack.ps1" -ProjectDir "<diretorio-do-projeto>" -Variant "<variante>"
+# - Linux/macOS: bash ~/.agents/scripts/setup-gstack.sh "<diretorio-do-projeto>" "<variante>"
 ```
 
 **O que cria:** `.gstack/config.json` com stack, infra, versões, variant, api_dir, db_package
@@ -49,7 +51,8 @@ Se for PostgreSQL (express/fastify), use `@my/db`. Se for Turso (hono), use `@my
 ```bash
 # Pergunta: "Instalar gbrain? (cria contexto do negócio e decisões)"
 # Se Sim:
-& "$env:USERPROFILE\.agents\scripts\setup-gbrain.ps1" -ProjectDir "<diretorio-do-projeto>"
+# - Windows: & "$env:USERPROFILE\.agents\scripts\setup-gbrain.ps1" -ProjectDir "<diretorio-do-projeto>"
+# - Linux/macOS: bash ~/.agents/scripts/setup-gbrain.sh "<diretorio-do-projeto>"
 ```
 
 **O que cria:** `.gbrain/context.json` + `.gbrain/README.md` com objetivos, stakeholders, decisões
@@ -61,7 +64,8 @@ Se for PostgreSQL (express/fastify), use `@my/db`. Se for Turso (hono), use `@my
 ```bash
 # Pergunta: "Instalar context7? (documentação da stack e contexto para IA)"
 # Se Sim:
-& "$env:USERPROFILE\.agents\scripts\setup-context7.ps1" -ProjectDir "<diretorio-do-projeto>"
+# - Windows: & "$env:USERPROFILE\.agents\scripts\setup-context7.ps1" -ProjectDir "<diretorio-do-projeto>"
+# - Linux/macOS: bash ~/.agents/scripts/setup-context7.sh "<diretorio-do-projeto>"
 ```
 
 **O que cria:** `.context7/stack.json` + `.context7/AGENTS.md` (lido automaticamente pelo Codex como contexto)
@@ -73,7 +77,8 @@ Se for PostgreSQL (express/fastify), use `@my/db`. Se for Turso (hono), use `@my
 ```bash
 # Pergunta: "Instalar superpowers? (scripts de dev, build, deploy)"
 # Se Sim:
-& "$env:USERPROFILE\.agents\scripts\setup-superpowers.ps1" -ProjectDir "<diretorio-do-projeto>"
+# - Windows: & "$env:USERPROFILE\.agents\scripts\setup-superpowers.ps1" -ProjectDir "<diretorio-do-projeto>"
+# - Linux/macOS: bash ~/.agents/scripts/setup-superpowers.sh "<diretorio-do-projeto>"
 ```
 
 **O que cria:** `scripts/run.ps1` + `scripts/seed.ps1`
@@ -85,14 +90,33 @@ Se for PostgreSQL (express/fastify), use `@my/db`. Se for Turso (hono), use `@my
 ```bash
 # Pergunta: "Instalar graphify? (visualização de dependências do projeto)"
 # Se Sim:
-& "$env:USERPROFILE\.agents\scripts\setup-graphify.ps1" -ProjectDir "<diretorio-do-projeto>"
+# - Windows: & "$env:USERPROFILE\.agents\scripts\setup-graphify.ps1" -ProjectDir "<diretorio-do-projeto>"
+# - Linux/macOS: bash ~/.agents/scripts/setup-graphify.sh "<diretorio-do-projeto>"
 ```
 
 **O que cria:** `.graphify/deps.json` + `.graphify/index.html` (grafo visual)
 
 ---
 
-### 6. MOM — Memória Persistente para Agentes
+### 6. frontend-design — Design System
+
+```bash
+# Pergunta: "Instalar design system? (configura tema, cores, tipografia para o projeto)"
+# Se Sim:
+#   - Carregar skill frontend-design
+#   - Perguntar engine (brutalist/soft/minimalist/stitch) OU se ja tem DS proprio
+#   - Gerar design-system/MASTER.md no projeto
+#   - Salvar em .gstack/session_state.json
+# Se Nao: anotar e seguir
+```
+
+**O que cria:** `design-system/` com MASTER.md (cores, tipografia, spacing, componentes)
+
+**Pós-instalação:** os hooks `pre_tool_use_security.py` vão verificar session_state antes de permitir escrita de UI.
+
+---
+
+### 7. MOM — Memória Persistente para Agentes
 
 ⚠️ **MOM é incompatível com Windows** (usa Go + CGo + syscall.Flock). Não instalar no Windows.
 
@@ -108,6 +132,32 @@ Se for PostgreSQL (express/fastify), use `@my/db`. Se for Turso (hono), use `@my
 
 ## Fluxo Completo (usado pela new-project skill)
 
+```
+Usuario: "quero criar um projeto de vendas"
+
+Agente:
+1. mkdir vendas && cd vendas
+2. robocopy template + renomear packages
+3. PERGUNTA: "Qual variante de backend? (express / fastify / hono)"
+   → Default: express
+   → Só copia a variante escolhida do template
+4. pnpm install
+5. npx shadcn@latest add ...
+6. PERGUNTA: "Instalar gstack?"
+   → Se sim: executa setup-gstack.ps1 -Variant <variante>
+7. PERGUNTA: "Instalar gbrain?"
+   → Se sim: executa setup-gbrain.ps1
+8. PERGUNTA: "Instalar context7?"
+   → Se sim: executa setup-context7.ps1
+9. PERGUNTA: "Instalar superpowers?"
+   → Se sim: executa setup-superpowers.ps1
+10. PERGUNTA: "Instalar graphify?"
+   → Se sim: executa setup-graphify.ps1
+11. PERGUNTA: "Instalar design system? (frontend-design)"
+   → Se sim: carregar skill frontend-design, gerar design-system/MASTER.md
+12. PERGUNTA: "Instalar MOM?" (⚠️ só no Linux/macOS — Windows usa chronicle)
+13. Iniciar dev server + abrir navegador
+14. "Projeto pronto! Use scripts/run.ps1 (Windows) ou scripts/run.sh (Linux/macOS) dev para comandos rápidos"
 ```
 Usuário: "quero criar um projeto de vendas"
 
@@ -131,7 +181,7 @@ Agente:
    → Se sim: executa setup-graphify.ps1
 11. PERGUNTA: "Instalar MOM?" (⚠️ só no Linux/macOS — Windows usa chronicle)
 12. Iniciar dev server + abrir navegador
-13. "Projeto pronto! Use .\scripts\run.ps1 dev para comandos rápidos"
+13. "Projeto pronto! Use scripts/run.ps1 (Windows) ou scripts/run.sh (Linux/macOS) dev para comandos rápidos"
 ```
 
 ## Para Projetos Existentes

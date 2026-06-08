@@ -104,6 +104,33 @@ Pergunte ao usuario:
 
 ---
 
+### PASSO 4.5: Design System (OBRIGATORIO antes de codar)
+
+**Pergunta obrigatoria antes de escrever qualquer codigo de frontend:**
+
+> *"Voce ja tem um design system proprio? (caminho da pasta com tokens, ou package npm)"*
+
+**Cenarios:**
+
+1. **Se o usuario tem design system:**
+   - Carregue a skill `frontend-design`
+   - Aplique a secao 0 (DESIGN SYSTEM DETECTION) para carregar tokens e adaptar os 3 dials
+   - Respeite os tokens existentes — nao sobrescreva cores, fontes ou componentes
+   - Salve o caminho em `.gstack/session_state.json` com `asked_about_design_system: true` e `design_system_path: "<caminho>"`
+
+2. **Se o usuario NAO tem design system:**
+   - Pergunte: *"Qual engine de estilo? (brutalist / soft / minimalist / stitch)"*
+   - Pergunte: *"Prefere light ou dark mode?"*
+   - Aplique a skill `frontend-design` para gerar um design system completo
+   - Salve em `.gstack/session_state.json` com `asked_about_design_system: true` e `design_system_engine: "<engine>"`
+
+3. **Se o usuario disser "pula por enquanto":**
+   - Salve `asked_about_design_system: false` — o hook `pre_tool_use_security.py` vai bloquear escrita de UI ate que a pergunta seja respondida
+
+**Regra:** Nao avance para o PASSO 5 sem registrar a resposta em `.gstack/session_state.json`.
+
+---
+
 ### PASSO 5: Seguranca OBRIGATORIA
 
 **Nao negociavel** — configure antes do primeiro commit:

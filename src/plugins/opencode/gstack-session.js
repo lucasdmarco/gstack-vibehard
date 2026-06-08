@@ -1,13 +1,11 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs"
-import { join } from "path"
-import { homedir } from "os"
-
-const HOME = homedir()
-const GV_DIR = join(HOME, ".gstack_vibehard")
-const GV_STATUS = join(GV_DIR, "update_status.json")
-const CWD = process.cwd()
-
 export const GstackSession = async ({ $ }) => {
+  const { readFileSync, writeFileSync, existsSync, mkdirSync } = await import("fs")
+  const { join } = await import("path")
+  const { homedir } = await import("os")
+  const HOME = homedir()
+  const GV_DIR = join(HOME, ".gstack_vibehard")
+  const GV_STATUS = join(GV_DIR, "update_status.json")
+
   return {
     "session.created": async () => {
       if (!existsSync(GV_DIR)) mkdirSync(GV_DIR, { recursive: true })
@@ -25,7 +23,7 @@ export const GstackSession = async ({ $ }) => {
         try {
           const result = await $`npm view @gstack-vibehard/installer version`
           const latest = result.stdout?.toString().trim() || "unknown"
-          const local = "0.7.5"
+          const local = await getLocalVersion($)
           if (latest !== "unknown" && latest !== local) {
             status = { latest, local, checked_at: now, has_update: true }
           } else {
@@ -41,5 +39,21 @@ export const GstackSession = async ({ $ }) => {
         await $`python ${HOME}/.codex/hooks/stop.py`
       } catch {}
     },
+  }
+}
+
+async function getLocalVersion($) {
+  try {
+    const result = await $`npm list -g @gstack-vibehard/installer --depth=0`
+    const out = result.stdout?.toString().trim() || ""
+    if (out.includes("@")) return out.split("@").pop()?.trim() || "0.0.0"
+    return "0.0.0"
+  } catch {
+    try {
+      const result = await $`gstack_vibehard --version`
+      return result.stdout?.toString().trim() || "0.0.0"
+    } catch {
+      return "0.0.0"
+    }
   }
 }

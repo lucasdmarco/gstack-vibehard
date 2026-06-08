@@ -159,9 +159,16 @@ export async function doctor() {
 
   // Playwright
   section("Playwright (browser testing)")
-  const pwBrowsers = isWindows()
-    ? join(HOME, "AppData", "Local", "ms-playwright")
-    : join(HOME, ".cache", "ms-playwright")
+  const pwBrowsers = process.env.PLAYWRIGHT_BROWSERS_PATH
+    || (isWindows()
+      ? join(HOME, "AppData", "Local", "ms-playwright")
+      : join(HOME, ".cache", "ms-playwright"))
+  try {
+    const pwVer = (await import("child_process")).execSync("npx playwright --version 2>&1", { stdio: "pipe", timeout: 10000 }).toString().trim()
+    success(`Playwright CLI: ${pwVer}`)
+  } catch {
+    warn("Playwright CLI: nao disponivel (rode: npx playwright install chromium)")
+  }
   if (existsSync(pwBrowsers)) {
     const fs = await import("fs")
     const browsers = fs.readdirSync(pwBrowsers).filter((f) => f.startsWith("chromium"))

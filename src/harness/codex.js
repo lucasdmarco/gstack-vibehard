@@ -27,19 +27,24 @@ export async function installCodex(config, report) {
   }
 
   if (config.template) {
+    const skillsDir = join(HOME, ".agents", "skills").replaceAll("\\", "/")
+    const hooksDirPosix = hooksDir.replaceAll("\\", "/")
     const tomlContent = `# gstack_vibehard — Codex CLI hooks
 [hooks]
-on_session_start = ["python ${hooksDir.replaceAll("\\", "/")}/session_start.py"]
-on_stop = ["python ${hooksDir.replaceAll("\\", "/")}/stop.py"]
-pre_tool_use = ["python ${hooksDir.replaceAll("\\", "/")}/pre_tool_use_security.py"]
-post_tool_use = ["python ${hooksDir.replaceAll("\\", "/")}/post_tool_use_review.py"]
+on_session_start = ["python ${hooksDirPosix}/session_start.py"]
+on_stop = ["python ${hooksDirPosix}/stop.py"]
+pre_tool_use = ["python ${hooksDirPosix}/pre_tool_use_security.py"]
+post_tool_use = ["python ${hooksDirPosix}/post_tool_use_review.py"]
 
 [agent]
-skills_dir = "${join(HOME, ".agents", "skills").replaceAll("\\", "/")}"
+skills_dir = "${skillsDir}"
 instructions = """
 Comandos disponiveis:
-  /newproject — Guided Architecture Walkthrough (9 passos)
+  /newproject — Guided Architecture Walkthrough (10 passos com design system)
   /g_update   — Atualizar gstack_vibehard para versao mais recente
+
+Design System: ANTES de escrever frontend, pergunte se usuario tem DS proprio.
+Se nao perguntar, o hook pre_tool_use_security.py vai bloquear a escrita.
 
 Se ~/.gstack_vibehard/update_status.json mostrar latest > local, avise e sugira /g_update
 """
@@ -47,6 +52,30 @@ Se ~/.gstack_vibehard/update_status.json mostrar latest > local, avise e sugira 
 [mcp_servers.fallow]
 command = "npx"
 args = ["-y", "fallow", "mcp"]
+
+[mcp_servers.supabase]
+command = "npx"
+args = ["-y", "@supabase/mcp-server", "--project-ref", "${SUPABASE_PROJECT_REF}"]
+
+[mcp_servers.playwright]
+command = "npx"
+args = ["-y", "@playwright/mcp"]
+
+[mcp_servers.context7]
+command = "npx"
+args = ["-y", "@upstash/context7-mcp", "--api-key", "${CONTEXT7_API_KEY}"]
+
+[mcp_servers.gbrain]
+command = "gbrain"
+args = ["serve"]
+
+[mcp_servers.graphify]
+command = "python"
+args = ["-m", "graphify.serve", "graphify-out/graph.json"]
+
+[mcp_servers.headroom]
+command = "headroom"
+args = ["mcp"]
 `
     writeWithBackup(configFile, tomlContent)
     report.updated.push("~/.codex/config.toml")

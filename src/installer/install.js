@@ -10,6 +10,7 @@ import { installOpenCode } from "../harness/opencode.js"
 import { installHeadroom } from "../harness/headroom.js"
 import { ensureDir, copyWithBackup, copyDirSync } from "./merge.js"
 import { checkAlreadyInstalled } from "./check.js"
+import { installGeneratedAgentLayer, installGraphifyGitHooks } from "./agent-distribution.js"
 import { multiSelect, success, warn, error, info, section } from "../cli/index.js"
 
 const HOME = homedir()
@@ -213,9 +214,22 @@ async function installDeps(run, warn, success, info, report, harnessIds) {
   // ========================================
   try {
     execSync("npx playwright install chromium 2>&1", { stdio: "pipe", timeout: 120000 })
-    success("Playwright: chromium instalado")
-  } catch {
-    warn("Playwright: falha ao instalar chromium. Rode manualmente: npx playwright install chromium")
+    const pwDir = isWindows()
+      ? join(HOME, "AppData", "Local", "ms-playwright")
+      : join(HOME, ".cache", "ms-playwright")
+    const { readdirSync } = await import("fs")
+    if (existsSync(pwDir) && readdirSync(pwDir).some((f) => f.startsWith("chromium"))) {
+      success("Playwright: chromium instalado")
+    } else {
+      warn("Playwright: comando executado mas chromium nao encontrado em " + pwDir)
+    }
+  } catch (e) {
+    warn(`Playwright: falha ao instalar chromium: ${e.message}`)
+    info("  Rode manualmente: npx playwright install chromium")
+  }
+
+  if (isWindows()) {
+    refreshPath()
   }
 
   // ========================================
@@ -255,6 +269,7 @@ export async function install() {
     info("Instale um dos harnesses primeiro:")
     info("  • OpenAI Codex CLI — pip install codex-cli")
     info("  • Claude Code     — npm install -g @anthropic-ai/claude-code")
+    info("  • Cursor          — instale o Cursor e abra um projeto com .cursor/")
     info("  • OpenCode CLI    — npm install -g opencode")
     process.exit(1)
   }
@@ -281,6 +296,10 @@ export async function install() {
 
   // If nothing to install for harnesses
   if (availableHarnessIds.length === 0) {
+    section("agents/generated — Distribuicao cross-harness")
+    await installGeneratedAgentLayer({ projectRoot: PROJECT_ROOT, report, info, success, warn, harnessIds: allHarnessIds })
+    section("graphify/ — Git hooks AST")
+    installGraphifyGitHooks({ report, info, success, warn })
     success("\n  Todos os harnesses ja configurados. Deps globais ja verificadas.")
     info("  Para forcar reinstalação, remova manualmente:")
     for (const h of alreadyInstalled) {
@@ -318,11 +337,17 @@ export async function install() {
   ensureDir(scriptsDir)
   const scriptsSource = join(PROJECT_ROOT, "scripts", "scripts")
   if (existsSync(scriptsSource)) {
-    const scripts = readdirSync(scriptsSource).filter((f) => f.endsWith(".ps1"))
+    const ext = isWindows() ? ".ps1" : ".sh"
+    const scripts = readdirSync(scriptsSource).filter((f) => f.endsWith(ext))
     for (const script of scripts) {
       const src = join(scriptsSource, script)
       const dst = join(scriptsDir, script)
       copyWithBackup(src, dst)
+      if (!isWindows()) {
+        try {
+          execSync(`chmod +x "${dst}"`, { stdio: "pipe", timeout: 5000 })
+        } catch {}
+      }
       report.added.push(`script: ${script}`)
     }
     success(`${scripts.length} scripts copiados para ~/.agents/scripts/`)
@@ -379,11 +404,11 @@ export async function install() {
   }
 
   // Step 6: Agents info
-  section("agents/ — 20 Especialistas com QG Gate")
+  section("agents/ — 21 Especialistas com QG Gate")
   const agentsSource = join(PROJECT_ROOT, "agents")
   if (existsSync(agentsSource)) {
     info("Agentes disponiveis em: agents/")
-    report.added.push("agentes: 20 especialistas com QG gate")
+    report.added.push("agentes: 21 especialistas com QG gate")
     success("Agentes prontos para uso")
   }
 
@@ -403,6 +428,9 @@ export async function install() {
         case "opencode":
           await installOpenCode({ hooks: true }, report)
           break
+        case "cursor":
+          report.skipped.push("cursor: configuracao legacy nao requerida")
+          break
       }
       success(`${harnessId} configurado`)
     } catch (e) {
@@ -411,7 +439,15 @@ export async function install() {
     }
   }
 
-  // Step 8: OS-aware launcher
+  // Step 8: Generated agents layer
+  section("agents/generated — Distribuicao cross-harness")
+  await installGeneratedAgentLayer({ projectRoot: PROJECT_ROOT, report, info, success, warn, harnessIds: selectedHarnessIds })
+
+  // Step 9: Graphify git hooks
+  section("graphify/ — Git hooks AST")
+  installGraphifyGitHooks({ report, info, success, warn })
+
+  // Step 10: OS-aware launcher
   section("os/ — Instalando launcher para este sistema")
   if (isWindows()) {
     const launcherSrc = join(PROJECT_ROOT, "launchers", "windows", "install.bat")
