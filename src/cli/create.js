@@ -7,6 +7,7 @@ import {
   readdirSync,
   writeFileSync,
   readFileSync,
+  unlinkSync,
 } from "node:fs"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -42,7 +43,7 @@ function getProjectRoot() {
     if (existsSync(join(dir, "package.json"))) return dir
     dir = dirname(dir)
   }
-  return process.cwd()
+  return dirname(__filename)
 }
 
 function copyRecursive(src, dst) {
@@ -75,11 +76,13 @@ function safeExec(exec, cmd, opts) {
 
 function safeDownloadAndRun(url, logger, exec, label) {
   const tmp = join(tmpdir(), `gstack-dl-${Date.now()}${process.platform === "win32" ? ".ps1" : ".sh"}`)
+  const safeUrl = JSON.stringify(url)
+  const safeTmp = JSON.stringify(tmp)
   try {
     if (process.platform === "win32") {
-      safeExec(exec, `powershell -c "irm ${url} -OutFile '${tmp}'"`, { timeout: 120000 })
+      safeExec(exec, `powershell -c "irm ${safeUrl} -OutFile ${safeTmp}"`, { timeout: 120000 })
     } else {
-      safeExec(exec, `curl -fsSL '${url}' -o '${tmp}'`, { timeout: 120000 })
+      safeExec(exec, `curl -fsSL ${safeUrl} -o ${safeTmp}`, { timeout: 120000 })
     }
     if (!existsSync(tmp)) {
       logger.warn(`${label}: download falhou (arquivo nao criado)`)
@@ -88,18 +91,18 @@ function safeDownloadAndRun(url, logger, exec, label) {
     const content = readFileSync(tmp, "utf-8")
     if (content.length < 10) {
       logger.warn(`${label}: download muito pequeno (${content.length} bytes), possivelmente invalido`)
-      try { exec(`rm '${tmp}' 2>/dev/null || del '${tmp}'`, { timeout: 5000 }) } catch {}
+      try { unlinkSync(tmp) } catch {}
       return false
     }
     if (process.platform === "win32") {
-      safeExec(exec, `powershell -c "& '${tmp}'"`, { timeout: 180000 })
+      safeExec(exec, `powershell -c "& ${safeTmp}"`, { timeout: 180000 })
     } else {
-      safeExec(exec, `sh '${tmp}'`, { timeout: 180000 })
+      safeExec(exec, `sh ${safeTmp}`, { timeout: 180000 })
     }
-    try { exec(`rm '${tmp}' 2>/dev/null`, { timeout: 5000 }) } catch {}
+    try { unlinkSync(tmp) } catch {}
     return true
   } catch {
-    try { exec(`rm '${tmp}' 2>/dev/null || del '${tmp}'`, { timeout: 5000 }) } catch {}
+    try { unlinkSync(tmp) } catch {}
     logger.warn(`${label}: falha no download/execucao segura`)
     return false
   }
@@ -155,10 +158,12 @@ function startCasdoor(logger, exec, projectDir) {
   }
   logger.info("Iniciando Casdoor IAM local via docker-compose...")
   writeCasdoorCompose(projectDir)
-  const out = safeExec(exec,
-    `docker compose -f "${join(projectDir, ".gstack", "docker-compose.yml")}" up -d`,
-    { timeout: 120000 },
-  )
+  const composeFile = join(projectDir, ".gstack", "docker-compose.yml")
+  let out = safeExec(exec, `docker compose -f "${composeFile}" up -d`, { timeout: 120000 })
+  if (!out) {
+    logger.info("docker compose (v2) falhou. Tentando docker-compose (v1)...")
+    out = safeExec(exec, `docker-compose -f "${composeFile}" up -d`, { timeout: 120000 })
+  }
   if (out) {
     logger.success("Casdoor IAM rodando em http://localhost:8000")
     logger.info("  User: admin / Password: 123 (mude apos primeiro login)")
@@ -368,12 +373,12 @@ function getStandardHooksJson(homeDir) {
     gstack: true,
     hooks: {
       preToolUse: {
-        command: `python ${homeDir}/.gstack/hooks/pre_tool_use_security.py`,
+        command: `python ${homeDir}/.codex/hooks/pre_tool_use_security.py`,
         timeout: 5000,
         blocking: true,
       },
       beforeShellExecution: {
-        command: `python ${homeDir}/.gstack/hooks/before_shell.py`,
+        command: `python ${homeDir}/.codex/hooks/before_shell.py`,
         timeout: 3000,
         blocking: true,
       },

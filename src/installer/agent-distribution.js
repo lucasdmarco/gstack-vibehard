@@ -117,7 +117,7 @@ export function installGraphifyGitHooks(options = {}) {
 
 export async function installGeneratedAgentLayer(options = {}) {
   const {
-    projectRoot = process.cwd(),
+    projectRoot = "",
     home = homedir(),
     cwd = process.cwd(),
     report = { added: [], updated: [], skipped: [], errors: [] },
@@ -130,7 +130,8 @@ export async function installGeneratedAgentLayer(options = {}) {
     now = () => new Date().toISOString(),
   } = options
 
-  const generatedRoot = join(projectRoot, "agents", "generated")
+  const resolvedRoot = projectRoot || homedir()
+  const generatedRoot = join(resolvedRoot, "agents", "generated")
   if (!existsSync(generatedRoot)) {
     warn("agents/generated/ nao encontrado no pacote")
     report.skipped.push("generated agents: fonte ausente")

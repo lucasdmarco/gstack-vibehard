@@ -1,6 +1,6 @@
 {
   "name": "@gstack-vibehard/installer",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "description": "gstack_vibehard — Cross-harness installer & fullstack template kit with deep agent integration (Codex, Claude Code, OpenCode)",
   "license": "MIT",
   "type": "module",
@@ -32,11 +32,18 @@
     "launchers/macos/gstack_vibehard.rb",
     "launchers/windows/install.bat",
     "launchers/windows/gstack_vibehard.cmd",
-    "plugins/",
+    "src/plugins/",
     "README.md",
     "CHANGELOG.md",
     "LICENSE",
     "NOTICE"
+  ],
+  "peerDependencies": {
+    "fallow": "0.x",
+    "@agentmemory/agentmemory": "0.x"
+  },
+  "bundledDependencies": [
+    "@gstack/headroom-proxy"
   ],
   "repository": {
     "type": "git",

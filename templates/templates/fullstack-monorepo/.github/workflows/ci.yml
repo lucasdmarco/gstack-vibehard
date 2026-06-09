@@ -16,7 +16,7 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: myproject_test
+          POSTGRES_DB: ${{ github.event.repository.name }}_test
         ports:
           - 5432:5432
         options: >-
@@ -46,9 +46,9 @@ jobs:
       - name: Push schema to test DB
         run: pnpm db:push:test
         env:
-          DATABASE_URL_TEST: postgresql://postgres:postgres@localhost:5432/myproject_test
+          DATABASE_URL_TEST: postgresql://postgres:postgres@localhost:5432/${{ github.event.repository.name }}_test
           DB_ENV: test
 
       - run: pnpm test
         env:
-          DATABASE_URL_TEST: postgresql://postgres:postgres@localhost:5432/myproject_test
+          DATABASE_URL_TEST: postgresql://postgres:postgres@localhost:5432/${{ github.event.repository.name }}_test

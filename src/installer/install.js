@@ -22,26 +22,28 @@ function getProjectRoot() {
     if (existsSync(join(dir, "package.json"))) return dir
     dir = dirname(dir)
   }
-  return process.cwd()
+  return dirname(__filename)
 }
 
 const PROJECT_ROOT = getProjectRoot()
 
 function safeDownloadAndRun(url, label) {
   const tmp = join(tmpdir(), `gstack-dl-${Date.now()}${isWindows() ? ".ps1" : ".sh"}`)
+  const safeUrl = JSON.stringify(url)
+  const safeTmp = JSON.stringify(tmp)
   try {
     if (isWindows()) {
-      execSync(`powershell -c "irm '${url}' -OutFile '${tmp}'"`, { stdio: "pipe", timeout: 120000 })
+      execSync(`powershell -c "irm ${safeUrl} -OutFile ${safeTmp}"`, { stdio: "pipe", timeout: 120000 })
     } else {
-      execSync(`curl -fsSL '${url}' -o '${tmp}'`, { stdio: "pipe", timeout: 120000 })
+      execSync(`curl -fsSL ${safeUrl} -o ${safeTmp}`, { stdio: "pipe", timeout: 120000 })
     }
     if (!existsSync(tmp)) { warn(`${label}: download falhou`); return false }
     const content = readFileSync(tmp, "utf-8")
     if (content.length < 10) { warn(`${label}: download invalido (${content.length} bytes)`); return false }
     if (isWindows()) {
-      execSync(`powershell -c "& '${tmp}'"`, { stdio: "pipe", timeout: 180000 })
+      execSync(`powershell -c "& ${safeTmp}"`, { stdio: "pipe", timeout: 180000 })
     } else {
-      execSync(`sh '${tmp}'`, { stdio: "pipe", timeout: 180000 })
+      execSync(`sh ${safeTmp}`, { stdio: "pipe", timeout: 180000 })
     }
     try { unlinkSync(tmp) } catch {}
     return true
@@ -92,12 +94,15 @@ async function installDeps(run, warn, success, info, report, harnessIds) {
   } catch {}
 
   if (!bunFound) {
-    info("bun: nao encontrado. Instalando...")
+    info("bun: nao encontrado. Instalando (download seguro)...")
     try {
-      if (isWindows()) {
-        execSync('powershell -c "irm https://bun.sh/install.ps1 | iex"', { stdio: "pipe", timeout: 120000 })
+      const bunUrl = isWindows() ? "https://bun.sh/install.ps1" : "https://bun.sh/install"
+      const ok = safeDownloadAndRun(bunUrl, "Bun")
+      if (ok) {
         refreshPath()
-        const bunPaths = [join(HOME, ".bun", "bin", "bun.exe")]
+        const bunPaths = isWindows()
+          ? [join(HOME, ".bun", "bin", "bun.exe")]
+          : [join(HOME, ".bun", "bin", "bun")]
         for (const p of [...bunPaths, "bun"]) {
           try {
             execSync(`${p} --version`, { stdio: "pipe", timeout: 5000 })
@@ -105,21 +110,13 @@ async function installDeps(run, warn, success, info, report, harnessIds) {
             break
           } catch {}
         }
-      } else {
-        execSync('curl -fsSL https://bun.sh/install | bash', { stdio: "pipe", timeout: 120000 })
-        const bunPaths = [join(HOME, ".bun", "bin", "bun")]
-        for (const p of [...bunPaths, "bun"]) {
-          try {
-            execSync(`${p} --version`, { stdio: "pipe", timeout: 5000 })
-            bunFound = true
-            break
-          } catch {}
+        if (bunFound) {
+          success("bun instalado")
+        } else {
+          warn("bun: instalado mas nao encontrado no PATH")
         }
-      }
-      if (bunFound) {
-        success("bun instalado")
       } else {
-        warn("bun: instalado mas nao encontrado no PATH")
+        warn("bun: download falhou. Instale manualmente: https://bun.sh")
       }
     } catch (e) {
       warn("bun: falha ao instalar. Instale manualmente: https://bun.sh")
@@ -211,6 +208,11 @@ async function installDeps(run, warn, success, info, report, harnessIds) {
         safeDownloadAndRun("https://sh.rustup.rs", "Rustup (macOS)")
       } else {
         safeDownloadAndRun("https://sh.rustup.rs", "Rustup (Linux)")
+      }
+      const cargoBin = join(HOME, ".cargo", "bin")
+      if (isWindows() && existsSync(cargoBin)) {
+        process.env.Path = cargoBin + ";" + (process.env.Path || "")
+        info("Adicionado ~/.cargo/bin ao PATH")
       }
       refreshPath()
       try {

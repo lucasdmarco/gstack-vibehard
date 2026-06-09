@@ -37,7 +37,7 @@ export async function installCodex(config, report) {
 on_session_start = ["python ${hooksDirPosix}/session_start.py"]
 on_stop = ["python ${hooksDirPosix}/stop.py"]
 pre_tool_use = ["python ${hooksDirPosix}/pre_tool_use_security.py"]
-post_tool_use = ["python ${hooksDirPosix}/post_tool_use_review.py"]
+post_tool_use = ["python ${hooksDirPosix}/stop.py"]
 
 [agent]
 skills_dir = "${skillsDir}"

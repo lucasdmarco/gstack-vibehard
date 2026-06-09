@@ -245,8 +245,8 @@ def main():
         f"{k}→{v}" for k, v in gstack.get("infra", {}).items()
     ) if gstack.get("infra") else "n/a"
 
-        topo_str = "; ".join(graphify.get("topology", [])) if graphify.get("topology") else "n/a"
-        edges_str = "; ".join(graphify.get("edges", [])) if graphify.get("edges") else "n/a"
+    topo_str = "; ".join(graphify.get("topology", [])) if graphify.get("topology") else "n/a"
+    edges_str = "; ".join(graphify.get("edges", [])) if graphify.get("edges") else "n/a"
 
     mom_recall = ""
     if mom.get("present") and mom.get("recent"):
@@ -279,7 +279,7 @@ def main():
         f"  Topologia: {topo_str}",
         f"  Dependências: {edges_str}",
         f"Context7: {'✓' if context7.get('present') else '✗'}",
-        f"MOM: {'✗ (Windows incompatível)' if not mom.get('present') else '✓'}",
+        f"MOM: {'✗ (não instalado — macOS only)' if not mom.get('present') else '✓'}",
         f"Chronicle: {'✓' if chronicle.get('present') else '✗'}",
     ]
     if mom_recall:

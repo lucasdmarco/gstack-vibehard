@@ -11,7 +11,7 @@ function getProjectRoot() {
     if (existsSync(join(dir, "package.json"))) return dir
     dir = dirname(dir)
   }
-  return process.cwd()
+  return dirname(__filename)
 }
 
 const PROJECT_ROOT = getProjectRoot()
@@ -41,6 +41,15 @@ export async function initCommand(args) {
   if (existsSync(projectDir)) {
     error(`Diretorio '${projectName}' ja existe.`)
     process.exit(1)
+  }
+
+  // Python check
+  try {
+    execSync("python --version", { stdio: "pipe", timeout: 5000 })
+    info("Python encontrado")
+  } catch {
+    warn("Python nao encontrado no PATH. Hooks Python exigem python3 instalado.")
+    info("Instale Python: https://www.python.org/downloads/")
   }
 
   // Version check
