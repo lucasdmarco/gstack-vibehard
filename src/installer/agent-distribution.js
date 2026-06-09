@@ -65,7 +65,7 @@ function detectGeneratedAgentHarnesses({ home, cwd, execSync, harnessIds }) {
     harnesses.push({
       id: "opencode",
       label: "OpenCode CLI",
-      source: "cursor",
+      source: "opencode",
       target: join(opencodeRoot, "agents", AGENT_NAMESPACE),
     })
   }

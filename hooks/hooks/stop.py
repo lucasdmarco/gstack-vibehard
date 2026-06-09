@@ -16,7 +16,7 @@ Security Gate checks (BLOCKING before deploy):
 Security Gate only runs when invoked explicitly (--security-gate) or
 via deploy command detection in the session.
 """
-import json, sys, subprocess, os, re, shutil, platform
+import json, sys, subprocess, os, re, shutil, platform, logging
 from pathlib import Path
 from datetime import datetime
 
@@ -51,8 +51,8 @@ def play_audio_cue(kind: str) -> None:
                 else:
                     winsound.MessageBeep(winsound.MB_ICONHAND)
                 return
-            except Exception:
-                pass
+            except Exception as e:
+                sys.stderr.write(f"[Audio] winsound: {e}\n")
         elif system == "darwin":
             sound = "/System/Library/Sounds/Glass.aiff" if kind == "success" else "/System/Library/Sounds/Basso.aiff"
             if shutil.which("afplay"):
@@ -69,8 +69,8 @@ def play_audio_cue(kind: str) -> None:
 
         sys.stderr.write("\a")
         sys.stderr.flush()
-    except Exception:
-        pass
+    except Exception as e:
+        sys.stderr.write(f"[Audio] outer: {e}\n")
 
 
 def run_sandbox(cwd: str) -> dict:
@@ -331,7 +331,8 @@ def run_security_gate(root: Path) -> dict:
     for check in SECURITY_GATE_CHECKS:
         try:
             ok = check["check"](root)
-        except Exception:
+        except Exception as e:
+            logging.error(f"Erro no validador {check['id']}: {e}")
             ok = False
 
         if ok:
@@ -373,7 +374,10 @@ def run_security_gate(root: Path) -> dict:
 # ═══════════════════════════════════════════════════════════════
 #  MAIN
 # ═══════════════════════════════════════════════════════════════
-inp = json.loads(sys.stdin.read())
+try:
+    inp = json.loads(sys.stdin.read())
+except json.JSONDecodeError:
+    inp = {}
 cwd = inp.get("cwd", "")
 last_msg = inp.get("last_assistant_message", "")
 turn_id = inp.get("turn_id", "")
@@ -385,6 +389,8 @@ stop_exit_status = 0
 sandbox_result = None
 
 project_name = Path(cwd).name if cwd else "unknown"
+if not project_name:
+    project_name = "root"
 chronicle_dir = Path.home() / ".codex" / "chronicle"
 chronicle_dir.mkdir(parents=True, exist_ok=True)
 
@@ -611,11 +617,30 @@ if run_security:
         msg_parts.append(f"Security Gate: {gate['verdict']} ({gate['critical']}C/{gate['high']}H)")
 
 # ── Continuous Learning v2 (ECC) — instincts.yaml ──
+def _acquire_lock(fd):
+    if sys.platform == "win32":
+        import msvcrt
+        msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+    else:
+        import fcntl
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+def _release_lock(fd):
+    if sys.platform == "win32":
+        import msvcrt
+        msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+    else:
+        import fcntl
+        fcntl.flock(fd, fcntl.LOCK_UN)
+
 def write_instinct_entry(trigger: str, details: str, pattern: str, action: str) -> None:
     """Append a structured instinct entry to ~/.gstack/instincts.yaml.
 
     Each entry records a failure/error pattern so the system can learn
     new security behaviors organically after each session.
+
+    Uses platform-appropriate file locking to prevent race conditions
+    from concurrent sessions.
     """
     try:
         instincts_dir = Path.home() / ".gstack"
@@ -649,9 +674,16 @@ def write_instinct_entry(trigger: str, details: str, pattern: str, action: str) 
             instincts_file.write_text("instincts:\n" + entry, encoding="utf-8")
         else:
             with open(str(instincts_file), "a", encoding="utf-8") as f:
-                f.write(entry)
-    except Exception:
-        pass  # instincts are advisory; never block on them
+                try:
+                    _acquire_lock(f.fileno())
+                    f.write(entry)
+                finally:
+                    try:
+                        _release_lock(f.fileno())
+                    except Exception:
+                        pass
+    except Exception as e:
+        sys.stderr.write(f"[instincts] erro nao critico: {e}\n")
 
 # Collect session failures into instincts
 if stop_failed:
@@ -754,8 +786,8 @@ def gitops_issue_create(fallow: dict, instincts_path: Path) -> Optional[str]:
                     reasons.append(
                         f"Instinto persistente: {trigger} ({hits} ocorrencias)"
                     )
-        except Exception:
-            pass
+        except Exception as e:
+            sys.stderr.write(f"[gitops] instinct read error: {e}\n")
 
     if not reasons:
         return None
@@ -840,7 +872,7 @@ def gitops_pr_create(summary_text: str, root: Optional[Path]) -> Optional[str]:
     branch_name = f"gstack/auto-{datetime.now().strftime('%Y%m%d%H%M')}"
 
     try:
-        # Create branch, commit, push, and open PR
+        # Create branch and local commit only — no automatic push or PR
         subprocess.run(["git", "checkout", "-b", branch_name],
                        cwd=str(root), capture_output=True, text=True, timeout=15)
         subprocess.run(["git", "add", "-A"],
@@ -848,48 +880,66 @@ def gitops_pr_create(summary_text: str, root: Optional[Path]) -> Optional[str]:
         commit_msg = f"[gstack] {summary_text[:100]}"
         subprocess.run(["git", "commit", "-m", commit_msg, "--no-verify"],
                        cwd=str(root), capture_output=True, text=True, timeout=30)
-        push_result = subprocess.run(
-            ["git", "push", "origin", branch_name, "--no-verify"],
-            cwd=str(root), capture_output=True, text=True, timeout=60,
-        )
-        if push_result.returncode != 0:
-            sys.stderr.write(f"[gitops] push falhou: {push_result.stderr[:200]}\n")
-            return None
-
-        pr_body = [
-            f"## {summary_text[:200]}",
-            "",
-            f"**Projeto:** {project_name}",
-            f"**Turno:** {turn_id}",
-            f"**Data:** {datetime.now().isoformat()}",
-            "",
-        ]
-        if new_docs:
-            pr_body.append("### Documentacao gerada")
-            for d in new_docs:
-                pr_body.append(f"- `{d}`")
-            pr_body.append("")
-
-        pr_body.append("---")
-        pr_body.append("_PR gerado automaticamente por gstack_vibehard `stop.py`_")
-
-        result = subprocess.run(
-            [gh_bin, "pr", "create",
-             "--title", f"[gstack] {summary_text[:100]}",
-             "--body", "\n".join(pr_body),
-             "--label", "gstack-automation,documentation"],
-            capture_output=True, text=True, timeout=30,
-        )
-        if result.returncode == 0:
-            url = result.stdout.strip()
-            msg_parts.append(f"PR: {url}")
-            return url
-        else:
-            sys.stderr.write(f"[gitops] pr create falhou: {result.stderr[:200]}\n")
-            return None
-    except (OSError, subprocess.TimeoutExpired) as e:
-        sys.stderr.write(f"[gitops] pr create error: {e}\n")
+        sys.stderr.write(f"[gitops] Commit local criado no branch '{branch_name}'.\n")
+        sys.stderr.write(f"[gitops]  Revise e push manualmente: git push origin {branch_name}\n")
+        sys.stderr.write(f"[gitops]  Depois crie PR: gh pr create --title \"{summary_text[:80]}\"\n")
         return None
+    except (OSError, subprocess.TimeoutExpired) as e:
+        sys.stderr.write(f"[gitops] git error: {e}\n")
+        return None
+
+
+# ── Output Guard (Porteiro) — RBAC validation on agent output ──
+SENSITIVE_PATTERNS = [
+    r'(?i)(sk_live_|sk_test_|pk_live_|pk_test_|whsec_|acct_)[A-Za-z0-9]{20,}',
+    r'(?i)(api[-_]?key|apikey|secret|password|token|auth_token|private_key)\s*[=:]\s*["\'][^"\'"]{8,}',
+    r'(?i)(ghp_|gho_|ghu_|ghs_|ghr_)[A-Za-z0-9]{36,}',
+    r'(?i)(xox[parbse]-)[A-Za-z0-9-]{20,}',
+    r'(?i)(-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----)',
+    r'\b\d{3}[-.]?\d{2}[-.]?\d{4}\b',
+    r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b',
+]
+
+ALLOWED_ROLES_HIERARCHY = {
+    "admin": 3,
+    "developer": 2,
+    "viewer": 1,
+}
+
+def output_guard(output_text: str, user_role: str) -> tuple[bool, str]:
+    """Valida se o output pode ser exibido ao usuario dado seu papel RBAC.
+
+    Returns:
+        (blocked: bool, reason: str)
+    """
+    role_level = ALLOWED_ROLES_HIERARCHY.get(user_role, 0)
+
+    # Admin pode ver tudo
+    if role_level >= 3:
+        return False, ""
+
+    sensitive_found = []
+    for pattern in SENSITIVE_PATTERNS:
+        matches = re.findall(pattern, output_text)
+        if matches:
+            sensitive_found.append(pattern[:30])
+
+    if sensitive_found:
+        # Viewer pode ver apenas non-sensitive output
+        if role_level <= 1:
+            return True, f"Output bloqueado pelo Porteiro: nivel '{user_role}' nao tem acesso a dados sensiveis ({len(sensitive_found)} padroes detectados)"
+        # Developer can see limited
+        if role_level == 2:
+            return True, f"Output bloqueado pelo Porteiro: nivel 'developer' requer sanitizacao de {len(sensitive_found)} dados sensiveis detectados"
+
+    # Check for PII patterns (CPF, email, etc) — viewer cannot see these
+    pii_patterns = [r'\b\d{3}\.\d{3}\.\d{3}-\d{2}\b', r'\b\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}\b']
+    for pp in pii_patterns:
+        if re.search(pp, output_text):
+            if role_level <= 1:
+                return True, f"Output bloqueado pelo Porteiro: PII detectado, nivel '{user_role}' nao autorizado"
+
+    return False, ""
 
 
 # Execute GitOps
@@ -912,5 +962,19 @@ output = {
 if stop_exit_status:
     output["error"] = "OpenHands sandbox failed"
     output["exitStatus"] = stop_exit_status
-sys.stdout.write(json.dumps(output))
+
+# Output Guard: verifica se o output pode ser exibido ao usuario
+user_role = os.environ.get("GSTACK_USER_ROLE", "developer")
+output_text = json.dumps(output)
+blocked, reason = output_guard(output_text, user_role)
+if blocked:
+    sys.stderr.write(f"[Porteiro] {reason}\n")
+    sys.stdout.write(json.dumps({
+        "systemMessage": reason,
+        "blocked": True,
+        "originalBlockedMsg": msg_parts[0] if msg_parts else "",
+    }))
+    sys.exit(1)
+
+sys.stdout.write(output_text)
 sys.exit(stop_exit_status)

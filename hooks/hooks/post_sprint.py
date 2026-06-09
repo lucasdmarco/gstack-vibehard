@@ -33,7 +33,7 @@ def update_graphify(root: Path, last_msg: str) -> dict:
                         try:
                             pkg = json.loads(pkg_json.read_text())
                             deps = list(pkg.get("dependencies", {}).keys())[:10]
-                        except:
+                        except Exception:
                             pass
                     type_map = {"apps": "app", "packages": "lib"}
                     nodes.append({
@@ -96,7 +96,7 @@ def update_gbrain(root: Path, last_msg: str) -> dict:
     if ctx_file.exists():
         try:
             ctx = json.loads(ctx_file.read_text())
-        except:
+        except Exception:
             pass
 
     decisions_found = re.findall(
@@ -119,7 +119,7 @@ def update_gbrain(root: Path, last_msg: str) -> dict:
     ctx["updatedAt"] = datetime.now().isoformat()
     ctx_file.write_text(json.dumps(ctx, indent=2, ensure_ascii=False))
 
-    return {"decisions_added": added, "total_decisions": len(ctx.get("decisions", []))}
+    return {"decisions_added": added, "total_decisions": len(ctx.get("decisions", [])), "decisions": ctx.get("decisions", [])}
 
 
 def record_mom(session_summary: str, project: str) -> dict:
@@ -205,10 +205,7 @@ def count_fallow_blocks(root: Path) -> int:
                     entry = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                if entry.get("action") == "block" or entry.get("blocked"):
-                    blocks += 1
-                severity = (entry.get("severity", "") or "").upper()
-                if severity in ("CRITICO", "ALTO"):
+                if (entry.get("action") == "block" or entry.get("blocked")) or (entry.get("severity", "") or "").upper() in ("CRITICO", "ALTO"):
                     blocks += 1
         except Exception:
             pass
@@ -234,11 +231,8 @@ def count_atomic_files(root: Path) -> int:
     except Exception:
         pass
     if modified == 0:
-        # Fallback: conta arquivos no diretorio de workspace
-        for f in atomic_dir.rglob("*.toml"):
-            modified += 1
-        for f in atomic_dir.rglob("*.json"):
-            modified += 1
+        # Fallback: atomic log vazio ou indisponivel — retorna 0
+        return 0
     return modified
 
 
@@ -312,7 +306,10 @@ def write_roi_report(root: Path, project_name: str,
 
 
 def main():
-    inp = json.loads(sys.stdin.read())
+    try:
+        inp = json.loads(sys.stdin.read())
+    except json.JSONDecodeError:
+        inp = {}
     cwd = inp.get("cwd", "")
     last_msg = inp.get("last_assistant_message", "")
 
@@ -328,7 +325,7 @@ def main():
     gbrain_result = update_gbrain(root, last_msg)
     mom_result = record_mom(last_msg[:500], project_name)
 
-    decisions = gbrain_result.get("decisions_added", 0)
+    decisions = gbrain_result.get("decisions", [])
     graph_summary = f"{graphify_result.get('nodes', 0)} nodes, {graphify_result.get('edges', 0)} edges"
     chronicle_result = enrich_chronicle(chronicle_dir, project_name, decisions, graph_summary)
 

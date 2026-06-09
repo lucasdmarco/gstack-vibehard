@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync, unlinkSync } from
 import { homedir, tmpdir } from "os"
 import { join, dirname } from "path"
 import { fileURLToPath } from "url"
-import { execSync } from "child_process"
+import { execSync, execFileSync } from "child_process"
 import { detectHarnesses, isWindows, isMacOS, isLinux } from "../harness/detector.js"
 import { installCodex } from "../harness/codex.js"
 import { installClaude } from "../harness/claude.js"
@@ -29,27 +29,26 @@ const PROJECT_ROOT = getProjectRoot()
 
 function safeDownloadAndRun(url, label) {
   const tmp = join(tmpdir(), `gstack-dl-${Date.now()}${isWindows() ? ".ps1" : ".sh"}`)
-  const safeUrl = JSON.stringify(url)
-  const safeTmp = JSON.stringify(tmp)
+  const safeUrl = url.replace(/'/g, "'\\''")
   try {
     if (isWindows()) {
-      execSync(`powershell -c "irm ${safeUrl} -OutFile ${safeTmp}"`, { stdio: "pipe", timeout: 120000 })
+      execFileSync("powershell", ["-c", `irm '${safeUrl}' -OutFile '${tmp}'`], { stdio: "pipe", timeout: 120000, shell: false })
     } else {
-      execSync(`curl -fsSL ${safeUrl} -o ${safeTmp}`, { stdio: "pipe", timeout: 120000 })
+      execFileSync("curl", ["-fsSL", url, "-o", tmp], { stdio: "pipe", timeout: 120000, shell: false })
     }
     if (!existsSync(tmp)) { warn(`${label}: download falhou`); return false }
     const content = readFileSync(tmp, "utf-8")
     if (content.length < 10) { warn(`${label}: download invalido (${content.length} bytes)`); return false }
     if (isWindows()) {
-      execSync(`powershell -c "& ${safeTmp}"`, { stdio: "pipe", timeout: 180000 })
+      execFileSync("powershell", ["-c", `& '${tmp}'`], { stdio: "pipe", timeout: 180000, shell: false })
     } else {
-      execSync(`sh ${safeTmp}`, { stdio: "pipe", timeout: 180000 })
+      execFileSync("sh", [tmp], { stdio: "pipe", timeout: 180000, shell: false })
     }
-    try { unlinkSync(tmp) } catch {}
+    try { unlinkSync(tmp) } catch (e) { console.error("cleanup tmp:", e) }
     return true
-  } catch {
-    try { unlinkSync(tmp) } catch {}
-    warn(`${label}: falha no download/execucao segura`)
+  } catch (e) {
+    try { unlinkSync(tmp) } catch (e2) { console.error("cleanup tmp:", e2) }
+    warn(`${label}: falha no download/execucao segura: ${e.message}`)
     return false
   }
 }
@@ -78,7 +77,7 @@ function refreshPath() {
     const userMatch = userPath.match(/REG_\w+\s+(\S.+)/)
     const merged = [sysMatch?.[1], userMatch?.[1]].filter(Boolean).join(";")
     if (merged) process.env.Path = merged
-  } catch {}
+  } catch (e) { console.error("refreshPath (non-critical):", e.message) }
 }
 
 async function installDeps(run, warn, success, info, report, harnessIds) {
@@ -91,7 +90,7 @@ async function installDeps(run, warn, success, info, report, harnessIds) {
   try {
     execSync("bun --version", { stdio: "pipe", timeout: 5000 })
     bunFound = true
-  } catch {}
+  } catch { /* bun not found, expected */ }
 
   if (!bunFound) {
     info("bun: nao encontrado. Instalando (download seguro)...")
@@ -108,7 +107,7 @@ async function installDeps(run, warn, success, info, report, harnessIds) {
             execSync(`${p} --version`, { stdio: "pipe", timeout: 5000 })
             bunFound = true
             break
-          } catch {}
+          } catch { /* bun path not found, expected */ }
         }
         if (bunFound) {
           success("bun instalado")
@@ -142,7 +141,7 @@ async function installDeps(run, warn, success, info, report, harnessIds) {
       execSync(`${p} --version`, { stdio: "pipe", timeout: 5000 })
       uvBin = p
       break
-    } catch {}
+    } catch { /* expected */ }
   }
 
   if (!uvBin) {
@@ -160,14 +159,14 @@ async function installDeps(run, warn, success, info, report, harnessIds) {
           uvBin = p
           success("uv instalado")
           break
-        } catch {}
+        } catch { /* expected */ }
       }
       if (!uvBin) {
         try {
           execSync("uv --version", { stdio: "pipe", timeout: 5000 })
           uvBin = "uv"
           success("uv instalado")
-        } catch {}
+        } catch { /* expected */ }
       }
       if (!uvBin) warn("uv: instalado mas nao encontrado. Tente reiniciar o terminal.")
     } catch {
@@ -176,7 +175,7 @@ async function installDeps(run, warn, success, info, report, harnessIds) {
   }
 
   if (uvBin) {
-    run(`${uvBin} tool install graphifyy`, "graphify (uv tool)")
+    run(`${uvBin} tool install graphify`, "graphify (uv tool)")
   } else {
     info("graphify: pulado (uv nao disponivel)")
   }
@@ -189,7 +188,7 @@ async function installDeps(run, warn, success, info, report, harnessIds) {
     execSync("rustc --version", { stdio: "pipe", timeout: 5000 })
     rustFound = true
     success("Rust encontrado")
-  } catch {}
+  } catch { /* expected */ }
 
   if (!rustFound) {
     info("Rust: nao encontrado. Instalando rustup...")
@@ -227,7 +226,7 @@ async function installDeps(run, warn, success, info, report, harnessIds) {
             execSync("rustc --version", { stdio: "pipe", timeout: 5000 })
             rustFound = true
             success("Rust instalado (toolchain GNU)")
-          } catch {}
+          } catch { /* expected */ }
         }
         if (!rustFound) warn("Rust: instalado mas `rustc` nao encontrado no PATH")
       }
@@ -378,7 +377,7 @@ export async function install() {
       if (!isWindows()) {
         try {
           execSync(`chmod +x "${dst}"`, { stdio: "pipe", timeout: 5000 })
-        } catch {}
+        } catch (e) { console.error("chmod (non-critical):", e.message) }
       }
       report.added.push(`script: ${script}`)
     }

@@ -1,4 +1,4 @@
-import { execSync as defaultExecSync } from "node:child_process"
+import { execSync as defaultExecSync, execFileSync } from "node:child_process"
 import {
   chmodSync,
   copyFileSync,
@@ -77,13 +77,11 @@ function safeExec(exec, cmd, opts) {
 
 function safeDownloadAndRun(url, logger, exec, label) {
   const tmp = join(tmpdir(), `gstack-dl-${Date.now()}${process.platform === "win32" ? ".ps1" : ".sh"}`)
-  const safeUrl = JSON.stringify(url)
-  const safeTmp = JSON.stringify(tmp)
   try {
     if (process.platform === "win32") {
-      safeExec(exec, `powershell -c "irm ${safeUrl} -OutFile ${safeTmp}"`, { timeout: 120000 })
+      execFileSync("powershell", ["-c", `irm '${url}' -OutFile '${tmp}'`], { stdio: "pipe", timeout: 120000, shell: false })
     } else {
-      safeExec(exec, `curl -fsSL ${safeUrl} -o ${safeTmp}`, { timeout: 120000 })
+      execFileSync("curl", ["-fsSL", url, "-o", tmp], { stdio: "pipe", timeout: 120000, shell: false })
     }
     if (!existsSync(tmp)) {
       logger.warn(`${label}: download falhou (arquivo nao criado)`)
@@ -92,19 +90,19 @@ function safeDownloadAndRun(url, logger, exec, label) {
     const content = readFileSync(tmp, "utf-8")
     if (content.length < 10) {
       logger.warn(`${label}: download muito pequeno (${content.length} bytes), possivelmente invalido`)
-      try { unlinkSync(tmp) } catch {}
+      try { unlinkSync(tmp) } catch (e) { /* cleanup */ }
       return false
     }
     if (process.platform === "win32") {
-      safeExec(exec, `powershell -c "& ${safeTmp}"`, { timeout: 180000 })
+      execFileSync("powershell", ["-c", `& '${tmp}'`], { stdio: "pipe", timeout: 180000, shell: false })
     } else {
-      safeExec(exec, `sh ${safeTmp}`, { timeout: 180000 })
+      execFileSync("sh", [tmp], { stdio: "pipe", timeout: 180000, shell: false })
     }
-    try { unlinkSync(tmp) } catch {}
+    try { unlinkSync(tmp) } catch (e) { /* cleanup */ }
     return true
-  } catch {
-    try { unlinkSync(tmp) } catch {}
-    logger.warn(`${label}: falha no download/execucao segura`)
+  } catch (e) {
+    try { unlinkSync(tmp) } catch (e2) { /* cleanup */ }
+    logger.warn(`${label}: falha no download/execucao segura: ${e.message || e}`)
     return false
   }
 }
@@ -386,123 +384,6 @@ function bootHeadroom(logger, exec, projectDir) {
 //  PHASE 4: Omniharness (agent-hooks & Skills)
 // ─────────────────────────────────────────────────────────────
 
-function getStandardHooksJson(homeDir) {
-  return {
-    version: "1.0",
-    gstack: true,
-    hooks: {
-      preToolUse: {
-        command: `python ${homeDir}/.codex/hooks/pre_tool_use_security.py`,
-        timeout: 5000,
-        blocking: true,
-      },
-      beforeShellExecution: {
-        command: `python ${homeDir}/.codex/hooks/before_shell.py`,
-        timeout: 3000,
-        blocking: true,
-      },
-      afterToolUse: {
-        command: "npx fallow audit --format json",
-        timeout: 30000,
-        blocking: false,
-      },
-    },
-    qualityGate: {
-      onCompletion: "npx fallow audit --format json",
-      blockOn: ["CRITICO", "ALTO"],
-      autoFixable: true,
-    },
-  }
-}
-
-function getZedInjectSettings() {
-  return {
-    "telemetry": { "diagnostics": false },
-    "lsp": { "gstack": { "binary": { "path": "node", "arguments": ["--experimental-strip-types", "--experimental-transform-types"] } } },
-    "gstack_integration": {
-      enabled: true,
-      hooksEndpoint: "http://localhost:8000",
-      auditCommand: "npx fallow audit --format json",
-    },
-  }
-}
-
-function injectOmniharness(logger, exec, projectDir) {
-  const hooksBin = findBinary("agent-hooks", exec)
-  const homeForHooks = HOME.replace(/\\/g, "/")
-
-  for (const target of OMNIHARNESS_MAP) {
-    try {
-      switch (target.mode) {
-        case "agent-hooks": {
-          if (hooksBin) {
-            const cmd = `${hooksBin} init ${target.id} --dir ${JSON.stringify(projectDir)}`
-            const out = safeExec(exec, cmd)
-            if (out) {
-              logger.success(`agent-hooks configurado para ${target.label}`)
-              break
-            }
-          }
-          if (target.configDir && target.hooksFile) {
-            mkdirSync(target.configDir, { recursive: true })
-            writeJson(join(target.configDir, target.hooksFile), getStandardHooksJson(homeForHooks))
-            logger.success(`hooks injetados em ${target.label} (${join(target.configDir, target.hooksFile)})`)
-          } else {
-            logger.warn(`${target.label}: sem hooks file definido — pulando`)
-          }
-          break
-        }
-        case "direct": {
-          if (target.configDir && target.hooksFile) {
-            mkdirSync(target.configDir, { recursive: true })
-            writeJson(join(target.configDir, target.hooksFile), getStandardHooksJson(homeForHooks))
-            logger.success(`hooks injetados em ${target.label}`)
-          } else {
-            logger.warn(`${target.label}: sem configDir — pulando`)
-          }
-          break
-        }
-        case "zed": {
-          if (target.hooksFile) {
-            mkdirSync(join(HOME, ".zed"), { recursive: true })
-            const existing = existsSync(target.hooksFile)
-              ? JSON.parse(readFileSync(target.hooksFile, "utf-8"))
-              : {}
-            const merged = { ...existing, ...getZedInjectSettings() }
-            writeJson(target.hooksFile, merged)
-            logger.success(`Zed Editor configurado — .zed/settings.json injetado`)
-          }
-          break
-        }
-        case "graphify": {
-          const platformFlag = target.id === "antigravity"
-            ? "antigravity install"
-            : `install --platform ${target.id}`
-          const gOut = safeExec(exec, `npx graphify ${platformFlag}`, { cwd: projectDir })
-          if (gOut) {
-            logger.success(`${target.label}: graphify ${platformFlag}`)
-          } else {
-            if (target.configDir) {
-              const absSkills = target.configDir.startsWith(".")
-                ? join(projectDir, target.configDir)
-                : target.configDir
-              mkdirSync(absSkills, { recursive: true })
-              const skillsDir = join(projectDir, ".claude", "skills")
-              if (existsSync(skillsDir)) copyRecursive(skillsDir, absSkills)
-              logger.success(`${target.label}: skills copiadas para ${absSkills}`)
-            } else {
-              logger.warn(`${target.label}: graphify falhou e sem configDir — pulando`)
-            }
-          }
-          break
-        }
-      }
-    } catch (err) {
-      logger.warn(`${target.label}: ${err.message}`)
-    }
-  }
-}
-
 function writeSkillsDir(projectDir) {
   const skillsDir = join(projectDir, ".claude", "skills")
   mkdirSync(skillsDir, { recursive: true })
@@ -649,11 +530,65 @@ audit:
 `)
 }
 
-function writeRuntimeFiles({ projectDir, projectName, now, projectRoot }) {
+const TEMPLATE_MANIFEST = {
+  "fullstack-monorepo": {
+    run_command: "pnpm dev",
+    build_command: "pnpm build",
+    env: { DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/project", NEXT_PUBLIC_SUPABASE_URL: "change-me", NEXT_PUBLIC_SUPABASE_ANON_KEY: "change-me" },
+    ports: [
+      { name: "web", port: 5173, protocol: "http", health: "/" },
+      { name: "api", port: 3000, protocol: "http", health: "/health" },
+    ],
+    services: [
+      { name: "web", command: "pnpm dev:web", port: 5173, health: "/" },
+      { name: "api", command: "pnpm dev:api", port: 3000, health: "/health" },
+    ],
+  },
+  "saas-auth-stripe": {
+    run_command: "concurrently \"pnpm dev:web\" \"pnpm dev:api\"",
+    build_command: "pnpm build",
+    env: { NEXT_PUBLIC_SUPABASE_URL: "change-me", NEXT_PUBLIC_SUPABASE_ANON_KEY: "change-me", STRIPE_SECRET_KEY: "sk_test_change-me", NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_change-me" },
+    ports: [
+      { name: "web", port: 3000, protocol: "http", health: "/" },
+      { name: "api", port: 3001, protocol: "http", health: "/api/health" },
+    ],
+    services: [
+      { name: "web", command: "pnpm dev:web", port: 3000, health: "/" },
+      { name: "api", command: "pnpm dev:api", port: 3001, health: "/api/health" },
+    ],
+  },
+  "mobile-backend": {
+    run_command: "concurrently \"pnpm dev:api\" \"pnpm dev:mobile\"",
+    build_command: "pnpm build",
+    env: { API_URL: "http://localhost:3000", DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/project", EXPO_PUBLIC_API_URL: "http://localhost:3000" },
+    ports: [
+      { name: "api", port: 3000, protocol: "http", health: "/health" },
+      { name: "mobile", port: 8081, protocol: "http", health: "/" },
+    ],
+    services: [
+      { name: "api", command: "pnpm dev:api", port: 3000, health: "/health" },
+    ],
+  },
+  "ai-agent-platform": {
+    run_command: "uvicorn api.main:app --host 0.0.0.0 --port 8000",
+    build_command: null,
+    env: { OPENAI_API_KEY: "change-me", ANTHROPIC_API_KEY: "change-me", CHROMA_DB_PATH: "./chroma_db" },
+    ports: [
+      { name: "api", port: 8000, protocol: "http", health: "/health" },
+    ],
+    services: [
+      { name: "api", command: "uvicorn api.main:app --host 0.0.0.0 --port 8000", port: 8000, health: "/health" },
+    ],
+  },
+}
+
+function writeRuntimeFiles({ projectDir, projectName, now, projectRoot, templateName }) {
   const gstackDir = join(projectDir, ".gstack")
   const scriptsDir = join(projectDir, "scripts")
   mkdirSync(gstackDir, { recursive: true })
   mkdirSync(scriptsDir, { recursive: true })
+
+  const tpl = TEMPLATE_MANIFEST[templateName] || TEMPLATE_MANIFEST["fullstack-monorepo"]
 
   writeJson(join(gstackDir, "app.json"), {
     name: projectName,
@@ -668,13 +603,19 @@ function writeRuntimeFiles({ projectDir, projectName, now, projectRoot }) {
     meshFederation: true,
     ticketOrchestration: "paperclip",
     iam: "casdoor-local",
+    run_command: tpl.run_command,
+    build_command: tpl.build_command,
+    env: tpl.env,
+    port: tpl.ports.length === 1 ? tpl.ports[0].port : tpl.ports.find(p => p.name === "web")?.port || tpl.ports[0].port,
   })
 
   writeJson(join(gstackDir, "services.json"), {
-    services: [
-      { name: "web", command: "pnpm dev:web", port: 5173, health: "/" },
-      { name: "api", command: "pnpm dev:api", port: 3000, health: "/health" },
-    ],
+    services: tpl.services,
+  })
+
+  writeJson(join(gstackDir, "ports.json"), {
+    version: 1,
+    ports: tpl.ports,
   })
 
   writeJson(join(gstackDir, "secrets.schema.json"), {
@@ -745,6 +686,109 @@ pnpm dev
   }
 }
 
+function writeRealHarnessBridge(projectDir, projectName, logger, exec) {
+  // ── Cursor Bridge: .cursor/rules/gstack-vibehard.mdc ──
+  // Cursor rules use MDC format with YAML frontmatter for metadata.
+  // Events: preToolUse (before any tool use) mapped to quality gate audit.
+  mkdirSync(join(projectDir, ".cursor", "rules"), { recursive: true })
+  writeFileSync(join(projectDir, ".cursor", "rules", "gstack-vibehard.mdc"),
+`---
+description: GStack quality gate and security bridge for Cursor
+globs: 
+alwaysApply: true
+---
+
+# GStack Bridge — ${projectName}
+
+## Pre-Tool Gate (tool.execute.before)
+Before executing shell or write operations, run the quality gate to
+validate that changes don't introduce CRITICO/ALTO issues:
+
+\`\`\`
+npx fallow audit --format json --level 1
+\`\`\`
+
+## Session Rules
+- Respect .gstack/app.json as the source of truth for runtime config
+- Run quality gate before any commit or deploy
+- Never expose secrets from .env or .gstack/*.json in output
+
+## Auto-Fix
+Issues marked auto_fixable=true can be corrected automatically.
+`)
+
+  // ── Windsurf Bridge: already handled by gstack.md ──
+
+  // ── Claude Code Bridge: inject hooks into settings.json ──
+  // Claude Code reads settings.json from ~/.claude/settings.json
+  // We write project-level hooks into .claude/ directory
+  mkdirSync(join(projectDir, ".claude", "hooks"), { recursive: true })
+  writeFileSync(join(projectDir, ".claude", "hooks", "settings.json"), JSON.stringify({
+    "gstack_bridge": {
+      "enabled": true,
+      "events": {
+        "preToolUse": {
+          "command": `python ${HOME}/.codex/hooks/pre_tool_use_security.py`,
+          "timeout": 5000,
+          "blocking": true,
+        },
+        "sessionEnd": {
+          "command": `python ${HOME}/.codex/hooks/stop.py`,
+          "timeout": 30000,
+          "blocking": false,
+        },
+      },
+      "qualityGate": {
+        "onCompletion": "npx fallow audit --format json",
+        "blockOn": ["CRITICO", "ALTO"],
+      },
+    },
+  }, null, 2) + "\n")
+
+  // ── OpenCode Bridge: .config/opencode/hooks.json ──
+  // OpenCode v1.15+ suporta hooks nativos tool.execute.before e session.idle
+  const opencodeConfigDir = join(HOME, ".config", "opencode")
+  mkdirSync(opencodeConfigDir, { recursive: true })
+  const opencodeHooksPath = join(opencodeConfigDir, "hooks.json")
+  if (!existsSync(opencodeHooksPath)) {
+    writeFileSync(opencodeHooksPath, JSON.stringify({
+      version: "1.0",
+      hooks: {
+        "tool.execute.before": {
+          command: `python ${HOME}/.codex/hooks/pre_tool_use_security.py`,
+          timeout: 5000,
+          blocking: true,
+        },
+        "session.idle": {
+          command: "npx fallow audit --format json --level 1",
+          timeout: 30000,
+          blocking: false,
+        },
+      },
+    }, null, 2) + "\n")
+    logger.success("OpenCode bridge: hooks.json configurado (tool.execute.before, session.idle)")
+  } else {
+    logger.info("OpenCode bridge: hooks.json ja existe — pulando")
+  }
+
+  // ── agent-hooks CLI (se disponivel) ──
+  const agentHooksBin = findBinary("agent-hooks", exec)
+  if (agentHooksBin) {
+    try {
+      safeExec(exec, `${agentHooksBin} init cursor --dir ${JSON.stringify(projectDir)}`)
+      logger.success("agent-hooks: Cursor inicializado")
+    } catch {}
+    try {
+      safeExec(exec, `${agentHooksBin} init claude --dir ${JSON.stringify(projectDir)}`)
+      logger.success("agent-hooks: Claude Code inicializado")
+    } catch {}
+    try {
+      safeExec(exec, `${agentHooksBin} init opencode --dir ${JSON.stringify(projectDir)}`)
+      logger.success("agent-hooks: OpenCode inicializado")
+    } catch {}
+  }
+}
+
 function writeHarnessFiles(projectDir, projectName) {
   mkdirSync(join(projectDir, ".cursor", "rules"), { recursive: true })
   mkdirSync(join(projectDir, ".windsurf", "rules"), { recursive: true })
@@ -752,7 +796,12 @@ function writeHarnessFiles(projectDir, projectName) {
   mkdirSync(join(projectDir, ".claude", "workflows"), { recursive: true })
 
   writeFileSync(join(projectDir, ".cursor", "rules", "gstack.mdc"),
-`# ${projectName}
+`---
+description: GStack project rules for ${projectName}
+globs: 
+---
+
+# ${projectName}
 
 Use the local GStack runtime files in .gstack/ before changing architecture.
 Quality gate: npx fallow audit --format json
@@ -1145,6 +1194,7 @@ export async function createProject(options = {}) {
   const projectRoot = options.projectRoot || getProjectRoot()
   const execSync = options.execSync || defaultExecSync
   const now = options.now || (() => new Date().toISOString())
+  const isLite = args.includes("--lite")
 
   // Parse --template flag
   const templateFlagIndex = args.findIndex((a) => a === "--template")
@@ -1169,6 +1219,10 @@ export async function createProject(options = {}) {
     throw new Error(`Uso: gstack_vibehard create <nome-do-app> [--template ${Object.keys(VALID_TEMPLATES).join("|")}]`)
   }
 
+  if (projectName.includes("..") || projectName.includes("/") || projectName.includes("\\")) {
+    throw new Error(`Nome de projeto invalido: "${projectName}" — nao use caminhos relativos (..)`)
+  }
+
   const projectDir = join(cwd, projectName)
   if (existsSync(projectDir)) {
     throw new Error(`Diretorio '${projectName}' ja existe.`)
@@ -1176,23 +1230,32 @@ export async function createProject(options = {}) {
 
   const phases = {}
 
-  console.log(`\n  === Fase 1/5: IAM Local (Casdoor) ===`)
-  mkdirSync(projectDir, { recursive: true })
-  const casdoorUrl = startCasdoor(logger, execSync, projectDir)
-  phases.casdoor = { status: casdoorUrl ? "online" : "offline", url: casdoorUrl }
+  if (isLite) {
+    console.log(`\n  Modo lite ativado — pulando: Casdoor, Atomic VCS, ECC 2.0, AgentMemory Federation`)
+  }
 
-  console.log(`\n  === Fase 2/5: Atomic VCS ===`)
-  writeAtomicConfig(projectDir)
-  initAtomic(logger, execSync, projectDir)
-  phases.atomic = { status: "configured" }
+  if (!isLite) {
+    console.log(`\n  === Fase 1/5: IAM Local (Casdoor) ===`)
+    mkdirSync(projectDir, { recursive: true })
+    const casdoorUrl = startCasdoor(logger, execSync, projectDir)
+    phases.casdoor = { status: casdoorUrl ? "online" : "offline", url: casdoorUrl }
 
-  console.log(`\n  === Fase 3/5: Daemons & Memoria ===`)
-  bootEcc2(logger, execSync, projectDir)
-  writeControlPlaneConfig(projectDir, projectName)
-  bootAgentMemory(logger, execSync, projectDir)
-  writeMemoryFederationConfig(projectDir)
+    console.log(`\n  === Fase 2/5: Atomic VCS ===`)
+    writeAtomicConfig(projectDir)
+    initAtomic(logger, execSync, projectDir)
+    phases.atomic = { status: "configured" }
+  }
+
+  if (!isLite) {
+    console.log(`\n  === Fase 3/5: Daemons & Memoria ===`)
+    bootEcc2(logger, execSync, projectDir)
+    writeControlPlaneConfig(projectDir, projectName)
+    bootAgentMemory(logger, execSync, projectDir)
+    writeMemoryFederationConfig(projectDir)
+    phases.daemons = { status: "configured" }
+  }
+
   bootGraphify(logger, execSync, projectDir)
-  phases.daemons = { status: "configured" }
 
   console.log(`\n  === Fase 4/5: Scaffold ${templateName} (${OMNIHARNESS_MAP.length} IDEs) ===`)
   if (templateName === "fullstack-monorepo") {
@@ -1201,13 +1264,12 @@ export async function createProject(options = {}) {
   } else {
     scaffoldVerticalTemplate(templateName, projectDir, projectName, logger)
   }
-  writeRuntimeFiles({ projectDir, projectName, now, projectRoot })
+  writeRuntimeFiles({ projectDir, projectName, now, projectRoot, templateName })
   writeSkillsDir(projectDir)
-  injectOmniharness(logger, execSync, projectDir)
-  phases.omniharness = { status: "injected", ides: OMNIHARNESS_MAP.length }
 
   console.log(`\n  === Fase 5/5: Scaffold & Orquestracao Macro ===`)
   writeHarnessFiles(projectDir, projectName)
+  writeRealHarnessBridge(projectDir, projectName, logger, execSync)
   writeTeamMatrix(projectDir, projectName)
   writeGatewayMcpConfig(projectDir)
   writePaperclipManifest(projectDir, projectName)

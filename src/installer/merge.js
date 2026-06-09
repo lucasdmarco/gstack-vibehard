@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, copyFileSync, cpSync, existsSync, mkdirSync, readdirSync } from "fs"
+import { readFileSync, writeFileSync, copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, statSync } from "fs"
 import { join, dirname } from "path"
 
 /**
@@ -11,6 +11,7 @@ import { join, dirname } from "path"
 
 export function backupFile(filePath) {
   if (!existsSync(filePath)) return false
+  if (statSync(filePath).isDirectory()) return false
   const bakPath = filePath + ".gstack_vibehard.bak"
   if (!existsSync(bakPath)) {
     copyFileSync(filePath, bakPath)
@@ -50,21 +51,6 @@ export function deepMerge(target, source) {
 export function mergeJson(existing, gvConfig) {
   if (!existing) return gvConfig
   return deepMerge(existing, gvConfig)
-}
-
-export function mergeArray(existing, gvItems, marker) {
-  if (!Array.isArray(existing)) existing = []
-  if (!Array.isArray(gvItems)) gvItems = []
-  const merged = existing.filter(
-    (item) => !gvItems.includes(item)
-  )
-  merged.push(...gvItems)
-
-  if (marker) {
-    merged.push(`# GStack: ${marker}`)
-  }
-
-  return merged
 }
 
 export function writeWithBackup(filePath, content) {
