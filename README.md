@@ -1,4 +1,4 @@
-# 🚀 gstack-vibehard 2.1.2
+# 🚀 gstack-vibehard 2.1.3
 **A Máquina de Desenvolvimento Zero-Config Definitiva para Agentes de IA.**
 
 O `gstack-vibehard` é um **Control Plane e Instalador Cross-Harness**. Ele envelopa o seu terminal com ferramentas de elite, transformando Claude Code, Cursor, OpenCode e Codex em um ecossistema corporativo seguro, unificado e autônomo, rodando 100% na sua máquina.
@@ -7,7 +7,7 @@ Chega de alucinações, vazamentos de dados ou perda de contexto. O `gstack-vibe
 
 ---
 
-## ✨ O que há de novo na v2.1.2 (Security Convergence)
+## ✨ O que há de novo na v2.1.3 (Output Guard Shared Module + Default Viewer)
 
 - 🛡️ **Zero-Trust Output Guard:** Um "Agente Porteiro" intercepta as saídas da IA. Usa RBAC (`GSTACK_USER_ROLE`) para escanear e bloquear vazamentos de 8 classes de dados sensíveis (Chaves Stripe, Tokens GitHub, CPFs, etc.) antes de exibi-los.
 - 📦 **Replitização do Workspace:** Os projetos nascem com manifestos de app nativos (`.gstack/app.json`, `ports.json` e `services.json`), com `run_command`, `build_command`, `env` e portas dinâmicas por template.
@@ -15,6 +15,13 @@ Chega de alucinações, vazamentos de dados ou perda de contexto. O `gstack-vibe
 - 🪶 **Modo `--lite`:** Gere projeto sem Docker/Rust/ECC 2.0 — ideal para máquinas com recursos limitados.
 - 🔒 **RCE-Safe & Hardened:** Todas as execuções externas usam `execFileSync()` com `shell: false`. Nenhuma URL ou nome de projeto malicioso pode injetar comandos no shell. Nomes de projeto validados por allowlist (`/^[a-zA-Z0-9._-]+$/`).
 - 🪵 **Error Visibility:** Empty catches eliminados em todo o código — erros reais são logados com contexto, não silenciados.
+
+### v2.1.3 (Shared Output Guard + Viewer Default)
+
+- 📦 **Output Guard como Módulo Compartilhado:** `output_guard()` extraído para `_output_guard.py` — reutilizado automaticamente por `stop.py`, `post_sprint.py` e `session_start.py`.
+- 👁️ **Default Role `viewer`:** `GSTACK_USER_ROLE` agora defaulta para `"viewer"` (menor privilégio) em vez de `"developer"`. Admin deve ser explicitamente configurado.
+- 🔌 **Guard no Session Start:** `session_start.py` escaneia `additionalContext` com Output Guard antes de injetar no agente.
+- 📊 **Guard no Post-Sprint:** `post_sprint.py` escaneia relatório ROI com Output Guard antes de exibir.
 
 ---
 
@@ -50,7 +57,7 @@ gstack_vibehard create meu-projeto
 ## 🔒 Segurança
 
 - **File Locking:** `fcntl`/`msvcrt` nativo para `instincts.yaml`
-- **Output Guard:** RBAC (admin/developer/viewer) bloqueia secrets por nível
+- **Output Guard:** RBAC (admin/developer/viewer) bloqueia secrets por nível — default `viewer` (menor privilégio)
 - **Project Name Allowlist:** `^[a-zA-Z0-9._-]+$` — sem injeção via `$()`, backtick, `;`
 - **No Shell Execution:** `execFileSync` com `shell: false` em todo o código
 - **GitOps Seguro:** `git push` apenas com consentimento explícito

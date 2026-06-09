@@ -9,6 +9,8 @@ Integrates highermind patterns:
 import json, sys, os, subprocess, time, getpass, socket, shutil, urllib.request
 from pathlib import Path
 
+from _output_guard import output_guard
+
 
 def build_chronicle_index():
     """Constrói índice de busca sobre todos os arquivos chronicle."""
@@ -406,4 +408,15 @@ output = {
         "additionalContext": additional_context
     }
 }
-sys.stdout.write(json.dumps(output))
+output_text = json.dumps(output)
+user_role = os.environ.get("GSTACK_USER_ROLE", "viewer")
+blocked, reason = output_guard(output_text, user_role)
+if blocked:
+    sys.stderr.write(f"[Porteiro] {reason}\n")
+    output_text = json.dumps({
+        "hookSpecificOutput": {
+            "hookEventName": "SessionStart",
+            "additionalContext": f"[Output bloqueado pelo Porteiro] {reason}"
+        }
+    })
+sys.stdout.write(output_text)

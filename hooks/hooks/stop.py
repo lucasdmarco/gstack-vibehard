@@ -18,6 +18,8 @@ via deploy command detection in the session.
 """
 import json, sys, subprocess, os, re, shutil, platform, logging
 from pathlib import Path
+
+from _output_guard import output_guard, SENSITIVE_PATTERNS, ALLOWED_ROLES_HIERARCHY
 from datetime import datetime
 
 
@@ -889,59 +891,6 @@ def gitops_pr_create(summary_text: str, root: Optional[Path]) -> Optional[str]:
         return None
 
 
-# ── Output Guard (Porteiro) — RBAC validation on agent output ──
-SENSITIVE_PATTERNS = [
-    r'(?i)(sk_live_|sk_test_|pk_live_|pk_test_|whsec_|acct_)[A-Za-z0-9]{20,}',
-    r'(?i)(api[-_]?key|apikey|secret|password|token|auth_token|private_key)\s*[=:]\s*["\'][^"\'"]{8,}',
-    r'(?i)(ghp_|gho_|ghu_|ghs_|ghr_)[A-Za-z0-9]{36,}',
-    r'(?i)(xox[parbse]-)[A-Za-z0-9-]{20,}',
-    r'(?i)(-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----)',
-    r'\b\d{3}[-.]?\d{2}[-.]?\d{4}\b',
-    r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b',
-]
-
-ALLOWED_ROLES_HIERARCHY = {
-    "admin": 3,
-    "developer": 2,
-    "viewer": 1,
-}
-
-def output_guard(output_text: str, user_role: str) -> tuple[bool, str]:
-    """Valida se o output pode ser exibido ao usuario dado seu papel RBAC.
-
-    Returns:
-        (blocked: bool, reason: str)
-    """
-    role_level = ALLOWED_ROLES_HIERARCHY.get(user_role, 0)
-
-    # Admin pode ver tudo
-    if role_level >= 3:
-        return False, ""
-
-    sensitive_found = []
-    for pattern in SENSITIVE_PATTERNS:
-        matches = re.findall(pattern, output_text)
-        if matches:
-            sensitive_found.append(pattern[:30])
-
-    if sensitive_found:
-        # Viewer pode ver apenas non-sensitive output
-        if role_level <= 1:
-            return True, f"Output bloqueado pelo Porteiro: nivel '{user_role}' nao tem acesso a dados sensiveis ({len(sensitive_found)} padroes detectados)"
-        # Developer can see limited
-        if role_level == 2:
-            return True, f"Output bloqueado pelo Porteiro: nivel 'developer' requer sanitizacao de {len(sensitive_found)} dados sensiveis detectados"
-
-    # Check for PII patterns (CPF, email, etc) — viewer cannot see these
-    pii_patterns = [r'\b\d{3}\.\d{3}\.\d{3}-\d{2}\b', r'\b\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}\b']
-    for pp in pii_patterns:
-        if re.search(pp, output_text):
-            if role_level <= 1:
-                return True, f"Output bloqueado pelo Porteiro: PII detectado, nivel '{user_role}' nao autorizado"
-
-    return False, ""
-
-
 # Execute GitOps
 gh_bin = shutil.which("gh")
 if gh_bin:
@@ -964,7 +913,7 @@ if stop_exit_status:
     output["exitStatus"] = stop_exit_status
 
 # Output Guard: verifica se o output pode ser exibido ao usuario
-user_role = os.environ.get("GSTACK_USER_ROLE", "developer")
+user_role = os.environ.get("GSTACK_USER_ROLE", "viewer")
 output_text = json.dumps(output)
 blocked, reason = output_guard(output_text, user_role)
 if blocked:

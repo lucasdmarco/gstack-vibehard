@@ -12,6 +12,8 @@ Trigger manual: gstack_vibehard sprint --save
 """
 import json, sys, os, subprocess, re
 from pathlib import Path
+
+from _output_guard import output_guard
 from datetime import datetime
 
 
@@ -345,6 +347,16 @@ def main():
         "timestamp": datetime.now().isoformat(),
     }
     output = json.dumps(result, indent=2, default=str)
+    user_role = os.environ.get("GSTACK_USER_ROLE", "viewer")
+    blocked, reason = output_guard(output, user_role)
+    if blocked:
+        sys.stderr.write(f"[Porteiro] {reason}\n")
+        output = json.dumps({
+            "project": project_name,
+            "blocked": True,
+            "reason": reason,
+            "timestamp": datetime.now().isoformat(),
+        }, indent=2, default=str)
     print(output)
 
     # Print ROI summary to stderr so it's visible in CI/terminal
