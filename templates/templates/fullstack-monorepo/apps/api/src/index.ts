@@ -8,7 +8,7 @@ import { openapiSpec } from './openapi.js'
 const app = express()
 const port = process.env.API_PORT || 3001
 
-app.use(cors())
+app.use(cors({ origin: process.env.CORS_ORIGIN || false }))
 app.use(express.json())
 
 app.get('/api/openapi.json', (_req, res) => {

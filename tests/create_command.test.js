@@ -9,7 +9,7 @@ import { pathToFileURL } from "node:url"
 const repoRoot = path.resolve(import.meta.dirname, "..")
 const modulePath = path.join(repoRoot, "src", "cli", "create.js")
 
-test("create scaffolds with Control Plane, MCP Gateway, Mesh Federation, and Ticket Orchestration", async () => {
+test("create scaffolds with 5-phase DAG boot (Casdoor, Atomic, Daemons, Omniharness, Scaffold)", async () => {
   const tmp = await mkdtemp(path.join(tmpdir(), "gstack-create-"))
   try {
     const cwd = path.join(tmp, "workspace")
@@ -31,9 +31,6 @@ test("create scaffolds with Control Plane, MCP Gateway, Mesh Federation, and Tic
       },
       execSync: (cmd, options = {}) => {
         commands.push({ cmd, cwd: options.cwd })
-        if (cmd.includes("atomic init") || cmd.includes("ecc2") || cmd.includes("agentmemory") || cmd.includes("agent-hooks") || cmd.includes("graphify")) {
-          return Buffer.from("ok")
-        }
         return Buffer.from("ok")
       },
     })
@@ -41,55 +38,72 @@ test("create scaffolds with Control Plane, MCP Gateway, Mesh Federation, and Tic
     const appDir = path.join(cwd, "teste-app")
     assert.equal(result.projectDir, appDir)
 
-    // Pillar 1: Control Plane
+    // Phase 1: Casdoor IAM config
+    assert.equal(existsSync(path.join(appDir, ".gstack", "casdoor.json")), true)
+    const casdoorConfig = JSON.parse(await readFile(path.join(appDir, ".gstack", "casdoor.json"), "utf8"))
+    assert.equal(casdoorConfig.endpoint, "http://localhost:8000")
+    assert.equal(casdoorConfig.iamMode, "local-sqlite")
+
+    // Phase 2: Atomic VCS
+    assert.equal(existsSync(path.join(appDir, ".atomicignore")), true)
+    assert.equal(existsSync(path.join(appDir, ".atomic", "workspace.toml")), true)
+
+    // Phase 3: Control Plane & Memory
     assert.equal(existsSync(path.join(appDir, ".gstack", "control-plane.yaml")), true)
     const cpYaml = await readFile(path.join(appDir, ".gstack", "control-plane.yaml"), "utf8")
     assert.match(cpYaml, /daemon:/)
     assert.match(cpYaml, /dashboard: true/)
     assert.match(cpYaml, /sessions: true/)
 
-    // Pillar 2: MCP Gateway
-    assert.equal(existsSync(path.join(appDir, ".mcp.json")), true)
-    const mcp = JSON.parse(await readFile(path.join(appDir, ".mcp.json"), "utf8"))
-    assert.equal(Boolean(mcp.mcpServers["permit-gateway"]), true)
-    assert.equal(mcp.mcpServers["permit-gateway"].args[0], "-y")
-    assert.equal(mcp.mcpServers["permit-gateway"].args[1], "@permitio/mcp-gateway")
-    // No direct connections remain
-    assert.equal(mcp.mcpServers["supabase"], undefined)
-    assert.equal(mcp.mcpServers["composio"], undefined)
-
-    // Pillar 3: Mesh Federation
     assert.equal(existsSync(path.join(appDir, ".gstack", "federation.toml")), true)
     const fedToml = await readFile(path.join(appDir, ".gstack", "federation.toml"), "utf8")
     assert.match(fedToml, /\[mesh\]/)
     assert.match(fedToml, /hybrid = \["bm25", "vector", "graph"\]/)
 
-    // Pillar 4: Ticket Orchestration
+    // Phase 4: Omniharness — skills dir + AGENTS.md
+    assert.equal(existsSync(path.join(appDir, ".claude", "skills", "superpowers-cycle.md")), true)
+    assert.equal(existsSync(path.join(appDir, ".claude", "skills", "quality-gate.md")), true)
+
+    // Phase 5: MCP Gateway (Casdoor + Headroom, no Permit.io)
+    assert.equal(existsSync(path.join(appDir, ".mcp.json")), true)
+    const mcp = JSON.parse(await readFile(path.join(appDir, ".mcp.json"), "utf8"))
+    assert.equal(Boolean(mcp.mcpServers["casdoor-gateway"]), true)
+    assert.equal(mcp.mcpServers["casdoor-gateway"].args[0], "exec")
+    // No Permit.io or direct connections
+    assert.equal(mcp.mcpServers["permit-gateway"], undefined)
+    assert.equal(mcp.mcpServers["supabase"], undefined)
+    assert.equal(mcp.mcpServers["composio"], undefined)
+
+    // Phase 5: Ticket Orchestration
     assert.equal(existsSync(path.join(appDir, "paperclip.toml")), true)
     const paperclip = await readFile(path.join(appDir, "paperclip.toml"), "utf8")
     assert.match(paperclip, /orchestrator = "paperclip"/)
-    assert.match(paperclip, /provider = "jira"/)
+    assert.match(paperclip, /auto_fixable = true/)
     assert.equal(existsSync(path.join(appDir, "symphony.yml")), true)
 
     // app.json metadata
     const app = JSON.parse(await readFile(path.join(appDir, ".gstack", "app.json"), "utf8"))
     assert.equal(app.controlPlane, "ecc2")
-    assert.equal(app.mcpGateway, "permitio")
+    assert.equal(app.mcpGateway, "casdoor")
     assert.equal(app.meshFederation, true)
     assert.equal(app.ticketOrchestration, "paperclip")
+    assert.equal(app.iam, "casdoor-local")
 
-    // AGENTS.md documents the pillars
+    // AGENTS.md documents the stack
     const agents = await readFile(path.join(appDir, "AGENTS.md"), "utf8")
+    assert.match(agents, /Casdoor/)
     assert.match(agents, /Control Plane/)
-    assert.match(agents, /MCP Gateway/)
     assert.match(agents, /Mesh Federation/)
-    assert.match(agents, /Ticket Orchestration/)
+    assert.match(agents, /Omniharness/)
+    assert.match(agents, /auto_fixable/)
 
     // Core scaffold still works
     assert.equal(existsSync(path.join(appDir, "Dockerfile")), true)
     assert.equal(existsSync(path.join(appDir, ".gstack", "services.json")), true)
     assert.equal(existsSync(path.join(appDir, ".claude", "teams", "supervisor.json")), true)
-    assert.equal(existsSync(path.join(appDir, ".atomicignore")), true)
+    assert.equal(existsSync(path.join(appDir, ".claude", "teams", "pipeline.json")), true)
+    assert.equal(existsSync(path.join(appDir, ".claude", "teams", "producer-reviewer.json")), true)
+    assert.equal(existsSync(path.join(appDir, ".claude", "teams", "validator.json")), true)
   } finally {
     delete process.env.GSTACK_SKIP_PREFLIGHT
     await rm(tmp, { recursive: true, force: true })

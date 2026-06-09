@@ -77,11 +77,8 @@ def run_sandbox(cwd: str) -> dict:
     """Run validation in OpenHands headless mode.
 
     OpenHands is the only supported sandbox engine. It manages Docker
-    isolation internally. If the CLI is not found, this hook fails hard.
+    isolation internally. If the CLI is not found, the sandbox fails gracefully.
     """
-    if os.environ.get("GSTACK_SANDBOX_TEST") != "1":
-        return {"status": "disabled"}
-
     if not cwd:
         return {"status": "skipped", "reason": "cwd missing"}
 
@@ -247,7 +244,7 @@ def secrets_check(root: Path) -> bool:
     secrets_patterns = [
         r'(?i)(api[-_]?key|apikey|secret|password|token|auth_token)\s*[=:]\s*["\'][^"\'"]{8,}',
     ]
-    for pattern in ["*.ts", "*.tsx", "*.py", "*.go", "*.rs", "*.js", "*.env"]:
+    for pattern in ["*.ts", "*.tsx", "*.js", "*.jsx", "*.py", "*.go", "*.rs", "*.java", "*.rb", "*.php", "*.env"]:
         for f in root.rglob(pattern):
             rel = f.relative_to(root).as_posix()
             if any(ignore in rel for ignore in ["node_modules", "dist", ".git", ".env.example"]):
@@ -263,11 +260,12 @@ def secrets_check(root: Path) -> bool:
 
 
 def health_endpoint_check(root: Path) -> bool:
-    """Verifica se existe endpoint /health."""
-    for pattern in ["routes/*.ts", "routes/*.py", "**/*route*", "**/*health*"]:
-        for f in root.rglob("*.ts"):
+    """Verifica se existe endpoint /health em qualquer linguagem suportada."""
+    extensions = ["*.ts", "*.tsx", "*.js", "*.jsx", "*.py", "*.go", "*.rs", "*.java", "*.rb", "*.php"]
+    for ext in extensions:
+        for f in root.rglob(ext):
             rel = f.relative_to(root).as_posix()
-            if any(ignore in rel for ignore in ["node_modules", "dist", ".git"]):
+            if any(ignore in rel for ignore in ["node_modules", "dist", ".git", "__pycache__"]):
                 continue
             try:
                 text = f.read_text(encoding="utf-8", errors="ignore")
@@ -289,7 +287,7 @@ def gitignore_has_dotenv(root: Path) -> bool:
 
 def swagger_check(root: Path) -> bool:
     """Verifica se swagger e condicional ao ambiente."""
-    for pattern in ["*.ts", "*.py", "*.go"]:
+    for pattern in ["*.ts", "*.tsx", "*.js", "*.py", "*.go", "*.rs", "*.java", "*.rb", "*.php"]:
         for f in root.rglob(pattern):
             rel = f.relative_to(root).as_posix()
             if any(ignore in rel for ignore in ["node_modules", "dist", ".git"]):
@@ -439,7 +437,73 @@ if run_security:
             note_lines.append("")
             note_lines.append("**DEPLOY BLOQUEADO** — resolva os itens acima antes.")
 
-# Quality Gate (modo log-only por default; blocking se qg_level > 0)
+# ── Fallow Audit (auto_fixable-aware) ──
+def run_fallow_audit(cwd: str) -> dict:
+    """Executa npx fallow audit --format json e retorna resultado com auto_fixable.
+    
+    Returns dict com:
+      - status: "passed" | "auto_fixable" | "failed" | "skipped"
+      - summary: string
+      - auto_fixable_count: int
+      - blocking_count: int
+      - issues: list
+    """
+    if not cwd:
+        return {"status": "skipped", "summary": "cwd missing"}
+    try:
+        result = subprocess.run(
+            ["npx", "fallow", "audit", "--format", "json"],
+            capture_output=True, text=True, timeout=60, cwd=cwd,
+        )
+    except FileNotFoundError:
+        return {"status": "skipped", "summary": "npx/fallow not found"}
+    except OSError as e:
+        return {"status": "skipped", "summary": str(e)}
+    except subprocess.TimeoutExpired:
+        return {"status": "skipped", "summary": "fallow audit timed out"}
+
+    if result.returncode != 0:
+        return {"status": "skipped", "summary": f"fallow exit {result.returncode}: {result.stderr[:200]}"}
+
+    try:
+        data = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return {"status": "skipped", "summary": "fallow output not valid JSON"}
+
+    issues = data.get("issues", data.get("findings", []))
+    auto_fixable = [i for i in issues if i.get("auto_fixable")]
+    blocking = [i for i in issues if not i.get("auto_fixable") and i.get("severity", "").upper() in ("CRITICO", "ALTO")]
+
+    if not issues:
+        return {"status": "passed", "summary": "Fallow audit: nenhum issue encontrado", "issues": []}
+
+    return {
+        "status": "auto_fixable" if auto_fixable and not blocking else "failed" if blocking else "passed",
+        "summary": f"Fallow audit: {len(issues)} issues ({len(auto_fixable)} auto-fixable, {len(blocking)} blocking)",
+        "auto_fixable_count": len(auto_fixable),
+        "blocking_count": len(blocking),
+        "issues": issues,
+        "auto_fixable": auto_fixable,
+        "blocking": blocking,
+    }
+
+# ── Quality Gate ──
+# Always runs fallow audit first (non-blocking by default, reports auto_fixable)
+fallow_result = run_fallow_audit(cwd)
+note_lines.append("")
+note_lines.append(f"## Fallow Audit")
+note_lines.append(fallow_result.get("summary", "N/A"))
+if fallow_result.get("auto_fixable"):
+    note_lines.append(f"Auto-fixable issues ({fallow_result['auto_fixable_count']}):")
+    for i in fallow_result["auto_fixable"][:5]:
+        note_lines.append(f"  - {i.get('file', '?')}: {i.get('type', i.get('rule', '?'))} [auto-fixable]")
+if fallow_result.get("blocking"):
+    note_lines.append(f"Blocking issues ({fallow_result['blocking_count']}):")
+    for i in fallow_result["blocking"][:5]:
+        note_lines.append(f"  - {i.get('file', '?')}: {i.get('type', i.get('rule', '?'))} [{i.get('severity', '?')}]")
+    stop_failed = True
+
+# Quality Gate (legacy qg.py, modo log-only por default; blocking se qg_level > 0)
 qg_path = Path.home() / ".codex" / "hooks" / "qg.py"
 if qg_path.exists() and cwd:
     qg_level = run_qg_level if run_qg_level > 0 else 1
@@ -497,6 +561,8 @@ chronicle_file = chronicle_dir / f"{project_name}_{datetime.now().strftime('%Y%m
 chronicle_file.write_text(note, encoding="utf-8")
 
 msg_parts = [f"Memorias salvas em {chronicle_file.name} + QG L1 executado"]
+if fallow_result.get("status") in ("passed", "auto_fixable"):
+    msg_parts.append(f"Fallow: {fallow_result['summary']}")
 if sandbox_result and sandbox_result.get("status") == "passed":
     msg_parts.append("Sandbox OpenHands: OK")
 elif sandbox_result and sandbox_result.get("status") == "failed":

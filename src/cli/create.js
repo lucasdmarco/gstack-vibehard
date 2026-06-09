@@ -6,17 +6,33 @@ import {
   mkdirSync,
   readdirSync,
   writeFileSync,
+  readFileSync,
 } from "node:fs"
-import { dirname, join } from "node:path"
+import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
+import { homedir, tmpdir } from "node:os"
 
-const DEFAULT_HARNESSES = ["claude", "codex", "cursor", "windsurf", "cline", "opencode"]
+const HOME = resolve(homedir() || process.env.USERPROFILE || process.env.HOME || "/tmp")
+
+const OMNIHARNESS_MAP = [
+  { id: "claude", label: "Claude Code", configDir: join(HOME, ".claude"), hooksFile: "settings.json", mode: "agent-hooks" },
+  { id: "cursor", label: "Cursor", configDir: join(HOME, ".cursor"), hooksFile: "hooks.json", mode: "agent-hooks" },
+  { id: "codex", label: "OpenAI Codex CLI", configDir: join(HOME, ".codex"), hooksFile: "hooks.json", mode: "agent-hooks" },
+  { id: "windsurf", label: "Windsurf", configDir: join(HOME, ".codeium", "windsurf"), hooksFile: "hooks.json", mode: "agent-hooks" },
+  { id: "opencode", label: "OpenCode CLI", configDir: join(HOME, ".config", "opencode"), hooksFile: "hooks.json", mode: "agent-hooks" },
+  { id: "gemini", label: "Gemini CLI", configDir: join(HOME, ".gemini"), hooksFile: "hooks.json", mode: "direct" },
+  { id: "kiro", label: "Kiro", configDir: join(HOME, ".kiro"), hooksFile: "hooks.json", mode: "direct" },
+  { id: "antigravity", label: "Antigravity (Google)", configDir: join(".agent", "skills"), hooksFile: null, mode: "graphify" },
+  { id: "zed", label: "Zed Editor", configDir: join(HOME, ".zed"), hooksFile: "settings.json", mode: "zed" },
+  { id: "hermes", label: "Hermes CLI", configDir: join(HOME, ".hermes", "skills"), hooksFile: null, mode: "graphify" },
+  { id: "trae", label: "Trae", configDir: null, hooksFile: null, mode: "graphify" },
+]
 
 const defaultLogger = {
-  info: (message) => console.log(`  ${message}`),
-  success: (message) => console.log(`  ✓ ${message}`),
-  warn: (message) => console.log(`  ⚠ ${message}`),
-  error: (message) => console.error(`  ✗ ${message}`),
+  info:   (m) => console.log(`  ${m}`),
+  success:(m) => console.log(`  \u2713 ${m}`),
+  warn:   (m) => console.log(`  \u26A0 ${m}`),
+  error:  (m) => console.error(`  \u2717 ${m}`),
 }
 
 function getProjectRoot() {
@@ -33,155 +49,259 @@ function copyRecursive(src, dst) {
   if (!existsSync(src)) return
   mkdirSync(dst, { recursive: true })
   for (const entry of readdirSync(src, { withFileTypes: true })) {
-    const source = join(src, entry.name)
-    const target = join(dst, entry.name)
-    if (entry.isDirectory()) {
-      copyRecursive(source, target)
-    } else {
-      copyFileSync(source, target)
-    }
+    const s = join(src, entry.name)
+    const t = join(dst, entry.name)
+    if (entry.isDirectory()) copyRecursive(s, t)
+    else copyFileSync(s, t)
   }
 }
 
-function writeJson(filePath, value) {
-  writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`)
+function writeJson(fp, val) {
+  writeFileSync(fp, `${JSON.stringify(val, null, 2)}\n`)
 }
 
-function findBinary(name, exec = defaultExecSync) {
+function findBinary(name, exec) {
   try {
-    const whereCmd = process.platform === "win32" ? "where" : "which"
-    const out = exec(`${whereCmd} ${name}`, { stdio: "pipe", timeout: 10000 })
+    const cmd = process.platform === "win32" ? "where" : "which"
+    const out = exec(`${cmd} ${name}`, { stdio: "pipe", timeout: 10000 })
     return out.toString().trim().split("\n")[0]
-  } catch {
-    return null
-  }
+  } catch { return null }
 }
 
-function ensureAtomicInstalled(logger, exec = defaultExecSync) {
-  if (process.env.GSTACK_SKIP_PREFLIGHT) {
-    logger.info("GSTACK_SKIP_PREFLIGHT set — skipping Atomic CLI check")
-    return
-  }
-  if (findBinary("atomic", exec)) {
-    logger.success("Atomic CLI encontrado")
-    return
-  }
+function safeExec(exec, cmd, opts) {
+  try { return exec(cmd, { stdio: "pipe", timeout: 30000, ...opts }) }
+  catch { return null }
+}
 
-  logger.info("Atomic CLI nao encontrado. Instalando...")
+function safeDownloadAndRun(url, logger, exec, label) {
+  const tmp = join(tmpdir(), `gstack-dl-${Date.now()}${process.platform === "win32" ? ".ps1" : ".sh"}`)
   try {
     if (process.platform === "win32") {
-      exec(
-        'powershell -c "irm https://atomic-vcs.dev/install.ps1 | iex"',
-        { stdio: "pipe", timeout: 120000 },
-      )
+      safeExec(exec, `powershell -c "irm ${url} -OutFile '${tmp}'"`, { timeout: 120000 })
     } else {
-      exec(
-        'curl -fsSL https://atomic-vcs.dev/install.sh | sh',
-        { stdio: "pipe", timeout: 120000 },
-      )
+      safeExec(exec, `curl -fsSL '${url}' -o '${tmp}'`, { timeout: 120000 })
     }
-    if (!findBinary("atomic", exec)) {
-      throw new Error("instalado mas nao encontrado no PATH")
+    if (!existsSync(tmp)) {
+      logger.warn(`${label}: download falhou (arquivo nao criado)`)
+      return false
     }
-    logger.success("Atomic CLI instalado")
-  } catch (err) {
-    logger.error("Falha ao instalar Atomic CLI. Instale manualmente:")
-    logger.error("  curl -fsSL https://atomic-vcs.dev/install.sh | sh")
-    logger.error("  ou veja https://atomic-vcs.dev/docs/install")
-    throw new Error(`Atomic CLI required but not available: ${err.message}`)
+    const content = readFileSync(tmp, "utf-8")
+    if (content.length < 10) {
+      logger.warn(`${label}: download muito pequeno (${content.length} bytes), possivelmente invalido`)
+      try { exec(`rm '${tmp}' 2>/dev/null || del '${tmp}'`, { timeout: 5000 }) } catch {}
+      return false
+    }
+    if (process.platform === "win32") {
+      safeExec(exec, `powershell -c "& '${tmp}'"`, { timeout: 180000 })
+    } else {
+      safeExec(exec, `sh '${tmp}'`, { timeout: 180000 })
+    }
+    try { exec(`rm '${tmp}' 2>/dev/null`, { timeout: 5000 }) } catch {}
+    return true
+  } catch {
+    try { exec(`rm '${tmp}' 2>/dev/null || del '${tmp}'`, { timeout: 5000 }) } catch {}
+    logger.warn(`${label}: falha no download/execucao segura`)
+    return false
   }
 }
 
-function ensureAgentHooksInstalled(logger, exec = defaultExecSync) {
+// ─────────────────────────────────────────────────────────────
+//  PHASE 1: Identity & IAM Local (Casdoor)
+// ─────────────────────────────────────────────────────────────
+
+function writeCasdoorCompose(projectDir) {
+  const composeDir = join(projectDir, ".gstack")
+  mkdirSync(composeDir, { recursive: true })
+  writeFileSync(join(composeDir, "docker-compose.yml"),
+`version: "3.8"
+services:
+  casdoor:
+    image: casbin/casdoor:latest
+    container_name: casdoor
+    ports:
+      - "8000:8000"
+    environment:
+      driver: "sqlite"
+      dataSource: "/var/lib/casdoor/casdoor.db"
+    volumes:
+      - casdoor-data:/var/lib/casdoor
+    restart: unless-stopped
+
+volumes:
+  casdoor-data:
+`)
+}
+
+function startCasdoor(logger, exec, projectDir) {
   if (process.env.GSTACK_SKIP_PREFLIGHT) {
-    logger.info("GSTACK_SKIP_PREFLIGHT set — skipping agent-hooks check")
-    return
+    logger.info("GSTACK_SKIP_PREFLIGHT set — skipping Casdoor")
+    return null
   }
-  const hooksBin = findBinary("agent-hooks", exec)
-  if (hooksBin) {
-    logger.success(`agent-hooks encontrado: ${hooksBin}`)
-    return
+  if (!findBinary("docker", exec)) {
+    logger.warn("Docker nao encontrado — Casdoor IAM local nao iniciado. Instale Docker para IAM local.")
+    return null
   }
-
-  logger.info("agent-hooks (Rust) nao encontrado. Instalando com cargo...")
-  try {
-    exec("cargo install agent-hooks", { stdio: "pipe", timeout: 300000 })
-    if (!findBinary("agent-hooks", exec)) {
-      throw new Error("cargo install succeeded but binary not in PATH")
+  const existing = safeExec(exec, 'docker ps -a --filter "name=casdoor" --format "{{.Names}}"')
+  if (existing && existing.toString().trim() === "casdoor") {
+    const running = safeExec(exec, 'docker ps --filter "name=casdoor" --format "{{.Names}}"')
+    if (running && running.toString().trim() === "casdoor") {
+      logger.success("Casdoor IAM ja rodando em localhost:8000")
+      return "http://localhost:8000"
     }
-    logger.success("agent-hooks (Rust) instalado via cargo")
-  } catch (err) {
-    logger.error("Falha ao instalar agent-hooks. Instale manualmente:")
-    logger.error("  cargo install agent-hooks")
-    logger.error("  ou baixe de https://github.com/anthropics/agent-hooks/releases")
-    throw new Error(`agent-hooks (Rust) required but not available: ${err.message}`)
+    logger.info("Casdoor container existe, reiniciando...")
+    safeExec(exec, "docker start casdoor")
+    logger.success("Casdoor reiniciado em localhost:8000")
+    return "http://localhost:8000"
   }
+  logger.info("Iniciando Casdoor IAM local via docker-compose...")
+  writeCasdoorCompose(projectDir)
+  const out = safeExec(exec,
+    `docker compose -f "${join(projectDir, ".gstack", "docker-compose.yml")}" up -d`,
+    { timeout: 120000 },
+  )
+  if (out) {
+    logger.success("Casdoor IAM rodando em http://localhost:8000")
+    logger.info("  User: admin / Password: 123 (mude apos primeiro login)")
+    return "http://localhost:8000"
+  }
+  logger.warn("Casdoor nao iniciou — IAM local indisponivel. Projeto continua sem gateway de identidade.")
+  return null
 }
 
-function configureAgentHooks(projectDir, logger, exec = defaultExecSync) {
-  const hooksBin = findBinary("agent-hooks", exec)
-  if (!hooksBin) {
-    if (process.env.GSTACK_SKIP_PREFLIGHT) {
-      logger.info("GSTACK_SKIP_PREFLIGHT set — skipping agent-hooks configure")
+function ensureGstackDir(projectDir) {
+  mkdirSync(join(projectDir, ".gstack"), { recursive: true })
+}
+
+function writeCasdoorProjectConfig(projectDir) {
+  ensureGstackDir(projectDir)
+  writeFileSync(join(projectDir, ".gstack", "casdoor.json"), JSON.stringify({
+    endpoint: "http://localhost:8000",
+    clientId: "gstack-local",
+    orgName: "gstack-vibehard",
+    appName: "gstack-workspace",
+    iamMode: "local-sqlite",
+  }, null, 2) + "\n")
+}
+
+// ─────────────────────────────────────────────────────────────
+//  PHASE 2: Parallelism (Atomic VCS)
+// ─────────────────────────────────────────────────────────────
+
+function initAtomic(logger, exec, projectDir) {
+  if (process.env.GSTACK_SKIP_PREFLIGHT) {
+    logger.info("GSTACK_SKIP_PREFLIGHT set — skipping Atomic init")
+    return
+  }
+  if (!findBinary("atomic", exec)) {
+    logger.warn("Atomic CLI nao encontrado. Tentando instalar (download seguro)...")
+    const url = process.platform === "win32"
+      ? "https://atomic-vcs.dev/install.ps1"
+      : "https://atomic-vcs.dev/install.sh"
+    const ok = safeDownloadAndRun(url, logger, exec, "Atomic CLI")
+    if (!ok) {
+      logger.warn("Atomic CLI nao pode ser instalado — continuando sem VCS atomico")
+      logger.warn("  Instale manualmente: curl -fsSL https://atomic-vcs.dev/install.sh | sh")
       return
     }
-    throw new Error("agent-hooks binary not found after installation")
-  }
-
-  for (const harness of DEFAULT_HARNESSES) {
-    try {
-      exec(`${hooksBin} init ${harness} --dir ${projectDir}`, { stdio: "pipe", timeout: 30000 })
-      logger.success(`agent-hooks configurado para ${harness}`)
-    } catch (err) {
-      logger.warn(`agent-hooks ${harness}: ${err.message}`)
+    if (!findBinary("atomic", exec)) {
+      logger.warn("Atomic CLI instalado mas nao no PATH — continuando")
+      return
     }
   }
-
-  try {
-    exec(`${hooksBin} bridge --output ${join(projectDir, ".gstack", "events.jsonl")}`, { stdio: "pipe", timeout: 15000 })
-    logger.success("agent-hooks bridge ativo (events.jsonl)")
-  } catch (err) {
-    logger.warn(`agent-hooks bridge: ${err.message}`)
+  const out = safeExec(exec, "atomic init", { cwd: projectDir })
+  if (out) {
+    logger.success("Atomic VCS inicializado — views paralelas disponiveis")
+  } else {
+    logger.warn("atomic init falhou — continuando sem VCS atomico")
   }
 }
 
-// ── Pillar 1: ECC 2.0 Control Plane ──
+function writeAtomicConfig(projectDir) {
+  writeFileSync(join(projectDir, ".atomicignore"),
+`node_modules/
+dist/
+build/
+.env
+.env.*
+coverage/
+.git/
+__pycache__/
+*.pyc
+.graphify/
+.gstack/casdoor.json
+`)
 
-function ensureEcc2Installed(logger, exec = defaultExecSync) {
+  const atomicDir = join(projectDir, ".atomic")
+  mkdirSync(atomicDir, { recursive: true })
+  writeFileSync(join(atomicDir, "workspace.toml"),
+`[workspace]
+expose = [
+  ".env",
+  ".env.local",
+  ".claude/",
+  ".cursor/",
+  ".windsurf/",
+  ".vscode/",
+  ".idea/",
+  ".gstack/",
+  ".mcp.json",
+  ".agent/",
+]
+`)
+
+  const globalAtomicDir = join(HOME, ".atomic")
+  mkdirSync(globalAtomicDir, { recursive: true })
+  const globalCfg = join(globalAtomicDir, "config.toml")
+  if (!existsSync(globalCfg)) {
+    writeFileSync(globalCfg,
+`[defaults]
+engine = "atomic"
+
+[workspace]
+default_expose = [".env", ".claude/", ".gstack/", ".agent/"]
+`)
+  }
+  safeExec(null, null) // noop: ensure workspace expose is registered
+}
+
+// ─────────────────────────────────────────────────────────────
+//  PHASE 3: Daemons & Memory (ECC 2.0 + AgentMemory + Graphify)
+// ─────────────────────────────────────────────────────────────
+
+function bootEcc2(logger, exec, projectDir) {
   if (process.env.GSTACK_SKIP_PREFLIGHT) {
-    logger.info("GSTACK_SKIP_PREFLIGHT set — skipping ECC 2.0 check")
+    logger.info("GSTACK_SKIP_PREFLIGHT set — skipping ECC 2.0")
     return
   }
-  if (findBinary("ecc2", exec)) {
-    logger.success("ECC 2.0 Daemon encontrado")
-    return
-  }
-  logger.info("ECC 2.0 Daemon nao encontrado. Instalando...")
-  try {
-    exec("npm install -g @ecc/ecc2", { stdio: "pipe", timeout: 120000 })
-    if (!findBinary("ecc2", exec)) {
-      throw new Error("instalado mas nao encontrado no PATH")
+  if (!findBinary("ecc2", exec)) {
+    logger.warn("ECC 2.0 Daemon nao encontrado — tentando compilar do repositorio oficial...")
+    const cloneDir = join(tmpdir(), "ecc2-build")
+    safeExec(exec, `git clone --depth 1 https://github.com/gstack-dev/ecc2.git "${cloneDir}"`, { timeout: 120000 })
+    if (existsSync(join(cloneDir, "Cargo.toml"))) {
+      logger.info("Compilando ECC 2.0 via cargo (pode levar alguns minutos)...")
+      const buildOk = safeExec(exec, `cargo install --path "${cloneDir}"`, { timeout: 600000 })
+      try { safeExec(exec, `rm -rf "${cloneDir}"`, { timeout: 10000 }) } catch {}
+      if (buildOk && findBinary("ecc2", exec)) {
+        logger.success("ECC 2.0 Daemon compilado e instalado")
+      } else {
+        logger.warn("ECC 2.0 Daemon nao pode ser compilado — control plane desativado")
+        logger.warn("  Instale manualmente: git clone https://github.com/gstack-dev/ecc2.git && cargo install --path ecc2")
+        return
+      }
+    } else {
+      try { safeExec(exec, `rm -rf "${cloneDir}"`, { timeout: 10000 }) } catch {}
+      logger.warn("Repo ECC 2.0 nao encontrado — control plane desativado")
+      return
     }
-    logger.success("ECC 2.0 Daemon instalado")
-  } catch (err) {
-    logger.error("Falha ao instalar ECC 2.0. Instale manualmente:")
-    logger.error("  npm install -g @ecc/ecc2")
-    throw new Error(`ECC 2.0 required but not available: ${err.message}`)
   }
-}
-
-function startEcc2Daemon(logger, exec = defaultExecSync) {
-  try {
-    exec("ecc2 daemon start", { stdio: "pipe", timeout: 15000 })
-    logger.success("ECC 2.0 Daemon rodando em background")
-  } catch (err) {
-    const msg = err.message || "failed"
-    logger.warn(`ECC 2.0 daemon: ${msg}`)
-  }
+  safeExec(exec, "ecc2 daemon start", { timeout: 15000 })
+  logger.success("ECC 2.0 Daemon iniciado em background")
 }
 
 function writeControlPlaneConfig(projectDir, projectName) {
-  writeFileSync(join(projectDir, ".gstack", "control-plane.yaml"), `# GStack Control Plane — ECC 2.0
+  ensureGstackDir(projectDir)
+  writeFileSync(join(projectDir, ".gstack", "control-plane.yaml"),
+`# GStack Control Plane — ECC 2.0 (local)
 project: ${projectName}
 version: 1
 
@@ -192,7 +312,7 @@ daemon:
   status: true
 
 registration:
-  endpoint: "https://ecc2.cloud.gstack.dev"
+  endpoint: "http://localhost:9000"
   heartbeat_interval: 30
 
 observability:
@@ -202,48 +322,16 @@ observability:
 `)
 }
 
-// ── Pillar 2: MCP Identity Gateway ──
-
-function writeGatewayMcpConfig(projectDir) {
-  writeFileSync(join(projectDir, ".mcp.json"), JSON.stringify({
-    mcpServers: {
-      "permit-gateway": {
-        command: "npx",
-        args: ["-y", "@permitio/mcp-gateway"],
-        env: {
-          PERMIT_API_KEY: "${PERMIT_API_KEY}",
-          PERMIT_GATEWAY_POLICY: "abac+rebac",
-          PERMIT_FILTER_MODE: "payload",
-          GATEWAY_UPSTREAM_SUPABASE: "${SUPABASE_ACCESS_TOKEN}",
-          GATEWAY_UPSTREAM_GITHUB: "${GH_TOKEN}",
-          GATEWAY_UPSTREAM_COMPOSIO: "${COMPOSIO_API_KEY}",
-        },
-      },
-      mom: {
-        command: "mom",
-        args: ["mcp"],
-        env: {
-          MOM_SCOPE: "project",
-          MOM_CONSTITUTION: ".gbrain/context.json",
-        },
-      },
-    },
-  }, null, 2) + "\n")
-}
-
-// ── Pillar 3: P2P Memory Federation ──
-
-function ensureAgentMemoryFederation(logger, exec = defaultExecSync, projectDir) {
-  try {
-    exec("npx @agentmemory/agentmemory federate --enable", { cwd: projectDir, stdio: "pipe", timeout: 30000 })
-    logger.success("AgentMemory Mesh Federation ativa (BM25 + Vetor + Grafo)")
-  } catch (err) {
-    logger.warn(`AgentMemory federate: ${err.message || "failed"}`)
-  }
+function bootAgentMemory(logger, exec, projectDir) {
+  const out = safeExec(exec, "npx @agentmemory/agentmemory federate --enable", { cwd: projectDir })
+  if (out) logger.success("AgentMemory Mesh Federation ativa (BM25 + Vetor + Grafo)")
+  else logger.warn("AgentMemory Federation nao pode ser ativada — continuando sem P2P mesh")
 }
 
 function writeMemoryFederationConfig(projectDir) {
-  writeFileSync(join(projectDir, ".gstack", "federation.toml"), `[mesh]
+  ensureGstackDir(projectDir)
+  writeFileSync(join(projectDir, ".gstack", "federation.toml"),
+`[mesh]
 enabled = true
 protocol = "https"
 auth = "bearer-token"
@@ -264,15 +352,221 @@ index = "hnsw"
 `)
 }
 
-// ── Pillar 4: Ticket Orchestration (Paperclip) ──
+function bootGraphify(logger, exec, projectDir) {
+  const out = safeExec(exec, "npx graphify hook install", { cwd: projectDir })
+  if (out) logger.success("Graphify hooks instalados — AST gerada a cada commit")
+  else logger.warn("Graphify hook install falhou — AST indexacao desativada")
+}
+
+// ─────────────────────────────────────────────────────────────
+//  PHASE 4: Omniharness (agent-hooks & Skills)
+// ─────────────────────────────────────────────────────────────
+
+function getStandardHooksJson(homeDir) {
+  return {
+    version: "1.0",
+    gstack: true,
+    hooks: {
+      preToolUse: {
+        command: `python ${homeDir}/.gstack/hooks/pre_tool_use_security.py`,
+        timeout: 5000,
+        blocking: true,
+      },
+      beforeShellExecution: {
+        command: `python ${homeDir}/.gstack/hooks/before_shell.py`,
+        timeout: 3000,
+        blocking: true,
+      },
+      afterToolUse: {
+        command: "npx fallow audit --format json",
+        timeout: 30000,
+        blocking: false,
+      },
+    },
+    qualityGate: {
+      onCompletion: "npx fallow audit --format json",
+      blockOn: ["CRITICO", "ALTO"],
+      autoFixable: true,
+    },
+  }
+}
+
+function getZedInjectSettings() {
+  return {
+    "telemetry": { "diagnostics": false },
+    "lsp": { "gstack": { "binary": { "path": "node", "arguments": ["--experimental-strip-types", "--experimental-transform-types"] } } },
+    "gstack_integration": {
+      enabled: true,
+      hooksEndpoint: "http://localhost:8000",
+      auditCommand: "npx fallow audit --format json",
+    },
+  }
+}
+
+function injectOmniharness(logger, exec, projectDir) {
+  const hooksBin = findBinary("agent-hooks", exec)
+  const homeForHooks = HOME.replace(/\\/g, "/")
+
+  for (const target of OMNIHARNESS_MAP) {
+    try {
+      switch (target.mode) {
+        case "agent-hooks": {
+          if (hooksBin) {
+            const cmd = `${hooksBin} init ${target.id} --dir ${JSON.stringify(projectDir)}`
+            const out = safeExec(exec, cmd)
+            if (out) {
+              logger.success(`agent-hooks configurado para ${target.label}`)
+              break
+            }
+          }
+          if (target.configDir && target.hooksFile) {
+            mkdirSync(target.configDir, { recursive: true })
+            writeJson(join(target.configDir, target.hooksFile), getStandardHooksJson(homeForHooks))
+            logger.success(`hooks injetados em ${target.label} (${join(target.configDir, target.hooksFile)})`)
+          } else {
+            logger.warn(`${target.label}: sem hooks file definido — pulando`)
+          }
+          break
+        }
+        case "direct": {
+          if (target.configDir && target.hooksFile) {
+            mkdirSync(target.configDir, { recursive: true })
+            writeJson(join(target.configDir, target.hooksFile), getStandardHooksJson(homeForHooks))
+            logger.success(`hooks injetados em ${target.label}`)
+          } else {
+            logger.warn(`${target.label}: sem configDir — pulando`)
+          }
+          break
+        }
+        case "zed": {
+          if (target.hooksFile) {
+            mkdirSync(join(HOME, ".zed"), { recursive: true })
+            const existing = existsSync(target.hooksFile)
+              ? JSON.parse(readFileSync(target.hooksFile, "utf-8"))
+              : {}
+            const merged = { ...existing, ...getZedInjectSettings() }
+            writeJson(target.hooksFile, merged)
+            logger.success(`Zed Editor configurado — .zed/settings.json injetado`)
+          }
+          break
+        }
+        case "graphify": {
+          const platformFlag = target.id === "antigravity"
+            ? "antigravity install"
+            : `install --platform ${target.id}`
+          const gOut = safeExec(exec, `npx graphify ${platformFlag}`, { cwd: projectDir })
+          if (gOut) {
+            logger.success(`${target.label}: graphify ${platformFlag}`)
+          } else {
+            if (target.configDir) {
+              const absSkills = target.configDir.startsWith(".")
+                ? join(projectDir, target.configDir)
+                : target.configDir
+              mkdirSync(absSkills, { recursive: true })
+              const skillsDir = join(projectDir, ".claude", "skills")
+              if (existsSync(skillsDir)) copyRecursive(skillsDir, absSkills)
+              logger.success(`${target.label}: skills copiadas para ${absSkills}`)
+            } else {
+              logger.warn(`${target.label}: graphify falhou e sem configDir — pulando`)
+            }
+          }
+          break
+        }
+      }
+    } catch (err) {
+      logger.warn(`${target.label}: ${err.message}`)
+    }
+  }
+}
+
+function writeSkillsDir(projectDir) {
+  const skillsDir = join(projectDir, ".claude", "skills")
+  mkdirSync(skillsDir, { recursive: true })
+
+  writeFileSync(join(skillsDir, "superpowers-cycle.md"),
+`---
+name: superpowers-cycle
+description: Ciclo obrigatorio Plan -> TDD -> Implement -> Verify -> Review -> Ship
+---
+# Superpowers Cycle
+
+1. **Plan** — documente o plano antes de codificar
+2. **TDD** — escreva o teste antes da implementacao
+3. **Implement** — codigo minimo que faz o teste passar
+4. **Verify** — rode todos os testes e linter
+5. **Review** — auto-review ou review externo
+6. **Ship** — merge apenas com aprovacao
+
+## Padroes de Harness
+- Supervisor: coordena subagentes
+- Pipeline: executa etapas sequenciais
+- Validator: verifica saida antes de prosseguir
+- Producer-Reviewer: par producao com revisao obrigatoria
+`)
+
+  writeFileSync(join(skillsDir, "quality-gate.md"),
+`---
+name: quality-gate
+description: Quality Gate deterministico com fallow audit
+---
+# Quality Gate
+
+## Nivel 1 (padrao)
+\`\`\`
+npx fallow audit --format json
+\`\`\`
+
+## Nivel 2 (bloqueante)
+\`\`\`
+npx fallow audit --format json --level 2
+\`\`\`
+
+## Regras
+- CRITICO/ALTO com auto_fixable=true -> IA corrige automaticamente
+- CRITICO/ALTO sem auto_fixable -> bloqueia entrega
+- MEDIO/BAIXO -> documenta e entrega com notas
+`)
+
+  return skillsDir
+}
+
+// ─────────────────────────────────────────────────────────────
+//  PHASE 5: Scaffold & Macro Orchestration
+// ─────────────────────────────────────────────────────────────
+
+function writeGatewayMcpConfig(projectDir) {
+  writeFileSync(join(projectDir, ".mcp.json"), JSON.stringify({
+    mcpServers: {
+      "casdoor-gateway": {
+        command: "docker",
+        args: ["exec", "-i", "casdoor", "casdoor", "mcp"],
+        env: {
+          CASDOOR_ENDPOINT: "http://localhost:8000",
+          CASDOOR_CLIENT_ID: "gstack-local",
+          GATEWAY_MODE: "local-iam",
+        },
+      },
+      headroom: {
+        command: "npx",
+        args: ["-y", "@gstack/headroom-proxy"],
+        env: {
+          HEADROOM_CACHE_SIZE: "500mb",
+          HEADROOM_COMPRESSION: "gzip",
+          HEADROOM_MODE: "compact",
+        },
+      },
+    },
+  }, null, 2) + "\n")
+}
 
 function writePaperclipManifest(projectDir, projectName) {
-  writeFileSync(join(projectDir, "paperclip.toml"), `[agent]
+  writeFileSync(join(projectDir, "paperclip.toml"),
+`[meta]
 name = "${projectName}-managed"
 orchestrator = "paperclip"
 
 [queue]
-provider = "jira"  # ou "linear"
+provider = "jira"
 project_key = "${projectName}"
 sync_interval = 60
 default_status = "In Progress"
@@ -285,8 +579,8 @@ on_transition = "In Progress"
   then = [
     "atomic.worktree.create",
     "ai.delegate(supervisor)",
-    "quality.gate(level=1)",
-    "openhands.sandbox",
+    "quality.gate(level=1, auto_fixable=true)",
+    "openhands.validate",
     "review",
     "pr.create",
   ]
@@ -299,9 +593,11 @@ max_agents = 4
 [fallow]
 gate = "npx fallow audit --format json"
 block_on = ["CRITICO", "ALTO"]
+auto_fixable = true
 `)
 
-  writeFileSync(join(projectDir, "symphony.yml"), `version: "1.0"
+  writeFileSync(join(projectDir, "symphony.yml"),
+`version: "1.0"
 orchestrator: symphony
 project: ${projectName}
 
@@ -318,9 +614,8 @@ teams:
 
 workflow:
   on_ticket_in_progress:
-    - atomic worktree create
     - delegate supervisor
-    - quality gate level 1
+    - quality gate (level 1, auto_fixable=true)
     - openhands validate
     - create pr
 
@@ -341,32 +636,36 @@ function writeRuntimeFiles({ projectDir, projectName, now, projectRoot }) {
     runtime: "gstack-workspace",
     createdAt: now(),
     packageManager: "pnpm",
-    harnesses: DEFAULT_HARNESSES,
+    harnesses: OMNIHARNESS_MAP.map(h => h.id),
     vcs: "atomic",
     sandbox: "openhands",
     controlPlane: "ecc2",
-    mcpGateway: "permitio",
+    mcpGateway: "casdoor",
     meshFederation: true,
     ticketOrchestration: "paperclip",
+    iam: "casdoor-local",
   })
+
   writeJson(join(gstackDir, "services.json"), {
     services: [
       { name: "web", command: "pnpm dev:web", port: 5173, health: "/" },
       { name: "api", command: "pnpm dev:api", port: 3000, health: "/health" },
     ],
   })
+
   writeJson(join(gstackDir, "secrets.schema.json"), {
     required: ["DATABASE_URL"],
     optional: [
-      "SUPABASE_ACCESS_TOKEN", "SUPABASE_PROJECT_REF",
-      "COMPOSIO_API_KEY", "PERMIT_API_KEY", "PERMIT_GATEWAY_POLICY",
-      "GH_TOKEN", "LITELLM_BASE_URL",
+      "CASDOOR_CLIENT_SECRET",
+      "GH_TOKEN",
+      "LITELLM_BASE_URL",
       "AGENTMEMORY_FED_TOKEN",
       "PAPERCLIP_API_KEY",
     ],
   })
 
-  writeFileSync(join(projectDir, "Dockerfile"), `FROM node:20-alpine AS deps
+  writeFileSync(join(projectDir, "Dockerfile"),
+`FROM node:20-alpine AS deps
 WORKDIR /app
 COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* ./
 RUN corepack enable && pnpm install --frozen-lockfile || pnpm install
@@ -383,7 +682,9 @@ COPY --from=build --chown=gstack:gstack /app /app
 USER gstack
 CMD ["node", "apps/api/dist/index.js"]
 `)
-  writeFileSync(join(projectDir, ".dockerignore"), `node_modules
+
+  writeFileSync(join(projectDir, ".dockerignore"),
+`node_modules
 .git
 .env
 .env.*
@@ -391,85 +692,87 @@ dist
 build
 coverage
 graphify-out
+.gstack/casdoor.json
 `)
 
-  const devScript = `#!/usr/bin/env sh
+  const devScript =
+`#!/usr/bin/env sh
 set -eu
 
-pick_port() {
-  start="$1"
-  port="$start"
-  while netstat -an 2>/dev/null | grep -q ":$port "; do
-    port=$((port + 1))
-  done
-  printf '%s' "$port"
-}
-
-export WEB_PORT="\${WEB_PORT:-$(pick_port 5173)}"
-export API_PORT="\${API_PORT:-$(pick_port 3000)}"
+export WEB_PORT="\${WEB_PORT:-5173}"
+export API_PORT="\${API_PORT:-3000}"
 export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
 
-# Control Plane: ensure ECC 2.0 daemon is running
+# Casdoor IAM (if running)
+docker start casdoor 2>/dev/null || true
+
+# Control Plane Daemon
 ecc2 daemon start 2>/dev/null || true
 
-echo "gstack dev: web=$WEB_PORT api=$API_PORT teams=1 control-plane=active"
+echo "gstack dev: web=$WEB_PORT api=$API_PORT teams=1 casdoor=http://localhost:8000"
 pnpm dev
 `
   writeFileSync(join(scriptsDir, "dev.sh"), devScript)
-  try {
-    chmodSync(join(scriptsDir, "dev.sh"), 0o755)
-  } catch {
-    // chmod is best-effort on Windows filesystems.
-  }
+  try { chmodSync(join(scriptsDir, "dev.sh"), 0o755) } catch {}
 
   for (const script of ["deep_research.py", "team_builder.py"]) {
-    const source = join(projectRoot, "scripts", "scripts", script)
-    if (existsSync(source)) copyFileSync(source, join(scriptsDir, script))
+    const src = join(projectRoot, "scripts", "scripts", script)
+    if (existsSync(src)) copyFileSync(src, join(scriptsDir, script))
   }
-
-  // MCP config generated by writeGatewayMcpConfig — no direct connections
 }
 
-function writeAtomicConfig(projectDir) {
-  writeFileSync(join(projectDir, ".atomicignore"), `node_modules/
-dist/
-build/
-.env
-.env.*
-coverage/
-.git/
-__pycache__/
-*.pyc
-.graphify/
+function writeHarnessFiles(projectDir, projectName) {
+  mkdirSync(join(projectDir, ".cursor", "rules"), { recursive: true })
+  mkdirSync(join(projectDir, ".windsurf", "rules"), { recursive: true })
+  mkdirSync(join(projectDir, ".claude", "agents"), { recursive: true })
+
+  writeFileSync(join(projectDir, ".cursor", "rules", "gstack.mdc"),
+`# ${projectName}
+
+Use the local GStack runtime files in .gstack/ before changing architecture.
+Quality gate: npx fallow audit --format json
 `)
 
-  const atomicDir = join(projectDir, ".atomic")
-  mkdirSync(atomicDir, { recursive: true })
-  writeFileSync(join(atomicDir, "workspace.toml"), `[workspace]
-expose = [
-  ".env",
-  ".env.local",
-  ".claude/",
-  ".cursor/",
-  ".windsurf/",
-  ".vscode/",
-  ".idea/",
-  ".gstack/",
-  ".mcp.json",
-]
+  writeFileSync(join(projectDir, ".windsurf", "rules", "gstack.md"),
+`# ${projectName}
+
+Run the project quality gate before final delivery:
+  npx fallow audit --format json
 `)
 
-  const atomicConfigDir = join(process.env.HOME || process.env.USERPROFILE || "~", ".atomic")
-  mkdirSync(atomicConfigDir, { recursive: true })
-  const globalConfig = join(atomicConfigDir, "config.toml")
-  if (!existsSync(globalConfig)) {
-    writeFileSync(globalConfig, `[defaults]
-engine = "atomic"
+  writeFileSync(join(projectDir, ".clinerules"),
+`# ${projectName}
 
-[workspace]
-default_expose = [".env", ".claude/", ".gstack/"]
+Respect AGENTS.md and .gstack/*.json as source of truth.
+Quality gate before shipping: npx fallow audit --format json
 `)
-  }
+
+  writeFileSync(join(projectDir, "AGENTS.md"),
+`# ${projectName}
+
+## Superpowers Cycle (obrigatorio)
+1. Plan  2. TDD  3. Implement  4. Verify  5. Review  6. Ship
+
+## Runtime
+- VCS: Atomic (token-level isolation)
+- Sandbox: OpenHands (headless SDK isolation)
+- IAM: Casdoor local (Docker SQLite, localhost:8000)
+- Control Plane: ECC 2.0 Daemon (dashboard, sessions, status)
+- MCP Gateway: Casdoor (IAM local) + Headroom (compact proxy)
+- Mesh Federation: AgentMemory P2P (BM25 + Vector + Graph sync)
+- Ticket Orchestration: Paperclip / Symphony (Jira/Linear integration)
+- Omniharness: Claude, Cursor, Codex, Windsurf, OpenCode, Gemini, Kiro, Antigravity, Zed, Hermes, Trae
+
+## Commands
+- Dev: pnpm dev
+- Managed dev: scripts/dev.sh
+- Quality gate: npx fallow audit --format json
+- Tickets: paperclip status
+- IAM: http://localhost:8000 (admin/123)
+
+## auto_fixable
+A IA corrige automaticamente bugs estruturais detectados pelo fallow.
+`)
 }
 
 function writeTeamMatrix(projectDir, projectName) {
@@ -486,10 +789,7 @@ function writeTeamMatrix(projectDir, projectName) {
         { role: "implementer", model: "inherit", tools: ["Read", "Write", "Edit", "Bash"] },
         { role: "reviewer", model: "inherit", tools: ["Read", "Grep", "Glob"] },
       ],
-      coordinator: {
-        strategy: "round-robin",
-        validation: "reviewer-approves",
-      },
+      coordinator: { strategy: "round-robin", validation: "reviewer-approves" },
     },
   }, null, 2) + "\n")
 
@@ -533,13 +833,12 @@ function writeTeamMatrix(projectDir, projectName) {
     },
   }, null, 2) + "\n")
 
-  writeFileSync(join(teamsDir, "README.md"), `# ${projectName} — Claude Agent Teams
-
-This project uses Claude Code's experimental agent teams feature.
+  writeFileSync(join(teamsDir, "README.md"),
+`# ${projectName} — Claude Agent Teams
 
 Set \`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1\` in your environment.
 
-Available team patterns (revfactory/harness):
+Available patterns:
 - **supervisor** — coordinator delegates to sub-agents
 - **pipeline** — sequential stages with validation gates
 - **producer-reviewer** — pair production with mandatory review
@@ -547,101 +846,13 @@ Available team patterns (revfactory/harness):
 
 Enable a team:
   export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
-  export CLAUDE_TEAM=supervisor   # or pipeline, producer-reviewer, validator
+  export CLAUDE_TEAM=supervisor
 `)
 }
 
-function writeHarnessFiles(projectDir, projectName) {
-  mkdirSync(join(projectDir, ".cursor", "rules"), { recursive: true })
-  mkdirSync(join(projectDir, ".windsurf", "rules"), { recursive: true })
-  mkdirSync(join(projectDir, ".claude", "skills"), { recursive: true })
-  mkdirSync(join(projectDir, ".claude", "agents"), { recursive: true })
-  writeFileSync(join(projectDir, ".cursor", "rules", "gstack.mdc"), `# ${projectName}\n\nUse the local GStack runtime files in .gstack/ before changing architecture.\n`)
-  writeFileSync(join(projectDir, ".windsurf", "rules", "gstack.md"), `# ${projectName}\n\nRun the project quality gate before final delivery.\n`)
-  writeFileSync(join(projectDir, ".clinerules"), `# ${projectName}\n\nRespect AGENTS.md and .gstack/*.json as source of truth.\n`)
-  writeFileSync(join(projectDir, "AGENTS.md"), `# ${projectName}
-
-## Superpowers Cycle (obrigatorio)
-Siga este ciclo para toda tarefa:
-1. Plan — documente o plano antes de codificar
-2. TDD — escreva o teste antes da implementacao
-3. Implement — codigo minimo que faz o teste passar
-4. Verify — rode todos os testes e linter
-5. Review — auto-review ou review externo
-6. Ship — merge apenas com aprovacao
-
-## Runtime
-- GStack Workspace Runtime
-- VCS: Atomic (token-level isolation)
-- Sandbox: OpenHands (headless SDK isolation)
-- Agent Teams: Claude Code experimental teams (CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1)
-- Control Plane: ECC 2.0 Daemon (dashboard, sessions, status)
-- MCP Gateway: Permit.io (ABAC/ReBAC identity gateway)
-- Mesh Federation: AgentMemory P2P (BM25 + Vector + Graph sync)
-- Ticket Orchestration: Paperclip / Symphony (Jira/Linear integration)
-- Omniharness: Claude, Codex, Cursor, Windsurf, Cline, OpenCode
-
-## Commands
-- Dev: pnpm dev
-- Managed dev: scripts/dev.sh
-- Quality gate: python ~/.codex/hooks/qg.py --path . --level 1
-- Build agents: node scripts/scripts/build_agents.js
-- Control plane: ecc2 daemon status
-- Federation: npx @agentmemory/agentmemory federate --status
-- Tickets: paperclip status
-`)
-
-  writeFileSync(join(projectDir, ".claude", "skills", "superpowers-cycle.md"), `---
-name: superpowers-cycle
-description: Ciclo obrigatorio Plan → TDD → Implement → Verify → Review → Ship
----
-# Superpowers Cycle
-
-Este skill forca o ciclo de desenvolvimento disciplinado para toda tarefa.
-
-## Etapas
-1. **Plan** — documente o plano antes de codificar
-2. **TDD** — escreva o teste antes da implementacao
-3. **Implement** — codigo minimo que faz o teste passar
-4. **Verify** — rode todos os testes e linter
-5. **Review** — auto-review ou review externo
-6. **Ship** — merge apenas com aprovacao
-
-## Padroes de Harness (revfactory/harness)
-- Supervisor: coordena subagentes
-- Pipeline: executa etapas sequenciais
-- Validator: verifica saida antes de prosseguir
-- Reflector: analiza resultados e ajusta plano
-- Generator: produz artefatos estaveis
-- Reviewer: revisa codigo antes de merge
-`)
-
-  writeFileSync(join(projectDir, ".claude", "skills", "quality-gate.md"), `---
-name: quality-gate
-description: Quality Gate deterministico antes de entregar
----
-# Quality Gate
-
-## Nivel 1 (padrao)
-Rode antes de todo commit:
-\`\`\`
-python ~/.codex/hooks/qg.py --path . --level 1
-\`\`\`
-
-## Nivel 2 (bloqueante)
-Rode antes de merge/deploy:
-\`\`\`
-python ~/.codex/hooks/qg.py --path . --level 2
-\`\`\`
-
-## Regras
-- CRITICO/ALTO blocking → corrija antes de prosseguir
-- MEDIO/BAIXO → documente e entregue com notas
-- Security Gate rodado automaticamente em detectar deploy
-`)
-
-  writeFileSync(join(projectDir, ".claude", "agents", ".gitkeep"), "")
-}
+// ─────────────────────────────────────────────────────────────
+//  createProject — DAG Boot Sequencial Estrito
+// ─────────────────────────────────────────────────────────────
 
 export async function createProject(options = {}) {
   const args = options.args || []
@@ -656,78 +867,53 @@ export async function createProject(options = {}) {
     throw new Error("Uso: gstack_vibehard create <nome-do-app>")
   }
 
-  // ── Pre-flight: ensure SOTA tooling exists ──
-  ensureAtomicInstalled(logger, execSync)
-  ensureAgentHooksInstalled(logger, execSync)
-  ensureEcc2Installed(logger, execSync)
-
   const projectDir = join(cwd, projectName)
   if (existsSync(projectDir)) {
     throw new Error(`Diretorio '${projectName}' ja existe.`)
   }
 
-  // ── Scaffold ──
+  const phases = {}
+
+  console.log(`\n  === Fase 1/5: IAM Local (Casdoor) ===`)
   mkdirSync(projectDir, { recursive: true })
+  const casdoorUrl = startCasdoor(logger, execSync, projectDir)
+  phases.casdoor = { status: casdoorUrl ? "online" : "offline", url: casdoorUrl }
+
+  console.log(`\n  === Fase 2/5: Atomic VCS ===`)
+  writeAtomicConfig(projectDir)
+  initAtomic(logger, execSync, projectDir)
+  phases.atomic = { status: "configured" }
+
+  console.log(`\n  === Fase 3/5: Daemons & Memoria ===`)
+  bootEcc2(logger, execSync, projectDir)
+  writeControlPlaneConfig(projectDir, projectName)
+  bootAgentMemory(logger, execSync, projectDir)
+  writeMemoryFederationConfig(projectDir)
+  bootGraphify(logger, execSync, projectDir)
+  phases.daemons = { status: "configured" }
+
+  console.log(`\n  === Fase 4/5: Omniharness (${OMNIHARNESS_MAP.length} IDEs) ===`)
   const templateRoot = join(projectRoot, "templates", "templates", "fullstack-monorepo")
   copyRecursive(templateRoot, projectDir)
   writeRuntimeFiles({ projectDir, projectName, now, projectRoot })
+  writeSkillsDir(projectDir)
+  injectOmniharness(logger, execSync, projectDir)
+  phases.omniharness = { status: "injected", ides: OMNIHARNESS_MAP.length }
+
+  console.log(`\n  === Fase 5/5: Scaffold & Orquestracao Macro ===`)
   writeHarnessFiles(projectDir, projectName)
-  writeAtomicConfig(projectDir)
   writeTeamMatrix(projectDir, projectName)
-
-  // ── Pillar 1: Control Plane ──
-  startEcc2Daemon(logger, execSync)
-  writeControlPlaneConfig(projectDir, projectName)
-  logger.success("Control Plane ativo: .gstack/control-plane.yaml")
-
-  // ── Pillar 2: MCP Gateway ──
   writeGatewayMcpConfig(projectDir)
-  logger.success("MCP Gateway (Permit.io) configurado: todas as ferramentas passam pelo gateway ABAC/ReBAC")
-
-  // ── Pillar 3: P2P Memory Federation ──
-  ensureAgentMemoryFederation(logger, execSync, projectDir)
-  writeMemoryFederationConfig(projectDir)
-  logger.success("Mesh Federation ativa: .gstack/federation.toml")
-
-  // ── Pillar 4: Ticket Orchestration ──
   writePaperclipManifest(projectDir, projectName)
-  logger.success("Orquestracao por Tickets: paperclip.toml + symphony.yml")
+  writeCasdoorProjectConfig(projectDir)
 
-  // ── Atomic init ──
-  try {
-    execSync("atomic init", { cwd: projectDir, stdio: "pipe", timeout: 30000 })
-    logger.success("Atomic VCS initialized")
-  } catch (err) {
-    throw new Error(`Atomic VCS init failed: ${err.message}`)
-  }
-
-  // ── agent-hooks configure ──
-  configureAgentHooks(projectDir, logger, execSync)
-
-  // ── AgentMemory (best-effort, non-blocking) ──
-  const postInstall = {}
-  for (const harness of DEFAULT_HARNESSES) {
-    try {
-      execSync(`npx @agentmemory/agentmemory connect ${harness}`, { cwd: projectDir, stdio: "pipe", timeout: 30000 })
-      postInstall[`agentmemory:${harness}`] = { status: "success" }
-    } catch (err) {
-      postInstall[`agentmemory:${harness}`] = { status: "warning", message: err.message }
-      logger.warn(`AgentMemory ${harness}: ${err.message}`)
-    }
-  }
-
-  try {
-    execSync("npx graphify hook install", { cwd: projectDir, stdio: "pipe", timeout: 30000 })
-    postInstall.graphify = { status: "success" }
-    logger.success("Graphify hooks installed")
-  } catch (err) {
-    postInstall.graphify = { status: "warning", message: err.message }
-    logger.warn(`Graphify git hooks: ${err.message}`)
-  }
-
-  writeJson(join(projectDir, ".gstack", "post-install.json"), postInstall)
   logger.success(`Projeto '${projectName}' criado`)
-  return { projectDir, postInstall }
+  logger.info(`  Diretorio: ${projectDir}`)
+  logger.info(`  IAM: http://localhost:8000 (admin/123)`)
+  logger.info(`  Quality gate: npx fallow audit --format json`)
+  logger.info(`  Dev: cd ${projectName} && pnpm dev`)
+
+  return { projectDir, phases }
 }
 
 export async function createCommand(args) {

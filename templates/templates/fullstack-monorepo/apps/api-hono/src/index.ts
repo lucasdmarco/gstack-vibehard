@@ -8,7 +8,7 @@ import { userRoutes } from './routes/users.js'
 const app = new Hono()
 const port = parseInt(process.env.API_PORT || '3001', 10)
 
-app.use('/*', cors())
+app.use('/*', cors({ origin: process.env.CORS_ORIGIN || false }))
 app.get('/api/openapi.json', (c) => c.json(openapiSpec))
 
 app.route('/api', healthRoutes)

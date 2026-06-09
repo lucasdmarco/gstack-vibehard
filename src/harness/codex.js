@@ -1,13 +1,16 @@
 import { existsSync } from "fs"
-import { join } from "path"
+import { join, dirname } from "path"
 import { homedir } from "os"
+import { fileURLToPath } from "url"
 import { writeWithBackup, ensureDir, readJsonFile } from "../installer/merge.js"
 
 const HOME = homedir()
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const PACKAGE_ROOT = dirname(__dirname)
 
-const HOOKS_SOURCE = join(process.cwd(), "hooks", "hooks")
-const SKILLS_SOURCE = join(process.cwd(), "skills", "skills")
-const TEMPLATE_SOURCE = join(process.cwd(), "templates", "templates")
+const HOOKS_SOURCE = join(PACKAGE_ROOT, "hooks", "hooks")
+const SKILLS_SOURCE = join(PACKAGE_ROOT, "skills", "skills")
+const TEMPLATE_SOURCE = join(PACKAGE_ROOT, "templates", "templates")
 
 export async function installCodex(config, report) {
   const hooksDir = join(HOME, ".codex", "hooks")

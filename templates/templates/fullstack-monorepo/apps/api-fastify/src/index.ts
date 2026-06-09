@@ -9,7 +9,7 @@ import { healthRoutes } from './routes/health.js'
 const app = Fastify({ logger: true })
 const port = parseInt(process.env.API_PORT || '3001', 10)
 
-await app.register(cors, { origin: true })
+await app.register(cors, { origin: process.env.CORS_ORIGIN || false })
 
 await app.register(swagger, {
   openapi: {

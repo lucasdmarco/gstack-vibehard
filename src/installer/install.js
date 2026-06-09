@@ -1,5 +1,5 @@
-import { existsSync, readdirSync } from "fs"
-import { homedir } from "os"
+import { existsSync, readdirSync, readFileSync, unlinkSync } from "fs"
+import { homedir, tmpdir } from "os"
 import { join, dirname } from "path"
 import { fileURLToPath } from "url"
 import { execSync } from "child_process"
@@ -26,6 +26,31 @@ function getProjectRoot() {
 }
 
 const PROJECT_ROOT = getProjectRoot()
+
+function safeDownloadAndRun(url, label) {
+  const tmp = join(tmpdir(), `gstack-dl-${Date.now()}${isWindows() ? ".ps1" : ".sh"}`)
+  try {
+    if (isWindows()) {
+      execSync(`powershell -c "irm '${url}' -OutFile '${tmp}'"`, { stdio: "pipe", timeout: 120000 })
+    } else {
+      execSync(`curl -fsSL '${url}' -o '${tmp}'`, { stdio: "pipe", timeout: 120000 })
+    }
+    if (!existsSync(tmp)) { warn(`${label}: download falhou`); return false }
+    const content = readFileSync(tmp, "utf-8")
+    if (content.length < 10) { warn(`${label}: download invalido (${content.length} bytes)`); return false }
+    if (isWindows()) {
+      execSync(`powershell -c "& '${tmp}'"`, { stdio: "pipe", timeout: 180000 })
+    } else {
+      execSync(`sh '${tmp}'`, { stdio: "pipe", timeout: 180000 })
+    }
+    try { unlinkSync(tmp) } catch {}
+    return true
+  } catch {
+    try { unlinkSync(tmp) } catch {}
+    warn(`${label}: falha no download/execucao segura`)
+    return false
+  }
+}
 
 function run(cmd, label) {
   try {
@@ -70,7 +95,7 @@ async function installDeps(run, warn, success, info, report, harnessIds) {
     info("bun: nao encontrado. Instalando...")
     try {
       if (isWindows()) {
-        execSync('powershell -c "irm bun.sh/install.ps1 | iex"', { stdio: "pipe", timeout: 120000 })
+        execSync('powershell -c "irm https://bun.sh/install.ps1 | iex"', { stdio: "pipe", timeout: 120000 })
         refreshPath()
         const bunPaths = [join(HOME, ".bun", "bin", "bun.exe")]
         for (const p of [...bunPaths, "bun"]) {
@@ -124,12 +149,12 @@ async function installDeps(run, warn, success, info, report, harnessIds) {
   }
 
   if (!uvBin) {
-    info("uv: nao encontrado. Instalando...")
+    info("uv: nao encontrado. Instalando (download seguro)...")
     try {
       if (isWindows()) {
-        execSync('powershell -c "irm https://astral.sh/uv/install.ps1 | iex"', { stdio: "pipe", timeout: 60000 })
+        safeDownloadAndRun("https://astral.sh/uv/install.ps1", "uv (Windows)")
       } else {
-        execSync('curl -LsSf https://astral.sh/uv/install.sh | sh', { stdio: "pipe", timeout: 60000 })
+        safeDownloadAndRun("https://astral.sh/uv/install.sh", "uv (Unix)")
       }
       refreshPath()
       for (const p of possiblePaths) {
@@ -178,14 +203,14 @@ async function installDeps(run, warn, success, info, report, harnessIds) {
         } catch {
           info("winget falhou. Tentando rustup-init.exe diretamente...")
           execSync(
-            'powershell -c "$url = \'https://static.rust-lang.org/rustup/dist/i686-pc-windows-gnu/rustup-init.exe\'; $tmp = \'$env:TEMP\\rustup-init.exe\'; iwr -Uri $url -OutFile $tmp; & $tmp -y --default-toolchain stable --profile minimal"',
+            'powershell -c "$url = \'https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe\'; $tmp = \'$env:TEMP\\rustup-init.exe\'; iwr -Uri $url -OutFile $tmp; & $tmp -y --default-toolchain stable --profile minimal"',
             { stdio: "pipe", timeout: 180000 }
           )
         }
       } else if (isMacOS()) {
-        execSync("brew install rustup-init && rustup-init -y --default-toolchain stable --profile minimal", { stdio: "pipe", timeout: 180000 })
+        safeDownloadAndRun("https://sh.rustup.rs", "Rustup (macOS)")
       } else {
-        execSync('curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y', { stdio: "pipe", timeout: 180000 })
+        safeDownloadAndRun("https://sh.rustup.rs", "Rustup (Linux)")
       }
       refreshPath()
       try {
