@@ -385,6 +385,7 @@ cwd = inp.get("cwd", "")
 last_msg = inp.get("last_assistant_message", "")
 turn_id = inp.get("turn_id", "")
 flags = inp.get("flags", {})
+transcript_path = inp.get("transcript_path") or inp.get("transcriptPath")
 run_security = flags.get("security_gate", False) or "deploy" in last_msg.lower()[:200]
 run_qg_level = flags.get("qg_level", 0)
 stop_failed = False
@@ -959,18 +960,98 @@ if stop_exit_status:
     output["error"] = "OpenHands sandbox failed"
     output["exitStatus"] = stop_exit_status
 
-# Output Guard: verifica se o output pode ser exibido ao usuario
+# ── Output Guard: escaneia o transcript real do agente + systemMessage ──
 user_role = os.environ.get("GSTACK_USER_ROLE", "viewer")
+
+def scan_agent_transcript(transcript_path: str | None) -> tuple[bool, str, str]:
+    """Le o transcript JSONL do agente e extrai mensagens + tool_results para scan.
+
+    Returns:
+        (blocked: bool, reason: str, transcript_text: str)
+    """
+    if not transcript_path:
+        return False, "", ""
+
+    tp = Path(transcript_path)
+    if not tp.exists():
+        sys.stderr.write(
+            f"[Porteiro] AVISO: transcript_path '{transcript_path}' nao encontrado. "
+            "Output Guard nao cobriu a saida real do agente.\n"
+        )
+        return False, "", ""
+
+    parts = []
+    try:
+        for line in tp.read_text(encoding="utf-8", errors="replace").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            role = entry.get("role", "")
+            content = entry.get("content") or entry.get("text") or ""
+            if role == "assistant" and content:
+                parts.append(f"[assistant]\n{content}")
+            if entry.get("tool_result") or entry.get("tool_call_result"):
+                tr = entry.get("tool_result") or entry.get("tool_call_result") or {}
+                tr_content = tr.get("content") or tr.get("output") or tr.get("result") or ""
+                if tr_content:
+                    parts.append(f"[tool_result]\n{tr_content}")
+            if entry.get("type") == "tool_result":
+                tr_content = entry.get("content") or entry.get("output") or entry.get("result") or ""
+                if tr_content:
+                    parts.append(f"[tool_result]\n{tr_content}")
+    except OSError as e:
+        sys.stderr.write(f"[Porteiro] erro lendo transcript: {e}\n")
+        return False, "", ""
+
+    transcript_text = "\n\n".join(parts)
+    if not transcript_text.strip():
+        return False, "", ""
+
+    blocked, reason = output_guard(transcript_text, user_role)
+    return blocked, reason, transcript_text
+
+
+# 1. Escaneia o transcript real (se disponivel)
+transcript_blocked, transcript_reason, transcript_text = scan_agent_transcript(transcript_path)
+
+# 2. Escaneia o systemMessage como camada adicional
+system_blocked = False
+system_reason = ""
 output_text = json.dumps(output)
-blocked, reason = output_guard(output_text, user_role)
-if blocked:
-    sys.stderr.write(f"[Porteiro] {reason}\n")
+sys_blocked, sys_reason = output_guard(output_text, user_role)
+if sys_blocked:
+    system_blocked = True
+    system_reason = sys_reason
+
+# 3. Decide se bloqueia
+if transcript_blocked:
+    sys.stderr.write(f"[Porteiro] Transcript bloqueado: {transcript_reason}\n")
     sys.stdout.write(json.dumps({
-        "systemMessage": reason,
+        "systemMessage": f"Porteiro bloqueou: {transcript_reason}",
+        "blocked": True,
+        "decision": "block",
+        "reason": transcript_reason,
+    }))
+    sys.exit(1)
+
+if system_blocked:
+    sys.stderr.write(f"[Porteiro] systemMessage bloqueado: {system_reason}\n")
+    sys.stdout.write(json.dumps({
+        "systemMessage": system_reason,
         "blocked": True,
         "originalBlockedMsg": msg_parts[0] if msg_parts else "",
     }))
     sys.exit(1)
+
+if not transcript_path:
+    sys.stderr.write(
+        "[Porteiro] AVISO: transcript_path nao fornecido no input do hook. "
+        "Output Guard cobriu apenas o systemMessage, nao a saida real do agente.\n"
+    )
 
 sys.stdout.write(output_text)
 sys.exit(stop_exit_status)

@@ -1,4 +1,4 @@
-# 🚀 gstack-vibehard 2.1.4
+# 🚀 gstack-vibehard 2.1.5
 **A Máquina de Desenvolvimento Zero-Config Definitiva para Agentes de IA.**
 
 O `gstack-vibehard` é um **Control Plane e Instalador Cross-Harness**. Ele envelopa o seu terminal com ferramentas de elite, transformando Claude Code, Cursor, OpenCode e Codex em um ecossistema corporativo seguro, unificado e autônomo, rodando 100% na sua máquina.
@@ -7,12 +7,22 @@ Chega de alucinações, vazamentos de dados ou perda de contexto. O `gstack-vibe
 
 ---
 
-## ✨ O que há de novo na v2.1.4 (Quality Gate + Locking + GitOps)
+## ✨ O que há de novo na v2.1.5 (Transcript Output Guard + timeout fix)
+
+- 🛡️ **Transcript Scanning:** Output Guard agora escaneia o transcript JSONL real do agente (mensagens + tool_results), não apenas o systemMessage. Se o transcript_path não existir, emite aviso explícito.
+- ⏱️ **timeout Fix:** `post_tool_use_review.py` corrigido: `timeout=30000` → `timeout=30` (ms → segundos).
+
+### v2.1.5 (Transcript Output Guard + timeout fix)
+
+- **G1 — timeout=30000 → 30:** post_tool_use_review.py usava milissegundos. Auditado todos os hooks — único caso.
+- **G2 — Output Guard no transcript real:** Lê JSONL do agente, extrai assistant/tool_result, escaneia com RBAC. Se transcript_path ausente, aviso explícito. systemMessage mantido como camada extra.
+
+### v2.1.4 (Quality Gate + Locking + GitOps)
 
 - 🛡️ **Quality Gate no Commit:** `--no-verify` removido do `git commit`. Agora controlado por `GSTACK_ALLOW_DIRTY_COMMIT=1` (default = respeita hooks pre-commit).
 - 🔒 **File Locking Robusto:** `instincts.yaml` usa lock bloqueante com retry e exponential backoff. YAML sanitizado (sem injeção via aspas ou newlines). Read+write unificado sob lock.
 - 🤖 **GitOps Seguro:** Issue automática desativada por default (`GSTACK_AUTO_ISSUE=1` para ativar). Corpo da issue passa pelo Output Guard antes de publicar. Caminho local removido do corpo.
-- 🛡️ **Zero-Trust Output Guard:** Um "Agente Porteiro" intercepta as saídas da IA. Usa RBAC (`GSTACK_USER_ROLE`) para escanear e bloquear vazamentos de 8 classes de dados sensíveis (Chaves Stripe, Tokens GitHub, CPFs, etc.) antes de exibi-los.
+- 🛡️ **Output Guard Pós-Resposta:** Escaneia o transcript JSONL do agente (mensagens + tool_results) no hook `on_stop`. É pós-resposta — o output já foi exibido, mas o guard detecta vazamentos e loga/alerta. Também escaneia o `systemMessage` como camada adicional. Se o transcript_path não estiver disponível, um aviso explícito é emitido. Usa RBAC (`GSTACK_USER_ROLE`, default `viewer`).
 - 📦 **Replitização do Workspace:** Os projetos nascem com manifestos de app nativos (`.gstack/app.json`, `ports.json` e `services.json`), com `run_command`, `build_command`, `env` e portas dinâmicas por template.
 - 🔌 **Harness Bridge Real:** Integração com Cursor (`.cursor/rules/gstack-vibehard.mdc`), OpenCode (`hooks.json` com `tool.execute.before` e `session.idle`) e Claude Code (`settings.json` com `lifecycleHooks`).
 - 🪶 **Modo `--lite`:** Gere projeto sem Docker/Rust/ECC 2.0 — ideal para máquinas com recursos limitados.
@@ -65,7 +75,7 @@ gstack_vibehard create meu-projeto
 ## 🔒 Segurança
 
 - **File Locking:** `fcntl`/`msvcrt` nativo para `instincts.yaml`
-- **Output Guard:** RBAC (admin/developer/viewer) bloqueia secrets por nível — default `viewer` (menor privilégio)
+- **Output Guard:** Escaneia transcript do agente + systemMessage no hook on_stop (pós-resposta, best-effort). Loga aviso se transcript não disponível. RBAC admin/developer/viewer — default `viewer`
 - **Project Name Allowlist:** `^[a-zA-Z0-9._-]+$` — sem injeção via `$()`, backtick, `;`
 - **No Shell Execution:** `execFileSync` com `shell: false` em todo o código
 - **GitOps Seguro:** `git push` apenas com consentimento explícito

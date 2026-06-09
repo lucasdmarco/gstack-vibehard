@@ -16,7 +16,7 @@ def run_quality_gate():
             ["npx", "fallow", "audit", "--format", "json"],
             capture_output=True,
             text=True,
-            timeout=30000,
+            timeout=30,
         )
         if result.returncode == 0 and result.stdout:
             return json.loads(result.stdout)
