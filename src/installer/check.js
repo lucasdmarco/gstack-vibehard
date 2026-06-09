@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from "fs"
 import { homedir } from "os"
 import { join } from "path"
-import { execSync } from "child_process"
+import { execFileSync } from "child_process"
 
 const HOME = homedir()
 
@@ -52,7 +52,9 @@ export function checkAlreadyInstalled(harnessIds) {
         try {
           const content = readFileSync(cfgFile, "utf-8")
           if (content.includes("gstack_vibehard")) installed.push("opencode")
-        } catch {}
+        } catch (e) {
+          console.warn(`check: erro lendo opencode config: ${e.message || e}`)
+        }
       }
     }
   }
@@ -98,7 +100,7 @@ export function getInstalledSkills() {
 
 export function isHeadroomInstalled() {
   try {
-    execSync("headroom --version 2>&1", { stdio: "pipe", timeout: 5000 })
+    execFileSync("headroom", ["--version"], { stdio: "pipe", timeout: 5000 })
     return true
   } catch {
     return false

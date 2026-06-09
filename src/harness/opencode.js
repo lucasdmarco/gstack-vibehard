@@ -29,7 +29,7 @@ export async function installOpenCode(config, report) {
         "",
         "Se ~/.gstack_vibehard/update_status.json mostrar latest > local, avise e sugira /g_update",
         "",
-        "Sempre rode Quality Gate (python ~/.codex/hooks/qg.py) antes de entregar output.",
+        "Sempre rode Quality Gate (python ~/.gstack/hooks/qg.py ou ~/.codex/hooks/qg.py) antes de entregar output.",
       ],
     }
 

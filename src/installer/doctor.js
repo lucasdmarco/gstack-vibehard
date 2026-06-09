@@ -1,7 +1,7 @@
 import { existsSync } from "fs"
 import { homedir } from "os"
 import { join } from "path"
-import { execSync, execFileSync, execFile } from "child_process"
+import { execFileSync, execFile } from "child_process"
 import { getHarness, isWindows, isMacOS, getOSLabel } from "../harness/detector.js"
 import { checkAlreadyInstalled } from "./check.js"
 import { detectHarnesses } from "../harness/detector.js"
@@ -58,7 +58,7 @@ export async function doctor() {
     info(`  Config: ${opencodeConfig}`)
   } else {
     try {
-      const ver = execSync("opencode --version", { encoding: "utf-8", timeout: 3000 }).trim()
+      const ver = execFileSync("opencode", ["--version"], { encoding: "utf-8", timeout: 3000 }).trim()
       success(`OpenCode CLI — detectado (v${ver}, sem config)`)
     } catch {
       warn("OpenCode CLI — nao detectado")
@@ -97,7 +97,11 @@ export async function doctor() {
     warn("Nenhuma skill gstack_vibehard instalada")
   }
 
-  const chronicleDir = join(HOME, ".codex", "chronicle")
+  const chronicleDir = (() => {
+    const primary = join(HOME, ".gstack", "chronicle")
+    if (existsSync(primary)) return primary
+    return join(HOME, ".codex", "chronicle")
+  })()
   if (existsSync(chronicleDir)) {
     const fs = await import("fs")
     const sessions = fs.readdirSync(chronicleDir).filter((f) => f.endsWith(".md"))
@@ -119,18 +123,18 @@ export async function doctor() {
   // Global tools
   section("Ferramentas Globais")
   try {
-    const gbrain = (await import("child_process")).execSync("gbrain --version 2>&1", { stdio: "pipe", timeout: 5000 }).toString().trim()
-    success(`gbrain: ${gbrain}`)
+    execFileSync("gbrain", ["--version"], { stdio: "pipe", timeout: 5000 })
+    success("gbrain: (instalado)")
   } catch { warn("gbrain: nao instalado") }
 
   try {
-    const graphify = (await import("child_process")).execSync("graphify --version 2>&1", { stdio: "pipe", timeout: 5000 }).toString().trim()
-    success(`graphify: ${graphify}`)
+    execFileSync("graphify", ["--version"], { stdio: "pipe", timeout: 5000 })
+    success("graphify: (instalado)")
   } catch { warn("graphify: nao instalado") }
 
   try {
     if (isMacOS()) {
-      (await import("child_process")).execSync("which mom", { stdio: "pipe", timeout: 5000 })
+      execFileSync("which", ["mom"], { stdio: "pipe", timeout: 5000 })
       success("MOM: instalado")
     } else {
       info("MOM: apenas macOS")
@@ -138,8 +142,8 @@ export async function doctor() {
   } catch { warn("MOM: nao instalado") }
 
   try {
-    const headroom = (await import("child_process")).execSync("headroom --version 2>&1", { stdio: "pipe", timeout: 5000 }).toString().trim()
-    success(`headroom: ${headroom}`)
+    execFileSync("headroom", ["--version"], { stdio: "pipe", timeout: 5000 })
+    success("headroom: (instalado)")
   } catch { warn("headroom: nao instalado") }
 
   // MCP
@@ -158,7 +162,7 @@ export async function doctor() {
       ? join(HOME, "AppData", "Local", "ms-playwright")
       : join(HOME, ".cache", "ms-playwright"))
   try {
-    const pwVer = (await import("child_process")).execSync("npx playwright --version 2>&1", { stdio: "pipe", timeout: 10000 }).toString().trim()
+    const pwVer = execFileSync("npx", ["playwright", "--version"], { encoding: "utf-8", stdio: "pipe", timeout: 10000 }).trim()
     success(`Playwright CLI: ${pwVer}`)
   } catch {
     warn("Playwright CLI: nao disponivel (rode: npx playwright install chromium)")
@@ -177,33 +181,30 @@ export async function doctor() {
 
   // Dependencias globais
   section("Dependencias Globais")
-  const childP = await import("child_process")
   const missingDeps = []
 
   try {
-    childP.execSync("bun --version 2>&1", { stdio: "pipe", timeout: 5000 })
-    const bunVer = childP.execSync("bun --version 2>&1", { stdio: "pipe", timeout: 5000 }).toString().trim()
+    const bunVer = execFileSync("bun", ["--version"], { encoding: "utf-8", stdio: "pipe", timeout: 5000 }).trim()
     success(`bun: ${bunVer}`)
   } catch { warn("bun: nao instalado"); missingDeps.push("bun + gbrain") }
 
   try {
-    const gbrainVer = childP.execSync("gbrain --version 2>&1", { stdio: "pipe", timeout: 5000 }).toString().trim()
+    const gbrainVer = execFileSync("gbrain", ["--version"], { encoding: "utf-8", stdio: "pipe", timeout: 5000 }).trim()
     success(`gbrain: ${gbrainVer}`)
   } catch { warn("gbrain: nao instalado") }
 
   try {
-    const graphifyVer = childP.execSync("graphify --version 2>&1", { stdio: "pipe", timeout: 5000 }).toString().trim()
+    const graphifyVer = execFileSync("graphify", ["--version"], { encoding: "utf-8", stdio: "pipe", timeout: 5000 }).trim()
     success(`graphify: ${graphifyVer}`)
   } catch { warn("graphify: nao instalado"); if (!missingDeps.includes("graphify")) missingDeps.push("graphify") }
 
   try {
-    childP.execSync("rustc --version 2>&1", { stdio: "pipe", timeout: 5000 })
-    const rustVer = childP.execSync("rustc --version 2>&1", { stdio: "pipe", timeout: 5000 }).toString().trim()
+    const rustVer = execFileSync("rustc", ["--version"], { encoding: "utf-8", stdio: "pipe", timeout: 5000 }).trim()
     success(`Rust: ${rustVer}`)
   } catch { warn("Rust: nao instalado"); missingDeps.push("Rust") }
 
   try {
-    const headroomVer = childP.execSync("headroom --version 2>&1", { stdio: "pipe", timeout: 5000 }).toString().trim()
+    const headroomVer = execFileSync("headroom", ["--version"], { encoding: "utf-8", stdio: "pipe", timeout: 5000 }).trim()
     success(`headroom: ${headroomVer}`)
   } catch { warn("headroom: nao instalado"); missingDeps.push("headroom") }
 

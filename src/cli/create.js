@@ -694,7 +694,9 @@ async function writeJsonMerge(targetPath, newConfig, opts) {
   try {
     const raw = readFileSync(targetPath, "utf8")
     existing = JSON.parse(raw)
-  } catch {}
+  } catch (e) {
+    console.warn(`writeJsonMerge: config existente ignorado (${e.message || e})`)
+  }
   const merged = deepMerge(existing, newConfig)
   await writeFile(targetPath, JSON.stringify(merged, null, 2) + "\n", "utf8")
 }

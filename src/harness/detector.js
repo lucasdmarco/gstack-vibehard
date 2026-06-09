@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "fs"
 import { homedir, platform } from "os"
 import { join } from "path"
-import { execSync, execFileSync } from "child_process"
+import { execFileSync } from "child_process"
 
 const HOME = homedir()
 const OPENCODE_HOME_DIR = join(HOME, ".opencode")

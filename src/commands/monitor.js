@@ -1,11 +1,22 @@
 import { existsSync, readFileSync, readdirSync } from "fs"
 import { join, resolve } from "path"
 import { homedir } from "os"
-import { execSync, execFileSync } from "child_process"
+import { execFileSync } from "child_process"
 import { createInterface } from "readline"
 
 const HOME = resolve(homedir() || process.env.USERPROFILE || process.env.HOME || "/tmp")
 const REFRESH_INTERVAL = 5000
+const CACHE_TTL = 30000
+
+const _cache = { qg: { value: 0, ts: 0 }, sprint: { value: null, ts: 0 } }
+
+function _cacheGet(key, ttl) {
+  return (Date.now() - _cache[key].ts < ttl) ? _cache[key].value : null
+}
+
+function _cacheSet(key, value) {
+  _cache[key] = { value, ts: Date.now() }
+}
 
 function color(text, code) {
   return code + text + "\x1b[0m"
@@ -45,6 +56,8 @@ function gstackPath(sub) {
 }
 
 function getQGBlockedCount() {
+  const cached = _cacheGet("qg", CACHE_TTL)
+  if (cached !== null) return cached
   const chronicleDir = gstackPath("chronicle")
   if (!existsSync(chronicleDir)) return 0
   let count = 0
@@ -59,6 +72,7 @@ function getQGBlockedCount() {
   } catch (e) {
     console.warn(`monitor: erro ao ler chronicle QG: ${e.message || e}`)
   }
+  _cacheSet("qg", count)
   return count
 }
 
@@ -153,21 +167,27 @@ function render() {
     console.log(`  ${fallow.total} issues total (Fallow)`)
   }
 
-  // ROI quick summary (from last post_sprint)
-  const sprintDir = gstackPath("sprints")
-  if (existsSync(sprintDir)) {
-    const sprintFiles = readdirSync(sprintDir).filter((f) => f.endsWith(".json")).sort().reverse().slice(0, 1)
-    if (sprintFiles.length > 0) {
-      try {
-        const roi = JSON.parse(readFileSync(join(sprintDir, sprintFiles[0]), "utf-8"))
-        console.log(color("\n── Ultimo Sprint (ROI) ──", C.bold))
-        if (roi.tokens_saved) console.log(`  Tokens salvos: ${roi.tokens_saved.toLocaleString()}`)
-        if (roi.fallow_blocks !== undefined) console.log(`  Injeções barradas: ${roi.fallow_blocks}`)
-        if (roi.files_modified !== undefined) console.log(`  Arquivos modificados: ${roi.files_modified}`)
-      } catch (e) {
-        console.warn(`monitor: erro ao ler sprint ROI: ${e.message || e}`)
+  // ROI quick summary (from last post_sprint, cached 30s)
+  let roi = _cacheGet("sprint", CACHE_TTL)
+  if (roi === null) {
+    const sprintDir = gstackPath("sprints")
+    if (existsSync(sprintDir)) {
+      const sprintFiles = readdirSync(sprintDir).filter((f) => f.endsWith(".json")).sort().reverse().slice(0, 1)
+      if (sprintFiles.length > 0) {
+        try {
+          roi = JSON.parse(readFileSync(join(sprintDir, sprintFiles[0]), "utf-8"))
+        } catch (e) {
+          console.warn(`monitor: erro ao ler sprint ROI: ${e.message || e}`)
+        }
       }
     }
+    _cacheSet("sprint", roi)
+  }
+  if (roi) {
+    console.log(color("\n── Ultimo Sprint (ROI) ──", C.bold))
+    if (roi.tokens_saved) console.log(`  Tokens salvos: ${roi.tokens_saved.toLocaleString()}`)
+    if (roi.fallow_blocks !== undefined) console.log(`  Injeções barradas: ${roi.fallow_blocks}`)
+    if (roi.files_modified !== undefined) console.log(`  Arquivos modificados: ${roi.files_modified}`)
   }
 
   console.log(color("\n──────────────────────────────", C.dim))

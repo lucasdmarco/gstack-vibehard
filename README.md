@@ -1,4 +1,4 @@
-# 🚀 gstack-vibehard 2.1.7
+# 🚀 gstack-vibehard 2.1.8
 **A Máquina de Desenvolvimento Zero-Config Definitiva para Agentes de IA.**
 
 O `gstack-vibehard` é um **Control Plane e Instalador Cross-Harness**. Ele envelopa o seu terminal com ferramentas de elite, transformando Claude Code, Cursor, OpenCode e Codex em um ecossistema corporativo seguro, unificado e autônomo, rodando 100% na sua máquina.
@@ -7,11 +7,18 @@ Chega de alucinações, vazamentos de dados ou perda de contexto. O `gstack-vibe
 
 ---
 
-## ✨ O que há de novo na v2.1.7 (Polimento + Governança + Bugs)
+## ✨ O que há de novo na v2.1.8 (Segurança + Performance + Higiene)
 
 - 🔌 **Fase 0–8 — Portabilidade Cross-Harness:** Paths unificados (`_paths.py`), input normalization (`_harness.py`), crash safety global, MCP config para Claude, bridge real, hooks independentes do Codex, detectores para Windsurf/Gemini/Kiro/Zed.
-- 🛡️ **RCE Elimination:** `safeDownloadAndRun` usa `param($u,$o)` no PowerShell. `headroom.js` refatorado: 0 `execSync` restantes.
-- 🧠 **Python portátil:** `sys.executable` em todos os hooks + `resolvePythonCmd()` no JS (prefere `python3`, fallback `python`).
+- 🛡️ **RCE Elimination:** `safeDownloadAndRun` usa `param($u,$o)` no PowerShell. O código principal em `src/` não usa mais `execSync(string)`.
+- 🧠 **Python portátil:** `sys.executable` em hooks + `resolvePythonCmd()` no JS (prefere `python3`, fallback `python`).
+
+### v2.1.8 (Segurança + Performance + Higiene)
+
+- **L1 — Ameaças letais:** `git add -A` removido dos fluxos automáticos; staging agora é explícito. `execSync(string)` eliminado do código principal em `src/`. Vetor de injeção em `agent-distribution.js` fechado com allowlist de harness.
+- **L2 — Performance/UX:** `collect_project_files()` agora usa `os.walk()` com poda real de `node_modules`, `.git`, `dist`, `.venv`. Monitor TUI cacheia leituras de chronicle/sprint. `Popen` best-effort trocado por `run(timeout=...)`.
+- **L3 — Governança:** Chronicle deduplicado em `_chronicle.py`; paths globais centralizados em `_paths.py`; catches críticos agora logam contexto.
+- **L4 — Documentação honesta:** claims de segurança rebaixados para refletir apenas o código principal verificado.
 
 ### v2.1.7 (Polimento + Governança + Bugs)
 
@@ -46,7 +53,7 @@ Chega de alucinações, vazamentos de dados ou perda de contexto. O `gstack-vibe
 - 🔌 **Harness Bridge Real:** Integração com Cursor (`.cursor/rules/gstack-vibehard.mdc`), OpenCode (`hooks.json` com `tool.execute.before` e `session.idle`) e Claude Code (`settings.json` com `lifecycleHooks`).
 - 🪶 **Modo `--lite`:** Gere projeto sem Docker/Rust/ECC 2.0 — ideal para máquinas com recursos limitados.
 - 🔒 **RCE-Safe & Hardened:** Projetos novos usam `execFileSync()` com `shell: false`. Nomes validados por allowlist (`/^[a-zA-Z0-9._-]+$/`). Módulos auxiliares em migração contínua para o mesmo padrão.
-- 🪵 **Error Visibility:** Empty catches eliminados em todo o código — erros reais são logados com contexto, não silenciados.
+- 🪵 **Error Visibility:** Empty catches críticos foram convertidos para logs com contexto. Catches de cleanup/best-effort ainda existem e são documentados como baixo risco.
 
 ### v2.1.3 (Shared Output Guard + Viewer Default)
 
@@ -86,7 +93,7 @@ gstack_vibehard uninstall
 O Quality Gate roda automaticamente via hooks no final de cada sessão:
 - **Claude Code/OpenCode**: hooks restritivos (bloqueiam entrega se CRITICO/ALTO)
 - **Codex/Gemini CLI**: modo Best-Effort (instrucional — sem hooks API)
-- **Código migrado**: `execFileSync` com `shell: false` na criacao de projetos
+- **Código migrado**: `src/` sem `execSync(string)`; operações de subprocesso usam `execFileSync`/`execFile` com argumentos em array
 - **Typecheck complementar**: `qg.py` roda `npx tsc --noEmit` apos Fallow nos projetos com `tsconfig.json`
 
 ## ⚡ Instalação Rápida
@@ -123,7 +130,7 @@ gstack_vibehard create meu-projeto
 - **File Locking:** `fcntl`/`msvcrt` nativo para `instincts.yaml`
 - **Output Guard:** Escaneia transcript do agente + systemMessage no hook on_stop (pós-resposta, best-effort). Loga aviso se transcript não disponível. RBAC admin/developer/viewer — default `viewer`
 - **Project Name Allowlist:** `^[a-zA-Z0-9._-]+$` — sem injeção via `$()`, backtick, `;`
-- **No Shell Execution:** `execFileSync` com `shell: false` no scaffolding de projetos; migração contínua nos módulos de instalação/doctor
+- **No Shell Execution:** código principal em `src/` migrado para `execFileSync`/`execFile` com argumentos em array; scripts auxiliares legados continuam em migração contínua
 - **GitOps Seguro:** `git push` apenas com consentimento explícito
 
 ---

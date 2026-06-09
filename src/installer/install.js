@@ -3,7 +3,7 @@ import { copyFile, mkdir } from "fs/promises"
 import { homedir, tmpdir } from "os"
 import { join, dirname } from "path"
 import { fileURLToPath } from "url"
-import { execSync, execFileSync } from "child_process"
+import { execFileSync } from "child_process"
 import { detectHarnesses, isWindows, isMacOS, isLinux } from "../harness/detector.js"
 import { installCodex } from "../harness/codex.js"
 import { installClaude } from "../harness/claude.js"
@@ -54,34 +54,19 @@ function safeDownloadAndRun(url, label) {
   }
 }
 
-function run(cmd, label) {
-  try {
-    execSync(cmd, { stdio: "pipe", timeout: 120000 })
-    success(label)
-  } catch (e) {
-    warn(`${label}: ${e.message}`)
-  }
-}
-
 function refreshPath() {
   if (!isWindows()) return
   try {
-    const sysPath = execSync(
-      'reg query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" /v Path 2>&1 | findstr /i "Path"',
-      { stdio: "pipe", timeout: 5000 }
-    ).toString().trim()
-    const userPath = execSync(
-      'reg query "HKCU\\Environment" /v Path 2>&1 | findstr /i "Path"',
-      { stdio: "pipe", timeout: 5000 }
-    ).toString().trim()
-    const sysMatch = sysPath.match(/REG_\w+\s+(\S.+)/)
-    const userMatch = userPath.match(/REG_\w+\s+(\S.+)/)
+    const sysResult = execFileSync("reg", ["query", "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment", "/v", "Path"], { stdio: "pipe", timeout: 5000, encoding: "utf-8" })
+    const userResult = execFileSync("reg", ["query", "HKCU\\Environment", "/v", "Path"], { stdio: "pipe", timeout: 5000, encoding: "utf-8" })
+    const sysMatch = (sysResult || "").match(/REG_\w+\s+(\S.+)/)
+    const userMatch = (userResult || "").match(/REG_\w+\s+(\S.+)/)
     const merged = [sysMatch?.[1], userMatch?.[1]].filter(Boolean).join(";")
     if (merged) process.env.Path = merged
   } catch (e) { console.error("refreshPath (non-critical):", e.message) }
 }
 
-async function installDeps(run, warn, success, info, report, harnessIds) {
+async function installDeps(warn, success, info, report, harnessIds) {
   section("deps/ — Instalando dependencias globais")
 
   // ========================================
@@ -89,7 +74,7 @@ async function installDeps(run, warn, success, info, report, harnessIds) {
   // ========================================
   let bunFound = false
   try {
-    execSync("bun --version", { stdio: "pipe", timeout: 5000 })
+    execFileSync("bun", ["--version"], { stdio: "pipe", timeout: 5000 })
     bunFound = true
   } catch { /* bun not found, expected */ }
 
@@ -105,7 +90,7 @@ async function installDeps(run, warn, success, info, report, harnessIds) {
           : [join(HOME, ".bun", "bin", "bun")]
         for (const p of [...bunPaths, "bun"]) {
           try {
-            execSync(`${p} --version`, { stdio: "pipe", timeout: 5000 })
+            execFileSync(p, ["--version"], { stdio: "pipe", timeout: 5000 })
             bunFound = true
             break
           } catch { /* bun path not found, expected */ }
@@ -124,7 +109,12 @@ async function installDeps(run, warn, success, info, report, harnessIds) {
   }
 
   if (bunFound) {
-    run("bun install -g github:garrytan/gbrain", "gbrain (bun global)")
+    try {
+      execFileSync("bun", ["install", "-g", "github:garrytan/gbrain"], { stdio: "pipe", timeout: 120000 })
+      success("gbrain (bun global)")
+    } catch (e) {
+      warn(`gbrain (bun global): ${e.message}`)
+    }
   } else {
     info("gbrain: pulado (bun nao disponivel)")
   }
@@ -139,7 +129,7 @@ async function installDeps(run, warn, success, info, report, harnessIds) {
 
   for (const p of [...possiblePaths, "uv"]) {
     try {
-      execSync(`${p} --version`, { stdio: "pipe", timeout: 5000 })
+      execFileSync(p, ["--version"], { stdio: "pipe", timeout: 5000 })
       uvBin = p
       break
     } catch { /* expected */ }
@@ -156,7 +146,7 @@ async function installDeps(run, warn, success, info, report, harnessIds) {
       refreshPath()
       for (const p of possiblePaths) {
         try {
-          execSync(`${p} --version`, { stdio: "pipe", timeout: 5000 })
+          execFileSync(p, ["--version"], { stdio: "pipe", timeout: 5000 })
           uvBin = p
           success("uv instalado")
           break
@@ -164,7 +154,7 @@ async function installDeps(run, warn, success, info, report, harnessIds) {
       }
       if (!uvBin) {
         try {
-          execSync("uv --version", { stdio: "pipe", timeout: 5000 })
+          execFileSync("uv", ["--version"], { stdio: "pipe", timeout: 5000 })
           uvBin = "uv"
           success("uv instalado")
         } catch { /* expected */ }
@@ -176,7 +166,12 @@ async function installDeps(run, warn, success, info, report, harnessIds) {
   }
 
   if (uvBin) {
-    run(`${uvBin} tool install graphify`, "graphify (uv tool)")
+    try {
+      execFileSync(uvBin, ["tool", "install", "graphify"], { stdio: "pipe", timeout: 120000 })
+      success("graphify (uv tool)")
+    } catch (e) {
+      warn(`graphify (uv tool): ${e.message}`)
+    }
   } else {
     info("graphify: pulado (uv nao disponivel)")
   }
@@ -186,7 +181,7 @@ async function installDeps(run, warn, success, info, report, harnessIds) {
   // ========================================
   let rustFound = false
   try {
-    execSync("rustc --version", { stdio: "pipe", timeout: 5000 })
+    execFileSync("rustc", ["--version"], { stdio: "pipe", timeout: 5000 })
     rustFound = true
     success("Rust encontrado")
   } catch { /* expected */ }
@@ -196,7 +191,7 @@ async function installDeps(run, warn, success, info, report, harnessIds) {
     try {
       if (isWindows()) {
         try {
-          execSync("winget install Rustlang.Rustup 2>&1", { stdio: "pipe", timeout: 120000 })
+          execFileSync("winget", ["install", "Rustlang.Rustup"], { stdio: "pipe", timeout: 120000 })
         } catch {
           info("winget falhou. Tentando rustup-init.exe diretamente...")
           execFileSync("powershell", ["-c", `$url = 'https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe'; $tmp = "$env:TEMP\rustup-init.exe"; iwr -Uri $url -OutFile $tmp; & $tmp -y --default-toolchain stable --profile minimal`], { stdio: "pipe", timeout: 180000, shell: false })
@@ -213,15 +208,15 @@ async function installDeps(run, warn, success, info, report, harnessIds) {
       }
       refreshPath()
       try {
-        execSync("rustc --version", { stdio: "pipe", timeout: 5000 })
+        execFileSync("rustc", ["--version"], { stdio: "pipe", timeout: 5000 })
         rustFound = true
         success("Rust instalado")
       } catch {
         if (isWindows()) {
           info("Rust: MSVC toolchain pode ter falhado. Tentando toolchain GNU...")
           try {
-            execSync("rustup default stable-gnu 2>&1", { stdio: "pipe", timeout: 30000 })
-            execSync("rustc --version", { stdio: "pipe", timeout: 5000 })
+            execFileSync("rustup", ["default", "stable-gnu"], { stdio: "pipe", timeout: 30000 })
+            execFileSync("rustc", ["--version"], { stdio: "pipe", timeout: 5000 })
             rustFound = true
             success("Rust instalado (toolchain GNU)")
           } catch { /* expected */ }
@@ -237,11 +232,10 @@ async function installDeps(run, warn, success, info, report, harnessIds) {
   // Playwright
   // ========================================
   try {
-    execSync("npx playwright install chromium 2>&1", { stdio: "pipe", timeout: 120000 })
+    execFileSync("npx", ["playwright", "install", "chromium"], { stdio: "pipe", timeout: 120000 })
     const pwDir = isWindows()
       ? join(HOME, "AppData", "Local", "ms-playwright")
       : join(HOME, ".cache", "ms-playwright")
-    const { readdirSync } = await import("fs")
     if (existsSync(pwDir) && readdirSync(pwDir).some((f) => f.startsWith("chromium"))) {
       success("Playwright: chromium instalado")
     } else {
@@ -260,7 +254,12 @@ async function installDeps(run, warn, success, info, report, harnessIds) {
   // MOM (macOS only)
   // ========================================
   if (isMacOS()) {
-    run("brew install momhq/tap/mom", "MOM (brew)")
+    try {
+      execFileSync("brew", ["install", "momhq/tap/mom"], { stdio: "pipe", timeout: 120000 })
+      success("MOM (brew)")
+    } catch (e) {
+      warn(`MOM (brew): ${e.message}`)
+    }
   } else {
     info("MOM: incompativel com este OS (apenas macOS)")
   }
@@ -268,13 +267,17 @@ async function installDeps(run, warn, success, info, report, harnessIds) {
   // ========================================
   // CLI-Anything Hub (dynamic CLI download for agents)
   // ========================================
-  run("npm install -g cli-anything-hub", "cli-anything-hub (npm global)")
+  try {
+    execFileSync("npm", ["install", "-g", "cli-anything-hub"], { stdio: "pipe", timeout: 120000 })
+    success("cli-anything-hub (npm global)")
+  } catch (e) {
+    warn(`cli-anything-hub (npm global): ${e.message}`)
+  }
 
   // ========================================
   // Headroom (context compression proxy)
   // ========================================
   await installHeadroom({
-    run,
     warn,
     success,
     info,
@@ -316,7 +319,7 @@ export async function install() {
   }
 
   // Step 1: Install global deps ALWAYS — before harness check
-  await installDeps(run, warn, success, info, report, allHarnessIds)
+  await installDeps(warn, success, info, report, allHarnessIds)
 
   // Check which harnesses already have gstack_vibehard
   const alreadyInstalled = checkAlreadyInstalled(allHarnessIds)

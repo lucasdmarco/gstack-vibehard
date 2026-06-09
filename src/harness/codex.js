@@ -2,6 +2,7 @@ import { existsSync } from "fs"
 import { join, dirname } from "path"
 import { homedir } from "os"
 import { fileURLToPath } from "url"
+import { execFileSync } from "child_process"
 import { writeWithBackup, ensureDir, readJsonFile } from "../installer/merge.js"
 
 const HOME = homedir()
@@ -11,6 +12,10 @@ const PACKAGE_ROOT = dirname(__dirname)
 const HOOKS_SOURCE = join(PACKAGE_ROOT, "hooks", "hooks")
 const SKILLS_SOURCE = join(PACKAGE_ROOT, "skills", "skills")
 const TEMPLATE_SOURCE = join(PACKAGE_ROOT, "templates", "templates")
+
+function resolvePythonCmd() {
+  try { execFileSync("python3", ["--version"], { stdio: "pipe", timeout: 3000 }); return "python3" } catch { return "python" }
+}
 
 export async function installCodex(config, report) {
   const hooksDir = join(HOME, ".codex", "hooks")
@@ -32,12 +37,13 @@ export async function installCodex(config, report) {
   if (config.template) {
     const skillsDir = join(HOME, ".agents", "skills").replaceAll("\\", "/")
     const hooksDirPosix = hooksDir.replaceAll("\\", "/")
+    const pythonCmd = resolvePythonCmd()
     const tomlContent = `# gstack_vibehard — Codex CLI hooks
 [hooks]
-on_session_start = ["python ${hooksDirPosix}/session_start.py"]
-on_stop = ["python ${hooksDirPosix}/stop.py"]
-pre_tool_use = ["python ${hooksDirPosix}/pre_tool_use_security.py"]
-post_tool_use = ["python ${hooksDirPosix}/stop.py"]
+on_session_start = ["${pythonCmd} ${hooksDirPosix}/session_start.py"]
+on_stop = ["${pythonCmd} ${hooksDirPosix}/stop.py"]
+pre_tool_use = ["${pythonCmd} ${hooksDirPosix}/pre_tool_use_security.py"]
+post_tool_use = ["${pythonCmd} ${hooksDirPosix}/stop.py"]
 
 [agent]
 skills_dir = "${skillsDir}"
@@ -73,7 +79,7 @@ command = "gbrain"
 args = ["serve"]
 
 [mcp_servers.graphify]
-command = "python"
+command = "${pythonCmd}"
 args = ["-m", "graphify.serve", "graphify-out/graph.json"]
 
 [mcp_servers.headroom]

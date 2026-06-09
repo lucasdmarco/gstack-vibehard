@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Optional
 
 from _output_guard import output_guard, SENSITIVE_PATTERNS, ALLOWED_ROLES_HIERARCHY
-from _paths import chronicle_dir, hook_support_path, migrate_legacy
+from _paths import chronicle_dir, hook_support_path, migrate_legacy, GSTACK_DIR
 from _harness import parse_stdin, normalize_input
 from datetime import datetime
 
@@ -61,7 +61,7 @@ def play_audio_cue(kind: str) -> None:
         elif system == "darwin":
             sound = "/System/Library/Sounds/Glass.aiff" if kind == "success" else "/System/Library/Sounds/Basso.aiff"
             if shutil.which("afplay"):
-                subprocess.Popen(["afplay", sound], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.run(["afplay", sound], capture_output=True, timeout=5)
                 return
         else:
             for player, args in [
@@ -69,7 +69,7 @@ def play_audio_cue(kind: str) -> None:
                 ("canberra-gtk-play", ["-i", "complete" if kind == "success" else "dialog-error"]),
             ]:
                 if shutil.which(player):
-                    subprocess.Popen([player, *args], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    subprocess.run([player, *args], capture_output=True, timeout=5)
                     return
 
         sys.stderr.write("\a")
@@ -147,28 +147,39 @@ def run_sandbox(cwd: str) -> dict:
 _FILE_CACHE: dict[str, list[Path]] = {}
 
 
+IGNORE_DIRS = {"node_modules", "dist", ".git", "__pycache__", ".venv", ".next", ".turbo", "build", "target"}
+
+
 def collect_project_files(root: Path, extensions: list[str]) -> list[Path]:
     """Collect project source files once, cache by root.
 
-    Each check function calls this instead of doing its own rglob,
-    eliminating 35+ redundant filesystem scans per session.
+    Uses os.walk with top-down directory pruning to skip
+    node_modules, .git, dist, etc. BEFORE traversal.
+    Eliminates 35+ redundant filesystem scans per session.
     """
     cache_key = str(root.resolve())
     if cache_key in _FILE_CACHE:
         return _FILE_CACHE[cache_key]
 
+    ext_set = set(extensions)
     files: list[Path] = []
     seen: set[str] = set()
-    for ext in extensions:
-        for f in root.rglob(ext):
-            fp = str(f.resolve())
-            if fp in seen:
+    root_resolved = root.resolve()
+
+    for dirpath, dirnames, filenames in os.walk(root_resolved, topdown=True):
+        # Prune ignored dirs BEFORE os.walk descends into them
+        dirnames[:] = [d for d in dirnames if d not in IGNORE_DIRS]
+
+        for fname in filenames:
+            ext = os.path.splitext(fname)[1]
+            if ext not in ext_set:
                 continue
-            seen.add(fp)
-            rel = f.relative_to(root).as_posix()
-            if any(ignore in rel for ignore in ["node_modules", "dist", ".git", "__pycache__", ".venv"]):
+            fp = os.path.join(dirpath, fname)
+            resolved = os.path.realpath(fp)
+            if resolved in seen:
                 continue
-            files.append(f)
+            seen.add(resolved)
+            files.append(Path(fp))
 
     _FILE_CACHE[cache_key] = files
     return files
@@ -284,14 +295,15 @@ def dockerfile_check_non_root(root: Path) -> bool:
 
 def cors_check(root: Path) -> bool:
     """Verifica se CORS nao tem '*' hardcoded."""
-    bad_patterns = [r"cors\(\s*['"]\*['"]", r"allow_origins\s*=\s*['"]\*['"]"]
+    bad_patterns = [r'cors\(\s*[\'\"]\*[\'\"]', r'allow_origins\s*=\s*[\'\"]\*[\'\"]']
     for f in collect_project_files(root, ["*.ts", "*.tsx", "*.py", "*.go", "*.rs", "*.js"]):
         try:
             text = f.read_text(encoding="utf-8", errors="ignore")
             for bp in bad_patterns:
                 if re.search(bp, text, re.IGNORECASE):
                     return False
-        except Exception:
+        except Exception as e:
+            sys.stderr.write(f"[security-gate] erro lendo {f}: {e}\n")
             continue
     return True
 
@@ -299,7 +311,7 @@ def cors_check(root: Path) -> bool:
 def secrets_check(root: Path) -> bool:
     """Verifica se ha secrets hardcoded (API keys, tokens, passwords)."""
     secrets_patterns = [
-        r'(?i)(api[-_]?key|apikey|secret|password|token|auth_token)\s*[=:]\s*["'][^"'"]{8,}',
+        r'''(?i)(api[-_]?key|apikey|secret|password|token|auth_token)\s*[=:]\s*["'][^"']{8,}''',
     ]
     for f in collect_project_files(root, ["*.ts", "*.tsx", "*.js", "*.jsx", "*.py", "*.go", "*.rs", "*.java", "*.rb", "*.php", "*.env"]):
         rel = f.relative_to(root).as_posix()
@@ -310,7 +322,8 @@ def secrets_check(root: Path) -> bool:
             for sp in secrets_patterns:
                 if re.search(sp, text):
                     return False
-        except Exception:
+        except Exception as e:
+            sys.stderr.write(f"[security-gate] erro lendo {f}: {e}\n")
             continue
     return True
 
@@ -322,7 +335,8 @@ def health_endpoint_check(root: Path) -> bool:
             text = f.read_text(encoding="utf-8", errors="ignore")
             if "/health" in text or "/api/health" in text:
                 return True
-        except Exception:
+        except Exception as e:
+            sys.stderr.write(f"[security-gate] erro lendo {f}: {e}\n")
             continue
     return False
 
@@ -335,9 +349,13 @@ def swagger_check(root: Path) -> bool:
             if re.search(r'(swagger|openapi|docs|redoc)', text, re.IGNORECASE):
                 if not re.search(r'(environment|env|app_env|NODE_ENV|APP_ENV)', text, re.IGNORECASE):
                     return False
-        except Exception:
+        except Exception as e:
+            sys.stderr.write(f"[security-gate] erro lendo {f}: {e}\n")
             continue
-    return Truedef run_security_gate(root: Path) -> dict:
+    return True
+
+
+def run_security_gate(root: Path) -> dict:
     """Executa todos os security gate checks e retorna resultados."""
     results = []
     critical = 0
@@ -729,7 +747,7 @@ def write_instinct_entry(trigger: str, details: str, pattern: str, action: str) 
     exponential backoff), never silently skipped.
     """
     try:
-        instincts_dir = Path.home() / ".gstack"
+        instincts_dir = GSTACK_DIR
         instincts_dir.mkdir(parents=True, exist_ok=True)
         instincts_file = instincts_dir / "instincts.yaml"
 
@@ -808,10 +826,10 @@ if mom_bin:
             input=session_jsonl,
             capture_output=True, text=True, timeout=15
         )
-        # Async mom draft — non-blocking, best-effort
-        subprocess.Popen(
+        # Mom draft — non-blocking, best-effort
+        subprocess.run(
             [mom_bin, "draft"],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            capture_output=True, timeout=15
         )
     except (OSError, subprocess.TimeoutExpired):
         pass  # MOM is advisory; never block stop on it
@@ -971,7 +989,7 @@ def gitops_pr_create(summary_text: str, root: Optional[Path]) -> Optional[str]:
         # Create branch and local commit only — no automatic push or PR
         subprocess.run(["git", "checkout", "-b", branch_name],
                        cwd=str(root), capture_output=True, text=True, timeout=15)
-        subprocess.run(["git", "add", "-A"],
+        subprocess.run(["git", "add", "--", "*.md", "docs/", "wiki/"],
                        cwd=str(root), capture_output=True, text=True, timeout=15)
         commit_msg = f"[gstack] {summary_text[:100]}"
         allow_dirty = os.environ.get("GSTACK_ALLOW_DIRTY_COMMIT", "") == "1"
@@ -996,7 +1014,7 @@ if gh_bin:
     root_path = find_project_root(cwd)
     if root_path and gitops_available():
         if stop_failed:
-            instincts_file = Path.home() / ".gstack" / "instincts.yaml"
+            instincts_file = GSTACK_DIR / "instincts.yaml"
             if os.environ.get("GSTACK_AUTO_ISSUE", "") == "1":
                 gitops_issue_create(fallow_result, instincts_file)
             else:

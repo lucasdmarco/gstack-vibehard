@@ -42,7 +42,7 @@ async function installHeadroomPkg(warn, info, uvBin) {
 }
 
 export async function installHeadroom(deps, report) {
-  const { run, warn, success, info, uvBin } = deps
+  const { warn, success, info, uvBin } = deps
 
   info("headroom: Instalando...")
 

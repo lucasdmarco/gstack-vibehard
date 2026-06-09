@@ -4,8 +4,13 @@ import { execFileSync } from "child_process"
 import { homedir } from "os"
 import { success, warn, info, error } from "../cli/index.js"
 
-const HOOKS_DIR = join(homedir(), ".codex", "hooks")
-const POST_SPRINT = join(HOOKS_DIR, "post_sprint.py")
+function hooksDir() {
+  const primary = join(homedir(), ".gstack", "hooks")
+  if (existsSync(primary)) return primary
+  return join(homedir(), ".codex", "hooks")
+}
+
+const POST_SPRINT = join(hooksDir(), "post_sprint.py")
 
 function resolvePythonCmd() {
   try {
@@ -21,10 +26,10 @@ export async function sprintCommand(args) {
 
   if (flag === "--save") {
     const cwd = process.cwd()
-    const lastMsgFile = join(HOOKS_DIR, "last_message.txt")
+    const lastMsgFile = join(hooksDir(), "last_message.txt")
 
     if (!existsSync(POST_SPRINT)) {
-      error("post_sprint.py nao encontrado em ~/.codex/hooks/")
+      error("post_sprint.py nao encontrado em ~/.gstack/hooks/ ou ~/.codex/hooks/")
       error("Reinstale com: gstack_vibehard install")
       process.exit(1)
     }

@@ -9,64 +9,9 @@ Integrates highermind patterns:
 import json, sys, os, subprocess, time, getpass, socket, shutil, urllib.request
 from pathlib import Path
 
+from _chronicle import build_chronicle_index, search_chronicle
 from _output_guard import output_guard
-from _paths import chronicle_dir, hook_support_path, read_with_fallback
-
-
-def build_chronicle_index():
-    """Constrói índice de busca sobre todos os arquivos chronicle."""
-    cdir = chronicle_dir()
-    if not cdir.exists():
-        return []
-    entries = []
-    for f in sorted(cdir.glob("*.md"), key=os.path.getmtime, reverse=True):
-        text = f.read_text(encoding="utf-8", errors="replace")
-        lines = text.splitlines()
-        project = ""
-        summary = ""
-        cwd = ""
-        for line in lines:
-            if line.startswith("# Session:"):
-                project = line.replace("# Session:", "").strip()
-            elif line.startswith("- Working directory:"):
-                cwd = line.replace("- Working directory:", "").strip()
-        in_summary = False
-        summary_lines = []
-        for line in lines:
-            if line.strip() == "## Summary":
-                in_summary = True
-                continue
-            if line.startswith("## "):
-                in_summary = False
-            if in_summary and line.strip():
-                summary_lines.append(line.strip())
-        summary = " ".join(summary_lines)[:500]
-        entries.append({
-            "file": f.name,
-            "project": project,
-            "cwd": cwd,
-            "summary": summary,
-            "mtime": f.stat().st_mtime,
-        })
-    return entries
-
-
-def search_chronicle(index, query: str, limit: int = 3):
-    """Busca no índice por termo (case-insensitive, substring)."""
-    q = query.lower()
-    scored = []
-    for e in index:
-        score = 0
-        if q in e["project"].lower():
-            score += 3
-        if q in e["summary"].lower():
-            score += 2
-        if q in e["cwd"].lower():
-            score += 1
-        if score > 0:
-            scored.append((score, e))
-    scored.sort(key=lambda x: (-x[0], -x[1]["mtime"]))
-    return [e for _, e in scored[:limit]]
+from _paths import chronicle_dir, hook_support_path, read_with_fallback, GSTACK_VIBEHARD_DIR
 
 
 def run_gc_check(cwd: str) -> str | None:
@@ -364,7 +309,7 @@ ctx_parts.append(STACK_DECISION_FRAMEWORK)
 ctx_parts.append(SECURITY_BASELINE)
 
 # 6. Update check (1x/24h)
-UPDATE_FILE = Path.home() / ".gstack_vibehard" / "update_status.json"
+UPDATE_FILE = GSTACK_VIBEHARD_DIR / "update_status.json"
 if not UPDATE_FILE.parent.exists():
     UPDATE_FILE.parent.mkdir(parents=True, exist_ok=True)
 

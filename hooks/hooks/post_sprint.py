@@ -10,10 +10,10 @@ Integra:
 Chamado por: stop.py (hook on_stop)
 Trigger manual: gstack_vibehard sprint --save
 """
-import json, sys, os, subprocess, re
+import json, sys, os, subprocess, re, shutil
 from pathlib import Path
 
-from _paths import chronicle_dir
+from _paths import chronicle_dir, GSTACK_DIR
 from _harness import parse_stdin, normalize_input
 
 from _output_guard import output_guard
@@ -38,8 +38,8 @@ def update_graphify(root: Path, last_msg: str) -> dict:
                         try:
                             pkg = json.loads(pkg_json.read_text())
                             deps = list(pkg.get("dependencies", {}).keys())[:10]
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            sys.stderr.write(f"[post_sprint] erro lendo {pkg_json}: {e}\n")
                     type_map = {"apps": "app", "packages": "lib"}
                     nodes.append({
                         "id": f"{subdir}/{entry.name}",
@@ -101,8 +101,8 @@ def update_gbrain(root: Path, last_msg: str) -> dict:
     if ctx_file.exists():
         try:
             ctx = json.loads(ctx_file.read_text())
-        except Exception:
-            pass
+        except Exception as e:
+            sys.stderr.write(f"[post_sprint] erro lendo {ctx_file}: {e}\n")
 
     decisions_found = re.findall(
         r'(?:Decis[ãa]o|Decision|Optamos por|Vamos usar|Escolhemos)\s*:?\s*([^.]+)',
@@ -131,9 +131,12 @@ def record_mom(session_summary: str, project: str) -> dict:
     """Salva resumo no MOM (apenas macOS)."""
     if sys.platform != "darwin":
         return {"status": "skipped", "reason": "MOM: apenas macOS"}
+    mom_bin = shutil.which("mom")
+    if not mom_bin:
+        return {"status": "skipped", "reason": "mom nao encontrado no PATH"}
     try:
         result = subprocess.run(
-            ["mom", "remember", f"[{project}] {session_summary[:500]}"],
+            [mom_bin, "remember", f"[{project}] {session_summary[:500]}"],
             capture_output=True, text=True, timeout=10
         )
         if result.returncode == 0:
@@ -185,8 +188,8 @@ def estimate_tokens_saved(graphify_result: dict, root: Path) -> int:
             cfg = json.loads(mcp_config.read_text())
             if "headroom" in cfg.get("mcpServers", {}):
                 headroom_savings = 5000  # estimativa conservadora por sessao
-        except Exception:
-            pass
+        except Exception as e:
+            sys.stderr.write(f"[post_sprint] erro lendo {mcp_config}: {e}\n")
 
     # Graphify: AST cache evita re-scan de arquivos inalterados
     graphify_savings = nodes * 500 + edges * 200
@@ -212,8 +215,8 @@ def count_fallow_blocks(root: Path) -> int:
                     continue
                 if (entry.get("action") == "block" or entry.get("blocked")) or (entry.get("severity", "") or "").upper() in ("CRITICO", "ALTO"):
                     blocks += 1
-        except Exception:
-            pass
+        except Exception as e:
+            sys.stderr.write(f"[post_sprint] erro lendo {f}: {e}\n")
     return blocks
 
 
@@ -225,16 +228,19 @@ def count_atomic_files(root: Path) -> int:
     atomic_dir = root / ".atomic"
     if not atomic_dir.exists():
         return 0
+    atomic_bin = shutil.which("atomic")
+    if not atomic_bin:
+        return 0
     modified = 0
     try:
         result = subprocess.run(
-            ["atomic", "log", "--oneline"],
+            [atomic_bin, "log", "--oneline"],
             capture_output=True, text=True, timeout=10, cwd=str(root),
         )
         if result.returncode == 0:
             modified = len(result.stdout.strip().splitlines())
-    except Exception:
-        pass
+    except Exception as e:
+        sys.stderr.write(f"[post_sprint] atomic log indisponivel: {e}\n")
     if modified == 0:
         # Fallback: atomic log vazio ou indisponivel — retorna 0
         return 0
@@ -246,7 +252,7 @@ def write_roi_report(root: Path, project_name: str,
                      files_modified: int, graphify_result: dict) -> dict:
     """Gera relatório ROI em JSON e MD em ~/.gstack/sprints/ + .gstack/sprints/ local."""
     # Global path: ~/.gstack/sprints/ (cross-harness, funciona com qualquer CLI)
-    gstack_home = Path.home() / ".gstack"
+    gstack_home = GSTACK_DIR
     global_sprints_dir = gstack_home / "sprints"
     global_sprints_dir.mkdir(parents=True, exist_ok=True)
 

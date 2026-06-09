@@ -1,8 +1,12 @@
 import { existsSync, mkdirSync, writeFileSync, readdirSync, copyFileSync } from "fs"
 import { join, dirname, basename } from "path"
 import { fileURLToPath } from "url"
-import { execSync } from "child_process"
+import { execFileSync } from "child_process"
 import { success, warn, error, info, confirm, prompt } from "../cli/index.js"
+
+function resolvePythonCmd() {
+  try { execFileSync("python3", ["--version"], { stdio: "pipe", timeout: 3000 }); return "python3" } catch { return "python" }
+}
 
 function getProjectRoot() {
   const __filename = fileURLToPath(import.meta.url)
@@ -44,18 +48,20 @@ export async function initCommand(args) {
   }
 
   // Python check
+  const pyCmd = resolvePythonCmd()
   try {
-    execSync("python --version", { stdio: "pipe", timeout: 5000 })
+    execFileSync(pyCmd, ["--version"], { stdio: "pipe", timeout: 5000 })
     info("Python encontrado")
-  } catch {
+  } catch (e) {
     warn("Python nao encontrado no PATH. Hooks Python exigem python3 instalado.")
+    warn(`Python check: ${e.message || e}`)
     info("Instale Python: https://www.python.org/downloads/")
   }
 
   // Version check
   try {
-    const local = execSync("npm list -g @gstack-vibehard/installer --depth=0 2>&1", { encoding: "utf-8", timeout: 10000 }).trim()
-    const latest = execSync("npm view @gstack-vibehard/installer version 2>&1", { encoding: "utf-8", timeout: 10000 }).trim()
+    const local = execFileSync("npm", ["list", "-g", "@gstack-vibehard/installer", "--depth=0"], { encoding: "utf-8", timeout: 10000 }).trim()
+    const latest = execFileSync("npm", ["view", "@gstack-vibehard/installer", "version"], { encoding: "utf-8", timeout: 10000 }).trim()
     const localVer = local.includes("@") ? local.split("@").pop()?.trim() : local
     if (latest !== localVer) {
       warn(`gstack_vibehard: versao ${localVer} instalada, ${latest} disponivel`)
@@ -63,8 +69,8 @@ export async function initCommand(args) {
     } else {
       info(`gstack_vibehard ${localVer} — atualizado`)
     }
-  } catch {
-    // Silêncio se falhar (offline, npm ausente, etc)
+  } catch (e) {
+    warn(`version check pulado: ${e.message || e}`)
   }
 
   info(`Criando projeto '${projectName}' (variante: ${variant})...`)
@@ -125,8 +131,8 @@ export async function initCommand(args) {
     node: "latest", npm: "latest", created: new Date().toISOString().split("T")[0],
     stack: v.stack, infra: v.infra, variant, api_dir: v.api_dir, db_package: v.db_package,
     tools: ["gstack_vibehard", "gbrain", "context7", "superpowers", "graphify", "headroom"],
-    quality_gate: { script: "~/.codex/hooks/qg.py", gstack_check: "~/.codex/hooks/gc.py", levels: [1, 2, 3] },
-    ecosystem: { gbrain: ".gbrain/context.json", graphify: ".graphify/deps.json", context7: ".context7/stack.json", chronicle: "~/.codex/chronicle" },
+    quality_gate: { script: "~/.gstack/hooks/qg.py", gstack_check: "~/.gstack/hooks/gc.py", levels: [1, 2, 3], fallback_script: "~/.codex/hooks/qg.py", fallback_gstack_check: "~/.codex/hooks/gc.py" },
+    ecosystem: { gbrain: ".gbrain/context.json", graphify: ".graphify/deps.json", context7: ".context7/stack.json", chronicle: "~/.gstack/chronicle", fallback_chronicle: "~/.codex/chronicle" },
   }
   writeFileSync(join(gstackDir, "config.json"), JSON.stringify(gstackConfig, null, 2))
   success(".gstack/ criado")

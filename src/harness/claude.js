@@ -2,6 +2,7 @@ import { existsSync } from "fs"
 import { join, dirname } from "path"
 import { homedir } from "os"
 import { fileURLToPath } from "url"
+import { execFileSync } from "child_process"
 import { writeWithBackup, ensureDir, readJsonFile } from "../installer/merge.js"
 import { isWindows } from "./detector.js"
 
@@ -18,6 +19,10 @@ const CLAUDE_MD = join(HOME, "CLAUDE.md")
 const ULTRA_MD = join(CLAUDE_DIR, "rules", "ultracode.md")
 const MCP_CONFIG = join(HOME, ".mcp.json")
 const HOOKS_SOURCE = join(PACKAGE_ROOT, "hooks", "hooks")
+
+function resolvePythonCmd() {
+  try { execFileSync("python3", ["--version"], { stdio: "pipe", timeout: 3000 }); return "python3" } catch { return "python" }
+}
 
 const claudeMdContent = `# CLAUDE.md — gstack_vibehard
 
@@ -141,7 +146,7 @@ export async function installClaude(config, report) {
         args: ["serve"],
       },
       graphify: {
-        command: "python",
+        command: resolvePythonCmd(),
         args: ["-m", "graphify.serve", "graphify-out/graph.json"],
       },
       headroom: {

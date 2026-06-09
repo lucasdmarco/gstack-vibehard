@@ -51,8 +51,34 @@ def find_worktrees(root: Path) -> list[Path]:
     return worktrees
 
 
+SAFE_EXTENSIONS = {".py", ".js", ".ts", ".tsx", ".jsx", ".md", ".json",
+                   ".yaml", ".yml", ".toml", ".css", ".html", ".sh", ".ps1",
+                   ".go", ".rs", ".java", ".rb", ".php", ".c", ".cpp", ".h",
+                   ".sql", ".env.example"}
+UNSAFE_PREFIXES = {".env", ".env.", "node_modules", "dist", ".git"}
+UNSAFE_FILES = {".env", ".dockerignore"}
+
+
+def _is_safe_path(rel_path: str) -> bool:
+    """Check if a file is safe to stage (no secrets, no build artifacts)."""
+    rel_lower = rel_path.lower()
+    for prefix in UNSAFE_PREFIXES:
+        if rel_lower.startswith(prefix) or ("/" + prefix) in rel_lower:
+            return False
+    basename = Path(rel_path).name
+    if basename in UNSAFE_FILES:
+        return False
+    ext = Path(rel_path).suffix
+    if ext in SAFE_EXTENSIONS:
+        return True
+    return False
+
+
 def autosave_worktree(wt_path: Path) -> dict:
     """Commit any uncommitted changes in the worktree as an auto-save checkpoint.
+
+    Only stages safe file types (.py, .js, .ts, .md, .json, etc.)
+    and never stages .env, .dockerignore, node_modules/, or dist/.
 
     Returns dict with status and commit info.
     """
@@ -68,13 +94,33 @@ def autosave_worktree(wt_path: Path) -> dict:
         if status.returncode != 0 or not status.stdout.strip():
             return {"path": str(wt_path), "status": "clean", "reason": "no changes"}
 
-        # Stage all
-        subprocess.run(
-            ["git", "add", "-A"],
-            capture_output=True, text=True, timeout=30, cwd=str(wt_path)
-        )
+        # Parse changed files and stage only safe paths
+        safe_paths = []
+        has_staged = False
+        for line in status.stdout.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            prefix = line[:2]
+            path_part = line[3:].strip()
+            # Handle renamed/copied: "R  old -> new"
+            if " -> " in path_part and prefix[0] in "RC":
+                path_part = path_part.split(" -> ")[-1].strip()
+            if _is_safe_path(path_part):
+                safe_paths.append(path_part)
+            if prefix[0] != " " and prefix[0] != "?":
+                has_staged = True
 
-        # Commit
+        if not safe_paths and not has_staged:
+            return {"path": str(wt_path), "status": "clean", "reason": "no safe changes"}
+
+        if safe_paths:
+            subprocess.run(
+                ["git", "add", "--"] + safe_paths,
+                capture_output=True, text=True, timeout=30, cwd=str(wt_path)
+            )
+
+        # Commit (even if only previously staged changes exist)
         commit = subprocess.run(
             ["git", "commit", "-m", "gstack auto-save agent checkpoint",
              "--allow-empty", "--no-verify"],

@@ -5,6 +5,8 @@ import os
 HOOKS_DIR = Path(__file__).parent
 GSTACK_DIR = Path.home() / ".gstack"
 CODEX_DIR = Path.home() / ".codex"
+GSTACK_VIBEHARD_DIR = Path.home() / ".gstack_vibehard"
+MOM_DB_PATH = Path.home() / ".mom" / "mom.db"
 
 
 def chronicle_dir():
@@ -23,11 +25,13 @@ def read_with_fallback(subpath, binary=False):
     gstack_path = GSTACK_DIR / subpath
     if gstack_path.exists():
         mode = "rb" if binary else "r"
-        return gstack_path.open(mode, encoding=None if binary else "utf-8").read()
+        with gstack_path.open(mode, encoding=None if binary else "utf-8") as f:
+            return f.read()
     codex_path = CODEX_DIR / subpath
     if codex_path.exists():
         mode = "rb" if binary else "r"
-        return codex_path.open(mode, encoding=None if binary else "utf-8").read()
+        with codex_path.open(mode, encoding=None if binary else "utf-8") as f:
+            return f.read()
     return None
 
 

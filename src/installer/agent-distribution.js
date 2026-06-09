@@ -1,5 +1,5 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "fs"
-import { execSync as defaultExecSync } from "child_process"
+import { execFileSync as defaultExecFileSync } from "child_process"
 import { homedir } from "os"
 import { dirname, join } from "path"
 
@@ -18,23 +18,25 @@ function readJson(filePath) {
   }
 }
 
-function commandExists(command, execSync) {
+const ALLOWED_HARNESS_IDS = new Set(["claude", "codex", "cursor", "opencode", "windsurf"])
+
+function commandExists(command) {
   try {
-    execSync(`${command} --version`, { stdio: "pipe", timeout: 3000 })
+    defaultExecFileSync(command, ["--version"], { stdio: "pipe", timeout: 3000 })
     return true
   } catch {
     return false
   }
 }
 
-function detectGeneratedAgentHarnesses({ home, cwd, execSync, harnessIds }) {
+function detectGeneratedAgentHarnesses({ home, cwd, harnessIds }) {
   const opencodeHome = join(home, ".opencode")
   const opencodeConfig = join(home, ".config", "opencode")
   const opencodeRoot = existsSync(opencodeHome) ? opencodeHome : opencodeConfig
   const selected = harnessIds ? new Set(harnessIds) : null
   const harnesses = []
 
-  if ((!selected || selected.has("claude")) && (existsSync(join(home, ".claude")) || existsSync(join(home, "CLAUDE.md")) || commandExists("claude", execSync))) {
+  if ((!selected || selected.has("claude")) && (existsSync(join(home, ".claude")) || existsSync(join(home, "CLAUDE.md")) || commandExists("claude"))) {
     harnesses.push({
       id: "claude",
       label: "Claude Code",
@@ -43,7 +45,7 @@ function detectGeneratedAgentHarnesses({ home, cwd, execSync, harnessIds }) {
     })
   }
 
-  if ((!selected || selected.has("codex")) && (existsSync(join(home, ".codex")) || commandExists("codex", execSync))) {
+  if ((!selected || selected.has("codex")) && (existsSync(join(home, ".codex")) || commandExists("codex"))) {
     harnesses.push({
       id: "codex",
       label: "OpenAI Codex CLI",
@@ -61,7 +63,7 @@ function detectGeneratedAgentHarnesses({ home, cwd, execSync, harnessIds }) {
     })
   }
 
-  if ((!selected || selected.has("opencode")) && (existsSync(opencodeHome) || existsSync(opencodeConfig) || commandExists("opencode", execSync))) {
+  if ((!selected || selected.has("opencode")) && (existsSync(opencodeHome) || existsSync(opencodeConfig) || commandExists("opencode"))) {
     harnesses.push({
       id: "opencode",
       label: "OpenCode CLI",
@@ -78,9 +80,12 @@ function copyGeneratedAgents(sourceDir, targetDir) {
   cpSync(sourceDir, targetDir, { recursive: true, force: true })
 }
 
-function connectAgentMemory(harnessId, execSync) {
+function connectAgentMemory(harnessId) {
+  if (!ALLOWED_HARNESS_IDS.has(harnessId)) {
+    return { status: "warning", error: `harnessId invalido: ${harnessId}` }
+  }
   try {
-    execSync(`npx @agentmemory/agentmemory connect ${harnessId}`, { stdio: "pipe", timeout: 120000 })
+    defaultExecFileSync("npx", ["@agentmemory/agentmemory", "connect", harnessId], { stdio: "pipe", timeout: 120000 })
     return { status: "success" }
   } catch (e) {
     return { status: "warning", error: e.message }
@@ -94,7 +99,6 @@ export function installGraphifyGitHooks(options = {}) {
     info = () => {},
     success = () => {},
     warn = () => {},
-    execSync = defaultExecSync,
   } = options
 
   if (!cwd || !existsSync(join(cwd, ".git"))) {
@@ -104,7 +108,7 @@ export function installGraphifyGitHooks(options = {}) {
   }
 
   try {
-    execSync("npx graphify hook install", { cwd, stdio: "pipe", timeout: 120000 })
+    defaultExecFileSync("npx", ["graphify", "hook", "install"], { cwd, stdio: "pipe", timeout: 120000 })
     success("Graphify git hooks instalados")
     report.updated.push("Graphify git hooks")
     return { status: "success" }
@@ -124,7 +128,6 @@ export async function installGeneratedAgentLayer(options = {}) {
     info = () => {},
     success = () => {},
     warn = () => {},
-    execSync = defaultExecSync,
     copyDir = copyGeneratedAgents,
     harnessIds = null,
     now = () => new Date().toISOString(),
@@ -139,7 +142,7 @@ export async function installGeneratedAgentLayer(options = {}) {
   }
 
   const sourceManifest = readJson(join(generatedRoot, "manifest.json"))
-  const detectedHarnesses = detectGeneratedAgentHarnesses({ home, cwd, execSync, harnessIds })
+  const detectedHarnesses = detectGeneratedAgentHarnesses({ home, cwd, harnessIds })
   const agentDirectories = {}
   const agentmemory = {}
 
@@ -167,7 +170,7 @@ export async function installGeneratedAgentLayer(options = {}) {
     report.added.push(`generated agents: ${harness.id}`)
     success(`generated agents: ${harness.id}`)
 
-    const memoryStatus = connectAgentMemory(harness.id, execSync)
+    const memoryStatus = connectAgentMemory(harness.id)
     agentmemory[harness.id] = memoryStatus
     if (memoryStatus.status === "success") {
       report.updated.push(`AgentMemory: ${harness.id}`)
