@@ -39,9 +39,10 @@ test("installs generated agents into detected harnesses and writes manifest", as
       info: () => {},
       success: () => {},
       warn: () => {},
-      execSync: (cmd) => {
+      exec: (file, args) => {
+        const cmd = [file, ...args].join(" ")
         commands.push(cmd)
-        if (cmd.includes("opencode")) throw new Error("offline")
+        if (cmd.includes("connect opencode")) throw new Error("offline")
         return Buffer.from("ok")
       },
       now: () => "2026-06-08T00:00:00.000Z",
@@ -98,8 +99,8 @@ test("respects selected harness ids", async () => {
       info: () => {},
       success: () => {},
       warn: () => {},
-      execSync: (cmd) => {
-        commands.push(cmd)
+      exec: (file, args) => {
+        commands.push([file, ...args].join(" "))
         return Buffer.from("ok")
       },
     })
@@ -139,8 +140,8 @@ test("keeps generated agent copy failures non-blocking", async () => {
       info: () => {},
       success: () => {},
       warn: () => {},
-      execSync: (cmd) => {
-        commands.push(cmd)
+      exec: (file, args) => {
+        commands.push([file, ...args].join(" "))
         return Buffer.from("ok")
       },
       copyDir: (_src, dst) => {
@@ -177,8 +178,8 @@ test("does not detect Cursor from CLI alone", async () => {
       info: () => {},
       success: () => {},
       warn: () => {},
-      execSync: (cmd) => {
-        if (cmd === "cursor --version") return Buffer.from("ok")
+      exec: (file, args) => {
+        if ([file, ...args].join(" ") === "cursor --version") return Buffer.from("ok")
         throw new Error("not found")
       },
     })
@@ -208,8 +209,8 @@ test("installs Graphify git hooks only inside git projects", async () => {
       success: () => {},
       warn: () => {},
       info: () => {},
-      execSync: (cmd, options) => {
-        commands.push({ cmd, cwd: options.cwd })
+      exec: (file, args, options) => {
+        commands.push({ cmd: [file, ...args].join(" "), cwd: options.cwd })
         return Buffer.from("ok")
       },
     })
@@ -219,8 +220,8 @@ test("installs Graphify git hooks only inside git projects", async () => {
       success: () => {},
       warn: () => {},
       info: () => {},
-      execSync: (cmd, options) => {
-        commands.push({ cmd, cwd: options.cwd })
+      exec: (file, args, options) => {
+        commands.push({ cmd: [file, ...args].join(" "), cwd: options.cwd })
         return Buffer.from("unexpected")
       },
     })
@@ -250,7 +251,7 @@ test("keeps Graphify git hook install failures non-blocking", async () => {
       success: () => {},
       warn: (message) => warnings.push(message),
       info: () => {},
-      execSync: () => {
+      exec: () => {
         throw new Error("npx missing")
       },
     })

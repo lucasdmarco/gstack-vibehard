@@ -2,9 +2,9 @@ name: Test
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   pull_request:
-    branches: [main]
+    branches: [main, master]
 
 jobs:
   doctor:
@@ -20,6 +20,34 @@ jobs:
           node-version: ${{ matrix.node }}
       - run: node src/index.js doctor
         name: "Doctor check"
+
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm test
+        name: "Unit tests (Node)"
+
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: pip install pytest
+        name: "Install pytest"
+      - run: python -m pytest tests/ -v
+        name: "Unit tests (Python)"
 
   lint:
     runs-on: ubuntu-latest

@@ -1,6 +1,6 @@
 {
   "name": "@gstack-vibehard/installer",
-  "version": "2.1.8",
+  "version": "2.1.9",
   "description": "gstack_vibehard — Cross-harness installer & fullstack template kit with deep agent integration (Codex, Claude Code, OpenCode)",
   "license": "MIT",
   "type": "module",
@@ -13,7 +13,8 @@
     "build:agents": "node scripts/scripts/build_agents.js",
     "setup": "node src/index.js install",
     "doctor": "node src/index.js doctor",
-    "test": "node src/index.js doctor"
+    "test": "node --test \"tests/**/*.test.js\"",
+    "test:py": "python -m pytest tests/ -v"
   },
   "engines": {
     "node": ">=18"
@@ -42,9 +43,14 @@
     "fallow": "0.x",
     "@agentmemory/agentmemory": "0.x"
   },
-  "bundledDependencies": [
-    "@gstack/headroom-proxy"
-  ],
+  "peerDependenciesMeta": {
+    "fallow": {
+      "optional": true
+    },
+    "@agentmemory/agentmemory": {
+      "optional": true
+    }
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/lucasdmarco/gstack-vibehard.git"

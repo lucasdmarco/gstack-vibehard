@@ -4,6 +4,7 @@ import { fileURLToPath } from "url"
 import { createInterface } from "readline"
 import { install } from "../installer/install.js"
 import { doctor } from "../installer/doctor.js"
+import { uninstall, list } from "../installer/uninstall.js"
 import { createCommand } from "./create.js"
 import { initCommand } from "../commands/init.js"
 import { sprintCommand } from "../commands/sprint.js"
@@ -28,10 +29,19 @@ function color(text, ...codes) {
 }
 
 function logo() {
-  console.log(color("\n  ╔══════════════════════════════════════╗", COLORS.cyan))
-  console.log(color("  ║      GStack VibeHard Installer       ║", COLORS.cyan))
-  console.log(color(`  ║    @gstack-vibehard/installer — v${VERSION} ║`, COLORS.cyan))
-  console.log(color("  ╚══════════════════════════════════════╝\n", COLORS.cyan))
+  const width = 40
+  const line1 = "GStack VibeHard Installer"
+  const line2 = `@gstack-vibehard/installer — v${VERSION}`
+  const pad = (text) => {
+    const total = width - 2 - text.length
+    const left = Math.max(0, Math.floor(total / 2))
+    const right = Math.max(0, total - left)
+    return "║" + " ".repeat(left) + text + " ".repeat(right) + "║"
+  }
+  console.log(color(`\n  ╔${"═".repeat(width - 2)}╗`, COLORS.cyan))
+  console.log(color(`  ${pad(line1)}`, COLORS.cyan))
+  console.log(color(`  ${pad(line2)}`, COLORS.cyan))
+  console.log(color(`  ╚${"═".repeat(width - 2)}╝\n`, COLORS.cyan))
 }
 
 export function prompt(question) {
@@ -78,6 +88,7 @@ export function showHelp() {
   logo()
   console.log(color("  Comandos:", COLORS.bold))
   console.log(color("    gstack_vibehard install        Instalar gstack_vibehard no ambiente", COLORS.cyan))
+  console.log(color("      --skip-deps                  Pular instalacao de deps globais (bun, Rust...)", COLORS.dim))
   console.log(color("    gstack_vibehard create <nome>  Criar workspace runtime omniharness", COLORS.cyan))
   console.log(color("    gstack_vibehard init <nome>    Criar novo projeto com estrutura completa", COLORS.cyan))
   console.log(color("    gstack_vibehard doctor         Diagnosticar ambiente", COLORS.cyan))
@@ -111,9 +122,19 @@ export function section(title) {
 export async function runCLI(command, args) {
   logo()
 
+  try {
+    await dispatch(command, args)
+  } catch (e) {
+    error(`Falha ao executar '${command}': ${e.message}`)
+    if (process.env.GSTACK_DEBUG) console.error(e.stack)
+    process.exit(1)
+  }
+}
+
+async function dispatch(command, args) {
   switch (command) {
     case "install":
-      await install()
+      await install(args)
       break
     case "create":
       await createCommand(args)
@@ -125,13 +146,13 @@ export async function runCLI(command, args) {
       await doctor()
       break
     case "uninstall":
-      console.log(color("  Uninstall ainda nao implementado.", COLORS.yellow))
+      await uninstall(args)
       break
     case "sprint":
       await sprintCommand(args)
       break
     case "list":
-      console.log(color("  List ainda nao implementado.", COLORS.yellow))
+      await list()
       break
     case "monitor":
       await monitorCommand()

@@ -98,7 +98,7 @@ function getHarnessStatus() {
   ]
   return harnesses.map((h) => ({
     ...h,
-    active: existsSync(join(h.dir, "hooks.json")) || existsSync(h.dir),
+    active: existsSync(h.dir),
   }))
 }
 

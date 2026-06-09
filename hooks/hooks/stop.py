@@ -341,6 +341,21 @@ def health_endpoint_check(root: Path) -> bool:
     return False
 
 
+def gitignore_has_dotenv(root: Path) -> bool:
+    """Verifica se .gitignore cobre arquivos .env (secrets fora do git)."""
+    gitignore = root / ".gitignore"
+    if not gitignore.exists():
+        # Sem .env no projeto, nao ha o que vazar
+        has_env_files = any(
+            p.name.startswith(".env") and p.name != ".env.example"
+            for p in root.glob(".env*")
+        )
+        return not has_env_files
+    text = gitignore.read_text(encoding="utf-8", errors="ignore")
+    lines = [l.strip() for l in text.splitlines() if l.strip() and not l.strip().startswith("#")]
+    return any(l in (".env", ".env*", ".env.*", "*.env", "**/.env") or l.startswith(".env") for l in lines)
+
+
 def swagger_check(root: Path) -> bool:
     """Verifica se swagger e condicional ao ambiente."""
     for f in collect_project_files(root, ["*.ts", "*.tsx", "*.js", "*.py", "*.go", "*.rs", "*.java", "*.rb", "*.php"]):
@@ -458,7 +473,17 @@ note_lines = [
 ]
 
 # Sandbox: OpenHands headless mode (the only supported sandbox engine).
-sandbox_result = run_sandbox(cwd)
+# Opt-in: so roda quando habilitado explicitamente — rodar um sandbox de
+# validacao em TODA sessao (e falhar sem openhands instalado) e hostil.
+_sandbox_enabled = (
+    os.environ.get("GSTACK_SANDBOX") == "1"
+    or os.environ.get("GSTACK_SANDBOX_TEST") == "1"
+    or bool(flags.get("sandbox"))
+)
+if _sandbox_enabled:
+    sandbox_result = run_sandbox(cwd)
+else:
+    sandbox_result = {"status": "skipped", "reason": "sandbox desabilitado (defina GSTACK_SANDBOX=1 ou flag sandbox)"}
 if sandbox_result.get("status") == "passed":
     note_lines.append("")
     note_lines.append("## OpenHands Sandbox")
@@ -630,7 +655,7 @@ note_lines.append("")
 
 note = "\n".join(note_lines)
 
-chronicle_file = chronicle_dir / f"{project_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
+chronicle_file = chronicle_dir_path / f"{project_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
 chronicle_file.write_text(note, encoding="utf-8")
 
 msg_parts = [f"Memorias salvas em {chronicle_file.name} + QG L1 executado"]

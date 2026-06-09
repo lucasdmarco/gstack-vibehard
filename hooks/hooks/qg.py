@@ -113,10 +113,20 @@ def infer_verdict(raw: Any, returncode: int) -> str:
     return "fail" if returncode != 0 else "pass"
 
 
+def _synthesize_title(item: dict[str, Any]) -> str:
+    """Titulo legivel para findings sem title (ex.: metricas CRAP de complexidade)."""
+    if "crap" in item or "cyclomatic" in item:
+        name = item.get("name") or item.get("path") or "?"
+        cyc = item.get("cyclomatic")
+        cog = item.get("cognitive")
+        return f"Complexidade CRAP: {name} (cyclomatic {cyc}, cognitive {cog})"
+    return "Fallow finding"
+
+
 def normalize_issue(item: dict[str, Any]) -> dict[str, Any]:
     return {
         "rule": item.get("rule") or item.get("code") or item.get("id") or item.get("name") or "fallow",
-        "title": item.get("title") or item.get("message") or item.get("description") or "Auto-fixable Fallow finding",
+        "title": item.get("title") or item.get("message") or item.get("description") or _synthesize_title(item),
         "file": item.get("file") or item.get("path") or item.get("filename") or item.get("location", {}).get("file"),
         "line": item.get("line") or item.get("startLine") or item.get("location", {}).get("line"),
         "severity": str(item.get("severity") or item.get("level") or "MEDIO").upper(),
@@ -135,6 +145,33 @@ def collect_auto_fixable(raw: Any) -> list[dict[str, Any]]:
         if not truthy(item.get("auto_fixable")):
             continue
         normalized = normalize_issue(item)
+        fingerprint = json.dumps(
+            [normalized.get("rule"), normalized.get("file"), normalized.get("line"), normalized.get("title")],
+            sort_keys=True,
+            ensure_ascii=False,
+        )
+        if fingerprint in seen:
+            continue
+        seen.add(fingerprint)
+        issues.append(normalized)
+    return issues
+
+
+def collect_blocking(raw: Any) -> list[dict[str, Any]]:
+    """Non-auto-fixable findings — o agente nao pode corrigi-los sozinho, mas
+    precisa saber que existem para explicar um verdict 'fail' (senao recebe
+    pass=False com issues=[] e nenhuma pista)."""
+    issues = []
+    seen = set()
+    for item in iter_dicts(raw):
+        if truthy(item.get("auto_fixable")):
+            continue
+        # Heuristica conservadora: so dicts que parecem findings
+        looks_like_issue = "severity" in item or ("rule" in item and ("title" in item or "message" in item))
+        if not looks_like_issue:
+            continue
+        normalized = normalize_issue(item)
+        normalized["auto_fixable"] = False
         fingerprint = json.dumps(
             [normalized.get("rule"), normalized.get("file"), normalized.get("line"), normalized.get("title")],
             sort_keys=True,
@@ -216,7 +253,9 @@ def main() -> None:
 
     verdict = infer_verdict(raw, completed.returncode)
     auto_fixable = collect_auto_fixable(raw)
+    blocking = collect_blocking(raw)
     passed = verdict == "pass"
+    summary = f"Fallow Quality Gate: {verdict.upper()} ({len(auto_fixable)} auto-fixable, {len(blocking)} blocking issue(s))"
     result = {
         "pass": passed,
         "engine": "fallow",
@@ -226,7 +265,8 @@ def main() -> None:
         "returncode": completed.returncode,
         "issues": auto_fixable,
         "auto_fixable": auto_fixable,
-        "summary": f"Fallow Quality Gate: {verdict.upper()} ({len(auto_fixable)} auto-fixable issue(s))",
+        "blocking": blocking,
+        "summary": summary,
     }
 
     # Optional TypeScript type check (non-blocking, covers P2 blind spot)

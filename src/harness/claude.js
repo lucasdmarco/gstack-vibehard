@@ -14,10 +14,11 @@ const HOME = homedir()
 
 const CLAUDE_DIR = join(HOME, ".claude")
 const CLAUDE_HOOKS = join(CLAUDE_DIR, "hooks")
-const CLAUDE_SETTINGS = join(CLAUDE_DIR, "settings.json")
 const CLAUDE_MD = join(HOME, "CLAUDE.md")
 const ULTRA_MD = join(CLAUDE_DIR, "rules", "ultracode.md")
 const MCP_CONFIG = join(HOME, ".mcp.json")
+// Claude Code le servidores MCP globais de ~/.claude.json (nao de settings.json)
+const CLAUDE_JSON = join(HOME, ".claude.json")
 const HOOKS_SOURCE = join(PACKAGE_ROOT, "hooks", "hooks")
 
 function resolvePythonCmd() {
@@ -180,18 +181,14 @@ export async function installClaude(config, report) {
     writeWithBackup(MCP_CONFIG, JSON.stringify({ mcpServers: finalMcpServers }, null, 2))
     report.updated.push("~/.mcp.json")
 
-    // Also write to ~/.claude/settings.json so MCP servers appear in Claude Code
-    const claudeSettings = readJsonFile(CLAUDE_SETTINGS) || {}
-    const mergedSettings = { ...claudeSettings }
-    const existingClaudeServers = claudeSettings.mcpServers || {}
-    mergedSettings.mcpServers = { ...finalMcpServers }
-    for (const [key, val] of Object.entries(existingClaudeServers)) {
-      if (!(key in defaultMcpServers)) {
-        mergedSettings.mcpServers[key] = val
-      }
-    }
-    writeWithBackup(CLAUDE_SETTINGS, JSON.stringify(mergedSettings, null, 2))
-    report.updated.push("~/.claude/settings.json")
+    // Claude Code le MCP servers globais do top-level mcpServers em ~/.claude.json.
+    // Esse arquivo guarda muito estado interno do Claude Code — merge cuidadoso,
+    // preservando tudo e dando prioridade a configs existentes do usuario.
+    const claudeJson = readJsonFile(CLAUDE_JSON) || {}
+    const existingClaudeServers = claudeJson.mcpServers || {}
+    claudeJson.mcpServers = { ...finalMcpServers, ...existingClaudeServers }
+    writeWithBackup(CLAUDE_JSON, JSON.stringify(claudeJson, null, 2))
+    report.updated.push("~/.claude.json (mcpServers)")
   }
 
   return report

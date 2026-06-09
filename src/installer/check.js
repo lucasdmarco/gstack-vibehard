@@ -16,8 +16,8 @@ const HARNESS_COMPONENTS = {
   ],
   claude: [
     { path: join(HOME, ".claude", "rules", "ultracode.md"), label: "Ultracode rule" },
-    { path: join(HOME, ".claude", "rules", "gstack_vibehard.md"), label: "GStack rule" },
-    { path: join(HOME, ".claude", "mcp.json"), label: "MCP config", requiresContent: "gstack" },
+    { path: join(HOME, ".claude", "hooks", "qg.py"), label: "QG hook" },
+    { path: join(HOME, ".mcp.json"), label: "MCP config", requiresContent: "headroom" },
   ],
   opencode: [
     { path: join(HOME, ".config", "opencode", "opencode.json"), label: "Main config", requiresContent: "gstack_vibehard" },
@@ -28,23 +28,11 @@ export function checkAlreadyInstalled(harnessIds) {
   const installed = []
 
   for (const harnessId of harnessIds) {
-    const components = HARNESS_COMPONENTS[harnessId] || []
-    let allPresent = true
-    let somePresent = false
-
-    for (const comp of components) {
-      const present = existsSync(comp.path) && (
-        !comp.requiresContent ||
-        readFileSync(comp.path, "utf-8").includes(comp.requiresContent)
-      )
-      if (present) somePresent = true
-      else allPresent = false
-    }
-
     const hookFile = join(HOME, ".codex", "hooks", "qg.py")
     if (harnessId === "codex" && existsSync(hookFile)) {
       installed.push(harnessId)
-    } else if (harnessId === "claude" && somePresent) {
+    } else if (harnessId === "claude" && existsSync(join(HOME, ".claude", "rules", "ultracode.md"))) {
+      // ultracode.md e o marcador definitivo escrito por installClaude
       installed.push(harnessId)
     } else if (harnessId === "opencode") {
       const cfgFile = join(HOME, ".config", "opencode", "opencode.json")

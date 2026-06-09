@@ -8,7 +8,10 @@ import json, sys, re
 from pathlib import Path
 
 inp = json.loads(sys.stdin.read())
-cmd = inp.get("tool_input", {}).get("command", "")
+tool_input = inp.get("tool_input", {})
+cmd = tool_input.get("command", "")
+# Write/Edit/apply_patch enviam file_path (nao command)
+file_path = tool_input.get("file_path", "") or tool_input.get("path", "")
 tool_name = inp.get("tool_name", "")
 cwd = inp.get("cwd", "")
 
@@ -22,40 +25,41 @@ def check_design_system_mandate():
     if tool_name not in ("Write", "Edit", "apply_patch"):
         return False, ""
 
-    # Only block for frontend file types
-    target = cmd or ""
-    frontend_patterns = [
-        r'\.tsx["\']?\s*$', r'\.jsx["\']?\s*$', r'\.css["\']?\s*$',
-        r'\.html["\']?\s*$', r'\.vue["\']?\s*$', r'\.svelte["\']?\s*$',
-    ]
-    is_frontend = False
-    for pat in frontend_patterns:
-        if re.search(pat, target, re.IGNORECASE):
-            is_frontend = True
-            break
-
-    if not is_frontend:
+    # Only block for frontend file types — Write/Edit informam file_path
+    target = file_path or ""
+    if not target:
+        return False, ""
+    frontend_exts = (".tsx", ".jsx", ".css", ".html", ".vue", ".svelte")
+    if not target.lower().endswith(frontend_exts):
         return False, ""
 
     # Find project root (look for .gstack/)
     search_dir = Path(cwd) if cwd else Path.cwd()
     session_file = None
+    gstack_project = False
     for _ in range(5):
-        candidate = search_dir / ".gstack" / "session_state.json"
-        if candidate.exists():
-            session_file = candidate
+        if (search_dir / ".gstack").exists():
+            gstack_project = True
+            candidate = search_dir / ".gstack" / "session_state.json"
+            if candidate.exists():
+                session_file = candidate
             break
         parent = search_dir.parent
         if parent == search_dir:
             break
         search_dir = parent
 
+    # So aplica o mandato em projetos gstack (.gstack/ presente) — bloquear
+    # qualquer projeto do usuario sem opt-in seria hostil.
+    if not gstack_project:
+        return False, ""
+
     if not session_file:
-        # No session state yet — block until project is initialized
         return True, (
             "BLOQUEADO: Este projeto nao tem configuracao de design system. "
             "Antes de escrever codigo de frontend, pergunte ao usuario: "
-            "'Voce ja tem um design system proprio? (caminho da pasta com tokens, ou package npm)'"
+            "'Voce ja tem um design system proprio? (caminho da pasta com tokens, ou package npm)' "
+            "Depois registre em .gstack/session_state.json com asked_about_design_system: true."
         )
 
     try:

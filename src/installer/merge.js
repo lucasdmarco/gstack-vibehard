@@ -30,12 +30,15 @@ export function deepMerge(target, source) {
   for (const [key, value] of Object.entries(source)) {
     if (key in output) {
       if (Array.isArray(output[key]) && Array.isArray(value)) {
-        const existingSet = new Set(output[key])
+        // Copia antes de mutar — nao alterar o array do objeto de entrada
+        const merged = [...output[key]]
+        const existingSet = new Set(merged)
         for (const item of value) {
           if (!existingSet.has(item)) {
-            output[key].push(item)
+            merged.push(item)
           }
         }
+        output[key] = merged
       } else if (typeof output[key] === "object" && typeof value === "object" && !Array.isArray(output[key])) {
         output[key] = deepMerge(output[key], value)
       } else {

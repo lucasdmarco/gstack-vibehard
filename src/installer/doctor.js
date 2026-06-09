@@ -120,32 +120,6 @@ export async function doctor() {
     info("Setup scripts: nao instalados")
   }
 
-  // Global tools
-  section("Ferramentas Globais")
-  try {
-    execFileSync("gbrain", ["--version"], { stdio: "pipe", timeout: 5000 })
-    success("gbrain: (instalado)")
-  } catch { warn("gbrain: nao instalado") }
-
-  try {
-    execFileSync("graphify", ["--version"], { stdio: "pipe", timeout: 5000 })
-    success("graphify: (instalado)")
-  } catch { warn("graphify: nao instalado") }
-
-  try {
-    if (isMacOS()) {
-      execFileSync("which", ["mom"], { stdio: "pipe", timeout: 5000 })
-      success("MOM: instalado")
-    } else {
-      info("MOM: apenas macOS")
-    }
-  } catch { warn("MOM: nao instalado") }
-
-  try {
-    execFileSync("headroom", ["--version"], { stdio: "pipe", timeout: 5000 })
-    success("headroom: (instalado)")
-  } catch { warn("headroom: nao instalado") }
-
   // MCP
   section("MCP Servers")
   const mcp = join(HOME, ".mcp.json")
@@ -207,6 +181,15 @@ export async function doctor() {
     const headroomVer = execFileSync("headroom", ["--version"], { encoding: "utf-8", stdio: "pipe", timeout: 5000 }).trim()
     success(`headroom: ${headroomVer}`)
   } catch { warn("headroom: nao instalado"); missingDeps.push("headroom") }
+
+  if (isMacOS()) {
+    try {
+      execFileSync("which", ["mom"], { stdio: "pipe", timeout: 5000 })
+      success("MOM: instalado")
+    } catch { warn("MOM: nao instalado") }
+  } else {
+    info("MOM: apenas macOS")
+  }
 
   if (missingDeps.length > 0) {
     section("Acoes Corretivas")

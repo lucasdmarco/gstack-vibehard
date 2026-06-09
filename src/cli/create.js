@@ -81,11 +81,9 @@ function safeExec(file, args, opts) {
 function safeDownloadAndRun(url, logger, label) {
   const tmp = join(tmpdir(), `gstack-dl-${Date.now()}${process.platform === "win32" ? ".ps1" : ".sh"}`)
   try {
-    if (process.platform === "win32") {
-      execFileSync("powershell", ["-NoProfile", "-Command", "param($u,$o) Invoke-RestMethod $u -OutFile $o", "-u", url, "-o", tmp], { stdio: "pipe", timeout: 120000, shell: false })
-    } else {
-      execFileSync("curl", ["-fsSL", url, "-o", tmp], { stdio: "pipe", timeout: 120000, shell: false })
-    }
+    // curl existe nativamente no Windows 10 1803+ ("curl.exe") e em Unix.
+    const curlBin = process.platform === "win32" ? "curl.exe" : "curl"
+    execFileSync(curlBin, ["-fsSL", url, "-o", tmp], { stdio: "pipe", timeout: 120000, shell: false })
     if (!existsSync(tmp)) {
       logger.warn(`${label}: download falhou (arquivo nao criado)`)
       return false
@@ -97,7 +95,7 @@ function safeDownloadAndRun(url, logger, label) {
       return false
     }
     if (process.platform === "win32") {
-      execFileSync("powershell", ["-NoProfile", "-File", tmp], { stdio: "pipe", timeout: 180000, shell: false })
+      execFileSync("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", tmp], { stdio: "pipe", timeout: 180000, shell: false })
     } else {
       execFileSync("sh", [tmp], { stdio: "pipe", timeout: 180000, shell: false })
     }

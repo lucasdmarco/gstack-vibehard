@@ -30,18 +30,16 @@ const PROJECT_ROOT = getProjectRoot()
 
 function safeDownloadAndRun(url, label) {
   const tmp = join(tmpdir(), `gstack-dl-${Date.now()}${isWindows() ? ".ps1" : ".sh"}`)
-  const safeUrl = url.replace(/'/g, "'\\''")
   try {
-    if (isWindows()) {
-      execFileSync("powershell", ["-c", `irm '${safeUrl}' -OutFile '${tmp}'`], { stdio: "pipe", timeout: 120000, shell: false })
-    } else {
-      execFileSync("curl", ["-fsSL", url, "-o", tmp], { stdio: "pipe", timeout: 120000, shell: false })
-    }
+    // curl existe nativamente no Windows 10 1803+ ("curl.exe") e em Unix.
+    // Argumentos como array — sem interpolacao de string em shell.
+    const curlBin = isWindows() ? "curl.exe" : "curl"
+    execFileSync(curlBin, ["-fsSL", url, "-o", tmp], { stdio: "pipe", timeout: 120000, shell: false })
     if (!existsSync(tmp)) { warn(`${label}: download falhou`); return false }
     const content = readFileSync(tmp, "utf-8")
     if (content.length < 10) { warn(`${label}: download invalido (${content.length} bytes)`); return false }
     if (isWindows()) {
-      execFileSync("powershell", ["-c", `& '${tmp}'`], { stdio: "pipe", timeout: 180000, shell: false })
+      execFileSync("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", tmp], { stdio: "pipe", timeout: 180000, shell: false })
     } else {
       execFileSync("sh", [tmp], { stdio: "pipe", timeout: 180000, shell: false })
     }
@@ -194,7 +192,11 @@ async function installDeps(warn, success, info, report, harnessIds) {
           execFileSync("winget", ["install", "Rustlang.Rustup"], { stdio: "pipe", timeout: 120000 })
         } catch {
           info("winget falhou. Tentando rustup-init.exe diretamente...")
-          execFileSync("powershell", ["-c", `$url = 'https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe'; $tmp = "$env:TEMP\rustup-init.exe"; iwr -Uri $url -OutFile $tmp; & $tmp -y --default-toolchain stable --profile minimal`], { stdio: "pipe", timeout: 180000, shell: false })
+          const rustupUrl = "https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe"
+          const rustupTmp = join(tmpdir(), "rustup-init.exe")
+          execFileSync("curl.exe", ["-fsSL", rustupUrl, "-o", rustupTmp], { stdio: "pipe", timeout: 120000, shell: false })
+          execFileSync(rustupTmp, ["-y", "--default-toolchain", "stable", "--profile", "minimal"], { stdio: "pipe", timeout: 180000, shell: false })
+          try { unlinkSync(rustupTmp) } catch (e) { console.error("cleanup rustup-init:", e.message) }
         }
       } else if (isMacOS()) {
         safeDownloadAndRun("https://sh.rustup.rs", "Rustup (macOS)")
@@ -286,7 +288,8 @@ async function installDeps(warn, success, info, report, harnessIds) {
   }, report)
 }
 
-export async function install() {
+export async function install(args = []) {
+  const skipDeps = args.includes("--skip-deps") || process.env.GSTACK_SKIP_DEPS === "1"
   const report = { added: [], updated: [], skipped: [], errors: [] }
 
   section("gstack_vibehard Installer")
@@ -318,8 +321,14 @@ export async function install() {
     }
   }
 
-  // Step 1: Install global deps ALWAYS — before harness check
-  await installDeps(warn, success, info, report, allHarnessIds)
+  // Step 1: Install global deps (bun, uv, Rust, Playwright, headroom...)
+  // Opt-out: --skip-deps ou GSTACK_SKIP_DEPS=1 pula instalacoes pesadas
+  if (skipDeps) {
+    info("Deps globais: puladas (--skip-deps)")
+    report.skipped.push("deps globais (--skip-deps)")
+  } else {
+    await installDeps(warn, success, info, report, allHarnessIds)
+  }
 
   // Check which harnesses already have gstack_vibehard
   const alreadyInstalled = checkAlreadyInstalled(allHarnessIds)
@@ -399,24 +408,29 @@ export async function install() {
     warn("scripts/scripts/ nao encontrado no pacote")
   }
 
-  // Step 3: Install hooks
+  // Step 3: Install hooks — apenas nos harnesses selecionados
   section("hooks/ — Quality & Security Gates")
-  const hooksDir = join(HOME, ".codex", "hooks")
-  ensureDir(hooksDir)
   const hooksSource = join(PROJECT_ROOT, "hooks", "hooks")
-  if (existsSync(hooksSource)) {
-    const hooks = readdirSync(hooksSource).filter((f) => f.endsWith(".py"))
-    await Promise.all(hooks.map(async (hook) => {
-      const src = join(hooksSource, hook)
-      const dst = join(hooksDir, hook)
-      ensureDir(dirname(dst))
-      if (existsSync(dst)) backupFile(dst)
-      await copyFile(src, dst)
-      report.added.push(`hook: ${hook}`)
-    }))
-    success(`${hooks.length} hooks instalados em ~/.codex/hooks/`)
-  } else {
+  const hookTargets = []
+  if (selectedHarnessIds.includes("codex")) hookTargets.push({ id: "codex", dir: join(HOME, ".codex", "hooks") })
+  if (selectedHarnessIds.includes("claude")) hookTargets.push({ id: "claude", dir: join(HOME, ".claude", "hooks") })
+  if (!existsSync(hooksSource)) {
     warn("hooks/hooks/ nao encontrado no pacote")
+  } else if (hookTargets.length === 0) {
+    info("hooks: nenhum harness com suporte a hooks Python selecionado (pulado)")
+  } else {
+    const hooks = readdirSync(hooksSource).filter((f) => f.endsWith(".py"))
+    for (const target of hookTargets) {
+      ensureDir(target.dir)
+      await Promise.all(hooks.map(async (hook) => {
+        const src = join(hooksSource, hook)
+        const dst = join(target.dir, hook)
+        if (existsSync(dst)) backupFile(dst)
+        await copyFile(src, dst)
+        report.added.push(`hook (${target.id}): ${hook}`)
+      }))
+      success(`${hooks.length} hooks instalados em ${target.dir}`)
+    }
   }
 
   // Step 4: Install skills
@@ -469,7 +483,8 @@ export async function install() {
           await installCodex({ hooks: false, template: true }, report)
           break
         case "claude":
-          await installClaude({ hooks: true, claudeMd: true, ultracode: true, mcp: true }, report)
+          // hooks: false — Step 3 ja copia os hooks Python para ~/.claude/hooks
+          await installClaude({ hooks: false, claudeMd: true, ultracode: true, mcp: true }, report)
           break
         case "opencode":
           await installOpenCode({ hooks: true }, report)
