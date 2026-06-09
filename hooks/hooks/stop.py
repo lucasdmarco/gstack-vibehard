@@ -141,6 +141,44 @@ def run_sandbox(cwd: str) -> dict:
 
 
 # ═══════════════════════════════════════════════════════════════
+#  File Collection (cached — avoids redundant rglob scans)
+# ═══════════════════════════════════════════════════════════════
+
+_FILE_CACHE: dict[str, list[Path]] = {}
+
+
+def collect_project_files(root: Path, extensions: list[str]) -> list[Path]:
+    """Collect project source files once, cache by root.
+
+    Each check function calls this instead of doing its own rglob,
+    eliminating 35+ redundant filesystem scans per session.
+    """
+    cache_key = str(root.resolve())
+    if cache_key in _FILE_CACHE:
+        return _FILE_CACHE[cache_key]
+
+    files: list[Path] = []
+    seen: set[str] = set()
+    for ext in extensions:
+        for f in root.rglob(ext):
+            fp = str(f.resolve())
+            if fp in seen:
+                continue
+            seen.add(fp)
+            rel = f.relative_to(root).as_posix()
+            if any(ignore in rel for ignore in ["node_modules", "dist", ".git", "__pycache__", ".venv"]):
+                continue
+            files.append(f)
+
+    _FILE_CACHE[cache_key] = files
+    return files
+
+
+def clear_file_cache():
+    _FILE_CACHE.clear()
+
+
+# ═══════════════════════════════════════════════════════════════
 #  SECURITY GATE (highermind patterns)
 # ═══════════════════════════════════════════════════════════════
 
@@ -246,86 +284,60 @@ def dockerfile_check_non_root(root: Path) -> bool:
 
 def cors_check(root: Path) -> bool:
     """Verifica se CORS nao tem '*' hardcoded."""
-    bad_patterns = [r"cors\(\s*['\"]\*['\"]", r"allow_origins\s*=\s*['\"]\*['\"]"]
-    for pattern in ["*.ts", "*.tsx", "*.py", "*.go", "*.rs", "*.js"]:
-        for f in root.rglob(pattern):
-            rel = f.relative_to(root).as_posix()
-            if any(ignore in rel for ignore in ["node_modules", "dist", ".git"]):
-                continue
-            try:
-                text = f.read_text(encoding="utf-8", errors="ignore")
-                for bp in bad_patterns:
-                    if re.search(bp, text, re.IGNORECASE):
-                        return False
-            except Exception:
-                continue
+    bad_patterns = [r"cors\(\s*['"]\*['"]", r"allow_origins\s*=\s*['"]\*['"]"]
+    for f in collect_project_files(root, ["*.ts", "*.tsx", "*.py", "*.go", "*.rs", "*.js"]):
+        try:
+            text = f.read_text(encoding="utf-8", errors="ignore")
+            for bp in bad_patterns:
+                if re.search(bp, text, re.IGNORECASE):
+                    return False
+        except Exception:
+            continue
     return True
 
 
 def secrets_check(root: Path) -> bool:
     """Verifica se ha secrets hardcoded (API keys, tokens, passwords)."""
     secrets_patterns = [
-        r'(?i)(api[-_]?key|apikey|secret|password|token|auth_token)\s*[=:]\s*["\'][^"\'"]{8,}',
+        r'(?i)(api[-_]?key|apikey|secret|password|token|auth_token)\s*[=:]\s*["'][^"'"]{8,}',
     ]
-    for pattern in ["*.ts", "*.tsx", "*.js", "*.jsx", "*.py", "*.go", "*.rs", "*.java", "*.rb", "*.php", "*.env"]:
-        for f in root.rglob(pattern):
-            rel = f.relative_to(root).as_posix()
-            if any(ignore in rel for ignore in ["node_modules", "dist", ".git", ".env.example"]):
-                continue
-            try:
-                text = f.read_text(encoding="utf-8", errors="ignore")
-                for sp in secrets_patterns:
-                    if re.search(sp, text):
-                        return False
-            except Exception:
-                continue
+    for f in collect_project_files(root, ["*.ts", "*.tsx", "*.js", "*.jsx", "*.py", "*.go", "*.rs", "*.java", "*.rb", "*.php", "*.env"]):
+        rel = f.relative_to(root).as_posix()
+        if ".env.example" in rel:
+            continue
+        try:
+            text = f.read_text(encoding="utf-8", errors="ignore")
+            for sp in secrets_patterns:
+                if re.search(sp, text):
+                    return False
+        except Exception:
+            continue
     return True
 
 
 def health_endpoint_check(root: Path) -> bool:
     """Verifica se existe endpoint /health em qualquer linguagem suportada."""
-    extensions = ["*.ts", "*.tsx", "*.js", "*.jsx", "*.py", "*.go", "*.rs", "*.java", "*.rb", "*.php"]
-    for ext in extensions:
-        for f in root.rglob(ext):
-            rel = f.relative_to(root).as_posix()
-            if any(ignore in rel for ignore in ["node_modules", "dist", ".git", "__pycache__"]):
-                continue
-            try:
-                text = f.read_text(encoding="utf-8", errors="ignore")
-                if "/health" in text or "/api/health" in text:
-                    return True
-            except Exception:
-                continue
+    for f in collect_project_files(root, ["*.ts", "*.tsx", "*.js", "*.jsx", "*.py", "*.go", "*.rs", "*.java", "*.rb", "*.php"]):
+        try:
+            text = f.read_text(encoding="utf-8", errors="ignore")
+            if "/health" in text or "/api/health" in text:
+                return True
+        except Exception:
+            continue
     return False
-
-
-def gitignore_has_dotenv(root: Path) -> bool:
-    """Verifica se .env esta no .gitignore."""
-    gitignore = root / ".gitignore"
-    if not gitignore.exists():
-        return False
-    text = gitignore.read_text(encoding="utf-8", errors="ignore")
-    return ".env" in text
 
 
 def swagger_check(root: Path) -> bool:
     """Verifica se swagger e condicional ao ambiente."""
-    for pattern in ["*.ts", "*.tsx", "*.js", "*.py", "*.go", "*.rs", "*.java", "*.rb", "*.php"]:
-        for f in root.rglob(pattern):
-            rel = f.relative_to(root).as_posix()
-            if any(ignore in rel for ignore in ["node_modules", "dist", ".git"]):
-                continue
-            try:
-                text = f.read_text(encoding="utf-8", errors="ignore")
-                if re.search(r'(swagger|openapi|docs|redoc)', text, re.IGNORECASE):
-                    if not re.search(r'(environment|env|app_env|NODE_ENV|APP_ENV)', text, re.IGNORECASE):
-                        return False
-            except Exception:
-                continue
-    return True
-
-
-def run_security_gate(root: Path) -> dict:
+    for f in collect_project_files(root, ["*.ts", "*.tsx", "*.js", "*.py", "*.go", "*.rs", "*.java", "*.rb", "*.php"]):
+        try:
+            text = f.read_text(encoding="utf-8", errors="ignore")
+            if re.search(r'(swagger|openapi|docs|redoc)', text, re.IGNORECASE):
+                if not re.search(r'(environment|env|app_env|NODE_ENV|APP_ENV)', text, re.IGNORECASE):
+                    return False
+        except Exception:
+            continue
+    return Truedef run_security_gate(root: Path) -> dict:
     """Executa todos os security gate checks e retorna resultados."""
     results = []
     critical = 0
@@ -634,6 +646,36 @@ if run_security:
     gate = run_security_gate(root) if (root := find_project_root(cwd)) else None
     if gate:
         msg_parts.append(f"Security Gate: {gate['verdict']} ({gate['critical']}C/{gate['high']}H)")
+
+# ── Worktree Auto-Save (prevents data loss in Agent View) ──
+try:
+    wt_script = hook_support_path("git_worktree_autosave.py")
+    if wt_script.exists():
+        subprocess.run(
+            [sys.executable, str(wt_script)],
+            env={**os.environ, "GSTACK_CWD": cwd or ""},
+            capture_output=True, text=True, timeout=30
+        )
+except (OSError, subprocess.TimeoutExpired) as e:
+    sys.stderr.write(f"[worktree-autosave] {e}\n")
+
+# ── Zombie tmux cleanup ──
+try:
+    tmux_result = subprocess.run(
+        ["tmux", "list-sessions", "-F", "#{session_name}"],
+        capture_output=True, text=True, timeout=5
+    )
+    if tmux_result.returncode == 0:
+        for session in tmux_result.stdout.splitlines():
+            session = session.strip()
+            if session.startswith("claude-team-"):
+                subprocess.run(
+                    ["tmux", "kill-session", "-t", session],
+                    capture_output=True, text=True, timeout=5
+                )
+                sys.stderr.write(f"[tmux-cleanup] killed zombie session: {session}\n")
+except (OSError, subprocess.TimeoutExpired):
+    pass  # tmux not available, skip
 
 # ── Continuous Learning v2 (ECC) — instincts.yaml ──
 def _acquire_lock_blocking(fd, retries=5, delay=0.1):

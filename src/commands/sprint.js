@@ -65,7 +65,11 @@ export async function sprintCommand(args) {
         info(`  Chronicle: ${data.chronicle.status} — ${data.chronicle.file || ""}`)
       }
     } catch (e) {
-      error(`Post-sprint falhou: ${e.message}`)
+      if (e.code === "ENOENT") {
+        error(`Post-sprint falhou: comando nao encontrado — verifique se ${pyCmd} esta instalado`)
+      } else {
+        error(`Post-sprint falhou: ${e.message}`)
+      }
       process.exit(1)
     }
   } else {

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "fs"
 import { homedir, platform } from "os"
 import { join } from "path"
-import { execSync } from "child_process"
+import { execSync, execFileSync } from "child_process"
 
 const HOME = homedir()
 const OPENCODE_HOME_DIR = join(HOME, ".opencode")
@@ -18,7 +18,7 @@ const HARNESS_PATHS = {
       const cfg = join(HOME, ".codex", "config.toml")
       const hooks = join(HOME, ".codex", "hooks")
       if (existsSync(join(HOME, ".codex")) || existsSync(cfg) || existsSync(hooks)) return true
-      try { execSync("codex --version", { stdio: "pipe", timeout: 3000 }); return true } catch { return false }
+      try { execFileSync("codex", ["--version"], { stdio: "pipe", timeout: 3000 }); return true } catch { return false }
     },
   },
   claude: {
@@ -31,7 +31,7 @@ const HARNESS_PATHS = {
         const settings = join(HOME, ".claude", "settings.json")
         const claudeMd = join(HOME, "CLAUDE.md")
         if (existsSync(join(HOME, ".claude")) || existsSync(settings) || existsSync(claudeMd)) return true
-        execSync("claude --version", { stdio: "pipe", timeout: 3000 }); return true
+        execFileSync("claude", ["--version"], { stdio: "pipe", timeout: 3000 }); return true
       } catch {
         return false
       }
@@ -53,7 +53,7 @@ const HARNESS_PATHS = {
       try {
         const cfg = join(OPENCODE_CONFIG_DIR, "opencode.json")
         if (existsSync(OPENCODE_HOME_DIR) || existsSync(OPENCODE_CONFIG_DIR) || existsSync(cfg)) return true
-        execSync("opencode --version", { stdio: "pipe", timeout: 3000 }); return true
+        execFileSync("opencode", ["--version"], { stdio: "pipe", timeout: 3000 }); return true
       } catch {
         return false
       }
@@ -66,7 +66,7 @@ const HARNESS_PATHS = {
     detect: () => {
       const dir = join(HOME, ".codeium", "windsurf")
       if (existsSync(dir)) return true
-      try { execSync("windsurf --version", { stdio: "pipe", timeout: 3000 }); return true } catch { return false }
+      try { execFileSync("windsurf", ["--version"], { stdio: "pipe", timeout: 3000 }); return true } catch { return false }
     },
   },
   gemini: {
@@ -76,7 +76,7 @@ const HARNESS_PATHS = {
     detect: () => {
       const dir = join(HOME, ".gemini")
       if (existsSync(dir) || existsSync(join(HOME, ".config", "gemini"))) return true
-      try { execSync("gemini --version", { stdio: "pipe", timeout: 3000 }); return true } catch { return false }
+      try { execFileSync("gemini", ["--version"], { stdio: "pipe", timeout: 3000 }); return true } catch { return false }
     },
   },
   kiro: {
@@ -85,7 +85,7 @@ const HARNESS_PATHS = {
     configFile: join(HOME, ".kiro", "config.json"),
     detect: () => {
       if (existsSync(join(HOME, ".kiro"))) return true
-      try { execSync("kiro --version", { stdio: "pipe", timeout: 3000 }); return true } catch { return false }
+      try { execFileSync("kiro", ["--version"], { stdio: "pipe", timeout: 3000 }); return true } catch { return false }
     },
   },
   zed: {
@@ -94,7 +94,7 @@ const HARNESS_PATHS = {
     configFile: join(HOME, ".config", "zed", "settings.json"),
     detect: () => {
       if (existsSync(join(HOME, ".config", "zed")) || existsSync(join(HOME, ".config", "zed", "settings.json"))) return true
-      try { execSync("zed --version", { stdio: "pipe", timeout: 3000 }); return true } catch { return false }
+      try { execFileSync("zed", ["--version"], { stdio: "pipe", timeout: 3000 }); return true } catch { return false }
     },
   },
 }

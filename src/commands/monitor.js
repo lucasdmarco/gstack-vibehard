@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from "fs"
 import { join, resolve } from "path"
 import { homedir } from "os"
-import { execSync } from "child_process"
+import { execSync, execFileSync } from "child_process"
 import { createInterface } from "readline"
 
 const HOME = resolve(homedir() || process.env.USERPROFILE || process.env.HOME || "/tmp")
@@ -28,7 +28,7 @@ function getAtomicViews() {
   const atomicDir = join(HOME, ".atomic")
   if (!existsSync(atomicDir)) return []
   try {
-    const result = execSync("atomic list-views 2>&1", { stdio: "pipe", timeout: 5000, encoding: "utf-8" })
+    const result = execFileSync("atomic", ["list-views"], { stdio: "pipe", timeout: 5000, encoding: "utf-8" })
     return result.trim().split("\n").filter(Boolean).map((l) => {
       const parts = l.split(/\s{2,}/)
       return { name: parts[0] || l, status: parts[1] || "active" }
@@ -64,7 +64,7 @@ function getQGBlockedCount() {
 
 function getTokenBudget() {
   try {
-    const result = execSync("ecc2 daemon status 2>&1", { stdio: "pipe", timeout: 3000, encoding: "utf-8" })
+    const result = execFileSync("ecc2", ["daemon", "status"], { stdio: "pipe", timeout: 3000, encoding: "utf-8" })
     const match = result.match(/tokens[:\s]+(\d+)/i)
     if (match) return parseInt(match[1], 10)
     return 128000
@@ -90,7 +90,7 @@ function getHarnessStatus() {
 
 function getFallowSummary() {
   try {
-    const result = execSync("npx fallow audit --format json 2>&1", { stdio: "pipe", timeout: 10000, encoding: "utf-8" })
+    const result = execFileSync("npx", ["fallow", "audit", "--format", "json"], { stdio: "pipe", timeout: 10000, encoding: "utf-8" })
     const data = JSON.parse(result)
     const issues = data.issues || data.findings || []
     return {
@@ -180,12 +180,20 @@ export async function monitorCommand() {
   render()
   interval = setInterval(render, REFRESH_INTERVAL)
 
-  const rl = createInterface({ input: process.stdin })
-  rl.on("SIGINT", () => {
-    if (interval) clearInterval(interval)
-    rl.close()
-    process.stdout.write("\n")
-    process.exit(0)
-  })
+  if (process.platform === "win32") {
+    process.on("SIGINT", () => {
+      if (interval) clearInterval(interval)
+      process.stdout.write("\n")
+      process.exit(0)
+    })
+  } else {
+    const rl = createInterface({ input: process.stdin })
+    rl.on("SIGINT", () => {
+      if (interval) clearInterval(interval)
+      rl.close()
+      process.stdout.write("\n")
+      process.exit(0)
+    })
+  }
 }
 

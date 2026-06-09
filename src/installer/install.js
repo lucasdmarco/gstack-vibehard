@@ -1,4 +1,5 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync, unlinkSync } from "fs"
+import { copyFile, mkdir } from "fs/promises"
 import { homedir, tmpdir } from "os"
 import { join, dirname } from "path"
 import { fileURLToPath } from "url"
@@ -8,7 +9,7 @@ import { installCodex } from "../harness/codex.js"
 import { installClaude } from "../harness/claude.js"
 import { installOpenCode } from "../harness/opencode.js"
 import { installHeadroom } from "../harness/headroom.js"
-import { ensureDir, copyWithBackup, copyDirSync } from "./merge.js"
+import { ensureDir, copyWithBackup, copyDirSync, backupFile } from "./merge.js"
 import { checkAlreadyInstalled } from "./check.js"
 import { installGeneratedAgentLayer, installGraphifyGitHooks } from "./agent-distribution.js"
 import { multiSelect, success, warn, error, info, section } from "../cli/index.js"
@@ -198,10 +199,7 @@ async function installDeps(run, warn, success, info, report, harnessIds) {
           execSync("winget install Rustlang.Rustup 2>&1", { stdio: "pipe", timeout: 120000 })
         } catch {
           info("winget falhou. Tentando rustup-init.exe diretamente...")
-          execSync(
-            'powershell -c "$url = \'https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe\'; $tmp = \'$env:TEMP\\rustup-init.exe\'; iwr -Uri $url -OutFile $tmp; & $tmp -y --default-toolchain stable --profile minimal"',
-            { stdio: "pipe", timeout: 180000 }
-          )
+          execFileSync("powershell", ["-c", `$url = 'https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe'; $tmp = "$env:TEMP\rustup-init.exe"; iwr -Uri $url -OutFile $tmp; & $tmp -y --default-toolchain stable --profile minimal`], { stdio: "pipe", timeout: 180000, shell: false })
         }
       } else if (isMacOS()) {
         safeDownloadAndRun("https://sh.rustup.rs", "Rustup (macOS)")
@@ -306,6 +304,16 @@ export async function install() {
   }
 
   info(`Harnesses detectados: ${harnesses.map((h) => h.label).join(", ")}`)
+  for (const h of harnesses) {
+    if (h.id === "codex") {
+      warn("Codex CLI: nao possui hooks API — Quality Gate rodara em modo Best-Effort (instrucional)")
+      warn("  O QG depende de instrucoes no AGENTS.md, nao de hooks restritivos.")
+    }
+    if (h.id === "gemini") {
+      warn("Gemini IDE: nao possui hooks API — Quality Gate rodara em modo Best-Effort (instrucional)")
+      warn("  Os agentes podem ignorar a instrucao de rodar o Fallow sem serem bloqueados.")
+    }
+  }
 
   // Step 1: Install global deps ALWAYS — before harness check
   await installDeps(run, warn, success, info, report, allHarnessIds)
@@ -370,17 +378,19 @@ export async function install() {
   if (existsSync(scriptsSource)) {
     const ext = isWindows() ? ".ps1" : ".sh"
     const scripts = readdirSync(scriptsSource).filter((f) => f.endsWith(ext))
-    for (const script of scripts) {
+    await Promise.all(scripts.map(async (script) => {
       const src = join(scriptsSource, script)
       const dst = join(scriptsDir, script)
-      copyWithBackup(src, dst)
+      ensureDir(dirname(dst))
+      if (existsSync(dst)) backupFile(dst)
+      await copyFile(src, dst)
       if (!isWindows()) {
         try {
-          execSync(`chmod +x "${dst}"`, { stdio: "pipe", timeout: 5000 })
+          execFileSync("chmod", ["+x", dst], { stdio: "pipe", timeout: 5000 })
         } catch (e) { console.error("chmod (non-critical):", e.message) }
       }
       report.added.push(`script: ${script}`)
-    }
+    }))
     success(`${scripts.length} scripts copiados para ~/.agents/scripts/`)
   } else {
     warn("scripts/scripts/ nao encontrado no pacote")
@@ -393,12 +403,14 @@ export async function install() {
   const hooksSource = join(PROJECT_ROOT, "hooks", "hooks")
   if (existsSync(hooksSource)) {
     const hooks = readdirSync(hooksSource).filter((f) => f.endsWith(".py"))
-    for (const hook of hooks) {
+    await Promise.all(hooks.map(async (hook) => {
       const src = join(hooksSource, hook)
       const dst = join(hooksDir, hook)
-      copyWithBackup(src, dst)
+      ensureDir(dirname(dst))
+      if (existsSync(dst)) backupFile(dst)
+      await copyFile(src, dst)
       report.added.push(`hook: ${hook}`)
-    }
+    }))
     success(`${hooks.length} hooks instalados em ~/.codex/hooks/`)
   } else {
     warn("hooks/hooks/ nao encontrado no pacote")

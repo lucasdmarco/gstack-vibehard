@@ -13,7 +13,7 @@ Uso:
 
 Retorno (stdout): JSON com diagnóstico completo.
 """
-import json, os, subprocess, sqlite3, sys, glob
+import json, os, subprocess, sqlite3, sys
 from pathlib import Path
 from datetime import datetime
 
@@ -211,6 +211,25 @@ def check_chronicle(root: Path) -> dict:
             for h in hits
         ],
     }
+
+
+def cleanup_zombie_tmux():
+    try:
+        result = subprocess.run(
+            ["tmux", "list-sessions", "-F", "#{session_name}"],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0:
+            for session in result.stdout.splitlines():
+                session = session.strip()
+                if session.startswith("claude-team-"):
+                    subprocess.run(
+                        ["tmux", "kill-session", "-t", session],
+                        capture_output=True, text=True, timeout=5
+                    )
+                    sys.stderr.write(f"[tmux-cleanup] killed zombie session: {session}\n")
+    except (OSError, subprocess.TimeoutExpired):
+        pass
 
 
 def main():

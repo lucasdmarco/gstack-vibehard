@@ -162,6 +162,36 @@ def run_fallow(root: Path, timeout: int) -> tuple[Any, subprocess.CompletedProce
     return raw, completed
 
 
+def run_typecheck(root: Path) -> dict:
+    """Optional: run tsc --noEmit to catch TypeScript type errors (P2 blind spot).
+
+    Returns dict with status and summary. Non-blocking — Fallow is the primary gate.
+    """
+    npx = shutil.which("npx")
+    if npx is None:
+        return {"status": "skipped", "summary": "npx not found"}
+    tsconfig = root / "tsconfig.json"
+    if not tsconfig.exists():
+        return {"status": "skipped", "summary": "no tsconfig.json"}
+    try:
+        result = subprocess.run(
+            [npx, "tsc", "--noEmit"],
+            cwd=root, capture_output=True, text=True, timeout=120
+        )
+        if result.returncode == 0:
+            return {"status": "passed", "summary": "TypeScript: no type errors"}
+        errors = len([l for l in result.stdout.splitlines() if "error" in l.lower() or "TS" in l])
+        return {
+            "status": "failed",
+            "summary": f"TypeScript: {errors} type error(s)",
+            "errors": errors,
+            "stdout": result.stdout[-2000:],
+            "stderr": result.stderr[-2000:],
+        }
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return {"status": "skipped", "summary": f"tsc failed: {e}"}
+
+
 def main() -> None:
     args = parse_args()
     root = Path(args.path).resolve()
@@ -198,6 +228,14 @@ def main() -> None:
         "auto_fixable": auto_fixable,
         "summary": f"Fallow Quality Gate: {verdict.upper()} ({len(auto_fixable)} auto-fixable issue(s))",
     }
+
+    # Optional TypeScript type check (non-blocking, covers P2 blind spot)
+    typecheck = run_typecheck(root)
+    if typecheck.get("status") == "failed":
+        result["typecheck"] = typecheck
+        result["summary"] += f" | {typecheck['summary']}"
+        sys.stderr.write(f"[qg] TypeScript: {typecheck['summary']}\n")
+
     emit(result, 0 if passed or args.log_only else 1)
 
 

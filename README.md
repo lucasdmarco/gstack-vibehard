@@ -1,4 +1,4 @@
-# 🚀 gstack-vibehard 2.1.6
+# 🚀 gstack-vibehard 2.1.7
 **A Máquina de Desenvolvimento Zero-Config Definitiva para Agentes de IA.**
 
 O `gstack-vibehard` é um **Control Plane e Instalador Cross-Harness**. Ele envelopa o seu terminal com ferramentas de elite, transformando Claude Code, Cursor, OpenCode e Codex em um ecossistema corporativo seguro, unificado e autônomo, rodando 100% na sua máquina.
@@ -7,11 +7,19 @@ Chega de alucinações, vazamentos de dados ou perda de contexto. O `gstack-vibe
 
 ---
 
-## ✨ O que há de novo na v2.1.6 (Cross-Harness Portability + RCE Elimination)
+## ✨ O que há de novo na v2.1.7 (Polimento + Governança + Bugs)
 
 - 🔌 **Fase 0–8 — Portabilidade Cross-Harness:** Paths unificados (`_paths.py`), input normalization (`_harness.py`), crash safety global, MCP config para Claude, bridge real, hooks independentes do Codex, detectores para Windsurf/Gemini/Kiro/Zed.
 - 🛡️ **RCE Elimination:** `safeDownloadAndRun` usa `param($u,$o)` no PowerShell. `headroom.js` refatorado: 0 `execSync` restantes.
 - 🧠 **Python portátil:** `sys.executable` em todos os hooks + `resolvePythonCmd()` no JS (prefere `python3`, fallback `python`).
+
+### v2.1.7 (Polimento + Governança + Bugs)
+
+- 🐛 **L1 — Bugs impeditivos:** `$env:TEMP` expande no Windows installer. SIGINT handler funcional. Doctor com timeout.
+- 🪟 **L2 — Cross-platform:** `execFileSync` em detector.js (8 harnesses). ENOENT handling no sprint. Paths normalizados.
+- ⚡ **L3 — Performance:** `collect_project_files()` cache elimina 35 rglob redundantes. Async copy loops no instalador. Version checks paralelos.
+- 📖 **L4 — Documentação:** Seção "Modo de Uso" adicionada no README.
+- 🛡️ **L5 — Governança:** `git_worktree_autosave.py` previne data loss. Warnings de graceful degradation para Codex/Gemini. `tsc --noEmit` complementa Fallow no qg.py. Limpeza de tmux zumbi no stop.py e gc.py.
 
 ### v2.1.6 (Cross-Harness Portability + RCE Elimination)
 
@@ -47,6 +55,39 @@ Chega de alucinações, vazamentos de dados ou perda de contexto. O `gstack-vibe
 - 🔌 **Guard no Session Start e Post-Sprint.**
 
 ---
+
+## 📖 Modo de Uso
+
+```bash
+# 1. Instalar globalmente
+npm install -g @gstack-vibehard/installer
+
+# 2. Diagnosticar ambiente
+gstack_vibehard doctor
+
+# 3. Instalar em harnesses detectados
+gstack_vibehard install
+
+# 4. Criar novo projeto
+gstack_vibehard create meu-projeto
+# Sem Docker/Rust: gstack_vibehard create meu-projeto --lite
+# Com template específico: gstack_vibehard create meu-projeto --template saas-auth-stripe
+
+# 5. Monitorar ambiente em tempo real
+gstack_vibehard monitor
+
+# 6. Salvar sprint (graphify + gbrain + chronicle)
+gstack_vibehard sprint --save
+
+# 7. Desinstalar
+gstack_vibehard uninstall
+```
+
+O Quality Gate roda automaticamente via hooks no final de cada sessão:
+- **Claude Code/OpenCode**: hooks restritivos (bloqueiam entrega se CRITICO/ALTO)
+- **Codex/Gemini CLI**: modo Best-Effort (instrucional — sem hooks API)
+- **Código migrado**: `execFileSync` com `shell: false` na criacao de projetos
+- **Typecheck complementar**: `qg.py` roda `npx tsc --noEmit` apos Fallow nos projetos com `tsconfig.json`
 
 ## ⚡ Instalação Rápida
 

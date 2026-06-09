@@ -1,7 +1,7 @@
 import { existsSync } from "fs"
 import { homedir } from "os"
 import { join } from "path"
-import { execSync } from "child_process"
+import { execSync, execFileSync, execFile } from "child_process"
 import { getHarness, isWindows, isMacOS, getOSLabel } from "../harness/detector.js"
 import { checkAlreadyInstalled } from "./check.js"
 import { detectHarnesses } from "../harness/detector.js"
@@ -14,26 +14,20 @@ export async function doctor() {
 
   info(`Sistema: ${getOSLabel()}`)
 
-  // Node.js
-  try {
-    const nodeVer = execSync("node --version", { encoding: "utf-8" }).trim()
-    success(`Node.js: ${nodeVer}`)
-  } catch {
-    error("Node.js: NAO ENCONTRADO")
-  }
-
-  // Python
-  try {
-    const pyVer = execSync("python --version", { encoding: "utf-8" }).trim()
-    success(`Python: ${pyVer}`)
-  } catch {
-    try {
-      const py3Ver = execSync("python3 --version", { encoding: "utf-8" }).trim()
-      success(`Python: ${py3Ver}`)
-    } catch {
-      warn("Python: NAO ENCONTRADO (necessario para hooks)")
-    }
-  }
+  // Version checks (parallel)
+  const [nodeVer, pyVer] = await Promise.all([
+    new Promise((r) => execFile("node", ["--version"], { timeout: 5000 }, (e, stdout) => r(e ? null : stdout.trim()))),
+    new Promise((r) => {
+      execFile("python", ["--version"], { timeout: 5000 }, (e, stdout) => {
+        if (!e) return r(stdout.trim())
+        execFile("python3", ["--version"], { timeout: 5000 }, (e2, stdout2) => r(e2 ? null : stdout2.trim()))
+      })
+    }),
+  ])
+  if (nodeVer) success(`Node.js: ${nodeVer}`)
+  else error("Node.js: NAO ENCONTRADO")
+  if (pyVer) success(`Python: ${pyVer}`)
+  else warn("Python: NAO ENCONTRADO (necessario para hooks)")
 
   // Harnesses
   section("Harnesses Detectados")
