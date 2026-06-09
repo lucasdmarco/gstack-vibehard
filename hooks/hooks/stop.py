@@ -16,8 +16,9 @@ Security Gate checks (BLOCKING before deploy):
 Security Gate only runs when invoked explicitly (--security-gate) or
 via deploy command detection in the session.
 """
-import json, sys, subprocess, os, re, shutil, platform, logging
+import json, sys, subprocess, os, re, shutil, platform, logging, time
 from pathlib import Path
+from typing import Optional
 
 from _output_guard import output_guard, SENSITIVE_PATTERNS, ALLOWED_ROLES_HIERARCHY
 from datetime import datetime
@@ -619,21 +620,45 @@ if run_security:
         msg_parts.append(f"Security Gate: {gate['verdict']} ({gate['critical']}C/{gate['high']}H)")
 
 # ── Continuous Learning v2 (ECC) — instincts.yaml ──
-def _acquire_lock(fd):
-    if sys.platform == "win32":
-        import msvcrt
-        msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
-    else:
-        import fcntl
-        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+def _acquire_lock_blocking(fd, retries=5, delay=0.1):
+    """Blocking lock acquisition with retry and exponential backoff.
+    
+    Raises BlockingIOError/OSError if all retries are exhausted.
+    """
+    last_exc = None
+    for attempt in range(retries):
+        try:
+            if sys.platform == "win32":
+                import msvcrt
+                msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return
+        except (BlockingIOError, OSError) as e:
+            last_exc = e
+            if attempt < retries - 1:
+                time.sleep(delay * (2 ** attempt))
+    sys.stderr.write(f"[instincts] lock falhou apos {retries} tentativas: {last_exc}\n")
+    raise last_exc  # type: ignore[misc]
+
 
 def _release_lock(fd):
-    if sys.platform == "win32":
-        import msvcrt
-        msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
-    else:
-        import fcntl
-        fcntl.flock(fd, fcntl.LOCK_UN)
+    try:
+        if sys.platform == "win32":
+            import msvcrt
+            msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(fd, fcntl.LOCK_UN)
+    except Exception as e:
+        sys.stderr.write(f"[instincts] unlock warning: {e}\n")
+
+
+def _sanitize_yaml_value(s: str) -> str:
+    """Sanitize a string value for safe YAML inline quoting."""
+    return str(s).replace('"', "'").replace("\n", " ").replace("\r", "")
+
 
 def write_instinct_entry(trigger: str, details: str, pattern: str, action: str) -> None:
     """Append a structured instinct entry to ~/.gstack/instincts.yaml.
@@ -642,48 +667,51 @@ def write_instinct_entry(trigger: str, details: str, pattern: str, action: str) 
     new security behaviors organically after each session.
 
     Uses platform-appropriate file locking to prevent race conditions
-    from concurrent sessions.
+    from concurrent sessions. The lock is BLOCKING (with retries and
+    exponential backoff), never silently skipped.
     """
     try:
         instincts_dir = Path.home() / ".gstack"
         instincts_dir.mkdir(parents=True, exist_ok=True)
         instincts_file = instincts_dir / "instincts.yaml"
 
-        entries = []
-        if instincts_file.exists():
-            raw = instincts_file.read_text(encoding="utf-8")
-            if raw.strip():
-                # Count existing entries to derive next ID
-                id_count = sum(1 for line in raw.splitlines() if line.strip().startswith("- id:"))
-            else:
-                id_count = 0
-        else:
-            id_count = 0
-
         now_iso = datetime.now().isoformat()
-        entry = f"""  - id: instinct_{id_count + 1:04d}
-    created_at: "{now_iso}"
-    trigger: {trigger}
-    context:
-      project: "{project_name}"
-      turn_id: "{turn_id}"
-      details: "{details[:200]}"
-    pattern: {pattern}
-    action: {action}
-    hits: 1
-"""
-        if id_count == 0:
-            instincts_file.write_text("instincts:\n" + entry, encoding="utf-8")
-        else:
-            with open(str(instincts_file), "a", encoding="utf-8") as f:
-                try:
-                    _acquire_lock(f.fileno())
+
+        with open(str(instincts_file), "a+", encoding="utf-8") as f:
+            _acquire_lock_blocking(f.fileno())
+            try:
+                f.seek(0)
+                raw = f.read()
+                if raw.strip():
+                    id_count = sum(1 for line in raw.splitlines() if line.strip().startswith("- id:"))
+                else:
+                    id_count = 0
+
+                def yq(s):
+                    return f'"{_sanitize_yaml_value(str(s))}"'
+
+                entry_id = f"instinct_{id_count + 1:04d}"
+                entry = (
+                    f"  - id: {yq(entry_id)}\n"
+                    f"    created_at: {yq(now_iso)}\n"
+                    f"    trigger: {yq(trigger)}\n"
+                    f"    context:\n"
+                    f"      project: {yq(project_name)}\n"
+                    f"      turn_id: {yq(turn_id)}\n"
+                    f"      details: {yq(details[:200])}\n"
+                    f"    pattern: {yq(pattern)}\n"
+                    f"    action: {yq(action)}\n"
+                    f"    hits: 1\n"
+                )
+
+                if id_count == 0:
+                    f.seek(0)
+                    f.truncate()
+                    f.write("instincts:\n" + entry)
+                else:
                     f.write(entry)
-                finally:
-                    try:
-                        _release_lock(f.fileno())
-                    except Exception:
-                        pass
+            finally:
+                _release_lock(f.fileno())
     except Exception as e:
         sys.stderr.write(f"[instincts] erro nao critico: {e}\n")
 
@@ -799,7 +827,7 @@ def gitops_issue_create(fallow: dict, instincts_path: Path) -> Optional[str]:
         "",
         f"**Turno:** {turn_id}",
         f"**Data:** {datetime.now().isoformat()}",
-        f"**Diretorio:** {cwd}",
+        f"**Projeto:** {project_name}",
         "",
         "### Gatilhos",
         "",
@@ -820,15 +848,23 @@ def gitops_issue_create(fallow: dict, instincts_path: Path) -> Optional[str]:
     body_lines.append("---")
     body_lines.append(f"_Issue gerada automaticamente por gstack_vibehard `stop.py`_")
 
+    body_text = "\n".join(body_lines)
     title = f"[gstack] {reasons[0][:120]}"
     if len(reasons) > 1:
         title += f" (+{len(reasons)-1})"
+
+    # Run body through Output Guard before publishing to GitHub
+    user_role = os.environ.get("GSTACK_USER_ROLE", "viewer")
+    blocked, guard_reason = output_guard(body_text, user_role)
+    if blocked:
+        sys.stderr.write(f"[gitops] issue nao criada — Output Guard bloqueou: {guard_reason}\n")
+        return None
 
     try:
         result = subprocess.run(
             [gh_bin, "issue", "create",
              "--title", title,
-             "--body", "\n".join(body_lines),
+             "--body", body_text,
              "--label", "gstack-automation,bug"],
             capture_output=True, text=True, timeout=30,
         )
@@ -880,7 +916,12 @@ def gitops_pr_create(summary_text: str, root: Optional[Path]) -> Optional[str]:
         subprocess.run(["git", "add", "-A"],
                        cwd=str(root), capture_output=True, text=True, timeout=15)
         commit_msg = f"[gstack] {summary_text[:100]}"
-        subprocess.run(["git", "commit", "-m", commit_msg, "--no-verify"],
+        allow_dirty = os.environ.get("GSTACK_ALLOW_DIRTY_COMMIT", "") == "1"
+        commit_cmd = ["git", "commit", "-m", commit_msg]
+        if allow_dirty:
+            commit_cmd.append("--no-verify")
+            sys.stderr.write("[gitops] GSTACK_ALLOW_DIRTY_COMMIT=1 — hooks de pre-commit ignorados\n")
+        subprocess.run(commit_cmd,
                        cwd=str(root), capture_output=True, text=True, timeout=30)
         sys.stderr.write(f"[gitops] Commit local criado no branch '{branch_name}'.\n")
         sys.stderr.write(f"[gitops]  Revise e push manualmente: git push origin {branch_name}\n")
@@ -898,7 +939,13 @@ if gh_bin:
     if root_path and gitops_available():
         if stop_failed:
             instincts_file = Path.home() / ".gstack" / "instincts.yaml"
-            gitops_issue_create(fallow_result, instincts_file)
+            if os.environ.get("GSTACK_AUTO_ISSUE", "") == "1":
+                gitops_issue_create(fallow_result, instincts_file)
+            else:
+                sys.stderr.write(
+                    "[gitops] Issue automatica desativada. "
+                    "Defina GSTACK_AUTO_ISSUE=1 para ativar.\n"
+                )
         else:
             # Only create PRs on successful sessions with meaningful work
             gitops_pr_create(summary, root_path)
