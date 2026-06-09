@@ -8,6 +8,7 @@ import {
   writeFileSync,
   readFileSync,
   unlinkSync,
+  symlinkSync,
 } from "node:fs"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -358,9 +359,27 @@ index = "hnsw"
 }
 
 function bootGraphify(logger, exec, projectDir) {
-  const out = safeExec(exec, "npx graphify hook install", { cwd: projectDir })
-  if (out) logger.success("Graphify hooks instalados — AST gerada a cada commit")
-  else logger.warn("Graphify hook install falhou — AST indexacao desativada")
+  try {
+    const out = safeExec(exec, "npx graphify hook install", { cwd: projectDir })
+    if (out) {
+      logger.success("Graphify hooks instalados — AST gerada a cada commit")
+    } else {
+      logger.warn("Graphify falhou (sem erro) — AST indexacao desativada")
+    }
+  } catch (e) {
+    logger.warn(`Otimizacao de contexto desativada temporariamente: Graphify — ${e.message}`)
+  }
+}
+
+function bootHeadroom(logger, exec, projectDir) {
+  try {
+    const out = safeExec(exec, "npx -y @gstack/headroom-proxy --check", { cwd: projectDir })
+    if (out) {
+      logger.success("Headroom proxy operacional — compressao de contexto ativa")
+    }
+  } catch (e) {
+    logger.warn(`Otimizacao de contexto desativada temporariamente: Headroom — ${e.message}`)
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -730,6 +749,7 @@ function writeHarnessFiles(projectDir, projectName) {
   mkdirSync(join(projectDir, ".cursor", "rules"), { recursive: true })
   mkdirSync(join(projectDir, ".windsurf", "rules"), { recursive: true })
   mkdirSync(join(projectDir, ".claude", "agents"), { recursive: true })
+  mkdirSync(join(projectDir, ".claude", "workflows"), { recursive: true })
 
   writeFileSync(join(projectDir, ".cursor", "rules", "gstack.mdc"),
 `# ${projectName}
@@ -745,11 +765,37 @@ Run the project quality gate before final delivery:
   npx fallow audit --format json
 `)
 
+  writeFileSync(join(projectDir, ".claude", "workflows", "deploy.js"),
+`// ${projectName} — Deploy workflow (Claude Code /effort ultracode)
+// Use /effort ultracode to activate this workflow for complex tasks.
+// GStack deploy checklist: security gate -> build -> qg -> ship
+
+const workflow = {
+  name: "deploy",
+  description: "Deploy pipeline with security gate, build, QG, and ship",
+  triggers: ["deploy", "release", "publish"],
+  steps: [
+    { action: "run security gate", expected: "all checks pass" },
+    { action: "build project", expected: "exit code 0" },
+    { action: "run quality gate", expected: "no CRITICO/ALTO blockers" },
+    { action: "deploy to production", expected: "deploy URL" },
+  ],
+  recovery: [
+    { when: "security gate fails", action: "fix all CRITICO/ALTO items before retry" },
+    { when: "build fails", action: "check build logs and fix compilation errors" },
+    { when: "QG blocks", action: "fix blocking items or mark auto_fixable for AI correction" },
+  ],
+};
+
+export default workflow;
+`)
+
   writeFileSync(join(projectDir, ".clinerules"),
 `# ${projectName}
 
 Respect AGENTS.md and .gstack/*.json as source of truth.
 Quality gate before shipping: npx fallow audit --format json
+For complex multi-step tasks, use /effort ultracode to activate dynamic JS workflows.
 `)
 
   writeFileSync(join(projectDir, "AGENTS.md"),
@@ -767,13 +813,17 @@ Quality gate before shipping: npx fallow audit --format json
 - Mesh Federation: AgentMemory P2P (BM25 + Vector + Graph sync)
 - Ticket Orchestration: Paperclip / Symphony (Jira/Linear integration)
 - Omniharness: Claude, Cursor, Codex, Windsurf, OpenCode, Gemini, Kiro, Antigravity, Zed, Hermes, Trae
+- Coverage Gaps: fallow coverage setup (hot/cold path analysis)
+- Workflows: .claude/workflows/ (ativar com /effort ultracode)
 
 ## Commands
 - Dev: pnpm dev
 - Managed dev: scripts/dev.sh
 - Quality gate: npx fallow audit --format json
+- Coverage gaps: pnpm coverage:gaps
 - Tickets: paperclip status
 - IAM: http://localhost:8000 (admin/123)
+- Workflows: /effort ultracode (para tarefas complexas)
 
 ## auto_fixable
 A IA corrige automaticamente bugs estruturais detectados pelo fallow.
@@ -856,6 +906,234 @@ Enable a team:
 }
 
 // ─────────────────────────────────────────────────────────────
+//  Vertical Templates
+// ─────────────────────────────────────────────────────────────
+
+function scaffoldVerticalTemplate(templateName, projectDir, projectName, logger) {
+  const t = (name) => join(projectDir, name)
+  const e = () => ensureGstackDir(projectDir)
+
+  switch (templateName) {
+    case "saas-auth-stripe":
+      e()
+      mkdirSync(t("apps/web"), { recursive: true })
+      mkdirSync(t("apps/api"), { recursive: true })
+      mkdirSync(t("packages/db"), { recursive: true })
+      mkdirSync(t("packages/shared"), { recursive: true })
+
+      writeFileSync(t("package.json"), JSON.stringify({
+        name: projectName, private: true, type: "module",
+        scripts: { dev: "concurrently \"pnpm dev:web\" \"pnpm dev:api\"", build: "pnpm -r build" },
+        dependencies: { "next": "^15", "react": "^19", "react-dom": "^19", "@supabase/supabase-js": "^2", "stripe": "^17", "@stripe/stripe-js": "^5", "trpc": "^11", "@trpc/next": "^11", "@trpc/react-query": "^11", "zod": "^3" },
+        devDependencies: { "typescript": "^5", "concurrently": "^9", "@types/react": "^19", "@types/node": "^22" },
+      }, null, 2))
+
+      writeFileSync(t(".env.example"), [
+        "# Supabase", "NEXT_PUBLIC_SUPABASE_URL=change-me", "NEXT_PUBLIC_SUPABASE_ANON_KEY=change-me",
+        "# Stripe", "STRIPE_SECRET_KEY=sk_test_change-me", "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_change-me", "STRIPE_WEBHOOK_SECRET=whsec_change-me",
+        "# App", "APP_URL=http://localhost:3000", "",
+      ].join("\n"))
+
+      writeFileSync(t("apps/api/src/auth.ts"), [
+        "import { createClient } from '@supabase/supabase-js'",
+        "import Stripe from 'stripe'",
+        `const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)`,
+        `const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)`,
+        "export async function createCheckoutSession(userId: string, priceId: string) {",
+        "  const session = await stripe.checkout.sessions.create({",
+        "    mode: 'subscription', line_items: [{ price: priceId, quantity: 1 }],",
+        "    client_reference_id: userId,",
+        "    success_url: `${process.env.APP_URL}/dashboard`, cancel_url: `${process.env.APP_URL}/pricing`,",
+        "  })",
+        "  return session",
+        "}",
+        "export async function handleStripeWebhook(rawBody: Buffer, signature: string) {",
+        "  const event = stripe.webhooks.constructEvent(rawBody, signature, process.env.STRIPE_WEBHOOK_SECRET!)",
+        "  if (event.type === 'checkout.session.completed') {",
+        "    const userId = event.data.object.client_reference_id",
+        "    await supabase.from('subscriptions').upsert({ user_id: userId, status: 'active' })",
+        "  }",
+        "  return event",
+        "}",
+      ].join("\n"))
+
+      logger.success(`Template SaaS (Next.js + Supabase + Stripe) scaffolded`)
+      break
+
+    case "mobile-backend":
+      e()
+      mkdirSync(t("apps/mobile"), { recursive: true })
+      mkdirSync(t("apps/api"), { recursive: true })
+      mkdirSync(t("packages/db"), { recursive: true })
+
+      writeFileSync(t("package.json"), JSON.stringify({
+        name: projectName, private: true,
+        scripts: {
+          "dev:mobile": "cd apps/mobile && npx expo start",
+          "dev:api": "cd apps/api && pnpm dev",
+          "db:push": "cd packages/db && pnpm drizzle-kit push",
+          "db:generate": "cd packages/db && pnpm drizzle-kit generate",
+        },
+        dependencies: {
+          "expo": "~52", "react": "^19", "react-native": "^0.76", "@tanstack/react-query": "^5",
+          "@trpc/client": "^11", "@trpc/server": "^11", "zod": "^3",
+          "@react-navigation/native": "^7", "@react-navigation/native-stack": "^7",
+          "expo-router": "~4", "expo-secure-store": "~14",
+        },
+        devDependencies: { "typescript": "^5", "@types/react": "^19" },
+      }, null, 2))
+
+      mkdirSync(t("apps/mobile/app"), { recursive: true })
+      writeFileSync(t("apps/mobile/app/_layout.tsx"), [
+        "import { Stack } from 'expo-router'",
+        "import { QueryClient, QueryClientProvider } from '@tanstack/react-query'",
+        "import { trpc, trpcClient } from '../lib/trpc'",
+        "const queryClient = new QueryClient()",
+        "export default function RootLayout() {",
+        "  return (",
+        "    <trpc.Provider client={trpcClient} queryClient={queryClient}>",
+        "      <QueryClientProvider client={queryClient}>",
+        "        <Stack />",
+        "      </QueryClientProvider>",
+        "    </trpc.Provider>",
+        "  )",
+        "}",
+      ].join("\n"))
+
+      writeFileSync(t("apps/api/src/index.ts"), [
+        "import { initTRPC } from '@trpc/server'",
+        "import { z } from 'zod'",
+        "import { createHTTPServer } from '@trpc/server/adapters/standalone'",
+        "",
+        "const t = initTRPC.create()",
+        "const appRouter = t.router({",
+        "  health: t.procedure.query(() => ({ status: 'ok', timestamp: new Date().toISOString() })),",
+        "  hello: t.procedure.input(z.object({ name: z.string() })).query(({ input }) => ({ message: `Hello ${input.name}` })),",
+        "})",
+        "",
+        "export type AppRouter = typeof appRouter",
+        "createHTTPServer({ router: appRouter, port: 3000 }).listen()",
+        "console.log('tRPC API running on http://localhost:3000')",
+      ].join("\n"))
+
+      writeFileSync(t("apps/mobile/lib/trpc.ts"), [
+        "import { createTRPCReact } from '@trpc/react'",
+        "import type { AppRouter } from '../../api/src/index'",
+        "export const trpc = createTRPCReact<AppRouter>()",
+        "export const trpcClient = trpc.createClient({ url: 'http://localhost:3000' })",
+      ].join("\n"))
+
+      writeFileSync(t(".env.example"), [
+        "# API", "API_URL=http://localhost:3000",
+        "# Database", "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/project",
+        "# Expo", "EXPO_PUBLIC_API_URL=http://localhost:3000", "",
+      ].join("\n"))
+
+      logger.success(`Template Mobile (Expo + tRPC + PostgreSQL) scaffolded`)
+      break
+
+    case "ai-agent-platform":
+      e()
+      mkdirSync(t("agents"), { recursive: true })
+      mkdirSync(t("tools"), { recursive: true })
+      mkdirSync(t("memory"), { recursive: true })
+      mkdirSync(t("api"), { recursive: true })
+
+      writeFileSync(t("pyproject.toml"), [
+        "[project]", `name = "${projectName}"`, "version = \"0.1.0\"",
+        "requires-python = \">=3.11\"",
+        "dependencies = [",
+        "  \"langgraph>=0.3\", \"langchain>=0.3\", \"llama-index>=0.12\",",
+        "  \"chromadb>=0.6\", \"openai>=1.0\", \"fastapi>=0.115\",",
+        "  \"uvicorn[standard]\", \"pydantic>=2\", \"httpx>=0.28\"",
+        "]", "",
+      ].join("\n"))
+
+      writeFileSync(t("agents/research_agent.py"), [
+        "from langgraph.graph import StateGraph, MessagesState",
+        "from langchain_openai import ChatOpenAi",
+        "",
+        "llm = ChatOpenAi(model=\"gpt-4o\")",
+        "",
+        "def research_node(state: MessagesState) -> MessagesState:",
+        '    """Pesquisa e sintetiza informacao sobre um topico."""',
+        "    response = llm.invoke(state[\"messages\"])",
+        "    return {\"messages\": [response]}",
+        "",
+        "graph = StateGraph(MessagesState)",
+        "graph.add_node(\"research\", research_node)",
+        "graph.add_edge(\"__start__\", \"research\")",
+        "graph.add_edge(\"research\", \"__end__\")",
+        "app = graph.compile()",
+        "",
+        'if __name__ == \"__main__\":',
+        '    result = app.invoke({\"messages\": [(\"user\", \"Pesquise sobre gVisor e Firecracker\")]})',
+        "    print(result[\"messages\"][-1].content)",
+      ].join("\n"))
+
+      writeFileSync(t("agents/supervisor.py"), [
+        "from langgraph.graph import StateGraph, MessagesState",
+        "from typing import Literal",
+        "",
+        "def supervisor(state: MessagesState) -> Literal[\"research\", \"code\", \"end\"]:",
+        "    last = state[\"messages\"][-1].content.lower()",
+        "    if \"pesquis\" in last or \"search\" in last:",
+        '        return "research"',
+        "    if \"cod\" in last or \"code\" in last or \"implement\" in last:",
+        '        return "code"',
+        '    return "end"',
+        "",
+      ].join("\n"))
+
+      writeFileSync(t("memory/vector_store.py"), [
+        "from chromadb import PersistentClient",
+        "from chromadb.utils import embedding_functions",
+        "",
+        "client = PersistentClient(path=\"./chroma_db\")",
+        "ef = embedding_functions.DefaultEmbeddingFunction()",
+        "collection = client.get_or_create_collection(name=\"agent_memory\", embedding_function=ef)",
+        "",
+        "def store_memory(key: str, content: str, metadata: dict | None = None):",
+        "    collection.add(documents=[content], ids=[key], metadatas=[metadata])",
+        "",
+        "def query_memory(query: str, n: int = 5):",
+        "    return collection.query(query_texts=[query], n_results=n)",
+        "",
+      ].join("\n"))
+
+      writeFileSync(t("api/main.py"), [
+        "from fastapi import FastAPI",
+        "from pydantic import BaseModel",
+        "",
+        "app = FastAPI(title=\"AI Agent Platform\")",
+        "",
+        "class Query(BaseModel):",
+        "    message: str",
+        "    thread_id: str | None = None",
+        "",
+        "@app.post(\"/chat\")",
+        "async def chat(query: Query):",
+        '    return {\"response\": \"Processed\", \"thread\": query.thread_id}',
+        "",
+        "@app.get(\"/health\")",
+        "async def health():",
+        '    return {\"status\": \"ok\"}',
+        "",
+      ].join("\n"))
+
+      writeFileSync(t(".env.example"), [
+        "# LLM", "OPENAI_API_KEY=change-me", "ANTHROPIC_API_KEY=change-me",
+        "# Vector DB", "CHROMA_DB_PATH=./chroma_db",
+        "# API", "API_PORT=8000",
+        "# LangSmith (observability)", "LANGSMITH_TRACING=true", "LANGSMITH_API_KEY=change-me", "",
+      ].join("\n"))
+
+      logger.success(`Template AI Agent Platform (LangGraph + ChromaDB + FastAPI) scaffolded`)
+      break
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
 //  createProject — DAG Boot Sequencial Estrito
 // ─────────────────────────────────────────────────────────────
 
@@ -868,8 +1146,27 @@ export async function createProject(options = {}) {
   const execSync = options.execSync || defaultExecSync
   const now = options.now || (() => new Date().toISOString())
 
+  // Parse --template flag
+  const templateFlagIndex = args.findIndex((a) => a === "--template")
+  const templateName = templateFlagIndex !== -1 && args[templateFlagIndex + 1]
+    ? args[templateFlagIndex + 1]
+    : "fullstack-monorepo"
+
+  const VALID_TEMPLATES = {
+    "fullstack-monorepo": { label: "Fullstack (React + Express + Supabase)", default: true },
+    "saas-auth-stripe": { label: "SaaS (Next.js + Supabase + Stripe)", default: false },
+    "mobile-backend": { label: "Mobile (Expo + tRPC + PostgreSQL)", default: false },
+    "ai-agent-platform": { label: "AI Agent Platform (LangGraph + Vector DB)", default: false },
+  }
+
+  if (!VALID_TEMPLATES[templateName]) {
+    throw new Error(
+      `Template invalido: "${templateName}". Validos: ${Object.keys(VALID_TEMPLATES).join(", ")}`
+    )
+  }
+
   if (!projectName) {
-    throw new Error("Uso: gstack_vibehard create <nome-do-app>")
+    throw new Error(`Uso: gstack_vibehard create <nome-do-app> [--template ${Object.keys(VALID_TEMPLATES).join("|")}]`)
   }
 
   const projectDir = join(cwd, projectName)
@@ -897,9 +1194,13 @@ export async function createProject(options = {}) {
   bootGraphify(logger, execSync, projectDir)
   phases.daemons = { status: "configured" }
 
-  console.log(`\n  === Fase 4/5: Omniharness (${OMNIHARNESS_MAP.length} IDEs) ===`)
-  const templateRoot = join(projectRoot, "templates", "templates", "fullstack-monorepo")
-  copyRecursive(templateRoot, projectDir)
+  console.log(`\n  === Fase 4/5: Scaffold ${templateName} (${OMNIHARNESS_MAP.length} IDEs) ===`)
+  if (templateName === "fullstack-monorepo") {
+    const templateRoot = join(projectRoot, "templates", "templates", "fullstack-monorepo")
+    copyRecursive(templateRoot, projectDir)
+  } else {
+    scaffoldVerticalTemplate(templateName, projectDir, projectName, logger)
+  }
   writeRuntimeFiles({ projectDir, projectName, now, projectRoot })
   writeSkillsDir(projectDir)
   injectOmniharness(logger, execSync, projectDir)
@@ -912,13 +1213,76 @@ export async function createProject(options = {}) {
   writePaperclipManifest(projectDir, projectName)
   writeCasdoorProjectConfig(projectDir)
 
-  logger.success(`Projeto '${projectName}' criado`)
+  // ── Boot Headroom (non-critical, wrapped in try/catch) ──
+  bootHeadroom(logger, execSync, projectDir)
+
+  // ── Obsidian Vault Global: project subfolder + graph.json symlink ──
+  const vaultDir = join(homedir(), "gstack-vault")
+  const vaultProjectDir = join(vaultDir, "projects", projectName)
+  mkdirSync(vaultProjectDir, { recursive: true })
+  logger.info(`Vault project: ${vaultProjectDir}`)
+
+  // Symlink graphify-out/graph.json into vault (if graphify has run)
+  const graphSource = join(projectDir, "graphify-out", "graph.json")
+  const graphTarget = join(vaultProjectDir, "graph.json")
+  try {
+    if (existsSync(graphSource)) {
+      // Remove stale symlink/file at target before linking
+      try { unlinkSync(graphTarget) } catch {}
+      try {
+        symlinkSync(graphSource, graphTarget, "file")
+        logger.success(`Graph symlink: ${graphTarget} → ${graphSource}`)
+      } catch {
+        // Fallback: copy if symlink not supported (Windows without admin/elevation)
+        copyFileSync(graphSource, graphTarget)
+        logger.info(`Graph copied: ${graphTarget}`)
+      }
+    } else {
+      // Create placeholder so vault always has the file structure
+      writeFileSync(graphTarget, JSON.stringify({ nodes: [], edges: [], project: projectName, created_at: now(), status: "pending" }, null, 2))
+      logger.info(`Graph placeholder: ${graphTarget} (aguardando graphify)`)
+
+      // Write a post-init script that will symlink once graphify runs
+      const postInitScript = join(projectDir, "scripts", "link-vault.sh")
+      mkdirSync(dirname(postInitScript), { recursive: true })
+      writeFileSync(postInitScript, [
+        "#!/bin/sh",
+        `# Auto-generated: link graph.json to ${vaultProjectDir}`,
+        `VAULT_TARGET="${vaultProjectDir}/graph.json"`,
+        `GRAPH_SOURCE="${projectDir}/graphify-out/graph.json"`,
+        'if [ -f "$GRAPH_SOURCE" ]; then',
+        '  ln -sf "$GRAPH_SOURCE" "$VAULT_TARGET" 2>/dev/null || cp "$GRAPH_SOURCE" "$VAULT_TARGET"',
+        '  echo "Vault graph link: $VAULT_TARGET"',
+        'fi',
+      ].join("\n") + "\n")
+
+      // Windows variant
+      const postInitPs1 = join(projectDir, "scripts", "link-vault.ps1")
+      writeFileSync(postInitPs1, [
+        "# Auto-generated: link graph.json to vault",
+        `$vaultTarget = "${vaultProjectDir.replace(/\\/g, '\\\\')}\\graph.json"`,
+        `$graphSource = "${projectDir.replace(/\\/g, '\\\\')}\\graphify-out\\graph.json"`,
+        "if (Test-Path $graphSource) {",
+        "  Remove-Item -Force $vaultTarget -ErrorAction SilentlyContinue",
+        "  New-Item -ItemType SymbolicLink -Path $vaultTarget -Target $graphSource -ErrorAction SilentlyContinue | Out-Null",
+        '  if (-not (Test-Path $vaultTarget)) { Copy-Item $graphSource $vaultTarget -Force }',
+        '  Write-Host "Vault graph link: $vaultTarget"',
+        "}",
+      ].join("\n") + "\n")
+    }
+  } catch (e) {
+    logger.warn(`Vault graph symlink: ${e.message} (non-blocking)`)
+  }
+
+  logger.success(`Projeto '${projectName}' criado (template: ${templateName})`)
   logger.info(`  Diretorio: ${projectDir}`)
+  logger.info(`  Template: ${templateName}`)
   logger.info(`  IAM: http://localhost:8000 (admin/123)`)
+  logger.info(`  Vault: ${vaultProjectDir}`)
   logger.info(`  Quality gate: npx fallow audit --format json`)
   logger.info(`  Dev: cd ${projectName} && pnpm dev`)
 
-  return { projectDir, phases }
+  return { projectDir, phases, vaultDir: vaultProjectDir, template: templateName }
 }
 
 export async function createCommand(args) {

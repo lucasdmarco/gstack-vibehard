@@ -7,6 +7,7 @@ import { doctor } from "../installer/doctor.js"
 import { createCommand } from "./create.js"
 import { initCommand } from "../commands/init.js"
 import { sprintCommand } from "../commands/sprint.js"
+import { monitorCommand } from "../commands/monitor.js"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const pkg = JSON.parse(readFileSync(resolve(__dirname, "../../package.json"), "utf-8"))
@@ -81,6 +82,7 @@ export function showHelp() {
   console.log(color("    gstack_vibehard init <nome>    Criar novo projeto com estrutura completa", COLORS.cyan))
   console.log(color("    gstack_vibehard doctor         Diagnosticar ambiente", COLORS.cyan))
   console.log(color("    gstack_vibehard sprint --save   Salvar decisoes e atualizar memorias", COLORS.cyan))
+  console.log(color("    gstack_vibehard monitor        TUI: agentes, tokens, QG, ROI", COLORS.cyan))
   console.log(color("    gstack_vibehard uninstall      Remover gstack_vibehard do ambiente", COLORS.cyan))
   console.log(color("    gstack_vibehard list           Listar componentes instalados", COLORS.cyan))
   console.log(color("    gstack_vibehard help           Mostrar esta ajuda\n", COLORS.cyan))
@@ -130,6 +132,9 @@ export async function runCLI(command, args) {
       break
     case "list":
       console.log(color("  List ainda nao implementado.", COLORS.yellow))
+      break
+    case "monitor":
+      await monitorCommand()
       break
     case "help":
       showHelp()

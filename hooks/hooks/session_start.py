@@ -330,6 +330,20 @@ if chronicle_index:
             extra.append(f"- {h['project']}: {h['summary'][:200]}")
         ctx_parts.append(f"## Memorias relacionadas a '{project_name}'\n" + "\n".join(extra))
 
+# 2b. MOM basal reading (macOS only)
+mom_bin = shutil.which("mom")
+if mom_bin:
+    try:
+        mom_basal = subprocess.run(
+            [mom_bin, "read", "--basal"],
+            capture_output=True, text=True, timeout=10
+        )
+        if mom_bin and mom_basal.returncode == 0 and mom_basal.stdout.strip():
+            basal_text = mom_basal.stdout.strip()[:800]
+            ctx_parts.append(f"## MOM Basal Memory\n{basal_text}")
+    except (subprocess.TimeoutExpired, OSError):
+        pass  # MOM is advisory; never block session start on it
+
 # 3. MCP servers
 config_toml = Path.home() / ".codex" / "config.toml"
 if config_toml.exists():

@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, unlinkSync } from "fs"
+import { existsSync, readdirSync, readFileSync, writeFileSync, unlinkSync } from "fs"
 import { homedir, tmpdir } from "os"
 import { join, dirname } from "path"
 import { fileURLToPath } from "url"
@@ -269,6 +269,11 @@ async function installDeps(run, warn, success, info, report, harnessIds) {
   }
 
   // ========================================
+  // CLI-Anything Hub (dynamic CLI download for agents)
+  // ========================================
+  run("npm install -g cli-anything-hub", "cli-anything-hub (npm global)")
+
+  // ========================================
   // Headroom (context compression proxy)
   // ========================================
   await installHeadroom({
@@ -495,6 +500,86 @@ export async function install() {
       report.added.push("launcher: gstack_vibehard-install.sh")
       success("Launcher Linux copiado para ~/gstack_vibehard-install.sh")
     }
+  }
+
+  // Step 11: Obsidian Vault Global (Segundo Cerebro)
+  section("vault/ — Obsidian Vault Global (Segundo Cerebro)")
+  const vaultDir = join(HOME, "gstack-vault")
+  ensureDir(vaultDir)
+  ensureDir(join(vaultDir, "projects"))
+  ensureDir(join(vaultDir, "chats"))
+  ensureDir(join(vaultDir, "agents"))
+  ensureDir(join(vaultDir, "graph"))
+  ensureDir(join(vaultDir, ".obsidian"))
+  info(`Vault global em: ${vaultDir}`)
+  report.added.push("vault: ~/gstack-vault")
+
+  // .obsidian/app.json — configuracoes basicas do vault
+  const obsidianConfig = {
+    "promptDelete": false,
+    "alwaysUpdateLinks": true,
+    "newFileLocation": "current",
+    "attachmentFolderPath": "./attachments",
+    "showUnsupportedFiles": true,
+    "userIgnoreFilters": ["node_modules", ".git", "dist"]
+  }
+  const obsidianAppJson = join(vaultDir, ".obsidian", "app.json")
+  writeFileSync(obsidianAppJson, JSON.stringify(obsidianConfig, null, 2) + "\n")
+  report.added.push("vault: .obsidian/app.json configurado")
+  success("Cofre Obsidian configurado em ~/gstack-vault")
+
+  // Vault README de boas-vindas
+  const vaultReadme = join(vaultDir, "README.md")
+  if (!existsSync(vaultReadme)) {
+    writeFileSync(vaultReadme, [
+      "---",
+      "tags: [gstack-vault, segundo-cerebro]",
+      "---",
+      "",
+      "# gstack-vault — Segundo Cerebro Global",
+      "",
+      "Este vault Obsidian e o centro nervoso do ecossistema gstack_vibehard.",
+      "",
+      "## Estrutura",
+      "",
+      "- `projects/` — subpastas com `graph.json` (symlink) de cada projeto ativo",
+      "- `chats/` — historico de sessoes processado pelo Chat Import Pipeline",
+      "- `agents/` — memorias e decisoes dos agentes especialistas",
+      "- `graph/` — grafos globais e exportacoes federadas do AgentMemory",
+      "",
+      "## Nota",
+      "Editado por agentes automaticamente. Nao edite manualmente a menos que",
+      "saiba exatamente o que esta fazendo.",
+      "",
+      "## Integracoes",
+      "",
+      "- **AgentMemory (MD Obsidian Export)** — banco vetorial espelha memorias em .md",
+      "- **Graphify** — graph.json de cada projeto linkado simbolicamente",
+      "- **Chat Import Pipeline** — logs de sessoes → wikilinks → notas permanentes",
+      "- **GitOps** — falhas CRITICAS viram Issues; documentacao nova vira PRs",
+      "",
+    ].join("\n") + "\n")
+    report.added.push("vault: README.md criado")
+    success("README do vault criado")
+  }
+
+  // AgentMemory MD Obsidian Export: configura export path para o vault
+  // AgentMemory suporta AGENTMEMORY_MD_EXPORT_PATH para espelhar memorias em .md
+  const codexConfigDir = join(HOME, ".codex")
+  if (existsSync(codexConfigDir)) {
+    const codexEnv = join(codexConfigDir, ".env")
+    const envLine = `\n# AgentMemory MD Obsidian Export — espelha memorias no vault global\nAGENTMEMORY_MD_EXPORT_PATH=${vaultDir}/agents\n`
+    if (existsSync(codexEnv)) {
+      const currentEnv = readFileSync(codexEnv, "utf-8")
+      if (!currentEnv.includes("AGENTMEMORY_MD_EXPORT_PATH")) {
+        writeFileSync(codexEnv, currentEnv.trimEnd() + "\n" + envLine)
+        report.updated.push("vault: AGENTMEMORY_MD_EXPORT_PATH em ~/.codex/.env")
+      }
+    } else {
+      writeFileSync(codexEnv, envLine.trimStart() + "\n")
+      report.added.push("vault: ~/.codex/.env criado com AGENTMEMORY_MD_EXPORT_PATH")
+    }
+    success("AgentMemory configurado para exportar .md para o vault")
   }
 
   // Report

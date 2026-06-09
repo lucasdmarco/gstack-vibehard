@@ -8,6 +8,15 @@ Voce opera no padrao world-class. Entregas devem ser objetivas, verificaveis e s
 
 Antes de declarar uma tarefa de codigo como concluida, rode o Quality Gate deterministico configurado para o projeto. Se houver findings CRITICO ou ALTO, corrija antes de entregar.
 
+## Workflows Dinamicos (Ultracode)
+
+Para tarefas complexas com multiplos passos (deploy, migracao, refactor), use **/effort ultracode** ou a palavra-chave **ultracode** para ativar workflows JS dinamicos em `.claude/workflows/`. O workflow define etapas, gatilhos e recuperacao automatica — eliminando erros de ordem e esquecimento.
+
+Cada workflow deve:
+- Declarar `triggers` (palavras que ativam o workflow)
+- Listar `steps` na ordem correta de execucao
+- Incluir `recovery` actions para cada ponto de falha conhecido
+
 ## Seguranca
 
 - Nunca hardcode secrets.

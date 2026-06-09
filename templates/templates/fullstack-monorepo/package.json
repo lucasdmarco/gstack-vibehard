@@ -21,8 +21,10 @@
     "db-turso:generate": "cd packages/db-turso && npx drizzle-kit generate",
     "db-turso:push": "cd packages/db-turso && npx drizzle-kit push",
     "db-turso:seed": "tsx packages/db-turso/src/seed.ts",
+    "coverage:gaps": "fallow coverage setup --yes --json",
     "setup:repo": "powershell -File scripts/setup-repo.ps1",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "postinstall": "fallow coverage setup --yes --json || true"
   },
   "devDependencies": {
     "turbo": "^2.4.0",
