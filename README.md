@@ -1,4 +1,4 @@
-# 🚀 gstack-vibehard 2.1.5
+# 🚀 gstack-vibehard 2.1.6
 **A Máquina de Desenvolvimento Zero-Config Definitiva para Agentes de IA.**
 
 O `gstack-vibehard` é um **Control Plane e Instalador Cross-Harness**. Ele envelopa o seu terminal com ferramentas de elite, transformando Claude Code, Cursor, OpenCode e Codex em um ecossistema corporativo seguro, unificado e autônomo, rodando 100% na sua máquina.
@@ -7,15 +7,26 @@ Chega de alucinações, vazamentos de dados ou perda de contexto. O `gstack-vibe
 
 ---
 
-## ✨ O que há de novo na v2.1.5 (Transcript Output Guard + timeout fix)
+## ✨ O que há de novo na v2.1.6 (Cross-Harness Portability + RCE Elimination)
 
-- 🛡️ **Transcript Scanning:** Output Guard agora escaneia o transcript JSONL real do agente (mensagens + tool_results), não apenas o systemMessage. Se o transcript_path não existir, emite aviso explícito.
-- ⏱️ **timeout Fix:** `post_tool_use_review.py` corrigido: `timeout=30000` → `timeout=30` (ms → segundos).
+- 🔌 **Fase 0–8 — Portabilidade Cross-Harness:** Paths unificados (`_paths.py`), input normalization (`_harness.py`), crash safety global, MCP config para Claude, bridge real, hooks independentes do Codex, detectores para Windsurf/Gemini/Kiro/Zed.
+- 🛡️ **RCE Elimination:** `safeDownloadAndRun` usa `param($u,$o)` no PowerShell. `headroom.js` refatorado: 0 `execSync` restantes.
+- 🧠 **Python portátil:** `sys.executable` em todos os hooks + `resolvePythonCmd()` no JS (prefere `python3`, fallback `python`).
 
-### v2.1.5 (Transcript Output Guard + timeout fix)
+### v2.1.6 (Cross-Harness Portability + RCE Elimination)
 
-- **G1 — timeout=30000 → 30:** post_tool_use_review.py usava milissegundos. Auditado todos os hooks — único caso.
-- **G2 — Output Guard no transcript real:** Lê JSONL do agente, extrai assistant/tool_result, escaneia com RBAC. Se transcript_path ausente, aviso explícito. systemMessage mantido como camada extra.
+- **F0 — Python portátil:** `sys.executable` em vez de `"python"`. `resolvePythonCmd()` no JS.
+- **F1 — Path resolution unificada:** `_paths.py` com `read_with_fallback()`. Dados em `~/.gstack/`.
+- **F2 — Input normalization:** `_harness.py` mapeia snake_case + camelCase.
+- **F3 — Crash safety:** `sys.excepthook` global em `stop.py`.
+- **F4 — MCP para Claude:** `claude.js` escreve em `~/.claude/settings.json`.
+- **F5 — Bridge real:** `writeRealHarnessBridge` aponta para `~/.gstack/hooks/`.
+- **F6 — Claude independente:** Hooks copiados do pacote, não do Codex.
+- **F7 — OpenCode com stdin:** Plugin passa payload JSON para `stop.py`.
+- **F8 — Detectores:** Windsurf, Gemini CLI, Kiro, Zed.
+- **C1.3 — safeDownloadAndRun seguro:** `param($u,$o)` bind no PowerShell.
+- **C1.2 — headroom.js RCE-free:** 6 `execSync` → `execFileSync`.
+- **README honesto:** Claims corrigidas sobre escopo do `execFileSync`.
 
 ### v2.1.4 (Quality Gate + Locking + GitOps)
 
@@ -26,14 +37,8 @@ Chega de alucinações, vazamentos de dados ou perda de contexto. O `gstack-vibe
 - 📦 **Replitização do Workspace:** Os projetos nascem com manifestos de app nativos (`.gstack/app.json`, `ports.json` e `services.json`), com `run_command`, `build_command`, `env` e portas dinâmicas por template.
 - 🔌 **Harness Bridge Real:** Integração com Cursor (`.cursor/rules/gstack-vibehard.mdc`), OpenCode (`hooks.json` com `tool.execute.before` e `session.idle`) e Claude Code (`settings.json` com `lifecycleHooks`).
 - 🪶 **Modo `--lite`:** Gere projeto sem Docker/Rust/ECC 2.0 — ideal para máquinas com recursos limitados.
-- 🔒 **RCE-Safe & Hardened:** Todas as execuções externas usam `execFileSync()` com `shell: false`. Nenhuma URL ou nome de projeto malicioso pode injetar comandos no shell. Nomes de projeto validados por allowlist (`/^[a-zA-Z0-9._-]+$/`).
+- 🔒 **RCE-Safe & Hardened:** Projetos novos usam `execFileSync()` com `shell: false`. Nomes validados por allowlist (`/^[a-zA-Z0-9._-]+$/`). Módulos auxiliares em migração contínua para o mesmo padrão.
 - 🪵 **Error Visibility:** Empty catches eliminados em todo o código — erros reais são logados com contexto, não silenciados.
-
-### v2.1.4 (Quality Gate + Locking + GitOps)
-
-- 🧪 **N1 — No `--no-verify` unconditional:** Agora controlado por `GSTACK_ALLOW_DIRTY_COMMIT=1`. Default = pre-commit hooks rodam.
-- 🔒 **N2 — instincts.yaml Locking Rewrite:** Lock bloqueante com retry + backoff. Unificado sob fd `a+`. YAML sanitizado.
-- 🤖 **N3 — GitOps Opt-in + Guard:** Issue criada apenas se `GSTACK_AUTO_ISSUE=1`. Corpo passa pelo Output Guard. Caminho local removido.
 
 ### v2.1.3 (Shared Output Guard + Viewer Default)
 
@@ -77,7 +82,7 @@ gstack_vibehard create meu-projeto
 - **File Locking:** `fcntl`/`msvcrt` nativo para `instincts.yaml`
 - **Output Guard:** Escaneia transcript do agente + systemMessage no hook on_stop (pós-resposta, best-effort). Loga aviso se transcript não disponível. RBAC admin/developer/viewer — default `viewer`
 - **Project Name Allowlist:** `^[a-zA-Z0-9._-]+$` — sem injeção via `$()`, backtick, `;`
-- **No Shell Execution:** `execFileSync` com `shell: false` em todo o código
+- **No Shell Execution:** `execFileSync` com `shell: false` no scaffolding de projetos; migração contínua nos módulos de instalação/doctor
 - **GitOps Seguro:** `git push` apenas com consentimento explícito
 
 ---

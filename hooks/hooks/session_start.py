@@ -10,15 +10,16 @@ import json, sys, os, subprocess, time, getpass, socket, shutil, urllib.request
 from pathlib import Path
 
 from _output_guard import output_guard
+from _paths import chronicle_dir, hook_support_path, read_with_fallback
 
 
 def build_chronicle_index():
     """Constrói índice de busca sobre todos os arquivos chronicle."""
-    chronicle_dir = Path.home() / ".codex" / "chronicle"
-    if not chronicle_dir.exists():
+    cdir = chronicle_dir()
+    if not cdir.exists():
         return []
     entries = []
-    for f in sorted(chronicle_dir.glob("*.md"), key=os.path.getmtime, reverse=True):
+    for f in sorted(cdir.glob("*.md"), key=os.path.getmtime, reverse=True):
         text = f.read_text(encoding="utf-8", errors="replace")
         lines = text.splitlines()
         project = ""
@@ -70,14 +71,14 @@ def search_chronicle(index, query: str, limit: int = 3):
 
 def run_gc_check(cwd: str) -> str | None:
     """Executa gc.py e retorna o diagnóstico textual."""
-    gc_path = Path.home() / ".codex" / "hooks" / "gc.py"
+    gc_path = hook_support_path("gc.py")
     if not gc_path.exists():
         return None
     if not cwd:
         return None
     try:
         result = subprocess.run(
-            ["python", str(gc_path), "--path", cwd],
+            [sys.executable, str(gc_path), "--path", cwd],
             capture_output=True, text=True, timeout=15
         )
         if result.returncode == 0:
@@ -347,10 +348,10 @@ if mom_bin:
         pass  # MOM is advisory; never block session start on it
 
 # 3. MCP servers
-config_toml = Path.home() / ".codex" / "config.toml"
-if config_toml.exists():
+config_toml = read_with_fallback("config.toml")
+if config_toml:
     mcps = []
-    for line in config_toml.read_text(encoding="utf-8").splitlines():
+    for line in config_toml.splitlines():
         if line.startswith("[mcp_servers."):
             mcps.append(line.split(".")[1].rstrip("]"))
     if mcps:

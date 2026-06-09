@@ -17,6 +17,8 @@ import json, os, subprocess, sqlite3, sys, glob
 from pathlib import Path
 from datetime import datetime
 
+from _paths import chronicle_dir
+
 
 def read_json(path: Path) -> dict | None:
     if path.exists():
@@ -133,11 +135,11 @@ def check_mom(root: Path) -> dict:
 
 def build_chronicle_index():
     """Constrói índice de busca sobre todos os arquivos chronicle."""
-    chronicle_dir = Path.home() / ".codex" / "chronicle"
-    if not chronicle_dir.exists():
+    cdir = chronicle_dir()
+    if not cdir.exists():
         return []
     entries = []
-    for f in sorted(chronicle_dir.glob("*.md"), key=os.path.getmtime, reverse=True):
+    for f in sorted(cdir.glob("*.md"), key=os.path.getmtime, reverse=True):
         text = f.read_text(encoding="utf-8", errors="replace")
         lines = text.splitlines()
         project = ""

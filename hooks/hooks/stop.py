@@ -21,6 +21,8 @@ from pathlib import Path
 from typing import Optional
 
 from _output_guard import output_guard, SENSITIVE_PATTERNS, ALLOWED_ROLES_HIERARCHY
+from _paths import chronicle_dir, hook_support_path, migrate_legacy
+from _harness import parse_stdin, normalize_input
 from datetime import datetime
 
 
@@ -374,18 +376,32 @@ def run_security_gate(root: Path) -> dict:
     }
 
 
+# Global exception hook: catches any unhandled exception and
+# writes valid JSON to stdout + traceback to stderr.
+def _crash_handler(exc_type, exc_value, exc_tb):
+    import traceback
+    tb = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+    sys.stderr.write(tb + "\n")
+    sys.stdout.write(json.dumps({
+        "systemMessage": f"gstack_vibehard stop hook error: {exc_value}",
+        "error": str(exc_value),
+        "traceback": tb,
+        "exitStatus": 1,
+    }))
+    sys.exit(1)
+
+sys.excepthook = _crash_handler
+
 # ═══════════════════════════════════════════════════════════════
 #  MAIN
 # ═══════════════════════════════════════════════════════════════
-try:
-    inp = json.loads(sys.stdin.read())
-except json.JSONDecodeError:
-    inp = {}
-cwd = inp.get("cwd", "")
-last_msg = inp.get("last_assistant_message", "")
-turn_id = inp.get("turn_id", "")
-flags = inp.get("flags", {})
-transcript_path = inp.get("transcript_path") or inp.get("transcriptPath")
+inp = parse_stdin()
+norm = normalize_input(inp)
+cwd = norm["cwd"]
+last_msg = norm["last_assistant_message"]
+turn_id = norm["turn_id"]
+flags = norm["flags"]
+transcript_path = norm["transcript_path"]
 run_security = flags.get("security_gate", False) or "deploy" in last_msg.lower()[:200]
 run_qg_level = flags.get("qg_level", 0)
 stop_failed = False
@@ -395,8 +411,7 @@ sandbox_result = None
 project_name = Path(cwd).name if cwd else "unknown"
 if not project_name:
     project_name = "root"
-chronicle_dir = Path.home() / ".codex" / "chronicle"
-chronicle_dir.mkdir(parents=True, exist_ok=True)
+chronicle_dir_path = chronicle_dir()
 
 summary = last_msg[:500] if last_msg else ""
 
@@ -434,7 +449,7 @@ elif sandbox_result.get("status") == "failed":
         note_lines.append("stderr:")
         note_lines.append(str(sandbox_result["stderr"])[-4000:])
     note_lines.append("")
-    chronicle_file = chronicle_dir / f"{project_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
+    chronicle_file = chronicle_dir_path / f"{project_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
     chronicle_file.write_text("\n".join(note_lines), encoding="utf-8")
     play_audio_cue("error")
     output = {
@@ -532,13 +547,13 @@ if fallow_result.get("blocking"):
     stop_failed = True
 
 # Quality Gate (legacy qg.py, modo log-only por default; blocking se qg_level > 0)
-qg_path = Path.home() / ".codex" / "hooks" / "qg.py"
+qg_path = hook_support_path("qg.py")
 if qg_path.exists() and cwd:
     qg_level = run_qg_level if run_qg_level > 0 else 1
     qg_log_only = run_qg_level <= 0
     qg_label = "log only" if qg_log_only else f"blocking (level {qg_level})"
     try:
-        args = ["python", str(qg_path), "--path", cwd, "--level", str(qg_level)]
+        args = [sys.executable, str(qg_path), "--path", cwd, "--level", str(qg_level)]
         if qg_log_only:
             args.append("--log-only")
         result = subprocess.run(args, capture_output=True, text=True, timeout=60)
@@ -599,7 +614,7 @@ elif sandbox_result and sandbox_result.get("status") == "failed":
 # Post-sprint: atualiza graphify + gbrain + MOM + chronicle enrich
 try:
     post_sprint = subprocess.run(
-        ["python", str(Path.home() / ".codex" / "hooks" / "post_sprint.py")],
+        [sys.executable, str(hook_support_path("post_sprint.py"))],
         input=json.dumps(inp), capture_output=True, text=True, timeout=30
     )
     if post_sprint.returncode == 0:

@@ -82,7 +82,7 @@ function safeDownloadAndRun(url, logger, label) {
   const tmp = join(tmpdir(), `gstack-dl-${Date.now()}${process.platform === "win32" ? ".ps1" : ".sh"}`)
   try {
     if (process.platform === "win32") {
-      execFileSync("powershell", ["-NoProfile", "-Command", "Invoke-RestMethod", url, "-OutFile", tmp], { stdio: "pipe", timeout: 120000, shell: false })
+      execFileSync("powershell", ["-NoProfile", "-Command", "param($u,$o) Invoke-RestMethod $u -OutFile $o", "-u", url, "-o", tmp], { stdio: "pipe", timeout: 120000, shell: false })
     } else {
       execFileSync("curl", ["-fsSL", url, "-o", tmp], { stdio: "pipe", timeout: 120000, shell: false })
     }
@@ -699,6 +699,15 @@ async function writeJsonMerge(targetPath, newConfig, opts) {
   await writeFile(targetPath, JSON.stringify(merged, null, 2) + "\n", "utf8")
 }
 
+function resolvePythonCmd() {
+  try {
+    execFileSync("python3", ["--version"], { stdio: "pipe", timeout: 5000 })
+    return "python3"
+  } catch {
+    return "python"
+  }
+}
+
 async function writeRealHarnessBridge(cwd, opts) {
   console.log("🔗 Integrando Harness Bridge Universal...")
   try {
@@ -721,10 +730,17 @@ Eventos de ferramentas devem ser logados via agent-hooks.
     await writeJsonMerge(openCodeHooksPath, openCodeConfig, opts)
 
     const claudeSettingsPath = join(homedir(), ".claude", "settings.json")
+    const pyCmd = resolvePythonCmd()
+
+    // Resolve hooks dir: ~/.gstack/hooks/ primary, ~/.codex/hooks/ fallback
+    const gstackHooksDir = join(homedir(), ".gstack", "hooks")
+    const codexHooksDir = join(homedir(), ".codex", "hooks")
+    const hooksDir = existsSync(gstackHooksDir) ? gstackHooksDir : codexHooksDir
+
     const claudeConfig = {
       "lifecycleHooks": {
-        "PreToolUse": "python ~/.gstack-vibehard/hooks/pre_tool_use_security.py",
-        "Stop": "python ~/.gstack-vibehard/hooks/stop.py",
+        "PreToolUse": `${pyCmd} ${join(hooksDir, "pre_tool_use_security.py")}`,
+        "Stop": `${pyCmd} ${join(hooksDir, "stop.py")}`,
       },
     }
     await writeJsonMerge(claudeSettingsPath, claudeConfig, opts)

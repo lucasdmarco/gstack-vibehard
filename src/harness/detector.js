@@ -59,6 +59,44 @@ const HARNESS_PATHS = {
       }
     },
   },
+  windsurf: {
+    label: "Windsurf",
+    configDir: join(HOME, ".codeium", "windsurf"),
+    configFile: join(HOME, ".codeium", "windsurf", "config.json"),
+    detect: () => {
+      const dir = join(HOME, ".codeium", "windsurf")
+      if (existsSync(dir)) return true
+      try { execSync("windsurf --version", { stdio: "pipe", timeout: 3000 }); return true } catch { return false }
+    },
+  },
+  gemini: {
+    label: "Gemini CLI",
+    configDir: join(HOME, ".gemini"),
+    configFile: join(HOME, ".gemini", "config.json"),
+    detect: () => {
+      const dir = join(HOME, ".gemini")
+      if (existsSync(dir) || existsSync(join(HOME, ".config", "gemini"))) return true
+      try { execSync("gemini --version", { stdio: "pipe", timeout: 3000 }); return true } catch { return false }
+    },
+  },
+  kiro: {
+    label: "Kiro",
+    configDir: join(HOME, ".kiro"),
+    configFile: join(HOME, ".kiro", "config.json"),
+    detect: () => {
+      if (existsSync(join(HOME, ".kiro"))) return true
+      try { execSync("kiro --version", { stdio: "pipe", timeout: 3000 }); return true } catch { return false }
+    },
+  },
+  zed: {
+    label: "Zed",
+    configDir: join(HOME, ".config", "zed"),
+    configFile: join(HOME, ".config", "zed", "settings.json"),
+    detect: () => {
+      if (existsSync(join(HOME, ".config", "zed")) || existsSync(join(HOME, ".config", "zed", "settings.json"))) return true
+      try { execSync("zed --version", { stdio: "pipe", timeout: 3000 }); return true } catch { return false }
+    },
+  },
 }
 
 export function detectHarnesses() {

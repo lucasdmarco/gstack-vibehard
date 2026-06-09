@@ -13,6 +13,9 @@ Trigger manual: gstack_vibehard sprint --save
 import json, sys, os, subprocess, re
 from pathlib import Path
 
+from _paths import chronicle_dir
+from _harness import parse_stdin, normalize_input
+
 from _output_guard import output_guard
 from datetime import datetime
 
@@ -308,12 +311,10 @@ def write_roi_report(root: Path, project_name: str,
 
 
 def main():
-    try:
-        inp = json.loads(sys.stdin.read())
-    except json.JSONDecodeError:
-        inp = {}
-    cwd = inp.get("cwd", "")
-    last_msg = inp.get("last_assistant_message", "")
+    inp = parse_stdin()
+    norm = normalize_input(inp)
+    cwd = norm["cwd"]
+    last_msg = norm["last_assistant_message"]
 
     root = Path(cwd) if cwd else None
     if not root or not root.exists():
@@ -321,7 +322,7 @@ def main():
         sys.exit(1)
 
     project_name = root.name
-    chronicle_dir = Path.home() / ".codex" / "chronicle"
+    cdir = chronicle_dir()
 
     graphify_result = update_graphify(root, last_msg)
     gbrain_result = update_gbrain(root, last_msg)
@@ -329,7 +330,7 @@ def main():
 
     decisions = gbrain_result.get("decisions", [])
     graph_summary = f"{graphify_result.get('nodes', 0)} nodes, {graphify_result.get('edges', 0)} edges"
-    chronicle_result = enrich_chronicle(chronicle_dir, project_name, decisions, graph_summary)
+    chronicle_result = enrich_chronicle(cdir, project_name, decisions, graph_summary)
 
     # ROI metrics
     tokens_saved = estimate_tokens_saved(graphify_result, root)

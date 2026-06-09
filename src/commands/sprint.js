@@ -1,11 +1,20 @@
 import { existsSync, readFileSync } from "fs"
 import { join } from "path"
-import { execSync } from "child_process"
+import { execFileSync } from "child_process"
 import { homedir } from "os"
 import { success, warn, info, error } from "../cli/index.js"
 
 const HOOKS_DIR = join(homedir(), ".codex", "hooks")
 const POST_SPRINT = join(HOOKS_DIR, "post_sprint.py")
+
+function resolvePythonCmd() {
+  try {
+    execFileSync("python3", ["--version"], { stdio: "pipe", timeout: 5000 })
+    return "python3"
+  } catch {
+    return "python"
+  }
+}
 
 export async function sprintCommand(args) {
   const flag = args[0]
@@ -33,7 +42,8 @@ export async function sprintCommand(args) {
     info("  Enriquecendo chronicle...")
 
     try {
-      const result = execSync(`python "${POST_SPRINT}"`, {
+      const pyCmd = resolvePythonCmd()
+      const result = execFileSync(pyCmd, [POST_SPRINT], {
         input,
         encoding: "utf-8",
         timeout: 30000,

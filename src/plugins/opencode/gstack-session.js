@@ -1,3 +1,13 @@
+async function resolvePythonCmd() {
+  try {
+    const { execFileSync } = await import("child_process")
+    execFileSync("python3", ["--version"], { stdio: "pipe", timeout: 5000 })
+    return "python3"
+  } catch {
+    return "python"
+  }
+}
+
 export const GstackSession = async ({ $ }) => {
   const { readFileSync, writeFileSync, existsSync, mkdirSync } = await import("fs")
   const { join } = await import("path")
@@ -40,7 +50,22 @@ export const GstackSession = async ({ $ }) => {
 
     "session.deleted": async () => {
       try {
-        await $`python ${HOME}/.codex/hooks/stop.py`
+        const { execFileSync } = await import("child_process")
+        const pyCmd = await resolvePythonCmd()
+        const hooksDir = existsSync(join(HOME, ".gstack", "hooks"))
+          ? join(HOME, ".gstack", "hooks")
+          : join(HOME, ".codex", "hooks")
+        const stopPy = join(hooksDir, "stop.py")
+        const payload = JSON.stringify({
+          cwd: process.cwd(),
+          transcript_path: process.env.OPENCODE_TRANSCRIPT_PATH || "",
+          last_assistant_message: process.env.OPENCODE_LAST_MESSAGE || "",
+        })
+        execFileSync(pyCmd, [stopPy], {
+          input: payload,
+          timeout: 30000,
+          stdio: ["pipe", "pipe", "pipe"],
+        })
       } catch (e) {
         console.warn(`gstack-session: erro ao executar stop.py: ${e.message || e}`)
       }

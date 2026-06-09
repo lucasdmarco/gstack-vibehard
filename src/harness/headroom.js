@@ -1,7 +1,7 @@
 import { existsSync } from "fs"
 import { join } from "path"
 import { homedir } from "os"
-import { execSync } from "child_process"
+import { execFileSync } from "child_process"
 import { writeWithBackup, ensureDir, readJsonFile, mergeJson } from "../installer/merge.js"
 import { isWindows } from "./detector.js"
 
@@ -9,22 +9,19 @@ const HOME = homedir()
 const MCP_CONFIG = join(HOME, ".mcp.json")
 
 async function installHeadroomPkg(warn, info, uvBin) {
-  let cmd
-  if (uvBin) {
-    cmd = `${uvBin} pip install --system`
-  } else {
-    cmd = "pip install --break-system-packages"
-  }
-
   const attempts = [
-    { label: "headroom-ai[proxy] (latest)", pkg: '"headroom-ai[proxy]"' },
-    { label: "headroom-ai[proxy]==0.20.15 (wheel)", pkg: '"headroom-ai[proxy]==0.20.15"' },
-    { label: "headroom-ai==0.20.15 (wheel, sem extras)", pkg: '"headroom-ai==0.20.15"' },
+    { label: "headroom-ai[proxy] (latest)", pkg: "headroom-ai[proxy]" },
+    { label: "headroom-ai[proxy]==0.20.15 (wheel)", pkg: "headroom-ai[proxy]==0.20.15" },
+    { label: "headroom-ai==0.20.15 (wheel, sem extras)", pkg: "headroom-ai==0.20.15" },
   ]
 
   for (const attempt of attempts) {
     try {
-      execSync(`${cmd} ${attempt.pkg} 2>&1`, { stdio: "pipe", timeout: 120000 })
+      if (uvBin) {
+        execFileSync(uvBin, ["pip", "install", "--system", attempt.pkg], { stdio: "pipe", timeout: 120000, shell: false })
+      } else {
+        execFileSync("pip", ["install", "--break-system-packages", attempt.pkg], { stdio: "pipe", timeout: 120000, shell: false })
+      }
       return true
     } catch (e) {
       info(`headroom: ${attempt.label} — falhou (${e.message || e}), tentando proxima...`)
@@ -34,7 +31,7 @@ async function installHeadroomPkg(warn, info, uvBin) {
   // Last ditch: try with uv even if uvBin was empty
   if (!uvBin) {
     try {
-      execSync('uv pip install --system "headroom-ai==0.20.15" 2>&1', { stdio: "pipe", timeout: 120000 })
+      execFileSync("uv", ["pip", "install", "--system", "headroom-ai==0.20.15"], { stdio: "pipe", timeout: 120000, shell: false })
       return true
     } catch (e) {
       info(`headroom: uv fallback — falhou (${e.message || e})`)
@@ -59,11 +56,11 @@ export async function installHeadroom(deps, report) {
 
   // Verify installation
   try {
-    const ver = execSync("headroom --version 2>&1", { stdio: "pipe", timeout: 5000 }).toString().trim()
+    const ver = execFileSync("headroom", ["--version"], { stdio: "pipe", timeout: 5000, shell: false }).toString().trim()
     success(`headroom: ${ver}`)
     report.added.push("headroom (context compressor)")
-  } catch {
-    warn("headroom: instalado mas `headroom --version` falhou (PATH talvez)")
+  } catch (e) {
+    warn(`headroom: instalado mas --version falhou (${e.message || e})`)
   }
 
   // headroom wrap for supported harnesses
@@ -71,16 +68,16 @@ export async function installHeadroom(deps, report) {
     try {
       switch (harnessId) {
         case "claude":
-          execSync("headroom wrap claude 2>&1", { stdio: "pipe", timeout: 30000 })
+          execFileSync("headroom", ["wrap", "claude"], { stdio: "pipe", timeout: 30000, shell: false })
           success("headroom wrap claude")
           break
         case "codex":
-          execSync("headroom wrap codex 2>&1", { stdio: "pipe", timeout: 30000 })
+          execFileSync("headroom", ["wrap", "codex"], { stdio: "pipe", timeout: 30000, shell: false })
           success("headroom wrap codex")
           break
       }
-    } catch {
-      info(`headroom wrap ${harnessId}: pulado`)
+    } catch (e) {
+      info(`headroom wrap ${harnessId}: pulado (${e.message || e})`)
     }
   }
 

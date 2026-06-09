@@ -38,8 +38,14 @@ function getAtomicViews() {
   }
 }
 
+function gstackPath(sub) {
+  const primary = join(HOME, ".gstack", sub)
+  if (existsSync(primary)) return primary
+  return join(HOME, ".codex", sub)
+}
+
 function getQGBlockedCount() {
-  const chronicleDir = join(HOME, ".codex", "chronicle")
+  const chronicleDir = gstackPath("chronicle")
   if (!existsSync(chronicleDir)) return 0
   let count = 0
   try {
@@ -70,6 +76,7 @@ function getTokenBudget() {
 function getHarnessStatus() {
   const harnesses = [
     { id: "claude", dir: join(HOME, ".claude") },
+    { id: "gstack", dir: join(HOME, ".gstack") },
     { id: "codex", dir: join(HOME, ".codex") },
     { id: "opencode", dir: join(HOME, ".config", "opencode") },
     { id: "cursor", dir: join(HOME, ".cursor") },
@@ -147,7 +154,7 @@ function render() {
   }
 
   // ROI quick summary (from last post_sprint)
-  const sprintDir = join(HOME, ".codex", "sprints")
+  const sprintDir = gstackPath("sprints")
   if (existsSync(sprintDir)) {
     const sprintFiles = readdirSync(sprintDir).filter((f) => f.endsWith(".json")).sort().reverse().slice(0, 1)
     if (sprintFiles.length > 0) {
