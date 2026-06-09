@@ -50,7 +50,9 @@ function getQGBlockedCount() {
         count++
       }
     }
-  } catch {}
+  } catch (e) {
+    console.warn(`monitor: erro ao ler chronicle QG: ${e.message || e}`)
+  }
   return count
 }
 
@@ -155,7 +157,9 @@ function render() {
         if (roi.tokens_saved) console.log(`  Tokens salvos: ${roi.tokens_saved.toLocaleString()}`)
         if (roi.fallow_blocks !== undefined) console.log(`  Injeções barradas: ${roi.fallow_blocks}`)
         if (roi.files_modified !== undefined) console.log(`  Arquivos modificados: ${roi.files_modified}`)
-      } catch {}
+      } catch (e) {
+        console.warn(`monitor: erro ao ler sprint ROI: ${e.message || e}`)
+      }
     }
   }
 
@@ -177,3 +181,4 @@ export async function monitorCommand() {
     process.exit(0)
   })
 }
+

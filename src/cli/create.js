@@ -9,11 +9,13 @@ import {
   readFileSync,
   unlinkSync,
   symlinkSync,
+  rmSync,
 } from "node:fs"
 import { mkdir, writeFile } from "node:fs/promises"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { homedir, tmpdir } from "node:os"
+import { deepMerge } from "../installer/merge.js"
 
 const HOME = resolve(homedir() || process.env.USERPROFILE || process.env.HOME || "/tmp")
 
@@ -63,24 +65,24 @@ function writeJson(fp, val) {
   writeFileSync(fp, `${JSON.stringify(val, null, 2)}\n`)
 }
 
-function findBinary(name, exec) {
+function findBinary(name) {
   try {
     const cmd = process.platform === "win32" ? "where" : "which"
-    const out = exec(`${cmd} ${name}`, { stdio: "pipe", timeout: 10000 })
+    const out = execFileSync(cmd, [name], { stdio: "pipe", timeout: 10000 })
     return out.toString().trim().split("\n")[0]
   } catch { return null }
 }
 
-function safeExec(exec, cmd, opts) {
-  try { return exec(cmd, { stdio: "pipe", timeout: 30000, ...opts }) }
+function safeExec(file, args, opts) {
+  try { return execFileSync(file, args, { stdio: "pipe", timeout: 30000, ...opts }) }
   catch { return null }
 }
 
-function safeDownloadAndRun(url, logger, exec, label) {
+function safeDownloadAndRun(url, logger, label) {
   const tmp = join(tmpdir(), `gstack-dl-${Date.now()}${process.platform === "win32" ? ".ps1" : ".sh"}`)
   try {
     if (process.platform === "win32") {
-      execFileSync("powershell", ["-c", `irm '${url}' -OutFile '${tmp}'`], { stdio: "pipe", timeout: 120000, shell: false })
+      execFileSync("powershell", ["-NoProfile", "-Command", "Invoke-RestMethod", url, "-OutFile", tmp], { stdio: "pipe", timeout: 120000, shell: false })
     } else {
       execFileSync("curl", ["-fsSL", url, "-o", tmp], { stdio: "pipe", timeout: 120000, shell: false })
     }
@@ -95,7 +97,7 @@ function safeDownloadAndRun(url, logger, exec, label) {
       return false
     }
     if (process.platform === "win32") {
-      execFileSync("powershell", ["-c", `& '${tmp}'`], { stdio: "pipe", timeout: 180000, shell: false })
+      execFileSync("powershell", ["-NoProfile", "-File", tmp], { stdio: "pipe", timeout: 180000, shell: false })
     } else {
       execFileSync("sh", [tmp], { stdio: "pipe", timeout: 180000, shell: false })
     }
@@ -135,34 +137,34 @@ volumes:
 `)
 }
 
-function startCasdoor(logger, exec, projectDir) {
+function startCasdoor(logger, projectDir) {
   if (process.env.GSTACK_SKIP_PREFLIGHT) {
     logger.info("GSTACK_SKIP_PREFLIGHT set — skipping Casdoor")
     return null
   }
-  if (!findBinary("docker", exec)) {
+  if (!findBinary("docker")) {
     logger.warn("Docker nao encontrado — Casdoor IAM local nao iniciado. Instale Docker para IAM local.")
     return null
   }
-  const existing = safeExec(exec, 'docker ps -a --filter "name=casdoor" --format "{{.Names}}"')
+  const existing = safeExec("docker", ["ps", "-a", "--filter", "name=casdoor", "--format", "{{.Names}}"])
   if (existing && existing.toString().trim() === "casdoor") {
-    const running = safeExec(exec, 'docker ps --filter "name=casdoor" --format "{{.Names}}"')
+    const running = safeExec("docker", ["ps", "--filter", "name=casdoor", "--format", "{{.Names}}"])
     if (running && running.toString().trim() === "casdoor") {
       logger.success("Casdoor IAM ja rodando em localhost:8000")
       return "http://localhost:8000"
     }
     logger.info("Casdoor container existe, reiniciando...")
-    safeExec(exec, "docker start casdoor")
+    safeExec("docker", ["start", "casdoor"])
     logger.success("Casdoor reiniciado em localhost:8000")
     return "http://localhost:8000"
   }
   logger.info("Iniciando Casdoor IAM local via docker-compose...")
   writeCasdoorCompose(projectDir)
   const composeFile = join(projectDir, ".gstack", "docker-compose.yml")
-  let out = safeExec(exec, `docker compose -f "${composeFile}" up -d`, { timeout: 120000 })
+  let out = safeExec("docker", ["compose", "-f", composeFile, "up", "-d"], { timeout: 120000 })
   if (!out) {
     logger.info("docker compose (v2) falhou. Tentando docker-compose (v1)...")
-    out = safeExec(exec, `docker-compose -f "${composeFile}" up -d`, { timeout: 120000 })
+    out = safeExec("docker-compose", ["-f", composeFile, "up", "-d"], { timeout: 120000 })
   }
   if (out) {
     logger.success("Casdoor IAM rodando em http://localhost:8000")
@@ -192,28 +194,28 @@ function writeCasdoorProjectConfig(projectDir) {
 //  PHASE 2: Parallelism (Atomic VCS)
 // ─────────────────────────────────────────────────────────────
 
-function initAtomic(logger, exec, projectDir) {
+function initAtomic(logger, projectDir) {
   if (process.env.GSTACK_SKIP_PREFLIGHT) {
     logger.info("GSTACK_SKIP_PREFLIGHT set — skipping Atomic init")
     return
   }
-  if (!findBinary("atomic", exec)) {
+  if (!findBinary("atomic")) {
     logger.warn("Atomic CLI nao encontrado. Tentando instalar (download seguro)...")
     const url = process.platform === "win32"
       ? "https://atomic-vcs.dev/install.ps1"
       : "https://atomic-vcs.dev/install.sh"
-    const ok = safeDownloadAndRun(url, logger, exec, "Atomic CLI")
+    const ok = safeDownloadAndRun(url, logger, "Atomic CLI")
     if (!ok) {
       logger.warn("Atomic CLI nao pode ser instalado — continuando sem VCS atomico")
       logger.warn("  Instale manualmente: curl -fsSL https://atomic-vcs.dev/install.sh | sh")
       return
     }
-    if (!findBinary("atomic", exec)) {
+    if (!findBinary("atomic")) {
       logger.warn("Atomic CLI instalado mas nao no PATH — continuando")
       return
     }
   }
-  const out = safeExec(exec, "atomic init", { cwd: projectDir })
+  const out = safeExec("atomic", ["init"], { cwd: projectDir })
   if (out) {
     logger.success("Atomic VCS inicializado — views paralelas disponiveis")
   } else {
@@ -266,27 +268,27 @@ engine = "atomic"
 default_expose = [".env", ".claude/", ".gstack/", ".agent/"]
 `)
   }
-  safeExec(null, null) // noop: ensure workspace expose is registered
+  safeExec("node", ["--version"]) // noop: ensure workspace expose is registered
 }
 
 // ─────────────────────────────────────────────────────────────
 //  PHASE 3: Daemons & Memory (ECC 2.0 + AgentMemory + Graphify)
 // ─────────────────────────────────────────────────────────────
 
-function bootEcc2(logger, exec, projectDir) {
+function bootEcc2(logger, projectDir) {
   if (process.env.GSTACK_SKIP_PREFLIGHT) {
     logger.info("GSTACK_SKIP_PREFLIGHT set — skipping ECC 2.0")
     return
   }
-  if (!findBinary("ecc2", exec)) {
+  if (!findBinary("ecc2")) {
     logger.warn("ECC 2.0 Daemon nao encontrado — tentando compilar do repositorio oficial...")
     const cloneDir = join(tmpdir(), "ecc2-build")
-    safeExec(exec, `git clone --depth 1 https://github.com/gstack-dev/ecc2.git "${cloneDir}"`, { timeout: 120000 })
+    safeExec("git", ["clone", "--depth", "1", "https://github.com/gstack-dev/ecc2.git", cloneDir], { timeout: 120000 })
     if (existsSync(join(cloneDir, "Cargo.toml"))) {
       logger.info("Compilando ECC 2.0 via cargo (pode levar alguns minutos)...")
-      const buildOk = safeExec(exec, `cargo install --path "${cloneDir}"`, { timeout: 600000 })
-      try { safeExec(exec, `rm -rf "${cloneDir}"`, { timeout: 10000 }) } catch {}
-      if (buildOk && findBinary("ecc2", exec)) {
+      const buildOk = safeExec("cargo", ["install", "--path", cloneDir], { timeout: 600000 })
+      try { rmSync(cloneDir, { recursive: true, force: true }) } catch {}
+      if (buildOk && findBinary("ecc2")) {
         logger.success("ECC 2.0 Daemon compilado e instalado")
       } else {
         logger.warn("ECC 2.0 Daemon nao pode ser compilado — control plane desativado")
@@ -294,12 +296,12 @@ function bootEcc2(logger, exec, projectDir) {
         return
       }
     } else {
-      try { safeExec(exec, `rm -rf "${cloneDir}"`, { timeout: 10000 }) } catch {}
+      try { rmSync(cloneDir, { recursive: true, force: true }) } catch {}
       logger.warn("Repo ECC 2.0 nao encontrado — control plane desativado")
       return
     }
   }
-  safeExec(exec, "ecc2 daemon start", { timeout: 15000 })
+  safeExec("ecc2", ["daemon", "start"], { timeout: 15000 })
   logger.success("ECC 2.0 Daemon iniciado em background")
 }
 
@@ -327,8 +329,8 @@ observability:
 `)
 }
 
-function bootAgentMemory(logger, exec, projectDir) {
-  const out = safeExec(exec, "npx @agentmemory/agentmemory federate --enable", { cwd: projectDir })
+function bootAgentMemory(logger, projectDir) {
+  const out = safeExec("npx", ["--yes", "@agentmemory/agentmemory", "federate", "--enable"], { cwd: projectDir })
   if (out) logger.success("AgentMemory Mesh Federation ativa (BM25 + Vetor + Grafo)")
   else logger.warn("AgentMemory Federation nao pode ser ativada — continuando sem P2P mesh")
 }
@@ -357,9 +359,9 @@ index = "hnsw"
 `)
 }
 
-function bootGraphify(logger, exec, projectDir) {
+function bootGraphify(logger, projectDir) {
   try {
-    const out = safeExec(exec, "npx graphify hook install", { cwd: projectDir })
+    const out = safeExec("npx", ["--yes", "graphify", "hook", "install"], { cwd: projectDir })
     if (out) {
       logger.success("Graphify hooks instalados — AST gerada a cada commit")
     } else {
@@ -370,9 +372,9 @@ function bootGraphify(logger, exec, projectDir) {
   }
 }
 
-function bootHeadroom(logger, exec, projectDir) {
+function bootHeadroom(logger, projectDir) {
   try {
-    const out = safeExec(exec, "npx -y @gstack/headroom-proxy --check", { cwd: projectDir })
+    const out = safeExec("npx", ["--yes", "@gstack/headroom-proxy", "--check"], { cwd: projectDir })
     if (out) {
       logger.success("Headroom proxy operacional — compressao de contexto ativa")
     }
@@ -693,17 +695,16 @@ async function writeJsonMerge(targetPath, newConfig, opts) {
     const raw = readFileSync(targetPath, "utf8")
     existing = JSON.parse(raw)
   } catch {}
-  const merged = { ...existing, ...newConfig }
+  const merged = deepMerge(existing, newConfig)
   await writeFile(targetPath, JSON.stringify(merged, null, 2) + "\n", "utf8")
 }
 
 async function writeRealHarnessBridge(cwd, opts) {
   console.log("🔗 Integrando Harness Bridge Universal...")
-
-  // 1. Cursor (.cursor/rules/gstack-vibehard.mdc)
-  const cursorRulesDir = join(cwd, ".cursor", "rules")
-  await mkdir(cursorRulesDir, { recursive: true })
-  await writeFile(join(cursorRulesDir, "gstack-vibehard.mdc"), `---
+  try {
+    const cursorRulesDir = join(cwd, ".cursor", "rules")
+    await mkdir(cursorRulesDir, { recursive: true })
+    await writeFile(join(cursorRulesDir, "gstack-vibehard.mdc"), `---
 description: GStack VibeHard 2.0 Universal Bridge
 globs: ["**/*"]
 alwaysApply: true
@@ -712,23 +713,24 @@ Sempre passe pelo Quality Gate local antes de finalizar o codigo.
 Eventos de ferramentas devem ser logados via agent-hooks.
 `)
 
-  // 2. OpenCode (~/.config/opencode/hooks.json)
-  const openCodeHooksPath = join(homedir(), ".config", "opencode", "hooks.json")
-  const openCodeConfig = {
-    "tool.execute.before": "gstack-agent-bridge",
-    "session.idle": "gstack-agent-bridge",
-  }
-  await writeJsonMerge(openCodeHooksPath, openCodeConfig, opts)
+    const openCodeHooksPath = join(homedir(), ".config", "opencode", "hooks.json")
+    const openCodeConfig = {
+      "tool.execute.before": "gstack-agent-bridge",
+      "session.idle": "gstack-agent-bridge",
+    }
+    await writeJsonMerge(openCodeHooksPath, openCodeConfig, opts)
 
-  // 3. Claude Code (~/.claude/settings.json)
-  const claudeSettingsPath = join(homedir(), ".claude", "settings.json")
-  const claudeConfig = {
-    "lifecycleHooks": {
-      "PreToolUse": "python ~/.gstack-vibehard/hooks/pre_tool_use_security.py",
-      "Stop": "python ~/.gstack-vibehard/hooks/stop.py",
-    },
+    const claudeSettingsPath = join(homedir(), ".claude", "settings.json")
+    const claudeConfig = {
+      "lifecycleHooks": {
+        "PreToolUse": "python ~/.gstack-vibehard/hooks/pre_tool_use_security.py",
+        "Stop": "python ~/.gstack-vibehard/hooks/stop.py",
+      },
+    }
+    await writeJsonMerge(claudeSettingsPath, claudeConfig, opts)
+  } catch (e) {
+    console.warn(`  ⚠ Harness Bridge: ${e.message || e} (non-blocking)`)
   }
-  await writeJsonMerge(claudeSettingsPath, claudeConfig, opts)
 }
 
 function writeHarnessFiles(projectDir, projectName) {
@@ -1161,8 +1163,9 @@ export async function createProject(options = {}) {
     throw new Error(`Uso: gstack_vibehard create <nome-do-app> [--template ${Object.keys(VALID_TEMPLATES).join("|")}]`)
   }
 
-  if (projectName.includes("..") || projectName.includes("/") || projectName.includes("\\")) {
-    throw new Error(`Nome de projeto invalido: "${projectName}" — nao use caminhos relativos (..)`)
+  // C1: allowlist estrito — apenas letras, numeros, ponto, hifen, underline
+  if (!/^[a-zA-Z0-9._-]+$/.test(projectName)) {
+    throw new Error(`Nome de projeto invalido: "${projectName}". Use apenas letras, numeros, ponto, hifen e underline.`)
   }
 
   const projectDir = join(cwd, projectName)
@@ -1179,25 +1182,25 @@ export async function createProject(options = {}) {
   if (!isLite) {
     console.log(`\n  === Fase 1/5: IAM Local (Casdoor) ===`)
     mkdirSync(projectDir, { recursive: true })
-    const casdoorUrl = startCasdoor(logger, execSync, projectDir)
+    const casdoorUrl = startCasdoor(logger, projectDir)
     phases.casdoor = { status: casdoorUrl ? "online" : "offline", url: casdoorUrl }
 
     console.log(`\n  === Fase 2/5: Atomic VCS ===`)
     writeAtomicConfig(projectDir)
-    initAtomic(logger, execSync, projectDir)
+    initAtomic(logger, projectDir)
     phases.atomic = { status: "configured" }
   }
 
   if (!isLite) {
     console.log(`\n  === Fase 3/5: Daemons & Memoria ===`)
-    bootEcc2(logger, execSync, projectDir)
+    bootEcc2(logger, projectDir)
     writeControlPlaneConfig(projectDir, projectName)
-    bootAgentMemory(logger, execSync, projectDir)
+    bootAgentMemory(logger, projectDir)
     writeMemoryFederationConfig(projectDir)
     phases.daemons = { status: "configured" }
   }
 
-  bootGraphify(logger, execSync, projectDir)
+  bootGraphify(logger, projectDir)
 
   console.log(`\n  === Fase 4/5: Scaffold ${templateName} (${OMNIHARNESS_MAP.length} IDEs) ===`)
   if (templateName === "fullstack-monorepo") {
@@ -1212,7 +1215,11 @@ export async function createProject(options = {}) {
   console.log(`\n  === Fase 5/5: Scaffold & Orquestracao Macro ===`)
   writeHarnessFiles(projectDir, projectName)
   if (!isLite) {
-    await writeRealHarnessBridge(projectDir, options)
+    try {
+      await writeRealHarnessBridge(projectDir, options)
+    } catch (e) {
+      logger.warn(`Harness Bridge nao pode ser escrito: ${e.message || e} (non-blocking)`)
+    }
   }
   writeTeamMatrix(projectDir, projectName)
   writeGatewayMcpConfig(projectDir)
@@ -1220,7 +1227,7 @@ export async function createProject(options = {}) {
   writeCasdoorProjectConfig(projectDir)
 
   // ── Boot Headroom (non-critical, wrapped in try/catch) ──
-  bootHeadroom(logger, execSync, projectDir)
+  bootHeadroom(logger, projectDir)
 
   // ── Obsidian Vault Global: project subfolder + graph.json symlink ──
   const vaultDir = join(homedir(), "gstack-vault")

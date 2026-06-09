@@ -26,8 +26,9 @@ async function installHeadroomPkg(warn, info, uvBin) {
     try {
       execSync(`${cmd} ${attempt.pkg} 2>&1`, { stdio: "pipe", timeout: 120000 })
       return true
-    } catch {}
-    info(`${attempt.label} — falhou, tentando proxima...`)
+    } catch (e) {
+      info(`headroom: ${attempt.label} — falhou (${e.message || e}), tentando proxima...`)
+    }
   }
 
   // Last ditch: try with uv even if uvBin was empty
@@ -35,7 +36,9 @@ async function installHeadroomPkg(warn, info, uvBin) {
     try {
       execSync('uv pip install --system "headroom-ai==0.20.15" 2>&1', { stdio: "pipe", timeout: 120000 })
       return true
-    } catch {}
+    } catch (e) {
+      info(`headroom: uv fallback — falhou (${e.message || e})`)
+    }
   }
 
   return false

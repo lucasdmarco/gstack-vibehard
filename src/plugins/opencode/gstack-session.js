@@ -15,7 +15,9 @@ export const GstackSession = async ({ $ }) => {
       if (existsSync(GV_STATUS)) {
         try {
           status = JSON.parse(readFileSync(GV_STATUS, "utf-8"))
-        } catch {}
+        } catch (e) {
+          console.warn(`gstack-session: erro ao ler update_status: ${e.message || e}`)
+        }
       }
 
       const lastCheck = status.checked_at || 0
@@ -30,14 +32,18 @@ export const GstackSession = async ({ $ }) => {
             status = { latest, local, checked_at: now, has_update: false }
           }
           writeFileSync(GV_STATUS, JSON.stringify(status, null, 2), "utf-8")
-        } catch {}
+        } catch (e) {
+          console.warn(`gstack-session: erro ao checar update: ${e.message || e}`)
+        }
       }
     },
 
     "session.deleted": async () => {
       try {
         await $`python ${HOME}/.codex/hooks/stop.py`
-      } catch {}
+      } catch (e) {
+        console.warn(`gstack-session: erro ao executar stop.py: ${e.message || e}`)
+      }
     },
   }
 }

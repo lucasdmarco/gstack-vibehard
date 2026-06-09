@@ -1,4 +1,4 @@
-# 🚀 gstack-vibehard 2.0.6
+# 🚀 gstack-vibehard 2.1.2
 **A Máquina de Desenvolvimento Zero-Config Definitiva para Agentes de IA.**
 
 O `gstack-vibehard` é um **Control Plane e Instalador Cross-Harness**. Ele envelopa o seu terminal com ferramentas de elite, transformando Claude Code, Cursor, OpenCode e Codex em um ecossistema corporativo seguro, unificado e autônomo, rodando 100% na sua máquina.
@@ -7,69 +7,54 @@ Chega de alucinações, vazamentos de dados ou perda de contexto. O `gstack-vibe
 
 ---
 
-## ✨ O que há de novo na v2.0.6 (The Convergence Update)
+## ✨ O que há de novo na v2.1.2 (Security Convergence)
 
-- 🛡️ **Zero-Trust Output Guard:** Um "Agente Porteiro" intercepta as saídas da IA. Usa RBAC para escanear e bloquear vazamentos de 8 classes de dados sensíveis (Chaves Stripe, Tokens GitHub, CPFs, etc.) antes de exibi-los na tela.
-- 📦 **Replitização do Workspace:** Os projetos agora nascem com os manifestos de app nativos (`.gstack/app.json`, `ports.json` e `services.json`), definindo comandos de execução e portas dinâmicas automaticamente.
-- 🔌 **Harness Bridge Real:** Eventos de ferramentas e lifecycle são roteados nativamente. Suporte profundo a `.cursor/rules` no Cursor, `hooks.json` (`tool.execute.before`) no OpenCode e `settings.json` no Claude.
-- 🪶 **Modo `--lite`:** PC fraco ou sem Docker/Rust? Use `gstack_vibehard create meu-app --lite` para gerar o projeto e a estrutura de agentes burlando a inicialização de daemons pesados.
-- 🔒 **RCE-Safe & Hardened:** Substituição completa de execuções de shell cruas (`execSync`) por `execFileSync`. Nenhuma URL ou caminho malicioso injetado por IA pode comprometer sua máquina. Crashs em Python causados por `stdin` vazios ou incompatibilidade de tipos foram erradicados.
+- 🛡️ **Zero-Trust Output Guard:** Um "Agente Porteiro" intercepta as saídas da IA. Usa RBAC (`GSTACK_USER_ROLE`) para escanear e bloquear vazamentos de 8 classes de dados sensíveis (Chaves Stripe, Tokens GitHub, CPFs, etc.) antes de exibi-los.
+- 📦 **Replitização do Workspace:** Os projetos nascem com manifestos de app nativos (`.gstack/app.json`, `ports.json` e `services.json`), com `run_command`, `build_command`, `env` e portas dinâmicas por template.
+- 🔌 **Harness Bridge Real:** Integração com Cursor (`.cursor/rules/gstack-vibehard.mdc`), OpenCode (`hooks.json` com `tool.execute.before` e `session.idle`) e Claude Code (`settings.json` com `lifecycleHooks`).
+- 🪶 **Modo `--lite`:** Gere projeto sem Docker/Rust/ECC 2.0 — ideal para máquinas com recursos limitados.
+- 🔒 **RCE-Safe & Hardened:** Todas as execuções externas usam `execFileSync()` com `shell: false`. Nenhuma URL ou nome de projeto malicioso pode injetar comandos no shell. Nomes de projeto validados por allowlist (`/^[a-zA-Z0-9._-]+$/`).
+- 🪵 **Error Visibility:** Empty catches eliminados em todo o código — erros reais são logados com contexto, não silenciados.
 
 ---
 
-## ⚡ Instalação Rápida (Padrão Ouro)
-
-O instalador detecta automaticamente suas IDEs e faz a injeção em background.
+## ⚡ Instalação Rápida
 
 ```bash
 npm install -g @gstack-vibehard/installer
-```
-
-Para criar um novo projeto blindado:
-```bash
 gstack_vibehard create meu-projeto
+# Para ambientes sem Docker/Rust: gstack_vibehard create meu-projeto --lite
 ```
-(Para ambientes sem Docker/Rust, adicione a flag `--lite`)
 
 ---
 
-## 🏗️ Templates Verticais Incluídos
+## 🏗️ Templates Verticais
 
-O instalador permite gerar arquiteturas prontas passando a flag `--template`:
-
-- `fullstack-monorepo` (Padrão: Express/Fastify/Hono)
+- `fullstack-monorepo` (Express/Fastify/Hono + React)
 - `saas-auth-stripe` (Next.js + Supabase + Stripe)
 - `mobile-backend` (Expo + tRPC + PostgreSQL)
 - `ai-agent-platform` (LangGraph + ChromaDB + FastAPI)
 
-Exemplo:
-```bash
-gstack_vibehard create app-vendas --template saas-auth-stripe
-```
+---
+
+## 🧠 Arquitetura
+
+- **Graphify:** AST caching a custo zero — IA lê topologia sem consumir API
+- **Headroom:** Proxy MCP que comprime RAG/logs em até 95%
+- **Fallow:** Auditoria determinística em Rust — CRAP analysis, código morto
+- **Post-Sprint:** ROI da sessão, arquivos via Atomic VCS, decisões no MOM
+- **TUI Monitor:** `gstack_vibehard monitor` — harnesses, QG, tokens em tempo real
 
 ---
 
-## 🧠 A Arquitetura Invisível (O que instalamos por você)
+## 🔒 Segurança
 
-Para que o desenvolvedor iniciante ("vibecoder") não precise ler manuais complexos, orquestramos em background:
-
-- **Memória de Custo Zero (Graphify):** Lê a Árvore de Sintaxe Abstrata (AST) do projeto a custo zero e entrega um grafo de conhecimento para a IA não precisar ler arquivos inteiros.
-- **Economia de Tokens (Headroom):** Um proxy MCP que esmaga o tráfego RAG, logs e saídas em até 95%, reduzindo sua fatura de API drasticamente.
-- **Auditoria Matemática (Fallow):** Impede o commit de lixo gerado por IA. Avalia complexidade (CRAP) e código morto em subsegundos usando Rust, sem "achismos".
-- **Governança Pós-Sprint:** Relatórios detalhados (`post_sprint.py`) calculam o ROI da sessão, arquivos modificados em massa via Atomic VCS, e decisões de negócio integradas ao servidor MOM.
-- **Observabilidade TUI:** Digite `gstack_vibehard monitor` para ver o status dos times Harness, bloqueios de Quality Gate e economia de tokens em tempo real.
+- **File Locking:** `fcntl`/`msvcrt` nativo para `instincts.yaml`
+- **Output Guard:** RBAC (admin/developer/viewer) bloqueia secrets por nível
+- **Project Name Allowlist:** `^[a-zA-Z0-9._-]+$` — sem injeção via `$()`, backtick, `;`
+- **No Shell Execution:** `execFileSync` com `shell: false` em todo o código
+- **GitOps Seguro:** `git push` apenas com consentimento explícito
 
 ---
 
-## 🛡️ Protocolos de Segurança Ativos
-
-- **File Locking Estrito:** `fcntl`/`msvcrt` nativo evita corrupção do arquivo `instincts.yaml` durante concorrência de agentes.
-- **GitOps Seguro:** Empurre código apenas com consentimento. `git push` automático bloqueado localmente.
-- **MicroVM / Sandbox:** Suporte nativo ao Docker headless e gVisor via OpenHands CLI.
-- **Sem Dependências Fantasmas:** Todas as chamadas `npx` foram limpas e sanitizadas na compilação.
-
----
-
-## 📝 Licença
-
-Desenvolvido sob a Licença MIT.
+## 📝 Licença MIT
