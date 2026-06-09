@@ -245,9 +245,15 @@ def count_atomic_files(root: Path) -> int:
 def write_roi_report(root: Path, project_name: str,
                      tokens_saved: int, fallow_blocks: int,
                      files_modified: int, graphify_result: dict) -> dict:
-    """Gera relatório ROI em JSON e MD em ~/.codex/sprints/."""
-    sprints_dir = Path.home() / ".codex" / "sprints"
-    sprints_dir.mkdir(parents=True, exist_ok=True)
+    """Gera relatório ROI em JSON e MD em ~/.gstack/sprints/ + .gstack/sprints/ local."""
+    # Global path: ~/.gstack/sprints/ (cross-harness, funciona com qualquer CLI)
+    gstack_home = Path.home() / ".gstack"
+    global_sprints_dir = gstack_home / "sprints"
+    global_sprints_dir.mkdir(parents=True, exist_ok=True)
+
+    # Local path: .gstack/sprints/ (dentro do projeto, visivel ao dev)
+    local_sprints_dir = root / ".gstack" / "sprints"
+    local_sprints_dir.mkdir(parents=True, exist_ok=True)
 
     now = datetime.now()
     timestamp = now.isoformat()
@@ -262,12 +268,14 @@ def write_roi_report(root: Path, project_name: str,
         "graphify_edges": graphify_result.get("edges", 0),
     }
 
-    # JSON report
-    json_path = sprints_dir / f"{project_name}_{now.strftime('%Y%m%d_%H%M%S')}.json"
-    json_path.write_text(json.dumps(roi, indent=2, ensure_ascii=False), encoding="utf-8")
+    # JSON report — global + local
+    json_name = f"{project_name}_{now.strftime('%Y%m%d_%H%M%S')}.json"
+    json_content = json.dumps(roi, indent=2, ensure_ascii=False)
+    (global_sprints_dir / json_name).write_text(json_content, encoding="utf-8")
+    (local_sprints_dir / json_name).write_text(json_content, encoding="utf-8")
 
-    # MD report (human-readable)
-    md_path = sprints_dir / f"{project_name}_{now.strftime('%Y%m%d_%H%M%S')}_ROI.md"
+    # MD report (human-readable) — global + local
+    md_name = f"{project_name}_{now.strftime('%Y%m%d_%H%M%S')}_ROI.md"
     md_lines = [
         f"# ROI Report — {project_name}",
         f"**Data:** {now.strftime('%Y-%m-%d %H:%M')}",
@@ -296,7 +304,9 @@ def write_roi_report(root: Path, project_name: str,
         "_Relatorio gerado automaticamente por gstack_vibehard post_sprint.py_",
         "",
     ])
-    md_path.write_text("\n".join(md_lines), encoding="utf-8")
+    md_content = "\n".join(md_lines)
+    (global_sprints_dir / md_name).write_text(md_content, encoding="utf-8")
+    (local_sprints_dir / md_name).write_text(md_content, encoding="utf-8")
 
     return roi
 

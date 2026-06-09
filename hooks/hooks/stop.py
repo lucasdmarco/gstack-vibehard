@@ -88,11 +88,25 @@ def run_sandbox(cwd: str) -> dict:
 
     root = find_project_root(cwd) or Path(cwd).resolve()
     try:
-        # gVisor runtime for kernel-level isolation (MicroVM sandbox).
-        # Falls back to default Docker runtime if runsc is not available.
-        runtime_flag = "--runtime=runsc"
+        # gVisor runtime detection: check if Docker has runsc available.
+        # Falls back to default Docker runtime if gVisor is not present.
+        gvisor_available = False
+        try:
+            docker_info = subprocess.run(
+                ["docker", "info", "--format", "{{json .Runtimes}}"],
+                capture_output=True, text=True, timeout=10,
+            )
+            if docker_info.returncode == 0 and "runsc" in docker_info.stdout:
+                gvisor_available = True
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+
+        runtime_args = ["--runtime=runsc"] if gvisor_available else []
+        if not gvisor_available:
+            sys.stderr.write("[sandbox] gVisor (runsc) nao detectado — usando runtime Docker padrao\n")
+
         result = subprocess.run(
-            [openhands_bin, "--headless", runtime_flag, "-t", "Validar entrega e executar testes", "--path", str(root)],
+            [openhands_bin, "--headless", *runtime_args, "-t", "Validar entrega e executar testes", "--path", str(root)],
             capture_output=True,
             text=True,
             timeout=600,
@@ -102,12 +116,12 @@ def run_sandbox(cwd: str) -> dict:
     except OSError as e:
         return {"status": "failed", "reason": str(e)}
     except subprocess.TimeoutExpired as e:
-        sys.stderr.write("[sandbox] OpenHands timed out (gVisor runtime may be slow on first run)\n")
+        sys.stderr.write("[sandbox] OpenHands timed out\n")
         return {
             "status": "failed",
             "returncode": 124,
             "stdout": e.stdout or "",
-            "stderr": e.stderr or "OpenHands sandbox timed out (gVisor)",
+            "stderr": e.stderr or "OpenHands sandbox timed out",
         }
 
     if result.returncode != 0:
