@@ -10,6 +10,7 @@ import {
   unlinkSync,
   symlinkSync,
 } from "node:fs"
+import { mkdir, writeFile } from "node:fs/promises"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { homedir, tmpdir } from "node:os"
@@ -686,107 +687,48 @@ pnpm dev
   }
 }
 
-function writeRealHarnessBridge(projectDir, projectName, logger, exec) {
-  // ── Cursor Bridge: .cursor/rules/gstack-vibehard.mdc ──
-  // Cursor rules use MDC format with YAML frontmatter for metadata.
-  // Events: preToolUse (before any tool use) mapped to quality gate audit.
-  mkdirSync(join(projectDir, ".cursor", "rules"), { recursive: true })
-  writeFileSync(join(projectDir, ".cursor", "rules", "gstack-vibehard.mdc"),
-`---
-description: GStack quality gate and security bridge for Cursor
-globs: 
+async function writeJsonMerge(targetPath, newConfig, opts) {
+  let existing = {}
+  try {
+    const raw = readFileSync(targetPath, "utf8")
+    existing = JSON.parse(raw)
+  } catch {}
+  const merged = { ...existing, ...newConfig }
+  await writeFile(targetPath, JSON.stringify(merged, null, 2) + "\n", "utf8")
+}
+
+async function writeRealHarnessBridge(cwd, opts) {
+  console.log("🔗 Integrando Harness Bridge Universal...")
+
+  // 1. Cursor (.cursor/rules/gstack-vibehard.mdc)
+  const cursorRulesDir = join(cwd, ".cursor", "rules")
+  await mkdir(cursorRulesDir, { recursive: true })
+  await writeFile(join(cursorRulesDir, "gstack-vibehard.mdc"), `---
+description: GStack VibeHard 2.0 Universal Bridge
+globs: ["**/*"]
 alwaysApply: true
 ---
-
-# GStack Bridge — ${projectName}
-
-## Pre-Tool Gate (tool.execute.before)
-Before executing shell or write operations, run the quality gate to
-validate that changes don't introduce CRITICO/ALTO issues:
-
-\`\`\`
-npx fallow audit --format json --level 1
-\`\`\`
-
-## Session Rules
-- Respect .gstack/app.json as the source of truth for runtime config
-- Run quality gate before any commit or deploy
-- Never expose secrets from .env or .gstack/*.json in output
-
-## Auto-Fix
-Issues marked auto_fixable=true can be corrected automatically.
+Sempre passe pelo Quality Gate local antes de finalizar o codigo.
+Eventos de ferramentas devem ser logados via agent-hooks.
 `)
 
-  // ── Windsurf Bridge: already handled by gstack.md ──
+  // 2. OpenCode (~/.config/opencode/hooks.json)
+  const openCodeHooksPath = join(homedir(), ".config", "opencode", "hooks.json")
+  const openCodeConfig = {
+    "tool.execute.before": "gstack-agent-bridge",
+    "session.idle": "gstack-agent-bridge",
+  }
+  await writeJsonMerge(openCodeHooksPath, openCodeConfig, opts)
 
-  // ── Claude Code Bridge: inject hooks into settings.json ──
-  // Claude Code reads settings.json from ~/.claude/settings.json
-  // We write project-level hooks into .claude/ directory
-  mkdirSync(join(projectDir, ".claude", "hooks"), { recursive: true })
-  writeFileSync(join(projectDir, ".claude", "hooks", "settings.json"), JSON.stringify({
-    "gstack_bridge": {
-      "enabled": true,
-      "events": {
-        "preToolUse": {
-          "command": `python ${HOME}/.codex/hooks/pre_tool_use_security.py`,
-          "timeout": 5000,
-          "blocking": true,
-        },
-        "sessionEnd": {
-          "command": `python ${HOME}/.codex/hooks/stop.py`,
-          "timeout": 30000,
-          "blocking": false,
-        },
-      },
-      "qualityGate": {
-        "onCompletion": "npx fallow audit --format json",
-        "blockOn": ["CRITICO", "ALTO"],
-      },
+  // 3. Claude Code (~/.claude/settings.json)
+  const claudeSettingsPath = join(homedir(), ".claude", "settings.json")
+  const claudeConfig = {
+    "lifecycleHooks": {
+      "PreToolUse": "python ~/.gstack-vibehard/hooks/pre_tool_use_security.py",
+      "Stop": "python ~/.gstack-vibehard/hooks/stop.py",
     },
-  }, null, 2) + "\n")
-
-  // ── OpenCode Bridge: .config/opencode/hooks.json ──
-  // OpenCode v1.15+ suporta hooks nativos tool.execute.before e session.idle
-  const opencodeConfigDir = join(HOME, ".config", "opencode")
-  mkdirSync(opencodeConfigDir, { recursive: true })
-  const opencodeHooksPath = join(opencodeConfigDir, "hooks.json")
-  if (!existsSync(opencodeHooksPath)) {
-    writeFileSync(opencodeHooksPath, JSON.stringify({
-      version: "1.0",
-      hooks: {
-        "tool.execute.before": {
-          command: `python ${HOME}/.codex/hooks/pre_tool_use_security.py`,
-          timeout: 5000,
-          blocking: true,
-        },
-        "session.idle": {
-          command: "npx fallow audit --format json --level 1",
-          timeout: 30000,
-          blocking: false,
-        },
-      },
-    }, null, 2) + "\n")
-    logger.success("OpenCode bridge: hooks.json configurado (tool.execute.before, session.idle)")
-  } else {
-    logger.info("OpenCode bridge: hooks.json ja existe — pulando")
   }
-
-  // ── agent-hooks CLI (se disponivel) ──
-  const agentHooksBin = findBinary("agent-hooks", exec)
-  if (agentHooksBin) {
-    try {
-      safeExec(exec, `${agentHooksBin} init cursor --dir ${JSON.stringify(projectDir)}`)
-      logger.success("agent-hooks: Cursor inicializado")
-    } catch {}
-    try {
-      safeExec(exec, `${agentHooksBin} init claude --dir ${JSON.stringify(projectDir)}`)
-      logger.success("agent-hooks: Claude Code inicializado")
-    } catch {}
-    try {
-      safeExec(exec, `${agentHooksBin} init opencode --dir ${JSON.stringify(projectDir)}`)
-      logger.success("agent-hooks: OpenCode inicializado")
-    } catch {}
-  }
+  await writeJsonMerge(claudeSettingsPath, claudeConfig, opts)
 }
 
 function writeHarnessFiles(projectDir, projectName) {
@@ -1269,7 +1211,9 @@ export async function createProject(options = {}) {
 
   console.log(`\n  === Fase 5/5: Scaffold & Orquestracao Macro ===`)
   writeHarnessFiles(projectDir, projectName)
-  writeRealHarnessBridge(projectDir, projectName, logger, execSync)
+  if (!isLite) {
+    await writeRealHarnessBridge(projectDir, options)
+  }
   writeTeamMatrix(projectDir, projectName)
   writeGatewayMcpConfig(projectDir)
   writePaperclipManifest(projectDir, projectName)

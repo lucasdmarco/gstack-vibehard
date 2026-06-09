@@ -1,101 +1,75 @@
-# gstack-vibehard 2.0.1
+# 🚀 gstack-vibehard 2.0.6
+**A Máquina de Desenvolvimento Zero-Config Definitiva para Agentes de IA.**
 
-**O Ecossistema Definitivo de Engenharia CLI para Agentes de IA.**
+O `gstack-vibehard` é um **Control Plane e Instalador Cross-Harness**. Ele envelopa o seu terminal com ferramentas de elite, transformando Claude Code, Cursor, OpenCode e Codex em um ecossistema corporativo seguro, unificado e autônomo, rodando 100% na sua máquina.
 
-O `gstack-vibehard` evoluiu. Ele deixou de ser apenas um kit de templates para se tornar uma **Plataforma de Orquestracao Agentic Cross-Harness**. Construido para desenvolvedores que se recusam a sair do terminal, ele integra ferramentas corporativas de IA como Graphify, Fallow, Headroom, AgentMemory e Harness em um unico instalador.
+Chega de alucinações, vazamentos de dados ou perda de contexto. O `gstack-vibehard` implementa a mesma infraestrutura de workspaces do Replit Agent 4, mas operando no seu CLI favorito.
 
-Nenhuma interface grafica. Nenhum gargalo de contexto. Paralelismo absoluto.
+---
 
-## Superpoderes da v2.0
+## ✨ O que há de novo na v2.0.6 (The Convergence Update)
 
-- **Fabrica de Agentes (Omnistack):** escreva a inteligencia do seu projeto uma vez nas pastas `core/` e `knowledge/`. O compilador gera **21 agentes especialistas** adaptados nativamente para Claude Code, Codex, Cursor e OpenCode.
-- **Paralelismo Absoluto (Git Worktrees):** trabalhe em multiplas features ao mesmo tempo. O `workspace_manager.py` isola os agentes em Git Worktrees separadas, clonando automaticamente seus segredos via `.worktreeinclude` para evitar colisoes.
-- **Quality Gates Deterministicos (Fallow):** os agentes sao barrados por analise estatica deterministica antes do codigo chegar ao commit.
-- **Memoria a Custo Zero (Graphify + AgentMemory):** o sistema mapeia o codigo usando AST via tree-sitter. A IA le a topologia do projeto sem consumir API, economizando contexto.
-- **Compressao de Transporte (Headroom):** o proxy integrado comprime RAG, logs e buscas web antes de chegar na LLM.
-- **Sandboxing e Governanca:** codigo gerado e testado em Docker efemero. A injecao de contexto suporta Permit.io, Composio e LiteLLM.
-- **Sinfonia Assincrona:** hooks emitem sinais sonoros quando tarefas falham ou terminam.
-- **Create Omniharness:** `gstack_vibehard create <nome>` cria um workspace runtime completo com template, MCP, Docker sandbox, scripts locais e regras para Claude/Codex/Cursor/Windsurf/Cline/OpenCode.
+- 🛡️ **Zero-Trust Output Guard:** Um "Agente Porteiro" intercepta as saídas da IA. Usa RBAC para escanear e bloquear vazamentos de 8 classes de dados sensíveis (Chaves Stripe, Tokens GitHub, CPFs, etc.) antes de exibi-los na tela.
+- 📦 **Replitização do Workspace:** Os projetos agora nascem com os manifestos de app nativos (`.gstack/app.json`, `ports.json` e `services.json`), definindo comandos de execução e portas dinâmicas automaticamente.
+- 🔌 **Harness Bridge Real:** Eventos de ferramentas e lifecycle são roteados nativamente. Suporte profundo a `.cursor/rules` no Cursor, `hooks.json` (`tool.execute.before`) no OpenCode e `settings.json` no Claude.
+- 🪶 **Modo `--lite`:** PC fraco ou sem Docker/Rust? Use `gstack_vibehard create meu-app --lite` para gerar o projeto e a estrutura de agentes burlando a inicialização de daemons pesados.
+- 🔒 **RCE-Safe & Hardened:** Substituição completa de execuções de shell cruas (`execSync`) por `execFileSync`. Nenhuma URL ou caminho malicioso injetado por IA pode comprometer sua máquina. Crashs em Python causados por `stdin` vazios ou incompatibilidade de tipos foram erradicados.
 
-## Instalacao Universal
+---
+
+## ⚡ Instalação Rápida (Padrão Ouro)
+
+O instalador detecta automaticamente suas IDEs e faz a injeção em background.
 
 ```bash
 npm install -g @gstack-vibehard/installer
-gstack_vibehard install
 ```
 
-Uso interativo via `npx`:
-
+Para criar um novo projeto blindado:
 ```bash
-npx @gstack-vibehard/installer
+gstack_vibehard create meu-projeto
 ```
+(Para ambientes sem Docker/Rust, adicione a flag `--lite`)
 
-## Como Usar o Ecossistema (CLI-First)
+---
 
-### 1. Criar um ambiente paralelo seguro
+## 🏗️ Templates Verticais Incluídos
 
-Nao use a branch principal. Crie uma worktree para o agente trabalhar:
+O instalador permite gerar arquiteturas prontas passando a flag `--template`:
 
+- `fullstack-monorepo` (Padrão: Express/Fastify/Hono)
+- `saas-auth-stripe` (Next.js + Supabase + Stripe)
+- `mobile-backend` (Expo + tRPC + PostgreSQL)
+- `ai-agent-platform` (LangGraph + ChromaDB + FastAPI)
+
+Exemplo:
 ```bash
-python scripts/scripts/workspace_manager.py create feature-x --repo .
+gstack_vibehard create app-vendas --template saas-auth-stripe
 ```
 
-### 2. Pesquisa Profunda (Deep Research)
+---
 
-Deixe o agente parametrizar a investigacao web com Playwright MCP, Context7 e compressao Headroom:
+## 🧠 A Arquitetura Invisível (O que instalamos por você)
 
-```bash
-python scripts/scripts/deep_research.py "Como implementar OAuth2 no Fastify"
-```
+Para que o desenvolvedor iniciante ("vibecoder") não precise ler manuais complexos, orquestramos em background:
 
-O comando gera um dossie em `.gstack/research/` e imprime apenas o caminho do arquivo para o agente principal abrir e executar.
+- **Memória de Custo Zero (Graphify):** Lê a Árvore de Sintaxe Abstrata (AST) do projeto a custo zero e entrega um grafo de conhecimento para a IA não precisar ler arquivos inteiros.
+- **Economia de Tokens (Headroom):** Um proxy MCP que esmaga o tráfego RAG, logs e saídas em até 95%, reduzindo sua fatura de API drasticamente.
+- **Auditoria Matemática (Fallow):** Impede o commit de lixo gerado por IA. Avalia complexidade (CRAP) e código morto em subsegundos usando Rust, sem "achismos".
+- **Governança Pós-Sprint:** Relatórios detalhados (`post_sprint.py`) calculam o ROI da sessão, arquivos modificados em massa via Atomic VCS, e decisões de negócio integradas ao servidor MOM.
+- **Observabilidade TUI:** Digite `gstack_vibehard monitor` para ver o status dos times Harness, bloqueios de Quality Gate e economia de tokens em tempo real.
 
-### 3. Evocar um Time de Agentes (Harness)
+---
 
-Monte equipes locais no padrao Agent Teams:
+## 🛡️ Protocolos de Segurança Ativos
 
-```bash
-python scripts/scripts/team_builder.py producer-reviewer
-```
+- **File Locking Estrito:** `fcntl`/`msvcrt` nativo evita corrupção do arquivo `instincts.yaml` durante concorrência de agentes.
+- **GitOps Seguro:** Empurre código apenas com consentimento. `git push` automático bloqueado localmente.
+- **MicroVM / Sandbox:** Suporte nativo ao Docker headless e gVisor via OpenHands CLI.
+- **Sem Dependências Fantasmas:** Todas as chamadas `npx` foram limpas e sanitizadas na compilação.
 
-Padroes suportados:
+---
 
-- `producer-reviewer`
-- `pipeline`
-- `fan-out`
+## 📝 Licença
 
-### 4. Deploy a Jato
-
-Rode o Agente Deployer. Ele aciona Fallow para aprovacao de QA e usa GitHub CLI e Vercel CLI quando autorizado.
-
-## O que instala
-
-| Componente | Descricao |
-|------------|-----------|
-| Hooks Python | `qg.py`, `gc.py`, `session_start.py`, `stop.py`, `post_sprint.py` |
-| Skills | frontend-design, chronicle, project-init e biblioteca completa de skills |
-| Template | fullstack-monorepo com variantes backend |
-| Agentes | 21 especialistas cross-harness |
-| Ferramentas | gbrain, graphify, Playwright, Headroom, Fallow, AgentMemory |
-| MCP | servidores base para RAG, browser, memoria, governanca e integracoes |
-
-## Comandos
-
-```bash
-gstack_vibehard install        # Instalar no ambiente
-gstack_vibehard create <nome>  # Criar workspace runtime omniharness
-gstack_vibehard doctor         # Diagnosticar ambiente
-gstack_vibehard init <nome>    # Criar novo projeto com template
-gstack_vibehard sprint --save  # Rodar post-sprint
-gstack_vibehard help           # Mostrar ajuda
-```
-
-## Filosofia
-
-A inteligencia artificial nao deve remover o engenheiro do controle; deve dar a ele um exercito de terminal.
-
-## Licenca
-
-MIT - see [LICENSE](LICENSE).
-
-Third-party attributions in [NOTICE](NOTICE).
+Desenvolvido sob a Licença MIT.
