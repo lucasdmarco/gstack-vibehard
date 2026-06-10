@@ -14,6 +14,8 @@ const HOME = homedir()
 
 const CLAUDE_DIR = join(HOME, ".claude")
 const CLAUDE_HOOKS = join(CLAUDE_DIR, "hooks")
+const CLAUDE_SETTINGS = join(CLAUDE_DIR, "settings.json")
+const GSTACK_HOOKS_DIR = join(HOME, ".gstack", "hooks")
 const CLAUDE_MD = join(HOME, "CLAUDE.md")
 const ULTRA_MD = join(CLAUDE_DIR, "rules", "ultracode.md")
 const MCP_CONFIG = join(HOME, ".mcp.json")
@@ -81,17 +83,57 @@ Security is not a phase. It is foundation.
 OWASP Top 10 audit before every deploy.
 `
 
+/**
+ * Registra os hooks Python no settings.json do Claude Code — formato real:
+ * hooks.<Evento> = [{ matcher?, hooks: [{ type: "command", command, timeout }] }]
+ * Idempotente: identifica entradas gstack pelo caminho do hook no comando e
+ * preserva hooks do usuario.
+ */
+export function registerClaudeHooks(report, hooksDir = GSTACK_HOOKS_DIR, settingsPath = CLAUDE_SETTINGS) {
+  const pyCmd = resolvePythonCmd()
+  const hookCommand = (script) => `${pyCmd} "${join(hooksDir, script)}"`
+
+  const GSTACK_EVENTS = {
+    PreToolUse: { matcher: "Write|Edit|Bash", script: "pre_tool_use_security.py", timeout: 30 },
+    Stop: { script: "stop.py", timeout: 600 },
+    SessionStart: { script: "session_start.py", timeout: 60 },
+    UserPromptSubmit: { script: "user_prompt_submit.py", timeout: 30 },
+  }
+
+  const settings = readJsonFile(settingsPath) || {}
+  const hooks = { ...(settings.hooks || {}) }
+
+  for (const [event, cfg] of Object.entries(GSTACK_EVENTS)) {
+    const command = hookCommand(cfg.script)
+    const entries = Array.isArray(hooks[event]) ? [...hooks[event]] : []
+    // Remove registros gstack antigos (qualquer command apontando para o script)
+    const cleaned = entries.filter((entry) => {
+      const cmds = (entry?.hooks || []).map((h) => h?.command || "")
+      return !cmds.some((c) => c.includes(cfg.script))
+    })
+    const newEntry = {
+      ...(cfg.matcher ? { matcher: cfg.matcher } : {}),
+      hooks: [{ type: "command", command, timeout: cfg.timeout }],
+    }
+    hooks[event] = [...cleaned, newEntry]
+  }
+
+  settings.hooks = hooks
+  writeWithBackup(settingsPath, JSON.stringify(settings, null, 2))
+  report.updated.push("~/.claude/settings.json (hooks registrados)")
+}
+
 export async function installClaude(config, report) {
   ensureDir(CLAUDE_DIR)
   ensureDir(join(CLAUDE_DIR, "rules"))
 
-  // Install hooks to ~/.claude/hooks/ from package source
+  // Hooks: copia .py (fallback se Step 3 do install nao rodou) + REGISTRO
+  // real no settings.json — sem registro o Claude Code nunca executa os hooks.
   if (config.hooks) {
     ensureDir(CLAUDE_HOOKS)
     const fs = await import("fs")
     let hooksSource = HOOKS_SOURCE
     if (!existsSync(hooksSource)) {
-      // Fallback para compat retroativa: copia de ~/.gstack/hooks/ ou ~/.codex/hooks/
       const gstackHooks = join(HOME, ".gstack", "hooks")
       const codexHooks = join(HOME, ".codex", "hooks")
       if (existsSync(gstackHooks)) hooksSource = gstackHooks
@@ -106,6 +148,10 @@ export async function installClaude(config, report) {
         report.added.push(`claude hook: ${hook}`)
       }
     }
+    // Registra apontando para a fonte canonica (~/.gstack/hooks) se existir,
+    // senao para ~/.claude/hooks
+    const registerDir = existsSync(GSTACK_HOOKS_DIR) ? GSTACK_HOOKS_DIR : CLAUDE_HOOKS
+    registerClaudeHooks(report, registerDir)
   }
 
   if (config.claudeMd) {

@@ -1,4 +1,4 @@
-# 🚀 gstack-vibehard 2.1.8
+# 🚀 gstack-vibehard 2.2.0
 **A Máquina de Desenvolvimento Zero-Config Definitiva para Agentes de IA.**
 
 O `gstack-vibehard` é um **Control Plane e Instalador Cross-Harness**. Ele envelopa o seu terminal com ferramentas de elite, transformando Claude Code, Cursor, OpenCode e Codex em um ecossistema corporativo seguro, unificado e autônomo, rodando 100% na sua máquina.
@@ -7,10 +7,23 @@ Chega de alucinações, vazamentos de dados ou perda de contexto. O `gstack-vibe
 
 ---
 
-## ✨ O que há de novo na v2.1.8 (Segurança + Performance + Higiene)
+## 🔌 Matriz de Suporte por Harness (honesta)
 
-- 🔌 **Fase 0–8 — Portabilidade Cross-Harness:** Paths unificados (`_paths.py`), input normalization (`_harness.py`), crash safety global, MCP config para Claude, bridge real, hooks independentes do Codex, detectores para Windsurf/Gemini/Kiro/Zed.
-- 🛡️ **RCE Elimination:** `safeDownloadAndRun` usa `param($u,$o)` no PowerShell. O código principal em `src/` não usa mais `execSync(string)`.
+| Nível | Harness | O que você recebe |
+|---|---|---|
+| **Hooks reais** (gates automáticos) | **Claude Code** | Hooks registrados em `settings.json` (PreToolUse/Stop/SessionStart/UserPromptSubmit) + MCP em `~/.claude.json` + agentes + regras |
+| **Hooks reais** | **Cursor** | Hooks registrados em `~/.cursor/hooks.json` (beforeShellExecution/preToolUse/stop/sessionStart) + agentes + rules `.mdc` |
+| **Hooks reais** | **OpenCode** | Plugins JS (`tool.execute.before`, `session.created`) + skills + config com merge não-destrutivo |
+| **Instrucional** (best-effort) | Codex, Gemini CLI, Windsurf, Kiro, Zed | Detecção + instruções de QG via AGENTS.md/regras — o agente é orientado a rodar os gates, sem bloqueio por API |
+| **Planejado** | Copilot CLI, VS Code, Droid (Factory), KiloCLI, Kimi CLI | Roadmap v2.3 |
+
+Os hooks Python respondem no formato nativo de cada harness (`hookSpecificOutput` para Claude Code, `permission` para Cursor) — camada de saída em `hooks/hooks/_harness.py`.
+
+## ✨ O que há de novo na v2.2.0 (Hooks Reais Cross-Harness)
+
+- 🪝 **Registro real de hooks:** Claude Code (`settings.json` formato oficial) e Cursor (`hooks.json` v1) agora EXECUTAM os gates — antes os hooks eram apenas copiados.
+- 🧪 **Suíte de testes viva:** CI roda `npm test` + `pytest` em matriz de 3 SOs; 27+ testes.
+- 🛠️ **uninstall/list/--skip-deps** implementados; downloads Windows via `curl.exe` (sem interpolação PowerShell).
 - 🧠 **Python portátil:** `sys.executable` em hooks + `resolvePythonCmd()` no JS (prefere `python3`, fallback `python`).
 
 ### v2.1.8 (Segurança + Performance + Higiene)
@@ -34,12 +47,12 @@ Chega de alucinações, vazamentos de dados ou perda de contexto. O `gstack-vibe
 - **F1 — Path resolution unificada:** `_paths.py` com `read_with_fallback()`. Dados em `~/.gstack/`.
 - **F2 — Input normalization:** `_harness.py` mapeia snake_case + camelCase.
 - **F3 — Crash safety:** `sys.excepthook` global em `stop.py`.
-- **F4 — MCP para Claude:** `claude.js` escreve em `~/.claude/settings.json`.
+- **F4 — MCP para Claude:** `claude.js` escreve em `~/.claude.json` (local que o Claude Code lê; corrigido na v2.1.9).
 - **F5 — Bridge real:** `writeRealHarnessBridge` aponta para `~/.gstack/hooks/`.
 - **F6 — Claude independente:** Hooks copiados do pacote, não do Codex.
 - **F7 — OpenCode com stdin:** Plugin passa payload JSON para `stop.py`.
 - **F8 — Detectores:** Windsurf, Gemini CLI, Kiro, Zed.
-- **C1.3 — safeDownloadAndRun seguro:** `param($u,$o)` bind no PowerShell.
+- **C1.3 — safeDownloadAndRun seguro:** downloads via `curl.exe` com argumentos em array (corrigido na v2.1.9 — o bind `param($u,$o)` não funcionava com `-Command`).
 - **C1.2 — headroom.js RCE-free:** 6 `execSync` → `execFileSync`.
 - **README honesto:** Claims corrigidas sobre escopo do `execFileSync`.
 
@@ -91,8 +104,8 @@ gstack_vibehard uninstall
 ```
 
 O Quality Gate roda automaticamente via hooks no final de cada sessão:
-- **Claude Code/OpenCode**: hooks restritivos (bloqueiam entrega se CRITICO/ALTO)
-- **Codex/Gemini CLI**: modo Best-Effort (instrucional — sem hooks API)
+- **Claude Code/Cursor/OpenCode**: hooks registrados e executados pelo harness (bloqueiam comandos perigosos; reportam gates no Stop)
+- **Codex/Gemini CLI/Windsurf/Kiro/Zed**: modo Best-Effort (instrucional — sem hooks API)
 - **Código migrado**: `src/` sem `execSync(string)`; operações de subprocesso usam `execFileSync`/`execFile` com argumentos em array
 - **Typecheck complementar**: `qg.py` roda `npx tsc --noEmit` apos Fallow nos projetos com `tsconfig.json`
 

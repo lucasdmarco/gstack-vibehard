@@ -8,6 +8,7 @@ import { detectHarnesses, isWindows, isMacOS, isLinux } from "../harness/detecto
 import { installCodex } from "../harness/codex.js"
 import { installClaude } from "../harness/claude.js"
 import { installOpenCode } from "../harness/opencode.js"
+import { installCursor } from "../harness/cursor.js"
 import { installHeadroom } from "../harness/headroom.js"
 import { ensureDir, copyWithBackup, copyDirSync, backupFile } from "./merge.js"
 import { checkAlreadyInstalled } from "./check.js"
@@ -408,16 +409,16 @@ export async function install(args = []) {
     warn("scripts/scripts/ nao encontrado no pacote")
   }
 
-  // Step 3: Install hooks — apenas nos harnesses selecionados
+  // Step 3: Install hooks — fonte canonica em ~/.gstack/hooks/ (todos os
+  // registros de harness apontam para ca) + copias legadas por harness
   section("hooks/ — Quality & Security Gates")
   const hooksSource = join(PROJECT_ROOT, "hooks", "hooks")
-  const hookTargets = []
+  const canonicalHooksDir = join(HOME, ".gstack", "hooks")
+  const hookTargets = [{ id: "gstack (canonico)", dir: canonicalHooksDir }]
   if (selectedHarnessIds.includes("codex")) hookTargets.push({ id: "codex", dir: join(HOME, ".codex", "hooks") })
   if (selectedHarnessIds.includes("claude")) hookTargets.push({ id: "claude", dir: join(HOME, ".claude", "hooks") })
   if (!existsSync(hooksSource)) {
     warn("hooks/hooks/ nao encontrado no pacote")
-  } else if (hookTargets.length === 0) {
-    info("hooks: nenhum harness com suporte a hooks Python selecionado (pulado)")
   } else {
     const hooks = readdirSync(hooksSource).filter((f) => f.endsWith(".py"))
     for (const target of hookTargets) {
@@ -483,15 +484,20 @@ export async function install(args = []) {
           await installCodex({ hooks: false, template: true }, report)
           break
         case "claude":
-          // hooks: false — Step 3 ja copia os hooks Python para ~/.claude/hooks
-          await installClaude({ hooks: false, claudeMd: true, ultracode: true, mcp: true }, report)
+          // hooks: true = REGISTRO no settings.json (Step 3 ja copiou os .py)
+          await installClaude({ hooks: true, claudeMd: true, ultracode: true, mcp: true }, report)
           break
         case "opencode":
           await installOpenCode({ hooks: true }, report)
           break
         case "cursor":
-          report.skipped.push("cursor: configuracao legacy nao requerida")
+          await installCursor({ hooks: true }, report)
           break
+        default:
+          // Harness sem API de hooks/config suportada — nao mentir "configurado"
+          info(`${harnessId}: detectado — integracao instrucional apenas (sem hooks API)`)
+          report.skipped.push(`${harnessId}: integracao instrucional`)
+          continue
       }
       success(`${harnessId} configurado`)
     } catch (e) {

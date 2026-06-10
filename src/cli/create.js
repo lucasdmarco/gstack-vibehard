@@ -737,13 +737,31 @@ Eventos de ferramentas devem ser logados via agent-hooks.
     const codexHooksDir = join(homedir(), ".codex", "hooks")
     const hooksDir = existsSync(gstackHooksDir) ? gstackHooksDir : codexHooksDir
 
+    // Formato REAL de hooks do Claude Code (settings.json):
+    // hooks.<Evento> = [{ matcher?, hooks: [{ type: "command", command, timeout }] }]
     const claudeConfig = {
-      "lifecycleHooks": {
-        "PreToolUse": `${pyCmd} ${join(hooksDir, "pre_tool_use_security.py")}`,
-        "Stop": `${pyCmd} ${join(hooksDir, "stop.py")}`,
+      hooks: {
+        PreToolUse: [{
+          matcher: "Write|Edit|Bash",
+          hooks: [{ type: "command", command: `${pyCmd} "${join(hooksDir, "pre_tool_use_security.py")}"`, timeout: 30 }],
+        }],
+        Stop: [{
+          hooks: [{ type: "command", command: `${pyCmd} "${join(hooksDir, "stop.py")}"`, timeout: 600 }],
+        }],
       },
     }
     await writeJsonMerge(claudeSettingsPath, claudeConfig, opts)
+
+    // Cursor: hooks.json em nivel de projeto (formato oficial version: 1)
+    const cursorHooksPath = join(cwd, ".cursor", "hooks.json")
+    const cursorConfig = {
+      version: 1,
+      hooks: {
+        beforeShellExecution: [{ command: `${pyCmd} "${join(hooksDir, "pre_tool_use_security.py")}"`, timeout: 30 }],
+        stop: [{ command: `${pyCmd} "${join(hooksDir, "stop.py")}"`, timeout: 600 }],
+      },
+    }
+    await writeJsonMerge(cursorHooksPath, cursorConfig, opts)
   } catch (e) {
     console.warn(`  ⚠ Harness Bridge: ${e.message || e} (non-blocking)`)
   }

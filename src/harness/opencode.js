@@ -2,7 +2,7 @@ import { existsSync, cpSync } from "fs"
 import { join, dirname } from "path"
 import { homedir } from "os"
 import { fileURLToPath } from "url"
-import { writeWithBackup, ensureDir, readJsonFile } from "../installer/merge.js"
+import { writeWithBackup, ensureDir, readJsonFile, mergeJson } from "../installer/merge.js"
 
 const HOME = homedir()
 const OPENCODE_CONFIG = join(HOME, ".config", "opencode", "opencode.json")
@@ -17,7 +17,7 @@ export async function installOpenCode(config, report) {
   ensureDir(OPENCODE_PLUGINS)
 
   if (config.hooks) {
-    const opencodeConfig = {
+    const gstackConfig = {
       $schema: "https://opencode.ai/config.json",
       skills: {
         paths: [OPENCODE_SKILLS],
@@ -33,8 +33,13 @@ export async function installOpenCode(config, report) {
       ],
     }
 
-    writeWithBackup(OPENCODE_CONFIG, JSON.stringify(opencodeConfig, null, 2))
-    report.updated.push("~/.config/opencode/opencode.json")
+    // MERGE com a config existente do usuario — nunca sobrescrever.
+    // Prioridade do usuario em conflito (mergeJson preserva chaves existentes
+    // e une arrays sem duplicar).
+    const existing = readJsonFile(OPENCODE_CONFIG)
+    const merged = existing ? mergeJson(gstackConfig, existing) : gstackConfig
+    writeWithBackup(OPENCODE_CONFIG, JSON.stringify(merged, null, 2))
+    report.updated.push("~/.config/opencode/opencode.json (merge)")
   }
 
   if (existsSync(PLUGIN_SRC)) {

@@ -7,13 +7,17 @@ Integrates Paperclip-inspired precondition enforcement:
 import json, sys, re
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _harness import emit_permission_decision, normalize_input
+
 inp = json.loads(sys.stdin.read())
 tool_input = inp.get("tool_input", {})
-cmd = tool_input.get("command", "")
+# Claude/Codex: tool_input.command | Cursor beforeShellExecution: command no top-level
+cmd = tool_input.get("command", "") or inp.get("command", "")
 # Write/Edit/apply_patch enviam file_path (nao command)
 file_path = tool_input.get("file_path", "") or tool_input.get("path", "")
 tool_name = inp.get("tool_name", "")
-cwd = inp.get("cwd", "")
+cwd = normalize_input(inp)["cwd"]
 
 # ═══════════════════════════════════════════════════════
 #  DESIGN SYSTEM MANDATE — Paperclip pre-tool gate pattern
@@ -98,28 +102,12 @@ BLOCK_PATTERNS = [
 
 for pattern, reason in BLOCK_PATTERNS:
     if re.search(pattern, cmd, re.IGNORECASE):
-        output = {
-            "hookSpecificOutput": {
-                "hookEventName": "PreToolUse",
-                "permissionDecision": "deny",
-                "permissionDecisionReason": reason
-            }
-        }
-        sys.stdout.write(json.dumps(output))
-        sys.exit(0)
+        emit_permission_decision(inp, "deny", reason)
 
 # Design system mandate check (runs after security check)
 blocked, reason = check_design_system_mandate()
 if blocked:
-    output = {
-        "hookSpecificOutput": {
-            "hookEventName": "PreToolUse",
-            "permissionDecision": "deny",
-            "permissionDecisionReason": reason
-        }
-    }
-    sys.stdout.write(json.dumps(output))
-    sys.exit(0)
+    emit_permission_decision(inp, "deny", reason)
 
 # Allow
 sys.exit(0)
