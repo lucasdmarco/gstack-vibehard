@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, unlinkSync, renameSync, rmSync, readFileSync } from "fs"
+import { existsSync, readdirSync, unlinkSync, renameSync, rmSync, readFileSync, writeFileSync } from "fs"
 import { homedir } from "os"
 import { join, dirname } from "path"
 import { fileURLToPath } from "url"
@@ -65,12 +65,74 @@ function removeDir(dir, report) {
 }
 
 function removeHooks(report) {
-  // Somente os nomes de hook que existem no pacote
+  // Somente os nomes de hook que existem no pacote. Inclui a fonte canonica
+  // ~/.gstack/hooks (criada pelo install Step 3) alem dos dirs por harness.
   const packageHooks = packageFileNames(join("hooks", "hooks"), ".py")
-  for (const hooksDir of [join(HOME, ".codex", "hooks"), join(HOME, ".claude", "hooks")]) {
+  const hookDirs = [
+    join(HOME, ".gstack", "hooks"),
+    join(HOME, ".codex", "hooks"),
+    join(HOME, ".claude", "hooks"),
+  ]
+  for (const hooksDir of hookDirs) {
     if (!existsSync(hooksDir)) continue
     const count = packageHooks.filter((hook) => removeWithRestore(join(hooksDir, hook), report)).length
     if (count > 0) success(`${count} hooks removidos de ${hooksDir}`)
+  }
+}
+
+/**
+ * Remove os registros de hooks gstack do settings.json (Claude) e do
+ * hooks.json (Cursor). Sem isso, o harness tenta executar .py ja deletados e
+ * falha em todo turno apos a desinstalacao.
+ */
+function unregisterHooks(report) {
+  const GSTACK_SCRIPTS = [
+    "pre_tool_use_security.py", "stop.py", "session_start.py", "user_prompt_submit.py",
+  ]
+  const mentionsGstack = (cmd) =>
+    typeof cmd === "string" && (cmd.includes(".gstack") || GSTACK_SCRIPTS.some((s) => cmd.includes(s)))
+
+  // Claude: settings.json -> hooks.<Evento>[].hooks[].command
+  const claudeSettings = join(HOME, ".claude", "settings.json")
+  if (existsSync(claudeSettings)) {
+    try {
+      const settings = JSON.parse(readFileSync(claudeSettings, "utf-8"))
+      if (settings.hooks && typeof settings.hooks === "object") {
+        for (const [event, entries] of Object.entries(settings.hooks)) {
+          if (!Array.isArray(entries)) continue
+          const kept = entries.filter((entry) => {
+            const cmds = (entry?.hooks || []).map((h) => h?.command || "")
+            return !cmds.some(mentionsGstack)
+          })
+          if (kept.length > 0) settings.hooks[event] = kept
+          else delete settings.hooks[event]
+        }
+        writeFileSync(claudeSettings, JSON.stringify(settings, null, 2))
+        report.removed.push("registro de hooks: ~/.claude/settings.json")
+      }
+    } catch (e) {
+      report.errors.push(`settings.json: ${e.message}`)
+    }
+  }
+
+  // Cursor: hooks.json -> hooks.<evento>[].command
+  const cursorHooks = join(HOME, ".cursor", "hooks.json")
+  if (existsSync(cursorHooks)) {
+    try {
+      const config = JSON.parse(readFileSync(cursorHooks, "utf-8"))
+      if (config.hooks && typeof config.hooks === "object") {
+        for (const [event, entries] of Object.entries(config.hooks)) {
+          if (!Array.isArray(entries)) continue
+          const kept = entries.filter((entry) => !mentionsGstack(entry?.command))
+          if (kept.length > 0) config.hooks[event] = kept
+          else delete config.hooks[event]
+        }
+        writeFileSync(cursorHooks, JSON.stringify(config, null, 2))
+        report.removed.push("registro de hooks: ~/.cursor/hooks.json")
+      }
+    } catch (e) {
+      report.errors.push(`hooks.json: ${e.message}`)
+    }
   }
 }
 
@@ -135,7 +197,8 @@ export async function uninstall(args = []) {
 
   section("gstack_vibehard Uninstaller")
   info("Sera removido apenas o que o instalador criou (backups .bak sao restaurados):")
-  info("  • hooks Python em ~/.codex/hooks e ~/.claude/hooks")
+  info("  • hooks Python em ~/.gstack/hooks, ~/.codex/hooks e ~/.claude/hooks")
+  info("  • registros de hooks em ~/.claude/settings.json e ~/.cursor/hooks.json")
   info("  • ~/.claude/rules/ultracode.md e ~/CLAUDE.md (restaura backup)")
   info("  • agentes gerados (namespace gstack-vibehard)")
   info("  • skills e scripts em ~/.agents instalados pelo pacote")
@@ -150,6 +213,7 @@ export async function uninstall(args = []) {
     }
   }
 
+  unregisterHooks(report)
   removeHooks(report)
   removeWithRestore(join(HOME, ".claude", "rules", "ultracode.md"), report)
   removeWithRestore(join(HOME, "CLAUDE.md"), report)

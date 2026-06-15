@@ -566,8 +566,6 @@ def run_test_gate(cwd: str) -> dict:
     """
     if not cwd:
         return {"status": "skipped", "summary": "cwd missing"}
-    if os.environ.get("GSTACK_TEST_GATE") == "off":
-        return {"status": "skipped", "summary": "test gate desabilitado (GSTACK_TEST_GATE=off)"}
     root = find_project_root(cwd) or Path(cwd).resolve()
     argv = detect_test_command(root)
     if not argv:
@@ -591,16 +589,14 @@ def run_test_gate(cwd: str) -> dict:
     }
 
 
-# Test gate roda sempre (skip automatico se nao ha suite). Nos auto-testes do
-# gstack (GSTACK_AUDIO_CUES_TEST=1) pulamos a execucao real para nao rodar a
-# suite do proprio projeto — exceto quando o gate e explicitamente forcado
-# (GSTACK_TEST_GATE in 1/block), caso em que estamos testando o proprio gate.
-_self_test = os.environ.get("GSTACK_AUDIO_CUES_TEST") == "1"
-_gate_forced = os.environ.get("GSTACK_TEST_GATE") in ("1", "block")
-if _self_test and not _gate_forced:
-    test_result = {"status": "skipped", "summary": "modo teste (GSTACK_AUDIO_CUES_TEST)"}
-else:
+# Test gate e OPT-IN: o Stop hook dispara a cada turno do agente, entao rodar
+# a suite inteira (ate 300s) sempre tornaria cada turno lento. Habilite com
+# GSTACK_TEST_GATE=on (reporta) ou =block (devolve o controle ao agente).
+_test_gate_mode = os.environ.get("GSTACK_TEST_GATE", "").lower()
+if _test_gate_mode in ("on", "1", "block"):
     test_result = run_test_gate(cwd)
+else:
+    test_result = {"status": "skipped", "summary": "test gate off (defina GSTACK_TEST_GATE=on para ativar)"}
 note_lines.append("")
 note_lines.append("## Test Gate")
 note_lines.append(test_result.get("summary", "N/A"))

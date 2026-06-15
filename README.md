@@ -1,4 +1,4 @@
-# 🚀 gstack-vibehard 2.2.1
+# 🚀 gstack-vibehard 2.2.2
 **A Máquina de Desenvolvimento Zero-Config Definitiva para Agentes de IA.**
 
 [![Test](https://github.com/lucasdmarco/gstack-vibehard/actions/workflows/test.yml/badge.svg)](https://github.com/lucasdmarco/gstack-vibehard/actions/workflows/test.yml)
@@ -121,10 +121,11 @@ O Quality Gate roda automaticamente via hooks no final de cada sessão:
 
 ### 🧪 Test Gate (entrega validada — paridade Replit Agent)
 
-No final de cada sessão, o Stop hook **detecta e roda a suíte de testes do projeto** (npm test, pytest, `cargo test`, `go test`), registra o resultado no chronicle e:
-- **Default**: reporta (não bloqueia) — o resultado vai no `systemMessage`.
+No final de cada sessão, o Stop hook pode **detectar e rodar a suíte de testes do projeto** (npm test, pytest, `cargo test`, `go test`) e registrar o resultado no chronicle. É **opt-in** (o Stop dispara a cada turno — rodar a suíte sempre tornaria cada turno lento):
+- **Default (desligado)**: o gate é pulado.
+- **`GSTACK_TEST_GATE=on`**: roda e reporta (não bloqueia) no `systemMessage`.
 - **`GSTACK_TEST_GATE=block`**: se os testes falham, devolve o controle ao agente para corrigir antes de finalizar (respeita `stop_hook_active` para evitar loop).
-- **`GSTACK_TEST_GATE=off`**: desativa o gate. Timeout via `GSTACK_TEST_TIMEOUT` (default 300s).
+- Timeout via `GSTACK_TEST_TIMEOUT` (default 300s).
 
 ## ⚡ Instalação Rápida
 
