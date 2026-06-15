@@ -3,6 +3,7 @@ import { homedir } from "os"
 import { join, dirname } from "path"
 import { fileURLToPath } from "url"
 import { getInstalledComponents, getInstalledScripts, getInstalledSkills } from "./check.js"
+import { stripGstackFromCodexConfig } from "../harness/codex.js"
 import { confirm, success, warn, error, info, section } from "../cli/index.js"
 
 const HOME = homedir()
@@ -215,6 +216,15 @@ export async function uninstall(args = []) {
 
   unregisterHooks(report)
   removeHooks(report)
+  // Codex config.toml: remove apenas as chaves gstack, preservando a config do usuario
+  try {
+    const codexConfig = join(HOME, ".codex", "config.toml")
+    if (existsSync(codexConfig) && stripGstackFromCodexConfig(codexConfig)) {
+      report.removed.push("chaves gstack: ~/.codex/config.toml")
+    }
+  } catch (e) {
+    report.errors.push(`config.toml: ${e.message}`)
+  }
   removeWithRestore(join(HOME, ".claude", "rules", "ultracode.md"), report)
   removeWithRestore(join(HOME, "CLAUDE.md"), report)
   removeGeneratedAgents(report)

@@ -40,8 +40,8 @@
     "NOTICE"
   ],
   "peerDependencies": {
-    "fallow": "0.x",
-    "@agentmemory/agentmemory": "0.x"
+    "@agentmemory/agentmemory": "0.x",
+    "fallow": "0.x"
   },
   "peerDependenciesMeta": {
     "fallow": {
@@ -64,5 +64,8 @@
     "fullstack-template",
     "taste-skill",
     "quality-gate"
-  ]
+  ],
+  "dependencies": {
+    "smol-toml": "^1.6.1"
+  }
 }
