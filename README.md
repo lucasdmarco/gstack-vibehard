@@ -109,6 +109,13 @@ O Quality Gate roda automaticamente via hooks no final de cada sessão:
 - **Código migrado**: `src/` sem `execSync(string)`; operações de subprocesso usam `execFileSync`/`execFile` com argumentos em array
 - **Typecheck complementar**: `qg.py` roda `npx tsc --noEmit` apos Fallow nos projetos com `tsconfig.json`
 
+### 🧪 Test Gate (entrega validada — paridade Replit Agent)
+
+No final de cada sessão, o Stop hook **detecta e roda a suíte de testes do projeto** (npm test, pytest, `cargo test`, `go test`), registra o resultado no chronicle e:
+- **Default**: reporta (não bloqueia) — o resultado vai no `systemMessage`.
+- **`GSTACK_TEST_GATE=block`**: se os testes falham, devolve o controle ao agente para corrigir antes de finalizar (respeita `stop_hook_active` para evitar loop).
+- **`GSTACK_TEST_GATE=off`**: desativa o gate. Timeout via `GSTACK_TEST_TIMEOUT` (default 300s).
+
 ## ⚡ Instalação Rápida
 
 ```bash

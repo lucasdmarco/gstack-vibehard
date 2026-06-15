@@ -535,6 +535,96 @@ if run_security:
             note_lines.append("")
             note_lines.append("**DEPLOY BLOQUEADO** — resolva os itens acima antes.")
 
+# ── Test Gate (Replit-like: entrega validada pela suite do projeto) ──
+def detect_test_command(root: Path) -> list[str] | None:
+    """Detecta a suite de testes do projeto. Retorna argv ou None."""
+    pkg = root / "package.json"
+    if pkg.exists():
+        try:
+            data = json.loads(pkg.read_text(encoding="utf-8", errors="ignore"))
+            script = (data.get("scripts") or {}).get("test", "")
+            # Ignora placeholders ("no test specified") e auto-referencias perigosas
+            if script and "no test specified" not in script.lower():
+                npm = shutil.which("npm")
+                if npm:
+                    return [npm, "test", "--silent"]
+        except (json.JSONDecodeError, OSError) as e:
+            sys.stderr.write(f"[test-gate] package.json ilegivel: {e}\n")
+    if (root / "pytest.ini").exists() or (root / "tests").is_dir() or (root / "conftest.py").exists():
+        return [sys.executable, "-m", "pytest", "-q", "--maxfail=10"]
+    if (root / "Cargo.toml").exists() and shutil.which("cargo"):
+        return ["cargo", "test", "--quiet"]
+    if (root / "go.mod").exists() and shutil.which("go"):
+        return ["go", "test", "./..."]
+    return None
+
+
+def run_test_gate(cwd: str) -> dict:
+    """Roda a suite de testes do projeto (timeout GSTACK_TEST_TIMEOUT, default 300s).
+
+    Returns: status "passed" | "failed" | "skipped", summary, output (tail).
+    """
+    if not cwd:
+        return {"status": "skipped", "summary": "cwd missing"}
+    if os.environ.get("GSTACK_TEST_GATE") == "off":
+        return {"status": "skipped", "summary": "test gate desabilitado (GSTACK_TEST_GATE=off)"}
+    root = find_project_root(cwd) or Path(cwd).resolve()
+    argv = detect_test_command(root)
+    if not argv:
+        return {"status": "skipped", "summary": "nenhuma suite de testes detectada"}
+    timeout_s = int(os.environ.get("GSTACK_TEST_TIMEOUT", "300"))
+    try:
+        result = subprocess.run(
+            argv, cwd=root, capture_output=True, text=True, timeout=timeout_s,
+        )
+    except (OSError, FileNotFoundError) as e:
+        return {"status": "skipped", "summary": f"test runner indisponivel: {e}"}
+    except subprocess.TimeoutExpired:
+        return {"status": "failed", "summary": f"testes excederam {timeout_s}s", "output": ""}
+    tail = ((result.stdout or "") + "\n" + (result.stderr or ""))[-3000:]
+    if result.returncode == 0:
+        return {"status": "passed", "summary": f"Testes: OK ({' '.join(argv[:2])})", "output": tail}
+    return {
+        "status": "failed",
+        "summary": f"Testes: FALHARAM (exit {result.returncode}, {' '.join(argv[:2])})",
+        "output": tail,
+    }
+
+
+# Test gate roda sempre (skip automatico se nao ha suite). Nos auto-testes do
+# gstack (GSTACK_AUDIO_CUES_TEST=1) pulamos a execucao real para nao rodar a
+# suite do proprio projeto — exceto quando o gate e explicitamente forcado
+# (GSTACK_TEST_GATE in 1/block), caso em que estamos testando o proprio gate.
+_self_test = os.environ.get("GSTACK_AUDIO_CUES_TEST") == "1"
+_gate_forced = os.environ.get("GSTACK_TEST_GATE") in ("1", "block")
+if _self_test and not _gate_forced:
+    test_result = {"status": "skipped", "summary": "modo teste (GSTACK_AUDIO_CUES_TEST)"}
+else:
+    test_result = run_test_gate(cwd)
+note_lines.append("")
+note_lines.append("## Test Gate")
+note_lines.append(test_result.get("summary", "N/A"))
+if test_result.get("status") == "failed":
+    stop_failed = True
+    if test_result.get("output"):
+        note_lines.append("```")
+        note_lines.append(test_result["output"][-2000:])
+        note_lines.append("```")
+    # Modo bloqueante: devolve o controle ao agente para corrigir (formato
+    # Stop hook do Claude Code). Respeita stop_hook_active para nao loopar.
+    if os.environ.get("GSTACK_TEST_GATE") == "block" and not norm.get("stop_hook_active"):
+        play_audio_cue("error")
+        sys.stdout.write(json.dumps({
+            "decision": "block",
+            "reason": (
+                "Test Gate: a suite do projeto falhou. Corrija os testes antes de finalizar.\n"
+                + test_result.get("summary", "") + "\n"
+                + (test_result.get("output") or "")[-1500:]
+            ),
+        }))
+        sys.exit(0)
+
+
 # ── Fallow Audit (auto_fixable-aware) ──
 def run_fallow_audit(cwd: str) -> dict:
     """Executa npx fallow audit --format json e retorna resultado com auto_fixable.
