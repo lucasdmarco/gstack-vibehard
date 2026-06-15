@@ -65,8 +65,22 @@ export async function doctor() {
     }
   }
 
-  // gstack_vibehard status per harness
+  // Todos os harnesses detectados (inclui Cursor, Windsurf, Gemini, Kiro, Zed,
+  // Copilot CLI, Droid, KiloCLI, Kimi, VS Code) com nivel de integracao
   const detected = detectHarnesses()
+  const HOOKS_HARNESSES = new Set(["claude", "cursor", "opencode"])
+  const otherDetected = detected.filter((h) => !["codex", "claude", "opencode"].includes(h.id))
+  if (otherDetected.length > 0) {
+    info("Outros harnesses detectados:")
+    for (const h of otherDetected) {
+      const level = HOOKS_HARNESSES.has(h.id)
+        ? "hooks reais"
+        : (h.instructionFile ? "instrucional" : "deteccao apenas")
+      info(`  ${h.label} — ${level}`)
+    }
+  }
+
+  // gstack_vibehard status per harness
   const ids = detected.map((h) => h.id)
   const gstackInstalled = checkAlreadyInstalled(ids)
   if (gstackInstalled.length > 0) {

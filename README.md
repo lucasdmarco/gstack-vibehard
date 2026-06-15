@@ -14,8 +14,8 @@ Chega de alucinações, vazamentos de dados ou perda de contexto. O `gstack-vibe
 | **Hooks reais** (gates automáticos) | **Claude Code** | Hooks registrados em `settings.json` (PreToolUse/Stop/SessionStart/UserPromptSubmit) + MCP em `~/.claude.json` + agentes + regras |
 | **Hooks reais** | **Cursor** | Hooks registrados em `~/.cursor/hooks.json` (beforeShellExecution/preToolUse/stop/sessionStart) + agentes + rules `.mdc` |
 | **Hooks reais** | **OpenCode** | Plugins JS (`tool.execute.before`, `session.created`) + skills + config com merge não-destrutivo |
-| **Instrucional** (best-effort) | Codex, Gemini CLI, Windsurf, Kiro, Zed | Detecção + instruções de QG via AGENTS.md/regras — o agente é orientado a rodar os gates, sem bloqueio por API |
-| **Planejado** | Copilot CLI, VS Code, Droid (Factory), KiloCLI, Kimi CLI | Roadmap v2.3 |
+| **Instrucional** (best-effort) | Codex, Gemini CLI, Windsurf, Kiro, GitHub Copilot CLI, Droid (Factory), Kilo Code CLI, Kimi CLI | Detecção + arquivo de orientação no convention do harness (`AGENTS.md`/`GEMINI.md`/`global_rules.md`/steering) — o agente é orientado a rodar QG/Test Gate/memória, sem bloqueio por API |
+| **Detecção** | Zed, VS Code | Reconhecidos pelo `doctor`/instalador; integração instrucional por-repo (sem convention global seguro) |
 
 Os hooks Python respondem no formato nativo de cada harness (`hookSpecificOutput` para Claude Code, `permission` para Cursor) — camada de saída em `hooks/hooks/_harness.py`.
 

@@ -4,11 +4,12 @@ import { homedir, tmpdir } from "os"
 import { join, dirname } from "path"
 import { fileURLToPath } from "url"
 import { execFileSync } from "child_process"
-import { detectHarnesses, isWindows, isMacOS, isLinux } from "../harness/detector.js"
+import { detectHarnesses, getHarness, isWindows, isMacOS, isLinux } from "../harness/detector.js"
 import { installCodex } from "../harness/codex.js"
 import { installClaude } from "../harness/claude.js"
 import { installOpenCode } from "../harness/opencode.js"
 import { installCursor } from "../harness/cursor.js"
+import { writeInstructionalGuidance } from "../harness/instructional.js"
 import { installHeadroom } from "../harness/headroom.js"
 import { ensureDir, copyWithBackup, copyDirSync, backupFile } from "./merge.js"
 import { checkAlreadyInstalled } from "./check.js"
@@ -493,11 +494,21 @@ export async function install(args = []) {
         case "cursor":
           await installCursor({ hooks: true }, report)
           break
-        default:
-          // Harness sem API de hooks/config suportada — nao mentir "configurado"
-          info(`${harnessId}: detectado — integracao instrucional apenas (sem hooks API)`)
-          report.skipped.push(`${harnessId}: integracao instrucional`)
+        default: {
+          // Harness sem API de hooks: integracao instrucional honesta —
+          // escreve orientacao de QG/memoria/tokens no convention do harness.
+          const h = getHarness(harnessId)
+          if (h?.instructionFile) {
+            const fs = await import("fs")
+            const readFile = (p) => (fs.existsSync(p) ? fs.readFileSync(p, "utf-8") : "")
+            writeInstructionalGuidance(h.instructionFile, report, readFile)
+            info(`${harnessId}: integracao instrucional escrita em ${h.instructionFile}`)
+          } else {
+            info(`${harnessId}: detectado — sem convention de instrucao global (apenas deteccao)`)
+            report.skipped.push(`${harnessId}: somente deteccao`)
+          }
           continue
+        }
       }
       success(`${harnessId} configurado`)
     } catch (e) {
