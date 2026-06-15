@@ -671,9 +671,18 @@ def run_fallow_audit(cwd: str) -> dict:
         "blocking": blocking,
     }
 
-# ── Quality Gate ──
-# Always runs fallow audit first (non-blocking by default, reports auto_fixable)
-fallow_result = run_fallow_audit(cwd)
+# ── Quality Gate (OPT-IN) ──
+# fallow audit + qg.py rodam `npx fallow audit` (ate 60s cada) — o Stop dispara
+# a cada turno, entao rodar sempre atrasaria toda resposta. Roda apenas com
+# GSTACK_STOP_AUDIT=on, ou automaticamente quando ha deploy/qg_level explicito.
+_stop_audit_on = (
+    os.environ.get("GSTACK_STOP_AUDIT", "").lower() in ("on", "1")
+    or run_qg_level > 0
+    or run_security
+)
+fallow_result = run_fallow_audit(cwd) if _stop_audit_on else {
+    "status": "skipped", "summary": "audit off (defina GSTACK_STOP_AUDIT=on para ativar)"
+}
 note_lines.append("")
 note_lines.append(f"## Fallow Audit")
 note_lines.append(fallow_result.get("summary", "N/A"))
@@ -689,7 +698,7 @@ if fallow_result.get("blocking"):
 
 # Quality Gate (legacy qg.py, modo log-only por default; blocking se qg_level > 0)
 qg_path = hook_support_path("qg.py")
-if qg_path.exists() and cwd:
+if _stop_audit_on and qg_path.exists() and cwd:
     qg_level = run_qg_level if run_qg_level > 0 else 1
     qg_log_only = run_qg_level <= 0
     qg_label = "log only" if qg_log_only else f"blocking (level {qg_level})"
@@ -744,7 +753,9 @@ note = "\n".join(note_lines)
 chronicle_file = chronicle_dir_path / f"{project_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
 chronicle_file.write_text(note, encoding="utf-8")
 
-msg_parts = [f"Memorias salvas em {chronicle_file.name} + QG L1 executado"]
+msg_parts = [f"Memorias salvas em {chronicle_file.name}"]
+if _stop_audit_on:
+    msg_parts[0] += " + QG executado"
 if fallow_result.get("status") in ("passed", "auto_fixable"):
     msg_parts.append(f"Fallow: {fallow_result['summary']}")
 if sandbox_result and sandbox_result.get("status") == "passed":
@@ -1134,8 +1145,16 @@ if gh_bin:
                     "Defina GSTACK_AUTO_ISSUE=1 para ativar.\n"
                 )
         else:
-            # Only create PRs on successful sessions with meaningful work
-            gitops_pr_create(summary, root_path)
+            # PR/commit automatico e OPT-IN: criar branch + commit local sem
+            # consentimento interrompe o fluxo do usuario. Habilite com
+            # GSTACK_AUTO_PR=1 (espelha GSTACK_AUTO_ISSUE).
+            if os.environ.get("GSTACK_AUTO_PR", "") == "1":
+                gitops_pr_create(summary, root_path)
+            else:
+                sys.stderr.write(
+                    "[gitops] PR/commit automatico desativado. "
+                    "Defina GSTACK_AUTO_PR=1 para ativar.\n"
+                )
 
 play_audio_cue("error" if stop_failed else "success")
 

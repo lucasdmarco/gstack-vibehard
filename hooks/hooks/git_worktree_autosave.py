@@ -150,13 +150,16 @@ def autosave_all_worktrees(cwd: str) -> list[dict]:
 
     worktrees = find_worktrees(root)
     results = []
+    # Worktrees do Agent View sao efemeros (podem ser fechados com Ctrl+X antes
+    # do merge) — auto-save previne perda de dados real nesse caso.
     for wt in worktrees:
         result = autosave_worktree(wt)
         results.append(result)
 
-    # Always also autosave the main repo
-    main_result = autosave_worktree(root)
-    results.append(main_result)
+    # O repositorio PRINCIPAL nao e efemero — o usuario o controla. Auto-commit
+    # a cada Stop poluiria o historico sem consentimento. OPT-IN via env.
+    if os.environ.get("GSTACK_AUTOSAVE_MAIN", "") == "1":
+        results.append(autosave_worktree(root))
 
     return results
 
