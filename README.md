@@ -23,10 +23,18 @@ Os hooks Python respondem no formato nativo de cada harness (`hookSpecificOutput
 
 ## ✨ O que há de novo na v2.2.0 (Hooks Reais Cross-Harness)
 
-- 🪝 **Registro real de hooks:** Claude Code (`settings.json` formato oficial) e Cursor (`hooks.json` v1) agora EXECUTAM os gates — antes os hooks eram apenas copiados.
-- 🧪 **Suíte de testes viva:** CI roda `npm test` + `pytest` em matriz de 3 SOs; 27+ testes.
+- 🪝 **Registro real de hooks:** Claude Code (`settings.json` formato oficial) e Cursor (`hooks.json` v1) agora EXECUTAM os gates — antes os hooks eram apenas copiados. OpenCode com merge não-destrutivo.
+- 🧪 **Test Gate (paridade Replit):** o Stop hook roda a suíte do projeto (npm/pytest/cargo/go); `GSTACK_TEST_GATE=block` devolve o controle ao agente para corrigir antes de finalizar.
+- 🔌 **Mais harnesses:** detectores para GitHub Copilot CLI, Factory Droid, Kilo Code CLI, Kimi CLI e VS Code + integração instrucional real (AGENTS.md/GEMINI.md/global_rules.md) para Gemini/Windsurf/Kiro.
 - 🛠️ **uninstall/list/--skip-deps** implementados; downloads Windows via `curl.exe` (sem interpolação PowerShell).
-- 🧠 **Python portátil:** `sys.executable` em hooks + `resolvePythonCmd()` no JS (prefere `python3`, fallback `python`).
+- ✅ **Suíte de testes viva:** CI roda `npm test` + `pytest` em matriz de 3 SOs; 19 testes Node + 21 Python.
+
+### v2.1.9 (Execução Consertada)
+
+- 🩹 **CI vivo:** workflow disparava só em `main` (branch é `master`) — nunca rodou. Corrigido + jobs Node/pytest.
+- 🪟 **Bugs Windows:** `\r` corrompia o path do `rustup-init`; download do `create` nunca recebia argumentos. Ambos via `curl.exe`.
+- 🐛 **Hooks:** `stop.py` falhava toda sessão sem `openhands` (sandbox agora opt-in); `gitignore_has_dotenv` implementada; design system mandate passou a ler `file_path`.
+- 🔌 **MCP:** `claude.js` escreve em `~/.claude.json` (local que o Claude Code lê).
 
 ### v2.1.8 (Segurança + Performance + Higiene)
 
