@@ -12,6 +12,7 @@ import { installCursor } from "../harness/cursor.js"
 import { writeInstructionalGuidance } from "../harness/instructional.js"
 import { installHeadroom } from "../harness/headroom.js"
 import { ensureDir, copyWithBackup, copyDirSync, backupFile } from "./merge.js"
+import { findWorkingBinary, getUvCandidates, getBunCandidates } from "./deps.js"
 import { checkAlreadyInstalled } from "./check.js"
 import { installGeneratedAgentLayer, installGraphifyGitHooks } from "./agent-distribution.js"
 import { multiSelect, success, warn, error, info, section } from "../cli/index.js"
@@ -72,11 +73,7 @@ async function installDeps(warn, success, info, report, harnessIds) {
   // ========================================
   // bun + gbrain
   // ========================================
-  let bunFound = false
-  try {
-    execFileSync("bun", ["--version"], { stdio: "pipe", timeout: 5000 })
-    bunFound = true
-  } catch { /* bun not found, expected */ }
+  let bunFound = findWorkingBinary(["bun"]) !== ""
 
   if (!bunFound) {
     info("bun: nao encontrado. Instalando (download seguro)...")
@@ -85,16 +82,7 @@ async function installDeps(warn, success, info, report, harnessIds) {
       const ok = safeDownloadAndRun(bunUrl, "Bun")
       if (ok) {
         refreshPath()
-        const bunPaths = isWindows()
-          ? [join(HOME, ".bun", "bin", "bun.exe")]
-          : [join(HOME, ".bun", "bin", "bun")]
-        for (const p of [...bunPaths, "bun"]) {
-          try {
-            execFileSync(p, ["--version"], { stdio: "pipe", timeout: 5000 })
-            bunFound = true
-            break
-          } catch { /* bun path not found, expected */ }
-        }
+        bunFound = findWorkingBinary(getBunCandidates(HOME, isWindows())) !== ""
         if (bunFound) {
           success("bun instalado")
         } else {
@@ -122,18 +110,8 @@ async function installDeps(warn, success, info, report, harnessIds) {
   // ========================================
   // uv + graphify
   // ========================================
-  let uvBin = ""
-  const possiblePaths = isWindows()
-    ? [join(HOME, ".local", "bin", "uv.exe"), join(HOME, "AppData", "Local", "uv", "uv.exe")]
-    : [join(HOME, ".local", "bin", "uv"), join(HOME, ".cargo", "bin", "uv"), "/usr/local/bin/uv"]
-
-  for (const p of [...possiblePaths, "uv"]) {
-    try {
-      execFileSync(p, ["--version"], { stdio: "pipe", timeout: 5000 })
-      uvBin = p
-      break
-    } catch { /* expected */ }
-  }
+  const uvCandidates = getUvCandidates(HOME, isWindows())
+  let uvBin = findWorkingBinary(uvCandidates)
 
   if (!uvBin) {
     info("uv: nao encontrado. Instalando (download seguro)...")
@@ -144,22 +122,9 @@ async function installDeps(warn, success, info, report, harnessIds) {
         safeDownloadAndRun("https://astral.sh/uv/install.sh", "uv (Unix)")
       }
       refreshPath()
-      for (const p of possiblePaths) {
-        try {
-          execFileSync(p, ["--version"], { stdio: "pipe", timeout: 5000 })
-          uvBin = p
-          success("uv instalado")
-          break
-        } catch { /* expected */ }
-      }
-      if (!uvBin) {
-        try {
-          execFileSync("uv", ["--version"], { stdio: "pipe", timeout: 5000 })
-          uvBin = "uv"
-          success("uv instalado")
-        } catch { /* expected */ }
-      }
-      if (!uvBin) warn("uv: instalado mas nao encontrado. Tente reiniciar o terminal.")
+      uvBin = findWorkingBinary(uvCandidates)
+      if (uvBin) success("uv instalado")
+      else warn("uv: instalado mas nao encontrado. Tente reiniciar o terminal.")
     } catch {
       warn("uv: falha ao instalar. Instale manualmente: https://docs.astral.sh/uv/#installation")
     }
@@ -179,12 +144,8 @@ async function installDeps(warn, success, info, report, harnessIds) {
   // ========================================
   // Rust (rustup) — needed for headroom build
   // ========================================
-  let rustFound = false
-  try {
-    execFileSync("rustc", ["--version"], { stdio: "pipe", timeout: 5000 })
-    rustFound = true
-    success("Rust encontrado")
-  } catch { /* expected */ }
+  let rustFound = findWorkingBinary(["rustc"]) !== ""
+  if (rustFound) success("Rust encontrado")
 
   if (!rustFound) {
     info("Rust: nao encontrado. Instalando rustup...")
@@ -211,18 +172,16 @@ async function installDeps(warn, success, info, report, harnessIds) {
         info("Adicionado ~/.cargo/bin ao PATH")
       }
       refreshPath()
-      try {
-        execFileSync("rustc", ["--version"], { stdio: "pipe", timeout: 5000 })
-        rustFound = true
+      rustFound = findWorkingBinary(["rustc"]) !== ""
+      if (rustFound) {
         success("Rust instalado")
-      } catch {
+      } else {
         if (isWindows()) {
           info("Rust: MSVC toolchain pode ter falhado. Tentando toolchain GNU...")
           try {
             execFileSync("rustup", ["default", "stable-gnu"], { stdio: "pipe", timeout: 30000 })
-            execFileSync("rustc", ["--version"], { stdio: "pipe", timeout: 5000 })
-            rustFound = true
-            success("Rust instalado (toolchain GNU)")
+            rustFound = findWorkingBinary(["rustc"]) !== ""
+            if (rustFound) success("Rust instalado (toolchain GNU)")
           } catch { /* expected */ }
         }
         if (!rustFound) warn("Rust: instalado mas `rustc` nao encontrado no PATH")
@@ -288,6 +247,84 @@ async function installDeps(warn, success, info, report, harnessIds) {
     uvBin,
     selectedHarnessIds: harnessIds,
   }, report)
+}
+
+function setupObsidianVault(report) {
+  const vaultDir = join(HOME, "gstack-vault")
+  for (const sub of ["", "projects", "chats", "agents", "graph", ".obsidian"]) {
+    ensureDir(sub ? join(vaultDir, sub) : vaultDir)
+  }
+  info(`Vault global em: ${vaultDir}`)
+  report.added.push("vault: ~/gstack-vault")
+
+  const obsidianConfig = {
+    promptDelete: false,
+    alwaysUpdateLinks: true,
+    newFileLocation: "current",
+    attachmentFolderPath: "./attachments",
+    showUnsupportedFiles: true,
+    userIgnoreFilters: ["node_modules", ".git", "dist"],
+  }
+  writeFileSync(join(vaultDir, ".obsidian", "app.json"), JSON.stringify(obsidianConfig, null, 2) + "\n")
+  report.added.push("vault: .obsidian/app.json configurado")
+  success("Cofre Obsidian configurado em ~/gstack-vault")
+
+  const vaultReadme = join(vaultDir, "README.md")
+  if (!existsSync(vaultReadme)) {
+    writeFileSync(vaultReadme, [
+      "---", "tags: [gstack-vault, segundo-cerebro]", "---", "",
+      "# gstack-vault — Segundo Cerebro Global", "",
+      "Este vault Obsidian e o centro nervoso do ecossistema gstack_vibehard.", "",
+      "## Estrutura", "",
+      "- `projects/` — subpastas com `graph.json` (symlink) de cada projeto ativo",
+      "- `chats/` — historico de sessoes processado pelo Chat Import Pipeline",
+      "- `agents/` — memorias e decisoes dos agentes especialistas",
+      "- `graph/` — grafos globais e exportacoes federadas do AgentMemory", "",
+      "## Nota",
+      "Editado por agentes automaticamente. Nao edite manualmente a menos que",
+      "saiba exatamente o que esta fazendo.", "",
+      "## Integracoes", "",
+      "- **AgentMemory (MD Obsidian Export)** — banco vetorial espelha memorias em .md",
+      "- **Graphify** — graph.json de cada projeto linkado simbolicamente",
+      "- **Chat Import Pipeline** — logs de sessoes → wikilinks → notas permanentes",
+      "- **GitOps** — falhas CRITICAS viram Issues; documentacao nova vira PRs", "",
+    ].join("\n") + "\n")
+    report.added.push("vault: README.md criado")
+    success("README do vault criado")
+  }
+
+  // AgentMemory MD Obsidian Export: espelha memorias em .md no vault
+  const codexConfigDir = join(HOME, ".codex")
+  if (existsSync(codexConfigDir)) {
+    const codexEnv = join(codexConfigDir, ".env")
+    const envLine = `\n# AgentMemory MD Obsidian Export — espelha memorias no vault global\nAGENTMEMORY_MD_EXPORT_PATH=${vaultDir}/agents\n`
+    if (existsSync(codexEnv)) {
+      const currentEnv = readFileSync(codexEnv, "utf-8")
+      if (!currentEnv.includes("AGENTMEMORY_MD_EXPORT_PATH")) {
+        writeFileSync(codexEnv, currentEnv.trimEnd() + "\n" + envLine)
+        report.updated.push("vault: AGENTMEMORY_MD_EXPORT_PATH em ~/.codex/.env")
+      }
+    } else {
+      writeFileSync(codexEnv, envLine.trimStart() + "\n")
+      report.added.push("vault: ~/.codex/.env criado com AGENTMEMORY_MD_EXPORT_PATH")
+    }
+    success("AgentMemory configurado para exportar .md para o vault")
+  }
+}
+
+function printInstallReport(report) {
+  section("Relatorio da Instalacao")
+  const groups = [
+    ["Adicionados:", report.added, "+", info],
+    ["Atualizados:", report.updated, "~", info],
+    ["Pulados (ja existem):", report.skipped, "-", info],
+    ["Erros:", report.errors, "", warn],
+  ]
+  for (const [title, items, prefix, log] of groups) {
+    if (items.length === 0) continue
+    info(title)
+    items.forEach((item) => log(`  ${prefix} ${item}`.trimEnd()))
+  }
 }
 
 export async function install(args = []) {
@@ -550,102 +587,10 @@ export async function install(args = []) {
 
   // Step 11: Obsidian Vault Global (Segundo Cerebro)
   section("vault/ — Obsidian Vault Global (Segundo Cerebro)")
-  const vaultDir = join(HOME, "gstack-vault")
-  ensureDir(vaultDir)
-  ensureDir(join(vaultDir, "projects"))
-  ensureDir(join(vaultDir, "chats"))
-  ensureDir(join(vaultDir, "agents"))
-  ensureDir(join(vaultDir, "graph"))
-  ensureDir(join(vaultDir, ".obsidian"))
-  info(`Vault global em: ${vaultDir}`)
-  report.added.push("vault: ~/gstack-vault")
-
-  // .obsidian/app.json — configuracoes basicas do vault
-  const obsidianConfig = {
-    "promptDelete": false,
-    "alwaysUpdateLinks": true,
-    "newFileLocation": "current",
-    "attachmentFolderPath": "./attachments",
-    "showUnsupportedFiles": true,
-    "userIgnoreFilters": ["node_modules", ".git", "dist"]
-  }
-  const obsidianAppJson = join(vaultDir, ".obsidian", "app.json")
-  writeFileSync(obsidianAppJson, JSON.stringify(obsidianConfig, null, 2) + "\n")
-  report.added.push("vault: .obsidian/app.json configurado")
-  success("Cofre Obsidian configurado em ~/gstack-vault")
-
-  // Vault README de boas-vindas
-  const vaultReadme = join(vaultDir, "README.md")
-  if (!existsSync(vaultReadme)) {
-    writeFileSync(vaultReadme, [
-      "---",
-      "tags: [gstack-vault, segundo-cerebro]",
-      "---",
-      "",
-      "# gstack-vault — Segundo Cerebro Global",
-      "",
-      "Este vault Obsidian e o centro nervoso do ecossistema gstack_vibehard.",
-      "",
-      "## Estrutura",
-      "",
-      "- `projects/` — subpastas com `graph.json` (symlink) de cada projeto ativo",
-      "- `chats/` — historico de sessoes processado pelo Chat Import Pipeline",
-      "- `agents/` — memorias e decisoes dos agentes especialistas",
-      "- `graph/` — grafos globais e exportacoes federadas do AgentMemory",
-      "",
-      "## Nota",
-      "Editado por agentes automaticamente. Nao edite manualmente a menos que",
-      "saiba exatamente o que esta fazendo.",
-      "",
-      "## Integracoes",
-      "",
-      "- **AgentMemory (MD Obsidian Export)** — banco vetorial espelha memorias em .md",
-      "- **Graphify** — graph.json de cada projeto linkado simbolicamente",
-      "- **Chat Import Pipeline** — logs de sessoes → wikilinks → notas permanentes",
-      "- **GitOps** — falhas CRITICAS viram Issues; documentacao nova vira PRs",
-      "",
-    ].join("\n") + "\n")
-    report.added.push("vault: README.md criado")
-    success("README do vault criado")
-  }
-
-  // AgentMemory MD Obsidian Export: configura export path para o vault
-  // AgentMemory suporta AGENTMEMORY_MD_EXPORT_PATH para espelhar memorias em .md
-  const codexConfigDir = join(HOME, ".codex")
-  if (existsSync(codexConfigDir)) {
-    const codexEnv = join(codexConfigDir, ".env")
-    const envLine = `\n# AgentMemory MD Obsidian Export — espelha memorias no vault global\nAGENTMEMORY_MD_EXPORT_PATH=${vaultDir}/agents\n`
-    if (existsSync(codexEnv)) {
-      const currentEnv = readFileSync(codexEnv, "utf-8")
-      if (!currentEnv.includes("AGENTMEMORY_MD_EXPORT_PATH")) {
-        writeFileSync(codexEnv, currentEnv.trimEnd() + "\n" + envLine)
-        report.updated.push("vault: AGENTMEMORY_MD_EXPORT_PATH em ~/.codex/.env")
-      }
-    } else {
-      writeFileSync(codexEnv, envLine.trimStart() + "\n")
-      report.added.push("vault: ~/.codex/.env criado com AGENTMEMORY_MD_EXPORT_PATH")
-    }
-    success("AgentMemory configurado para exportar .md para o vault")
-  }
+  setupObsidianVault(report)
 
   // Report
-  section("Relatorio da Instalacao")
-  if (report.added.length > 0) {
-    info("Adicionados:")
-    report.added.forEach((item) => info(`  + ${item}`))
-  }
-  if (report.updated.length > 0) {
-    info("Atualizados:")
-    report.updated.forEach((item) => info(`  ~ ${item}`))
-  }
-  if (report.skipped.length > 0) {
-    info("Pulados (ja existem):")
-    report.skipped.forEach((item) => info(`  - ${item}`))
-  }
-  if (report.errors.length > 0) {
-    info("Erros:")
-    report.errors.forEach((item) => warn(`  ${item}`))
-  }
+  printInstallReport(report)
 
   section("Instalacao Concluida!")
   info("Comandos uteis:")
