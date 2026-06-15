@@ -205,6 +205,18 @@ export async function doctor() {
     info("MOM: apenas macOS")
   }
 
+  // pytest — necessario para hooks Python, QG e Test Gate
+  try {
+    const pyBin = pyVer && pyVer.toLowerCase().includes("python 3") ? "python" : "python3"
+    execFileSync(pyBin, ["-m", "pytest", "--version"], { stdio: "pipe", timeout: 5000 })
+    success("pytest: instalado")
+  } catch {
+    try {
+      execFileSync("python3", ["-m", "pytest", "--version"], { stdio: "pipe", timeout: 5000 })
+      success("pytest: instalado")
+    } catch { warn("pytest: nao instalado"); missingDeps.push("pytest") }
+  }
+
   if (missingDeps.length > 0) {
     section("Acoes Corretivas")
     info(`Dependencias faltando: ${missingDeps.join(", ")}`)

@@ -142,6 +142,30 @@ async function installDeps(warn, success, info, report, harnessIds) {
   }
 
   // ========================================
+  // pytest — hooks Python, QG e Test Gate dependem dele
+  // ========================================
+  let pytestOk = false
+  if (uvBin) {
+    try {
+      execFileSync(uvBin, ["pip", "install", "--system", "pytest"], { stdio: "pipe", timeout: 120000 })
+      pytestOk = true
+    } catch { /* tenta pip abaixo */ }
+  }
+  if (!pytestOk) {
+    try {
+      const pip = findWorkingBinary(["pip3", "pip"], { timeout: 5000 }) || "pip"
+      execFileSync(pip, ["install", "--user", "pytest"], { stdio: "pipe", timeout: 120000 })
+      pytestOk = true
+    } catch (e) {
+      warn(`pytest: falha ao instalar (${e.message}). Instale manualmente: pip install pytest`)
+    }
+  }
+  if (pytestOk) {
+    success("pytest instalado")
+    report.added.push("pytest (testes Python)")
+  }
+
+  // ========================================
   // Rust (rustup) — needed for headroom build
   // ========================================
   let rustFound = findWorkingBinary(["rustc"]) !== ""

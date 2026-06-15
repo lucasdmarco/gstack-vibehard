@@ -789,7 +789,7 @@ Eventos de ferramentas devem ser logados via agent-hooks.
   }
 }
 
-function writeHarnessFiles(projectDir, projectName) {
+export function writeHarnessFiles(projectDir, projectName, { isLite = false } = {}) {
   mkdirSync(join(projectDir, ".cursor", "rules"), { recursive: true })
   mkdirSync(join(projectDir, ".windsurf", "rules"), { recursive: true })
   mkdirSync(join(projectDir, ".claude", "agents"), { recursive: true })
@@ -854,25 +854,19 @@ For complex multi-step tasks, use /effort ultracode to activate dynamic JS workf
 1. Plan  2. TDD  3. Implement  4. Verify  5. Review  6. Ship
 
 ## Runtime
-- VCS: Atomic (token-level isolation)
 - Sandbox: OpenHands (headless SDK isolation)
-- IAM: Casdoor local (Docker SQLite, localhost:8000)
-- Control Plane: ECC 2.0 Daemon (dashboard, sessions, status)
-- MCP Gateway: Casdoor (IAM local) + Headroom (compact proxy)
-- Mesh Federation: AgentMemory P2P (BM25 + Vector + Graph sync)
-- Ticket Orchestration: Paperclip / Symphony (Jira/Linear integration)
+${isLite ? "" : "- VCS: Atomic (token-level isolation)\n- IAM: Casdoor local (Docker SQLite, localhost:8000)\n- Control Plane: ECC 2.0 Daemon (dashboard, sessions, status)\n- MCP Gateway: Casdoor (IAM local) + Headroom (compact proxy)\n- Mesh Federation: AgentMemory P2P (BM25 + Vector + Graph sync)\n"}- Ticket Orchestration: Paperclip / Symphony (Jira/Linear integration)
 - Omniharness: Claude, Cursor, Codex, Windsurf, OpenCode, Gemini, Kiro, Antigravity, Zed, Hermes, Trae
 - Coverage Gaps: fallow coverage setup (hot/cold path analysis)
 - Workflows: .claude/workflows/ (ativar com /effort ultracode)
-
+${isLite ? "\n> Modo lite: sem Casdoor/IAM, Atomic VCS, ECC 2.0 ou AgentMemory Federation.\n" : ""}
 ## Commands
 - Dev: pnpm dev
 - Managed dev: scripts/dev.sh
 - Quality gate: npx fallow audit --format json
 - Coverage gaps: pnpm coverage:gaps
 - Tickets: paperclip status
-- IAM: http://localhost:8000 (admin/123)
-- Workflows: /effort ultracode (para tarefas complexas)
+${isLite ? "" : "- IAM: http://localhost:8000 (admin/123)\n"}- Workflows: /effort ultracode (para tarefas complexas)
 
 ## auto_fixable
 A IA corrige automaticamente bugs estruturais detectados pelo fallow.
@@ -1320,7 +1314,7 @@ export async function createProject(options = {}) {
   writeSkillsDir(projectDir)
 
   console.log(`\n  === Fase 5/5: Scaffold & Orquestracao Macro ===`)
-  writeHarnessFiles(projectDir, projectName)
+  writeHarnessFiles(projectDir, projectName, { isLite })
   if (!isLite) {
     try {
       await writeRealHarnessBridge(projectDir, options)
@@ -1331,7 +1325,9 @@ export async function createProject(options = {}) {
   writeTeamMatrix(projectDir, projectName)
   writeGatewayMcpConfig(projectDir)
   writePaperclipManifest(projectDir, projectName)
-  writeCasdoorProjectConfig(projectDir)
+  // Casdoor/IAM nao existe em modo lite — nao escrever config que aponta para
+  // um servico offline (admin/123 @ localhost:8000)
+  if (!isLite) writeCasdoorProjectConfig(projectDir)
 
   // ── Boot Headroom (non-critical, wrapped in try/catch) ──
   bootHeadroom(logger, projectDir)
