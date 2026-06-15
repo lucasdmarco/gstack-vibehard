@@ -39,10 +39,14 @@ const HARNESS_PATHS = {
   },
   cursor: {
     label: "Cursor",
-    configDir: join(process.cwd(), ".cursor"),
-    configFile: join(process.cwd(), ".cursor", "mcp.json"),
+    // Hooks user-level vivem em ~/.cursor/hooks.json; .cursor no projeto e
+    // escopo de repo. Detecta ambos para registro global de hooks.
+    configDir: join(HOME, ".cursor"),
+    configFile: join(HOME, ".cursor", "mcp.json"),
+    hooksFile: join(HOME, ".cursor", "hooks.json"),
     detect: () => {
-      return existsSync(join(process.cwd(), ".cursor"))
+      if (existsSync(join(HOME, ".cursor")) || existsSync(join(process.cwd(), ".cursor"))) return true
+      try { execFileSync("cursor", ["--version"], { stdio: "pipe", timeout: 3000 }); return true } catch { return false }
     },
   },
   opencode: {

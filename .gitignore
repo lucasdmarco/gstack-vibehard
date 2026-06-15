@@ -20,3 +20,4 @@ coverage/
 .npmrc
 .npmrc.bak
 *.exe
+*.tgz

@@ -1,5 +1,36 @@
 # Changelog - gstack-vibehard
 
+## [2.2.0] - 2026-06-15
+
+**Hooks Reais Cross-Harness — a alma do produto funcionando de verdade.**
+
+### Sprint 6 — Registro real de hooks
+- **Claude Code**: `registerClaudeHooks` escreve `settings.json` no formato OFICIAL (`hooks.<Evento>[].hooks[]`) para PreToolUse/Stop/SessionStart/UserPromptSubmit. Idempotente, preserva hooks do usuario. Antes os hooks eram so copiados e nunca executados.
+- **Cursor** (`src/harness/cursor.js`): `registerCursorHooks` em `~/.cursor/hooks.json` (formato `version: 1` — beforeShellExecution/preToolUse/stop/sessionStart).
+- **OpenCode**: merge nao-destrutivo do `opencode.json` (antes sobrescrevia a config do usuario).
+- **Camada de saida por harness** (`_harness.py`): `emit_permission_decision` responde `hookSpecificOutput` (Claude) ou `permission` (Cursor) conforme o payload; cwd via `workspace_roots`.
+- **create.js**: `writeRealHarnessBridge` usa o formato real (chave ficticia `lifecycleHooks` removida) + `.cursor/hooks.json` por projeto.
+- Fonte canonica de hooks em `~/.gstack/hooks/`; mensagens honestas para harnesses instrucionais.
+
+### Sprint 7 — Test Gate (paridade Replit Agent)
+- O Stop hook detecta e roda a suite de testes do projeto (npm test/pytest/cargo/go) com timeout. Default reporta; `GSTACK_TEST_GATE=block` devolve o controle ao agente para corrigir (respeita `stop_hook_active`); `=off` desativa.
+
+### Sprint 8 — Cobertura de harnesses
+- Novos detectores: GitHub Copilot CLI (`~/.copilot`/`COPILOT_HOME`), Factory Droid (`~/.factory`), Kilo Code CLI (`~/.config/kilo`), Kimi CLI (`~/.kimi`), VS Code (User dir por OS) — paths confirmados na doc oficial.
+- Integracao instrucional real (`instructional.js`): escreve orientacao de QG/Test Gate/memoria/economia de tokens no convention de cada harness (AGENTS.md/GEMINI.md/global_rules.md/steering). Idempotente, preserva conteudo do usuario.
+- `doctor` lista todos os harnesses detectados com nivel (hooks reais / instrucional / deteccao).
+
+### Sprint 9 — Refactor CRAP com cobertura
+- `deps.js` (novo, testavel): `findWorkingBinary`/`getUvCandidates`/`getBunCandidates`. `installDeps()` cc 47→37; `install()` cc 50→42 (vault/relatorio extraidos). Comportamento preservado.
+
+### Matriz de suporte (honesta)
+- **Hooks reais**: Claude Code, Cursor, OpenCode.
+- **Instrucional**: Codex, Gemini, Windsurf, Kiro, Copilot CLI, Droid, KiloCLI, Kimi.
+- **Deteccao**: Zed, VS Code.
+
+### Testes & CI
+- 19 testes Node + 21 Python (era 8+13 na v2.1.9). CI em matriz 3 SOs.
+
 ## [2.1.9] - 2026-06-09
 
 ### Correcoes Criticas de Execucao
