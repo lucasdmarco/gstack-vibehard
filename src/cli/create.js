@@ -630,8 +630,22 @@ function writeRuntimeFiles({ projectDir, projectName, now, projectRoot, template
     ],
   })
 
-  writeFileSync(join(projectDir, "Dockerfile"),
-`FROM node:20-alpine AS deps
+  // Dockerfile por stack: AI = Python (uvicorn); demais = Node multi-stage.
+  // Mobile (Expo) nao e containerizado — Docker cobre apenas a API.
+  const isPython = templateName === "ai-agent-platform"
+  const dockerfile = isPython
+? `FROM python:3.11-slim AS base
+WORKDIR /app
+ENV PYTHONUNBUFFERED=1
+COPY pyproject.toml ./
+RUN pip install --no-cache-dir uv && uv pip install --system .
+COPY . .
+RUN useradd -m gstack && chown -R gstack /app
+USER gstack
+EXPOSE 8000
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+`
+: `FROM node:20-alpine AS deps
 WORKDIR /app
 COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* ./
 RUN corepack enable && pnpm install --frozen-lockfile || pnpm install
@@ -647,7 +661,8 @@ RUN addgroup -S gstack && adduser -S gstack -G gstack
 COPY --from=build --chown=gstack:gstack /app /app
 USER gstack
 CMD ["node", "apps/api/dist/index.js"]
-`)
+`
+  writeFileSync(join(projectDir, "Dockerfile"), dockerfile)
 
   writeFileSync(join(projectDir, ".dockerignore"),
 `node_modules
@@ -661,6 +676,13 @@ graphify-out
 .gstack/casdoor.json
 `)
 
+  // Comando de dev por stack: AI = uvicorn; mobile = dev:api + dev:mobile
+  // (nao ha root `dev`); demais = pnpm dev.
+  const devCommand = isPython
+    ? "uv run uvicorn api.main:app --reload --port \"${API_PORT:-8000}\""
+    : (templateName === "mobile-backend"
+      ? "pnpm dev:api & pnpm dev:mobile"
+      : "pnpm dev")
   const devScript =
 `#!/usr/bin/env sh
 set -eu
@@ -675,8 +697,8 @@ docker start casdoor 2>/dev/null || true
 # Control Plane Daemon
 ecc2 daemon start 2>/dev/null || true
 
-echo "gstack dev: web=$WEB_PORT api=$API_PORT teams=1 casdoor=http://localhost:8000"
-pnpm dev
+echo "gstack dev: web=$WEB_PORT api=$API_PORT teams=1"
+${devCommand}
 `
   writeFileSync(join(scriptsDir, "dev.sh"), devScript)
   try { chmodSync(join(scriptsDir, "dev.sh"), 0o755) } catch {}
@@ -936,7 +958,7 @@ Enable a team:
 //  Vertical Templates
 // ─────────────────────────────────────────────────────────────
 
-function scaffoldVerticalTemplate(templateName, projectDir, projectName, logger) {
+export function scaffoldVerticalTemplate(templateName, projectDir, projectName, logger) {
   const t = (name) => join(projectDir, name)
   const e = () => ensureGstackDir(projectDir)
 
@@ -944,16 +966,51 @@ function scaffoldVerticalTemplate(templateName, projectDir, projectName, logger)
     case "saas-auth-stripe":
       e()
       mkdirSync(t("apps/web"), { recursive: true })
-      mkdirSync(t("apps/api"), { recursive: true })
+      mkdirSync(t("apps/api/src"), { recursive: true })
       mkdirSync(t("packages/db"), { recursive: true })
       mkdirSync(t("packages/shared"), { recursive: true })
 
       writeFileSync(t("package.json"), JSON.stringify({
-        name: projectName, private: true, type: "module",
-        scripts: { dev: "concurrently \"pnpm dev:web\" \"pnpm dev:api\"", build: "pnpm -r build" },
-        dependencies: { "next": "^15", "react": "^19", "react-dom": "^19", "@supabase/supabase-js": "^2", "stripe": "^17", "@stripe/stripe-js": "^5", "trpc": "^11", "@trpc/next": "^11", "@trpc/react-query": "^11", "zod": "^3" },
-        devDependencies: { "typescript": "^5", "concurrently": "^9", "@types/react": "^19", "@types/node": "^22" },
+        name: projectName, private: true,
+        workspaces: ["apps/*", "packages/*"],
+        scripts: {
+          dev: "concurrently \"pnpm dev:web\" \"pnpm dev:api\"",
+          "dev:web": "pnpm --filter web dev",
+          "dev:api": "pnpm --filter api dev",
+          build: "pnpm -r build",
+        },
+        devDependencies: { "typescript": "^5", "concurrently": "^9", "@types/node": "^22" },
       }, null, 2))
+
+      // apps/web — Next.js (script dev real)
+      writeFileSync(t("apps/web/package.json"), JSON.stringify({
+        name: "web", private: true,
+        scripts: { dev: "next dev", build: "next build", start: "next start" },
+        dependencies: { "next": "^15", "react": "^19", "react-dom": "^19", "@supabase/supabase-js": "^2", "@stripe/stripe-js": "^5", "@trpc/next": "^11", "@trpc/react-query": "^11", "zod": "^3" },
+        devDependencies: { "typescript": "^5", "@types/react": "^19" },
+      }, null, 2))
+      mkdirSync(t("apps/web/app"), { recursive: true })
+      writeFileSync(t("apps/web/app/page.tsx"), [
+        "export default function Home() {",
+        "  return <main><h1>SaaS — Next.js + Supabase + Stripe</h1></main>",
+        "}",
+      ].join("\n"))
+
+      // apps/api — tsx watch (script dev real)
+      writeFileSync(t("apps/api/package.json"), JSON.stringify({
+        name: "api", private: true, type: "module",
+        scripts: { dev: "tsx watch src/index.ts", build: "tsc -p ." },
+        dependencies: { "@supabase/supabase-js": "^2", "stripe": "^17", "zod": "^3" },
+        devDependencies: { "typescript": "^5", "tsx": "^4", "@types/node": "^22" },
+      }, null, 2))
+      writeFileSync(t("apps/api/src/index.ts"), [
+        "import { createServer } from 'node:http'",
+        "const port = Number(process.env.API_PORT ?? 3000)",
+        "createServer((req, res) => {",
+        "  if (req.url === '/health') { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ status: 'ok' })); return }",
+        "  res.writeHead(404); res.end()",
+        "}).listen(port, () => console.log(`api on http://localhost:${port}`))",
+      ].join("\n"))
 
       writeFileSync(t(".env.example"), [
         "# Supabase", "NEXT_PUBLIC_SUPABASE_URL=change-me", "NEXT_PUBLIC_SUPABASE_ANON_KEY=change-me",
@@ -989,25 +1046,41 @@ function scaffoldVerticalTemplate(templateName, projectDir, projectName, logger)
 
     case "mobile-backend":
       e()
-      mkdirSync(t("apps/mobile"), { recursive: true })
-      mkdirSync(t("apps/api"), { recursive: true })
+      mkdirSync(t("apps/mobile/lib"), { recursive: true })
+      mkdirSync(t("apps/api/src"), { recursive: true })
       mkdirSync(t("packages/db"), { recursive: true })
 
       writeFileSync(t("package.json"), JSON.stringify({
         name: projectName, private: true,
+        workspaces: ["apps/*", "packages/*"],
         scripts: {
-          "dev:mobile": "cd apps/mobile && npx expo start",
-          "dev:api": "cd apps/api && pnpm dev",
+          "dev:mobile": "pnpm --filter mobile start",
+          "dev:api": "pnpm --filter api dev",
           "db:push": "cd packages/db && pnpm drizzle-kit push",
           "db:generate": "cd packages/db && pnpm drizzle-kit generate",
         },
+        devDependencies: { "typescript": "^5" },
+      }, null, 2))
+
+      // apps/mobile — Expo (script start real)
+      writeFileSync(t("apps/mobile/package.json"), JSON.stringify({
+        name: "mobile", private: true,
+        scripts: { start: "expo start", android: "expo start --android", ios: "expo start --ios" },
         dependencies: {
           "expo": "~52", "react": "^19", "react-native": "^0.76", "@tanstack/react-query": "^5",
-          "@trpc/client": "^11", "@trpc/server": "^11", "zod": "^3",
+          "@trpc/client": "^11", "@trpc/react": "^11", "zod": "^3",
           "@react-navigation/native": "^7", "@react-navigation/native-stack": "^7",
           "expo-router": "~4", "expo-secure-store": "~14",
         },
         devDependencies: { "typescript": "^5", "@types/react": "^19" },
+      }, null, 2))
+
+      // apps/api — tRPC standalone (script dev real)
+      writeFileSync(t("apps/api/package.json"), JSON.stringify({
+        name: "api", private: true, type: "module",
+        scripts: { dev: "tsx watch src/index.ts", build: "tsc -p ." },
+        dependencies: { "@trpc/server": "^11", "zod": "^3" },
+        devDependencies: { "typescript": "^5", "tsx": "^4", "@types/node": "^22" },
       }, null, 2))
 
       mkdirSync(t("apps/mobile/app"), { recursive: true })
@@ -1070,7 +1143,7 @@ function scaffoldVerticalTemplate(templateName, projectDir, projectName, logger)
         "[project]", `name = "${projectName}"`, "version = \"0.1.0\"",
         "requires-python = \">=3.11\"",
         "dependencies = [",
-        "  \"langgraph>=0.3\", \"langchain>=0.3\", \"llama-index>=0.12\",",
+        "  \"langgraph>=0.3\", \"langchain>=0.3\", \"langchain-openai>=0.2\", \"llama-index>=0.12\",",
         "  \"chromadb>=0.6\", \"openai>=1.0\", \"fastapi>=0.115\",",
         "  \"uvicorn[standard]\", \"pydantic>=2\", \"httpx>=0.28\"",
         "]", "",
@@ -1078,9 +1151,9 @@ function scaffoldVerticalTemplate(templateName, projectDir, projectName, logger)
 
       writeFileSync(t("agents/research_agent.py"), [
         "from langgraph.graph import StateGraph, MessagesState",
-        "from langchain_openai import ChatOpenAi",
+        "from langchain_openai import ChatOpenAI",
         "",
-        "llm = ChatOpenAi(model=\"gpt-4o\")",
+        "llm = ChatOpenAI(model=\"gpt-4o\")",
         "",
         "def research_node(state: MessagesState) -> MessagesState:",
         '    """Pesquisa e sintetiza informacao sobre um topico."""',
