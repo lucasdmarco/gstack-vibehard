@@ -1,4 +1,4 @@
-# 🚀 gstack-vibehard 2.2.2
+# 🚀 gstack-vibehard 2.2.3
 **A Máquina de Desenvolvimento Zero-Config Definitiva para Agentes de IA.**
 
 [![Test](https://github.com/lucasdmarco/gstack-vibehard/actions/workflows/test.yml/badge.svg)](https://github.com/lucasdmarco/gstack-vibehard/actions/workflows/test.yml)
@@ -113,9 +113,18 @@ gstack_vibehard sprint --save
 gstack_vibehard uninstall
 ```
 
-O Quality Gate roda automaticamente via hooks no final de cada sessão:
-- **Claude Code/Cursor/OpenCode**: hooks registrados e executados pelo harness (bloqueiam comandos perigosos; reportam gates no Stop)
+O Quality Gate roda via hooks no final de cada sessão:
+- **Claude Code/Cursor/OpenCode**: hooks registrados e executados pelo harness (bloqueiam comandos perigosos; registram memória no Stop)
 - **Codex/Gemini CLI/Windsurf/Kiro/Zed**: modo Best-Effort (instrucional — sem hooks API)
+
+> **O Stop é leve por padrão** (registra memória e nada mais — não atrasa cada resposta). Trabalho pesado é **opt-in** por env var:
+> | Env var | Liga |
+> |---|---|
+> | `GSTACK_STOP_AUDIT=on` | Roda `fallow audit` + QG no Stop |
+> | `GSTACK_TEST_GATE=on` / `=block` | Roda a suíte de testes (reporta / bloqueia) |
+> | `GSTACK_AUTO_PR=1` | Cria branch + commit local de docs em sessões bem-sucedidas |
+> | `GSTACK_AUTO_ISSUE=1` | Abre issue automática em falhas |
+> | `GSTACK_AUTOSAVE_MAIN=1` | Auto-commit do repo principal (worktrees efêmeros já são salvos) |
 - **Código migrado**: `src/` sem `execSync(string)`; operações de subprocesso usam `execFileSync`/`execFile` com argumentos em array
 - **Typecheck complementar**: `qg.py` roda `npx tsc --noEmit` apos Fallow nos projetos com `tsconfig.json`
 
