@@ -1,5 +1,10 @@
 # Changelog - gstack-vibehard
 
+## [2.2.1] - 2026-06-15
+
+### Documentacao
+- README sincronizado com o estado do release: novidades v2.2.0 completas (Test Gate, novos detectores), historico v2.1.9 e contagem de testes corrigida (19 Node + 21 Python). Patch docs-only para alinhar a pagina do npm com o repositorio.
+
 ## [2.2.0] - 2026-06-15
 
 **Hooks Reais Cross-Harness — a alma do produto funcionando de verdade.**
