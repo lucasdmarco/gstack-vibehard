@@ -16,6 +16,7 @@ import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { homedir, tmpdir } from "node:os"
 import { deepMerge } from "../installer/merge.js"
+import { buildIntegrationsRegistry } from "../printing-press/registry.js"
 
 const HOME = resolve(homedir() || process.env.USERPROFILE || process.env.HOME || "/tmp")
 
@@ -583,7 +584,7 @@ const TEMPLATE_MANIFEST = {
   },
 }
 
-function writeRuntimeFiles({ projectDir, projectName, now, projectRoot, templateName }) {
+export function writeRuntimeFiles({ projectDir, projectName, now, projectRoot, templateName }) {
   const gstackDir = join(projectDir, ".gstack")
   const scriptsDir = join(projectDir, "scripts")
   mkdirSync(gstackDir, { recursive: true })
@@ -629,6 +630,11 @@ function writeRuntimeFiles({ projectDir, projectName, now, projectRoot, template
       "PAPERCLIP_API_KEY",
     ],
   })
+
+  // Registry de integracoes (dual-lane Composio nuvem + Printing Press local).
+  // Declarativo: sugere ferramentas por template, NAO instala nada. Opt-in via
+  // `gstack_vibehard tools`.
+  writeJson(join(gstackDir, "integrations.json"), buildIntegrationsRegistry(templateName))
 
   // Dockerfile por stack: AI = Python (uvicorn); demais = Node multi-stage.
   // Mobile (Expo) nao e containerizado — Docker cobre apenas a API.
