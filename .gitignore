@@ -21,3 +21,5 @@ coverage/
 .npmrc.bak
 *.exe
 *.tgz
+.claude/settings.local.json
+.docs/

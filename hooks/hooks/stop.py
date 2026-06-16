@@ -738,6 +738,46 @@ if _stop_audit_on and qg_path.exists() and cwd:
         note_lines.append("")
         note_lines.append(f"## Quality Gate ({qg_label})\nErro: {e}")
 
+# Loop-tracking (circuit breaker): conta falhas consecutivas do Stop e sugere
+# human handoff ao atingir maxConsecutiveSameFailure. Estado em ~/.gstack/
+# (cross-harness, nao Codex-only), barato e gracioso.
+def track_loop_failures(cwd_path, failed, fail_signature):
+    try:
+        state_file = GSTACK_DIR / "loop-state.json"
+        cap = 2
+        lb = Path(cwd_path) / ".gstack" / "loop-budget.json" if cwd_path else None
+        if lb and lb.exists():
+            try:
+                cap = int(json.loads(lb.read_text(encoding="utf-8")).get("maxConsecutiveSameFailure", 2))
+            except (json.JSONDecodeError, OSError, ValueError, TypeError):
+                cap = 2
+        state = {}
+        if state_file.exists():
+            try:
+                state = json.loads(state_file.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                state = {}
+        if not failed:
+            state = {"consecutive": 0, "signature": None}
+            state_file.write_text(json.dumps(state), encoding="utf-8")
+            return None
+        same = state.get("signature") == fail_signature
+        consecutive = (state.get("consecutive", 0) + 1) if same else 1
+        state = {"consecutive": consecutive, "signature": fail_signature}
+        state_file.write_text(json.dumps(state), encoding="utf-8")
+        if consecutive >= cap:
+            return (f"## Circuit Breaker\n{consecutive} falhas consecutivas iguais "
+                    f"({fail_signature}). Cap={cap}. Sugiro HUMAN HANDOFF — revise antes de re-tentar.")
+        return None
+    except (OSError, ValueError):
+        return None
+
+_fail_sig = "security_gate" if (run_security and stop_failed) else ("test_gate" if stop_failed else "ok")
+_breaker = track_loop_failures(cwd, stop_failed, _fail_sig)
+if _breaker:
+    note_lines.append("")
+    note_lines.append(_breaker)
+
 # Keywords para busca indexada
 keywords = []
 if summary:
