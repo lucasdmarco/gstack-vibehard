@@ -8,6 +8,7 @@ function parseFlags(args) {
     if (a === "--task") out.task = args[++i]
     else if (a === "--model") out.model = args[++i]
     else if (a === "--max-iterations") out.maxIterations = parseInt(args[++i], 10)
+    else if (a === "--worktree") out.worktree = true
     else if (a === "--yes" || a === "-y") out.yes = true
     else out._.push(a)
   }
@@ -21,8 +22,9 @@ export async function delegateCommand(args = [], opts = {}) {
 
   if (target !== "opencode") {
     section("delegate — delegar tarefa para outro harness")
-    info("  gstack_vibehard delegate opencode --task \"...\" [--model M] [--max-iterations N] [--yes]")
+    info("  gstack_vibehard delegate opencode --task \"...\" [--model M] [--max-iterations N] [--worktree] [--yes]")
     info("  Delega ao OpenCode (modelo/free tier configurado por você). Opt-in, com confirmação.")
+    info("  --worktree: roda numa git worktree isolada (não toca o branch principal).")
     return
   }
 
@@ -41,11 +43,15 @@ export async function delegateCommand(args = [], opts = {}) {
     if (!ok) { info("Delegação cancelada."); return }
   }
 
-  const result = runDelegation({ task, cwd, model: flags.model, exec: opts.exec })
+  const result = runDelegation({
+    task, cwd, model: flags.model, maxIterations: flags.maxIterations,
+    worktree: flags.worktree, exec: opts.exec,
+  })
   switch (result.status) {
     case "ok":
       success(result.summary)
       if (result.changedFiles.length) info(`Alterados: ${result.changedFiles.slice(0, 20).join(", ")}`)
+      if (result.reviewBranch) info(`Revise/mergeie: git merge ${result.reviewBranch}`)
       break
     case "failed":
       warn(result.summary)
