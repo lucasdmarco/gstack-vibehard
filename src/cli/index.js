@@ -7,6 +7,7 @@ import { doctor } from "../installer/doctor.js"
 import { uninstall, list } from "../installer/uninstall.js"
 import { toolsCommand } from "../commands/tools.js"
 import { contextCommand } from "../commands/context.js"
+import { delegateCommand } from "../commands/delegate.js"
 import { createCommand } from "./create.js"
 import { initCommand } from "../commands/init.js"
 import { sprintCommand } from "../commands/sprint.js"
@@ -167,6 +168,9 @@ async function dispatch(command, args) {
       break
     case "context":
       await contextCommand(args)
+      break
+    case "delegate":
+      await delegateCommand(args)
       break
     case "help":
       showHelp()
