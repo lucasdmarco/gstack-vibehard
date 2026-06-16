@@ -145,32 +145,43 @@ export async function contextCommand(args = [], opts = {}) {
 
     case "search": {
       const q = args[1]
-      section(`context search — ${q || ""}`)
-      if (!q) { error("Forneça o termo: context search \"...\""); return }
-      if (!existsSync(dbPath(cwd))) { warn("Índice não existe. Rode `context index` antes."); return }
       const json = args.includes("--json")
+      // --json → stdout PURO (sem header/banner) para automação/MCP.
+      if (!json) section(`context search — ${q || ""}`)
+      if (!q) { json ? process.stdout.write(JSON.stringify({ error: "missing query" }) + "\n") : error("Forneça o termo: context search \"...\""); return }
+      if (!existsSync(dbPath(cwd))) { json ? process.stdout.write(JSON.stringify({ error: "no_index" }) + "\n") : warn("Índice não existe. Rode `context index` antes."); return }
       const r = runIndexer(["search", "--db", dbPath(cwd), "--query", q, ...(json ? ["--json"] : [])])
       if (r.ok) process.stdout.write(r.stdout)
-      else error(`Busca falhou: ${r.error}`)
+      else json ? process.stdout.write(JSON.stringify({ error: r.error || "search_failed" }) + "\n") : error(`Busca falhou: ${r.error}`)
       return
     }
 
     case "related": {
       const ent = args[1]
-      section(`context related — ${ent || ""}`)
-      if (!ent) { error("Forneça a entidade: context related <Nome>"); return }
-      if (!existsSync(dbPath(cwd))) { warn("Índice não existe. Rode `context index` antes."); return }
-      const r = runIndexer(["related", "--db", dbPath(cwd), "--entity", ent, ...(args.includes("--json") ? ["--json"] : [])])
+      const json = args.includes("--json")
+      if (!json) section(`context related — ${ent || ""}`)
+      if (!ent) { json ? process.stdout.write(JSON.stringify({ error: "missing entity" }) + "\n") : error("Forneça a entidade: context related <Nome>"); return }
+      if (!existsSync(dbPath(cwd))) { json ? process.stdout.write(JSON.stringify({ error: "no_index" }) + "\n") : warn("Índice não existe. Rode `context index` antes."); return }
+      const r = runIndexer(["related", "--db", dbPath(cwd), "--entity", ent, ...(json ? ["--json"] : [])])
       if (r.ok) process.stdout.write(r.stdout)
-      else error(`Falha: ${r.error}`)
+      else json ? process.stdout.write(JSON.stringify({ error: r.error || "related_failed" }) + "\n") : error(`Falha: ${r.error}`)
       return
     }
 
     case "explain": {
       const topic = args[1]
+      const json = args.includes("--json")
+      if (!topic) { json ? process.stdout.write(JSON.stringify({ error: "missing topic" }) + "\n") : error("Forneça o tópico: context explain \"...\""); return }
+      if (!existsSync(dbPath(cwd))) { json ? process.stdout.write(JSON.stringify({ error: "no_index" }) + "\n") : warn("Índice não existe. Rode `context index` antes."); return }
+      if (json) {
+        // JSON combinado puro
+        const s = runIndexer(["search", "--db", dbPath(cwd), "--query", topic, "--json"])
+        const rel = runIndexer(["related", "--db", dbPath(cwd), "--entity", topic, "--json"])
+        const safe = (x) => { try { return JSON.parse(x) } catch { return null } }
+        process.stdout.write(JSON.stringify({ topic, search: safe(s.stdout), related: safe(rel.stdout) }) + "\n")
+        return
+      }
       section(`context explain — ${topic || ""}`)
-      if (!topic) { error("Forneça o tópico: context explain \"...\""); return }
-      if (!existsSync(dbPath(cwd))) { warn("Índice não existe. Rode `context index` antes."); return }
       info("Documentos relevantes:")
       process.stdout.write(runIndexer(["search", "--db", dbPath(cwd), "--query", topic]).stdout)
       info("Entidades relacionadas:")

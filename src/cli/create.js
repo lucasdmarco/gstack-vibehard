@@ -16,6 +16,7 @@ import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { homedir, tmpdir } from "node:os"
 import { deepMerge } from "../installer/merge.js"
+import { npxArgv } from "../installer/deps.js"
 import { buildIntegrationsRegistry } from "../printing-press/registry.js"
 import { buildContextRegistry, DOC_SOURCES as CONTEXT_DOC_SOURCES } from "../context-docs/registry.js"
 import { DEFAULT_LOOP_BUDGET } from "../loop-budget/policy.js"
@@ -331,7 +332,8 @@ observability:
 }
 
 function bootAgentMemory(logger, projectDir) {
-  const out = safeExec("npx", ["--yes", "@agentmemory/agentmemory", "federate", "--enable"], { cwd: projectDir })
+  const { file, argv } = npxArgv(["--yes", "@agentmemory/agentmemory", "federate", "--enable"])
+  const out = safeExec(file, argv, { cwd: projectDir })
   if (out) logger.success("AgentMemory Mesh Federation ativa (BM25 + Vetor + Grafo)")
   else logger.warn("AgentMemory Federation nao pode ser ativada — continuando sem P2P mesh")
 }
@@ -362,7 +364,8 @@ index = "hnsw"
 
 function bootGraphify(logger, projectDir) {
   try {
-    const out = safeExec("npx", ["--yes", "graphify", "hook", "install"], { cwd: projectDir })
+    const { file, argv } = npxArgv(["--yes", "graphify", "hook", "install"])
+    const out = safeExec(file, argv, { cwd: projectDir })
     if (out) {
       logger.success("Graphify hooks instalados — AST gerada a cada commit")
     } else {
@@ -375,7 +378,8 @@ function bootGraphify(logger, projectDir) {
 
 function bootHeadroom(logger, projectDir) {
   try {
-    const out = safeExec("npx", ["--yes", "@gstack/headroom-proxy", "--check"], { cwd: projectDir })
+    const { file, argv } = npxArgv(["--yes", "@gstack/headroom-proxy", "--check"])
+    const out = safeExec(file, argv, { cwd: projectDir })
     if (out) {
       logger.success("Headroom proxy operacional — compressao de contexto ativa")
     }

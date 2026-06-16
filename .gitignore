@@ -23,3 +23,10 @@ coverage/
 *.tgz
 .claude/settings.local.json
 .docs/
+
+# Artefatos gerados em runtime (context init/index)
+.gstack/
+/docs/adr/
+/docs/plans/
+/docs/prd/
+/docs/research/

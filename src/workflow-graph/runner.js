@@ -31,12 +31,17 @@ export function runWorkflow(opts = {}) {
   const verifier = opts.verifier || defaultVerifier(cwd, opts.exec)
 
   const state = makeState(task)
+  let anyExecuted = false // algum worker realmente executou trabalho?
   // Resume: reconstrói o ponto de retomada a partir do journal existente.
   const resume = replayState(journalBase, runId)
   if (resume.alreadyPassed) {
     return { runId, status: "passed", iterations: resume.lastIteration, journalBase, resumed: true }
   }
-  state.iteration = resume.lastIteration // continua da próxima iteração
+  // Retoma UMA iteração antes do último worker concluído: se o processo morreu
+  // ENTRE worker#N (concluído) e verifier#N (não rodou), o loop re-entra em N,
+  // detecta o worker via journal_hit e roda o verifier que ficou faltando — em
+  // vez de pular direto pra N+1 (que verificaria trabalho ainda não verificado).
+  state.iteration = Math.max(0, resume.lastIteration - 1)
   log({ event: "run_started", task, resumed: resume.lastIteration > 0 })
 
   // Nós lineares com replay (planner/rubric só uma vez)
@@ -64,8 +69,9 @@ export function runWorkflow(opts = {}) {
     } else {
       log({ event: "node_started", nodeId: wId })
       const w = worker(state)
+      if (w.executed) anyExecuted = true
       if (w.ok === false) log({ event: "node_failed", nodeId: wId, signature: w.signature || "worker_failed" })
-      else log({ event: "node_completed", nodeId: wId, summary: (w.summary || "").slice(0, 200) })
+      else log({ event: "node_completed", nodeId: wId, summary: (w.summary || "").slice(0, 200), executed: w.executed === true })
     }
 
     const vId = `verifier#${state.iteration}`
@@ -102,8 +108,14 @@ export function runWorkflow(opts = {}) {
     log({ event: "node_started", nodeId: `retry#${state.iteration}` })
   }
 
-  log({ event: "run_ended", status: state.status, iterations: state.iteration })
-  return { runId, status: state.status, iterations: state.iteration, journalBase }
+  // Aviso: "passed" sem nenhum trabalho executado = só instrução ao harness
+  // (delegação OFF). O verde reflete o estado pré-existente, não a tarefa feita.
+  const warning = (state.status === "passed" && !anyExecuted)
+    ? "instruction_only: nenhum worker executou trabalho (delegação OFF); 'passed' reflete o estado pré-existente"
+    : undefined
+  if (warning) log({ event: "run_warning", reason: "instruction_only" })
+  log({ event: "run_ended", status: state.status, iterations: state.iteration, executed: anyExecuted })
+  return { runId, status: state.status, iterations: state.iteration, journalBase, executed: anyExecuted, warning }
 }
 
 /**
@@ -144,9 +156,12 @@ function defaultWorker(cwd, budget, exec) {
   return (state) => {
     if (budget.delegation?.enabled) {
       const r = runDelegation({ task: state.task, cwd, exec })
-      return { ok: r.status === "ok", summary: r.summary, signature: r.status }
+      return { ok: r.status === "ok", summary: r.summary, signature: r.status, executed: true }
     }
-    return { ok: true, summary: `Instrução para o harness atual: ${state.task}`, signature: "instructed" }
+    // Delegação OFF: o gstack NÃO faz chamada de modelo — apenas emite a instrução
+    // para o harness atual. executed:false sinaliza que nenhum trabalho rodou (o
+    // "passed" subsequente reflete só o estado pré-existente, não a tarefa feita).
+    return { ok: true, summary: `Instrução para o harness atual: ${state.task}`, signature: "instructed", executed: false }
   }
 }
 
