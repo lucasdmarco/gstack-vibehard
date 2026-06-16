@@ -100,6 +100,8 @@ export function showHelp() {
   console.log(color("    gstack_vibehard monitor        TUI: agentes, tokens, QG, ROI", COLORS.cyan))
   console.log(color("    gstack_vibehard tools          Integracoes: Composio (nuvem) + Printing Press (local)", COLORS.cyan))
   console.log(color("    gstack_vibehard context        Context docs (ADR/PRD/plans/research) — init/status", COLORS.cyan))
+  console.log(color("    gstack_vibehard delegate       Delegar tarefa ao OpenCode (opt-in, confirmação)", COLORS.cyan))
+  console.log(color("    gstack_vibehard workflow       Graph runner determinístico — run/runs/inspect", COLORS.cyan))
   console.log(color("    gstack_vibehard uninstall      Remover gstack_vibehard do ambiente", COLORS.cyan))
   console.log(color("    gstack_vibehard list           Listar componentes instalados", COLORS.cyan))
   console.log(color("    gstack_vibehard help           Mostrar esta ajuda\n", COLORS.cyan))
