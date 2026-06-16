@@ -148,6 +148,17 @@ const HARNESS_PATHS = {
       try { execFileSync("kimi", ["--version"], { stdio: "pipe", timeout: 3000 }); return true } catch { return false }
     },
   },
+  hermes: {
+    label: "Hermes CLI (NousResearch)",
+    // Hermes fala MCP nas duas direções; config global em ~/.hermes/ (skills/ + config).
+    configDir: join(HOME, ".hermes"),
+    configFile: join(HOME, ".hermes", "config.yaml"),
+    instructionFile: join(HOME, ".hermes", "AGENTS.md"),
+    detect: () => {
+      if (existsSync(join(HOME, ".hermes"))) return true
+      try { execFileSync("hermes", ["--version"], { stdio: "pipe", timeout: 3000 }); return true } catch { return false }
+    },
+  },
   vscode: {
     label: "VS Code (Copilot)",
     // User dir por OS — detection only (instrucao Copilot e por-repo via .github/)

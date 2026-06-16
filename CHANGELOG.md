@@ -1,5 +1,16 @@
 # Changelog - gstack-vibehard
 
+## [2.7.0] - 2026-06-16
+
+### Hermes (NousResearch) como harness de primeira classe — fala MCP nas duas direções
+- **Detecção:** o `install` agora reconhece o **Hermes CLI** (via `~/.hermes/` ou `hermes --version`).
+- **Integração em 3 camadas (da mais garantida à best-effort), `src/harness/hermes.js`:**
+  1. **Skills** copiadas para `~/.hermes/skills/` (filesystem — não sobrescreve skills do usuário).
+  2. **Guidance instrucional** em `~/.hermes/AGENTS.md` (mesmo protocolo QG/memória/economia-de-tokens dos demais harnesses sem hooks).
+  3. **Registro MCP** dos servidores do gstack (de `mcp-configs/base.mcp.json`) via `hermes mcp add <name> --command …` — **só executa se o binário `hermes` existir**, totalmente guardado (falha = skip, nunca fatal). Deixamos o **próprio Hermes** persistir o config no formato dele, em vez de adivinhar o schema YAML (não corrompe config alheio).
+- **Uninstall** simétrico: remove as skills gstack de `~/.hermes/skills` e tira o bloco instrucional do `~/.hermes/AGENTS.md` (preservando o conteúdo do usuário fora dos marcadores).
+- Tudo offline e idempotente; nenhuma dependência nova. +3 testes (103 Node + 33 Python verdes).
+
 ## [2.6.2] - 2026-06-16
 
 ### Correções da revisão Codex (6 bugs reais)

@@ -184,6 +184,36 @@ function removeScripts(report) {
   if (count > 0) success(`${count} scripts removidos de ~/.agents/scripts/`)
 }
 
+/**
+ * Hermes: remove as skills gstack de ~/.hermes/skills e tira o bloco instrucional
+ * do ~/.hermes/AGENTS.md (preservando conteúdo do usuário fora dos marcadores).
+ * NÃO mexe nos registros `hermes mcp add` (vivem no config do Hermes; os MCP
+ * servers apontam para deps globais preservadas).
+ */
+function removeHermes(report) {
+  const skillsDir = join(HOME, ".hermes", "skills")
+  if (existsSync(skillsDir)) {
+    const count = packageSkillNames().filter((skill) => removeDir(join(skillsDir, skill), report)).length
+    if (count > 0) success(`${count} skills gstack removidas de ~/.hermes/skills/`)
+  }
+  const agents = join(HOME, ".hermes", "AGENTS.md")
+  if (existsSync(agents)) {
+    try {
+      const MARKER = "<!-- gstack_vibehard:instrucional -->"
+      const content = readFileSync(agents, "utf-8")
+      if (content.includes(MARKER)) {
+        const first = content.indexOf(MARKER)
+        const last = content.lastIndexOf(MARKER) + MARKER.length
+        const stripped = (content.slice(0, first) + content.slice(last)).trim()
+        if (stripped) { writeFileSync(agents, stripped + "\n"); report.removed.push("bloco gstack: ~/.hermes/AGENTS.md") }
+        else { unlinkSync(agents); report.removed.push("~/.hermes/AGENTS.md") }
+      }
+    } catch (e) {
+      report.errors.push(`hermes AGENTS.md: ${e.message}`)
+    }
+  }
+}
+
 export async function uninstall(args = []) {
   const hasYesFlag = args.includes("--yes") || args.includes("-y")
   const report = { removed: [], restored: [], skipped: [], errors: [] }
@@ -203,6 +233,7 @@ export async function uninstall(args = []) {
   info("  • ~/.claude/rules/ultracode.md e ~/CLAUDE.md (restaura backup)")
   info("  • agentes gerados (namespace gstack-vibehard)")
   info("  • skills e scripts em ~/.agents instalados pelo pacote")
+  info("  • skills gstack + bloco instrucional em ~/.hermes (Hermes)")
   info("  • manifest ~/.gstack_vibehard/")
   info("Nao remove: deps globais (bun, uv, Rust, headroom), ~/gstack-vault, ~/.mcp.json")
 
@@ -230,6 +261,7 @@ export async function uninstall(args = []) {
   removeGeneratedAgents(report)
   removeSkills(report)
   removeScripts(report)
+  removeHermes(report)
   removeWithRestore(join(HOME, "gstack_vibehard-install.bat"), report)
   removeWithRestore(join(HOME, "gstack_vibehard-install.sh"), report)
   removeDir(join(HOME, ".gstack_vibehard"), report)
