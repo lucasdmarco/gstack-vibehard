@@ -3,9 +3,9 @@ import { join, dirname } from "path"
 import { fileURLToPath } from "url"
 import { execFileSync } from "child_process"
 import { buildContextRegistry, countDocs, DOC_SOURCES } from "../context-docs/registry.js"
-import { setObsidianPath, getObsidianPath } from "../context-docs/obsidian.js"
+import { setObsidianPath, getObsidianPath, obsidianDetected, getGlobalObsidianDefault, chooseObsidian } from "../context-docs/obsidian.js"
 import { findGraphifyOutput } from "../context-docs/graphify.js"
-import { success, warn, error, info, section } from "../cli/index.js"
+import { success, warn, error, info, section, select, prompt } from "../cli/index.js"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const INDEXER = join(__dirname, "..", "context-docs", "py", "context_db.py")
@@ -61,6 +61,25 @@ export async function contextCommand(args = [], opts = {}) {
       ensureDocDirs(cwd)
       success(`Diretórios de docs prontos: ${Object.values(DOC_SOURCES).join(", ")}`)
       info("Coloque ADRs/PRDs/plans/research em docs/* — o session_start injeta só um resumo.")
+
+      // Obsidian: escolha obrigatória (com 'pular') se detectado e ainda não configurado.
+      if (!getObsidianPath(cwd)) {
+        const globalDefault = getGlobalObsidianDefault()
+        if (globalDefault) {
+          setObsidianPath(cwd, globalDefault)
+          info(`Obsidian herdado do default global: ${globalDefault} (read-only)`)
+        } else if (obsidianDetected() && process.stdin.isTTY) {
+          const chosen = await chooseObsidian({ select, prompt })
+          if (chosen) {
+            setObsidianPath(cwd, chosen)
+            success(`Obsidian configurado (read-only): ${chosen}`)
+          } else {
+            info("Obsidian: pulado. Configure depois com `context obsidian set <pasta>`.")
+          }
+        } else if (obsidianDetected()) {
+          info("Obsidian detectado (não-interativo) — rode `context obsidian set <pasta>` para indexar.")
+        }
+      }
       return
     }
 
