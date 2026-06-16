@@ -31,10 +31,19 @@ function goCandidates(home, plat) {
   return ["go", join(home, ".local", "go", "bin", "go"), "/usr/local/go/bin/go"]
 }
 
-function installGoLinuxTarball(exec, home) {
+// Mapeia process.arch -> sufixo de arch do Go. null = arch nao suportada.
+function goArch(arch) {
+  return { x64: "amd64", arm64: "arm64", arm: "armv6l", ppc64: "ppc64le", s390x: "s390x" }[arch] || null
+}
+
+function installGoLinuxTarball(exec, home, arch = process.arch) {
+  const goa = goArch(arch)
+  if (!goa) {
+    throw new Error(`arquitetura Linux nao suportada para auto-install do Go: ${arch}. Instale manual: https://go.dev/dl`)
+  }
   // Sem sudo: tarball oficial -> ~/.local/go (go/ extrai dentro de ~/.local)
-  const url = `https://go.dev/dl/${GO_LINUX_VERSION}.linux-amd64.tar.gz`
-  const tmp = join(tmpdir(), `${GO_LINUX_VERSION}.tar.gz`)
+  const url = `https://go.dev/dl/${GO_LINUX_VERSION}.linux-${goa}.tar.gz`
+  const tmp = join(tmpdir(), `${GO_LINUX_VERSION}-${goa}.tar.gz`)
   exec("curl", ["-fsSL", url, "-o", tmp], { stdio: "pipe", timeout: 300000 })
   const dest = join(home, ".local")
   mkdirSync(dest, { recursive: true })
@@ -67,7 +76,7 @@ export function ensureGo(opts = {}) {
     } else if (plat === "darwin") {
       exec("brew", ["install", "go"], { stdio: "pipe", timeout: 300000 })
     } else {
-      installGoLinuxTarball(exec, home)
+      installGoLinuxTarball(exec, home, opts.arch || process.arch)
     }
   } catch (e) {
     return { status: "absent", error: `falha ao instalar Go: ${e.message}. Instale manual: https://go.dev/dl` }

@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from "fs"
 import { join } from "path"
+import { findWorkingBinary } from "../installer/deps.js"
 
 /**
  * MCP opt-in, PROJECT-SCOPED. Registra o MCP companion de uma ferramenta
@@ -39,11 +40,33 @@ function defaultPpMcp(tool) {
   return { command: `${tool}-pp-mcp`, args: [] }
 }
 
-export function enableMcp(projectDir, tool) {
+/**
+ * @param {string} projectDir
+ * @param {string} tool
+ * @param {object} [opts] { installed: boolean (tool consta no registry),
+ *                          exec (injetavel), skipBinaryCheck }
+ */
+export function enableMcp(projectDir, tool, opts = {}) {
   if (!tool || !SAFE_TOOL.test(tool)) return { status: "invalid_tool" }
+  const name = ppServerName(tool)
+  const mcpBin = `${tool}-pp-mcp`
+
+  // Guard 1: a ferramenta precisa estar instalada (registry) — senao o harness
+  // carregaria um MCP apontando para um binario inexistente.
+  if (opts.installed === false) {
+    return { status: "not_installed", name, hint: `Rode antes: tools install ${tool}` }
+  }
+  // Guard 2: o binario do MCP precisa responder (a menos que explicitamente pulado).
+  if (!opts.skipBinaryCheck) {
+    const found = findWorkingBinary([mcpBin, join(process.env.HOME || process.env.USERPROFILE || "", "go", "bin", mcpBin)],
+      opts.exec ? { exec: opts.exec } : {})
+    if (!found) {
+      return { status: "missing_binary", name, hint: `${mcpBin} nao encontrado no PATH (verifique a instalacao)` }
+    }
+  }
+
   const cfg = readMcp(projectDir)
   cfg.mcpServers = cfg.mcpServers || {}
-  const name = ppServerName(tool)
   // Usuario vence: se ja existe um servidor com esse nome, nao sobrescreve.
   if (name in cfg.mcpServers) {
     return { status: "exists", name }

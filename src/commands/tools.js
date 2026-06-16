@@ -15,11 +15,35 @@ function readRegistry(cwd) {
   const p = registryPath(cwd)
   if (!existsSync(p)) return null
   try {
-    return JSON.parse(readFileSync(p, "utf-8"))
+    return migrateRegistry(JSON.parse(readFileSync(p, "utf-8")))
   } catch (e) {
     warn(`integrations.json ilegivel: ${e.message}`)
     return null
   }
+}
+
+/**
+ * Migra registries antigos (criados antes desta feature) para o schema atual,
+ * garantindo o bloco printingPress com defaults — evita explodir ao mutar
+ * reg.printingPress em projetos GStack antigos.
+ */
+function migrateRegistry(reg) {
+  if (!reg || typeof reg !== "object") reg = {}
+  reg.printingPress = {
+    lane: "local",
+    role: "read+longtail",
+    enabled: false,
+    discoveryInstalled: false,
+    installed: [],
+    suggested: [],
+    mcp: [],
+    ...(reg.printingPress || {}),
+  }
+  // normaliza arrays
+  for (const k of ["installed", "suggested", "mcp"]) {
+    if (!Array.isArray(reg.printingPress[k])) reg.printingPress[k] = []
+  }
+  return reg
 }
 
 function writeRegistry(cwd, reg) {
@@ -113,12 +137,22 @@ export async function toolsCommand(args = [], opts = {}) {
       section(`tools — uninstall ${slug || ""}`)
       const reg = readRegistry(cwd)
       const result = uninstallTool(slug, opts)
-      if (reg?.printingPress?.installed) {
-        reg.printingPress.installed = reg.printingPress.installed.filter((t) => t.name !== slug)
-        writeRegistry(cwd, reg)
+      if (result.status === "uninstalled") {
+        // So esquece do registry quando a remocao REAL teve sucesso
+        if (reg?.printingPress) {
+          reg.printingPress.installed = reg.printingPress.installed.filter((t) => t.name !== slug)
+          reg.printingPress.mcp = (reg.printingPress.mcp || []).filter((m) => m !== `pp-${slug}`)
+          writeRegistry(cwd, reg)
+        }
+        success(`${slug} removido e registry limpo.`)
+      } else {
+        // Falha: NAO remove do registry — marca o estado para nao "esquecer" o binario real
+        if (reg?.printingPress?.installed) {
+          const entry = reg.printingPress.installed.find((t) => t.name === slug)
+          if (entry) { entry.status = "uninstall_failed"; writeRegistry(cwd, reg) }
+        }
+        warn(`uninstall ${slug}: ${result.error || result.status} — entrada mantida (marcada uninstall_failed)`)
       }
-      if (result.status === "uninstalled") success(`${slug} removido e registry limpo.`)
-      else warn(`uninstall ${slug}: ${result.error || result.status} (entrada do registry removida)`)
       return
     }
 
@@ -133,7 +167,11 @@ export async function toolsCommand(args = [], opts = {}) {
         return
       }
       if (action === "enable") {
-        const r = enableMcp(cwd, tool)
+        const reg0 = readRegistry(cwd)
+        const installedNames = (reg0?.printingPress?.installed || []).map((t) => t.name)
+        const r = enableMcp(cwd, tool, { installed: installedNames.includes(tool), exec: opts.exec, skipBinaryCheck: opts.skipBinaryCheck })
+        if (r.status === "not_installed") { warn(`${tool} nao esta instalada. ${r.hint}`); return }
+        if (r.status === "missing_binary") { error(`MCP nao habilitado: ${r.hint}`); return }
         if (r.status === "enabled") {
           success(`MCP ${r.name} habilitado no .mcp.json do projeto.`)
           // reflete no registry
@@ -199,10 +237,22 @@ export async function toolsCommand(args = [], opts = {}) {
 
     default:
       section("tools — integracoes (Composio nuvem + Printing Press local)")
-      info("  gstack_vibehard tools suggested              Sugeridas para este projeto")
-      info("  gstack_vibehard tools list                   Catalogo Printing Press")
-      info("  gstack_vibehard tools search <termo>         Buscar no catalogo")
-      info("  gstack_vibehard tools enable-printing-press  Habilitar discovery no projeto")
+      info("  Descoberta:")
+      info("    tools suggested               Sugeridas para este projeto")
+      info("    tools list                    Catalogo Printing Press")
+      info("    tools search <termo>          Buscar no catalogo")
+      info("    tools enable-printing-press   Habilitar discovery no projeto")
+      info("  Instalacao (opt-in):")
+      info("    tools install <tool>          Instalar (instala Go sob demanda se faltar)")
+      info("    tools uninstall <tool>        Remover")
+      info("    tools installed               Listar instaladas")
+      info("  MCP (project-scoped):")
+      info("    tools mcp enable <tool>       Registrar pp-<tool> no .mcp.json do projeto")
+      info("    tools mcp disable <tool>      Remover o pp-<tool>")
+      info("    tools mcp list                Listar MCPs pp-* do projeto")
+      info("  Qualidade:")
+      info("    tools doctor                  Validar binario/auth/MCP das instaladas")
+      info("    tools generate                Gerar CLI de cauda-longa via HAR (em breve)")
       info("")
       info("  Leitura de alta frequencia → Printing Press (CLI local + SQLite)")
       info("  Escrita / OAuth / apps padrao → Composio (nuvem)")

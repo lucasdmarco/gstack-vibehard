@@ -13,7 +13,7 @@ test("enableMcp cria pp-<tool> no .mcp.json do projeto (project-scoped)", async 
   const tmp = await mkdtemp(path.join(tmpdir(), "gstack-mcp-"))
   try {
     const { enableMcp, listMcp } = await import(`${pathToFileURL(mcpModule)}?t=${Date.now()}`)
-    const r = enableMcp(tmp, "stripe")
+    const r = enableMcp(tmp, "stripe", { skipBinaryCheck: true })
     assert.equal(r.status, "enabled")
     assert.equal(r.name, "pp-stripe")
     const cfg = JSON.parse(await readFile(path.join(tmp, ".mcp.json"), "utf-8"))
@@ -34,7 +34,7 @@ test("enableMcp preserva servidores do usuario e nao sobrescreve mesmo nome", as
       },
     }))
     const { enableMcp } = await import(`${pathToFileURL(mcpModule)}?t=${Date.now()}`)
-    const r = enableMcp(tmp, "stripe")
+    const r = enableMcp(tmp, "stripe", { skipBinaryCheck: true })
     assert.equal(r.status, "exists", "nao sobrescreve pp-stripe customizado")
     const cfg = JSON.parse(await readFile(path.join(tmp, ".mcp.json"), "utf-8"))
     assert.deepEqual(cfg.mcpServers["pp-stripe"].args, ["--flag"], "customizacao do usuario preservada")
@@ -51,7 +51,7 @@ test("disableMcp remove so o pp-<tool> do gstack, preserva o resto", async () =>
     await writeFile(path.join(tmp, ".mcp.json"), JSON.stringify({
       mcpServers: { "meu-server": { command: "node" } },
     }))
-    enableMcp(tmp, "linear")
+    enableMcp(tmp, "linear", { skipBinaryCheck: true })
     const r = disableMcp(tmp, "linear")
     assert.equal(r.status, "disabled")
     const cfg = JSON.parse(await readFile(path.join(tmp, ".mcp.json"), "utf-8"))
@@ -67,6 +67,30 @@ test("enableMcp rejeita tool invalida", async () => {
   try {
     const { enableMcp } = await import(`${pathToFileURL(mcpModule)}?t=${Date.now()}`)
     assert.equal(enableMcp(tmp, "x; rm -rf /").status, "invalid_tool")
+    assert.equal(existsSync(path.join(tmp, ".mcp.json")), false)
+  } finally {
+    await rm(tmp, { recursive: true, force: true })
+  }
+})
+
+test("enableMcp bloqueia se a tool nao esta instalada (installed:false)", async () => {
+  const tmp = await mkdtemp(path.join(tmpdir(), "gstack-mcp-noinst-"))
+  try {
+    const { enableMcp } = await import(`${pathToFileURL(mcpModule)}?t=${Date.now()}`)
+    const r = enableMcp(tmp, "stripe", { installed: false })
+    assert.equal(r.status, "not_installed")
+    assert.equal(existsSync(path.join(tmp, ".mcp.json")), false, "nao escreve .mcp.json")
+  } finally {
+    await rm(tmp, { recursive: true, force: true })
+  }
+})
+
+test("enableMcp bloqueia se o binario MCP nao responde (missing_binary)", async () => {
+  const tmp = await mkdtemp(path.join(tmpdir(), "gstack-mcp-nobin-"))
+  try {
+    const { enableMcp } = await import(`${pathToFileURL(mcpModule)}?t=${Date.now()}`)
+    const r = enableMcp(tmp, "stripe", { installed: true, exec: () => { throw new Error("not found") } })
+    assert.equal(r.status, "missing_binary")
     assert.equal(existsSync(path.join(tmp, ".mcp.json")), false)
   } finally {
     await rm(tmp, { recursive: true, force: true })

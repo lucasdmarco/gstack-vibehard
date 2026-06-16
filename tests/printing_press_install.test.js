@@ -66,6 +66,28 @@ test("ensureGo: presente -> present; ausente+instalavel -> installed; autoInstal
   assert.equal(ensureGo({ exec: makeExec({ hasGo: false }), platform: "darwin", autoInstall: false }).status, "absent")
 })
 
+test("ensureGo Linux: baixa o tarball da arch certa; arch desconhecida nao auto-instala", async () => {
+  const { ensureGo } = await import(`${pathToFileURL(installModule)}?t=${Date.now()}`)
+  // arm64: deve tentar baixar e instalar
+  let urlBaixada = ""
+  const execArm = (file, args) => {
+    if (/[\\/]go(\.exe)?$/.test(file) || file === "go") {
+      if (urlBaixada) return Buffer.from("go1.22"); throw new Error("no go")
+    }
+    if (file === "curl") { urlBaixada = args[args.indexOf("-o") - 1] || args[2]; return Buffer.from("") }
+    if (file === "tar") return Buffer.from("")
+    throw new Error("unexpected " + file)
+  }
+  const rArm = ensureGo({ exec: execArm, platform: "linux", arch: "arm64", home: "/home/u" })
+  assert.match(urlBaixada, /linux-arm64\.tar\.gz/, "baixa o tarball arm64")
+  assert.equal(rArm.status, "installed")
+
+  // arch desconhecida (riscv64): nao auto-instala
+  const rUnknown = ensureGo({ exec: makeExec({ hasGo: false }), platform: "linux", arch: "riscv64", home: "/home/u" })
+  assert.equal(rUnknown.status, "absent")
+  assert.match(rUnknown.error, /nao suportada|manual/i)
+})
+
 test("installTool: instala mas binario nao encontrado -> install_unverified", async () => {
   const { installTool } = await import(`${pathToFileURL(installModule)}?t=${Date.now()}`)
   const r = installTool("stripe", { exec: makeExec({ binOnPath: false }) })
@@ -75,6 +97,46 @@ test("installTool: instala mas binario nao encontrado -> install_unverified", as
 test("installTool: slug invalido rejeitado", async () => {
   const { installTool } = await import(`${pathToFileURL(installModule)}?t=${Date.now()}`)
   assert.equal(installTool("stripe; rm -rf /", { exec: makeExec({}) }).status, "invalid_slug")
+})
+
+test("tools install migra registry antigo sem bloco printingPress", async () => {
+  const tmp = await mkdtemp(path.join(tmpdir(), "gstack-migrate-"))
+  try {
+    await mkdir(path.join(tmp, ".gstack"), { recursive: true })
+    // registry ANTIGO: sem printingPress (projeto criado antes da feature)
+    await writeFile(path.join(tmp, ".gstack", "integrations.json"), JSON.stringify({ schemaVersion: 1 }))
+    const { toolsCommand } = await import(`${pathToFileURL(toolsModule)}?t=${Date.now()}`)
+    // nao deve explodir ao acessar reg.printingPress
+    await toolsCommand(["install", "stripe"], { cwd: tmp, exec: makeExec({}) })
+    const reg = JSON.parse(await readFile(path.join(tmp, ".gstack", "integrations.json"), "utf-8"))
+    assert.ok(reg.printingPress, "bloco printingPress criado na migracao")
+    assert.equal(reg.printingPress.installed[0].name, "stripe")
+  } finally {
+    await rm(tmp, { recursive: true, force: true })
+  }
+})
+
+test("tools uninstall em FALHA nao esquece do registry (marca uninstall_failed)", async () => {
+  const tmp = await mkdtemp(path.join(tmpdir(), "gstack-uninst-fail-"))
+  try {
+    await mkdir(path.join(tmp, ".gstack"), { recursive: true })
+    await writeFile(path.join(tmp, ".gstack", "integrations.json"), JSON.stringify({
+      schemaVersion: 1,
+      printingPress: { enabled: true, installed: [{ name: "stripe", cli: "stripe-pp-cli", status: "installed" }], suggested: [], mcp: [] },
+    }))
+    const { toolsCommand } = await import(`${pathToFileURL(toolsModule)}?t=${Date.now()}`)
+    // exec que faz o `uninstall` externo falhar
+    const failExec = (file, args) => {
+      if (args.includes("uninstall")) throw new Error("uninstall externo falhou")
+      return Buffer.from("ok")
+    }
+    await toolsCommand(["uninstall", "stripe"], { cwd: tmp, exec: failExec })
+    const reg = JSON.parse(await readFile(path.join(tmp, ".gstack", "integrations.json"), "utf-8"))
+    assert.equal(reg.printingPress.installed.length, 1, "entrada NAO removida em falha")
+    assert.equal(reg.printingPress.installed[0].status, "uninstall_failed")
+  } finally {
+    await rm(tmp, { recursive: true, force: true })
+  }
 })
 
 test("tools install/uninstall atualiza registry (project-scoped)", async () => {
