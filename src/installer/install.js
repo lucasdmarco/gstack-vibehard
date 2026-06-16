@@ -598,8 +598,9 @@ export async function install(args = []) {
       success("Launcher Windows copiado para ~/gstack_vibehard-install.bat")
     }
   } else if (isMacOS()) {
-    info("macOS: brew install gstack_vibehard (via Homebrew tap)")
-    report.added.push("launcher: Homebrew formula gstack_vibehard")
+    info("macOS: instalacao via npm — npm install -g @gstack-vibehard/installer")
+    info("  (formula Homebrew disponivel em launchers/macos/gstack_vibehard.rb)")
+    report.added.push("launcher: instrucoes npm/Homebrew (macOS)")
   } else if (isLinux()) {
     const launcherSrc = join(PROJECT_ROOT, "launchers", "cross", "install.sh")
     const launcherDst = join(HOME, "gstack_vibehard-install.sh")

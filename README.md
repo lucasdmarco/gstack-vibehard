@@ -1,4 +1,4 @@
-# 🚀 gstack-vibehard 2.3.2
+# 🚀 gstack-vibehard 2.3.3
 **A Máquina de Desenvolvimento Zero-Config Definitiva para Agentes de IA.**
 
 [![Test](https://github.com/lucasdmarco/gstack-vibehard/actions/workflows/test.yml/badge.svg)](https://github.com/lucasdmarco/gstack-vibehard/actions/workflows/test.yml)
@@ -86,32 +86,91 @@ Os hooks Python respondem no formato nativo de cada harness (`hookSpecificOutput
 
 ---
 
-## 📖 Modo de Uso
+## 📖 Modo de Uso — passo a passo
 
+### Passo 0 — Instalar o CLI
+
+**Qualquer SO (recomendado):**
 ```bash
-# 1. Instalar globalmente
 npm install -g @gstack-vibehard/installer
-
-# 2. Diagnosticar ambiente
-gstack_vibehard doctor
-
-# 3. Instalar em harnesses detectados
-gstack_vibehard install
-
-# 4. Criar novo projeto
-gstack_vibehard create meu-projeto
-# Sem Docker/Rust: gstack_vibehard create meu-projeto --lite
-# Com template específico: gstack_vibehard create meu-projeto --template saas-auth-stripe
-
-# 5. Monitorar ambiente em tempo real
-gstack_vibehard monitor
-
-# 6. Salvar sprint (graphify + gbrain + chronicle)
-gstack_vibehard sprint --save
-
-# 7. Desinstalar
-gstack_vibehard uninstall
 ```
+**Windows:** dê duplo-clique em `launchers/windows/install.bat` (verifica o Node e roda via `npx`), ou use o comando npm acima.
+**macOS:** o comando npm acima; ou `brew install --formula launchers/macos/gstack_vibehard.rb`.
+
+Confirme: `gstack_vibehard --version`
+
+---
+
+### `doctor` — diagnosticar o ambiente
+```bash
+gstack_vibehard doctor
+```
+Mostra: Node/Python, harnesses detectados e nível de integração (hooks reais / instrucional / detecção), hooks instalados, skills, deps globais (bun, uv, Rust, Go, pytest, headroom), seção **Integrações** (Composio + Printing Press) e Playwright. **Rode primeiro** para ver o que falta.
+
+### `install` — configurar o ambiente
+```bash
+gstack_vibehard install              # instala deps globais + configura todos os harnesses
+gstack_vibehard install --skip-deps  # só configura harnesses (pula bun/Rust/Chromium pesados)
+```
+Registra os **hooks reais** (Claude Code `settings.json`, Cursor `hooks.json`, OpenCode plugins), copia agentes/skills, configura MCP e escreve orientação instrucional para os harnesses sem hooks API. Idempotente e não-destrutivo (faz backup `.bak`).
+
+### `create <nome>` — criar um workspace runtime
+```bash
+gstack_vibehard create meu-app                                   # template padrão (fullstack-monorepo)
+gstack_vibehard create meu-app --lite                            # sem Casdoor/Atomic/ECC2 (máquinas leves)
+gstack_vibehard create meu-app --template saas-auth-stripe       # vertical específico
+```
+Templates: `fullstack-monorepo` (Express/Fastify/Hono + React) · `saas-auth-stripe` (Next.js + Supabase + Stripe) · `mobile-backend` (Expo + tRPC + PostgreSQL) · `ai-agent-platform` (LangGraph + ChromaDB + FastAPI).
+Gera `.gstack/` (app/services/ports/secrets + **integrations.json**), Dockerfile por stack, `scripts/dev.sh`, regras por harness e o registry de integrações.
+
+### `init <nome>` — estrutura de projeto simples
+```bash
+gstack_vibehard init meu-projeto
+```
+Copia o template `fullstack-monorepo` para um diretório novo (mais simples que o `create`, sem o boot de 5 fases).
+
+### `tools` — integrações híbridas (Composio + Printing Press)
+```bash
+gstack_vibehard tools suggested            # ferramentas sugeridas para este projeto
+gstack_vibehard tools list                 # catálogo Printing Press (com rede)
+gstack_vibehard tools search stripe        # buscar no catálogo
+gstack_vibehard tools enable-printing-press # habilita discovery neste projeto
+gstack_vibehard tools install stripe       # instala (opt-in; instala Go sob demanda se faltar)
+gstack_vibehard tools installed            # lista instaladas
+gstack_vibehard tools uninstall stripe     # remove e limpa o registry
+gstack_vibehard tools mcp enable stripe    # registra pp-stripe no .mcp.json DO PROJETO
+gstack_vibehard tools mcp disable stripe   # remove o pp-stripe
+gstack_vibehard tools mcp list             # lista MCPs pp-* do projeto
+gstack_vibehard tools doctor               # valida binário/auth/MCP das instaladas
+```
+**Roteamento:** leitura de alta frequência → Printing Press (CLI local + SQLite); escrita/OAuth → Composio (nuvem). Tudo **opt-in e project-scoped** — nada toca sua config global.
+
+### `monitor` — TUI em tempo real
+```bash
+gstack_vibehard monitor
+```
+Painel: harnesses ativos, views do Atomic VCS, token budget, bloqueios de Quality Gate e ROI do último sprint. `Ctrl+C` para sair.
+
+### `sprint --save` — salvar memória da sessão
+```bash
+gstack_vibehard sprint --save
+```
+Persiste decisões e atualiza memórias (graphify + gbrain + chronicle).
+
+### `list` — ver o que está instalado
+```bash
+gstack_vibehard list
+```
+Lista componentes por harness, skills, scripts e o manifest de instalação.
+
+### `uninstall` — remover do ambiente
+```bash
+gstack_vibehard uninstall          # interativo (pede confirmação)
+gstack_vibehard uninstall --yes    # não-interativo (CI/scripts)
+```
+Remove só o que o instalador criou (restaura backups `.bak`, desregistra hooks do `settings.json`/`hooks.json`, limpa chaves gstack do `config.toml` do Codex). **Preserva** seu vault, `.mcp.json` e deps globais.
+
+---
 
 O Quality Gate roda via hooks no final de cada sessão:
 - **Claude Code/Cursor/OpenCode**: hooks registrados e executados pelo harness (bloqueiam comandos perigosos; registram memória no Stop)
