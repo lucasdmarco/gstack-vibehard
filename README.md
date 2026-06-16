@@ -1,4 +1,4 @@
-# 🚀 gstack-vibehard 2.4.1
+# 🚀 gstack-vibehard 2.5.0
 **A Máquina de Desenvolvimento Zero-Config Definitiva para Agentes de IA.**
 
 [![Test](https://github.com/lucasdmarco/gstack-vibehard/actions/workflows/test.yml/badge.svg)](https://github.com/lucasdmarco/gstack-vibehard/actions/workflows/test.yml)
@@ -222,9 +222,13 @@ Roteamento padrão: **leitura → Printing Press (local, barato)**, **escrita �
 Governança determinística para tarefas agênticas — **o LLM decide dentro do nó, o código decide as arestas**. O gstack **não faz model calls**: delega ao OpenCode (seu modelo/free tier) e verifica de forma determinística (testes/Fallow).
 
 ```bash
-# Context docs (consciência summary-only, economia de tokens)
-gstack_vibehard context init       # cria .gstack/context.json + docs/{adr,prd,plans,research}
-gstack_vibehard context status     # conta docs (offline)
+# Context docs + Document Graph local (GraphRAG offline, sem LLM, economia de tokens)
+gstack_vibehard context init               # cria .gstack/context.json + docs/{adr,prd,plans,research}
+gstack_vibehard context index              # indexa docs em SQLite/FTS5 (.gstack/context/context.db)
+gstack_vibehard context search "casdoor"   # busca FTS5 offline → path/heading/trecho/score
+gstack_vibehard context related Casdoor    # entidades e relações (mentions/links_to/tagged_as)
+gstack_vibehard context explain "auth"     # docs + entidades de um tópico
+gstack_vibehard context status --db        # documents/chunks/entities/edges + FTS status
 
 # Delegar uma tarefa ao OpenCode (opt-in, confirmação)
 gstack_vibehard delegate opencode --task "refatorar auth" --yes
