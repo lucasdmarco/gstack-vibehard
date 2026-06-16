@@ -2,6 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from "fs"
 import { join } from "path"
 import { ppList, ppSearch, PrintingPressError } from "../printing-press/cli.js"
 import { installTool, uninstallTool } from "../printing-press/install.js"
+import { enableMcp, disableMcp, listMcp } from "../printing-press/mcp.js"
 import { success, warn, error, info, section } from "../cli/index.js"
 
 /** Caminho do registry do projeto no cwd. */
@@ -117,6 +118,47 @@ export async function toolsCommand(args = [], opts = {}) {
       }
       if (result.status === "uninstalled") success(`${slug} removido e registry limpo.`)
       else warn(`uninstall ${slug}: ${result.error || result.status} (entrada do registry removida)`)
+      return
+    }
+
+    case "mcp": {
+      const action = args[1]
+      const tool = args[2]
+      section(`tools mcp ${action || ""} ${tool || ""}`)
+      if (action === "list") {
+        const servers = listMcp(cwd)
+        if (servers.length === 0) info("  (nenhum MCP pp-* habilitado neste projeto)")
+        else servers.forEach((s) => info(`  • ${s}`))
+        return
+      }
+      if (action === "enable") {
+        const r = enableMcp(cwd, tool)
+        if (r.status === "enabled") {
+          success(`MCP ${r.name} habilitado no .mcp.json do projeto.`)
+          // reflete no registry
+          const reg = readRegistry(cwd)
+          if (reg?.printingPress) {
+            reg.printingPress.mcp = [...new Set([...(reg.printingPress.mcp || []), r.name])]
+            writeRegistry(cwd, reg)
+          }
+        } else if (r.status === "exists") warn(`${r.name} ja existe — preservado (usuario vence).`)
+        else error(`tool invalida: ${tool}`)
+        return
+      }
+      if (action === "disable") {
+        const r = disableMcp(cwd, tool)
+        if (r.status === "disabled") {
+          success(`MCP ${r.name} removido do projeto.`)
+          const reg = readRegistry(cwd)
+          if (reg?.printingPress?.mcp) {
+            reg.printingPress.mcp = reg.printingPress.mcp.filter((m) => m !== r.name)
+            writeRegistry(cwd, reg)
+          }
+        } else if (r.status === "not_found") warn(`${r.name} nao encontrado.`)
+        else error(`tool invalida: ${tool}`)
+        return
+      }
+      info("Uso: tools mcp enable|disable|list <tool>")
       return
     }
 
