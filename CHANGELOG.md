@@ -1,5 +1,11 @@
 # Changelog - gstack-vibehard
 
+## [2.3.5] - 2026-06-16
+
+### Re-rodar `install` atualiza hooks obsoletos (raiz dos falsos positivos do QG)
+- **Bug:** quando todos os harnesses já estavam "instalados", `install` fazia early-return e **pulava o refresh dos hooks** — então um `qg.py` antigo (com heurísticas React de loading/error, propensas a falso-positivo, ex.: "componente com useEffect sem loading" em arquivo sem useEffect) **nunca era substituído**; a única saída era `rm` manual. Agora `install` **sempre atualiza os hooks** para a versão do pacote (idempotente, com backup `.bak`), inclusive no caminho "já configurado". O `qg.py` atual é o wrapper determinístico do Fallow (sem heurísticas React).
+- Refactor: lógica de cópia de hooks extraída para `refreshHooks()` e chamada nos dois caminhos.
+
 ## [2.3.4] - 2026-06-16
 
 ### Correções da revisão (Codex) — robustez do `tools`

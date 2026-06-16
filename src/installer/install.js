@@ -352,6 +352,35 @@ function printInstallReport(report) {
   }
 }
 
+/**
+ * Copia (refresh) os hooks Python do pacote para a fonte canonica ~/.gstack/hooks
+ * e os dirs por harness. Idempotente e com backup .bak. Chamado SEMPRE — inclusive
+ * quando os harnesses ja estao "instalados" — para que re-rodar `install`
+ * atualize hooks obsoletos (ex.: um qg.py antigo com heuristicas falso-positivas).
+ */
+async function refreshHooks(harnessIds, report) {
+  const hooksSource = join(PROJECT_ROOT, "hooks", "hooks")
+  const hookTargets = [{ id: "gstack (canonico)", dir: join(HOME, ".gstack", "hooks") }]
+  if (harnessIds.includes("codex")) hookTargets.push({ id: "codex", dir: join(HOME, ".codex", "hooks") })
+  if (harnessIds.includes("claude")) hookTargets.push({ id: "claude", dir: join(HOME, ".claude", "hooks") })
+  if (!existsSync(hooksSource)) {
+    warn("hooks/hooks/ nao encontrado no pacote")
+    return
+  }
+  const hooks = readdirSync(hooksSource).filter((f) => f.endsWith(".py"))
+  for (const target of hookTargets) {
+    ensureDir(target.dir)
+    await Promise.all(hooks.map(async (hook) => {
+      const src = join(hooksSource, hook)
+      const dst = join(target.dir, hook)
+      if (existsSync(dst)) backupFile(dst)
+      await copyFile(src, dst)
+      report.updated.push(`hook (${target.id}): ${hook}`)
+    }))
+    success(`${hooks.length} hooks atualizados em ${target.dir}`)
+  }
+}
+
 export async function install(args = []) {
   const skipDeps = args.includes("--skip-deps") || process.env.GSTACK_SKIP_DEPS === "1"
   const report = { added: [], updated: [], skipped: [], errors: [] }
@@ -409,19 +438,18 @@ export async function install(args = []) {
     }
   }
 
-  // If nothing to install for harnesses
+  // If nothing new to configure: ainda assim ATUALIZA os hooks (idempotente) —
+  // garante que hooks obsoletos (ex.: qg.py antigo) sejam substituidos pelos
+  // do pacote atual ao re-rodar `install`.
   if (availableHarnessIds.length === 0) {
+    section("hooks/ — Atualizando Quality & Security Gates")
+    await refreshHooks(allHarnessIds, report)
     section("agents/generated — Distribuicao cross-harness")
     await installGeneratedAgentLayer({ projectRoot: PROJECT_ROOT, report, info, success, warn, harnessIds: allHarnessIds })
     section("graphify/ — Git hooks AST")
     installGraphifyGitHooks({ report, info, success, warn })
-    success("\n  Todos os harnesses ja configurados. Deps globais ja verificadas.")
-    info("  Para forcar reinstalação, remova manualmente:")
-    for (const h of alreadyInstalled) {
-      if (h === "codex") info("    rm ~/.codex/hooks/qg.py")
-      if (h === "claude") info("    rm ~/.claude/rules/ultracode.md")
-      if (h === "opencode") info("    rm ~/.config/opencode/opencode.json")
-    }
+    success("\n  Harnesses ja configurados — hooks atualizados para a versao atual.")
+    printInstallReport(report)
     return
   }
 
@@ -472,30 +500,9 @@ export async function install(args = []) {
     warn("scripts/scripts/ nao encontrado no pacote")
   }
 
-  // Step 3: Install hooks — fonte canonica em ~/.gstack/hooks/ (todos os
-  // registros de harness apontam para ca) + copias legadas por harness
+  // Step 3: Install/refresh hooks — fonte canonica ~/.gstack/hooks/ + por harness
   section("hooks/ — Quality & Security Gates")
-  const hooksSource = join(PROJECT_ROOT, "hooks", "hooks")
-  const canonicalHooksDir = join(HOME, ".gstack", "hooks")
-  const hookTargets = [{ id: "gstack (canonico)", dir: canonicalHooksDir }]
-  if (selectedHarnessIds.includes("codex")) hookTargets.push({ id: "codex", dir: join(HOME, ".codex", "hooks") })
-  if (selectedHarnessIds.includes("claude")) hookTargets.push({ id: "claude", dir: join(HOME, ".claude", "hooks") })
-  if (!existsSync(hooksSource)) {
-    warn("hooks/hooks/ nao encontrado no pacote")
-  } else {
-    const hooks = readdirSync(hooksSource).filter((f) => f.endsWith(".py"))
-    for (const target of hookTargets) {
-      ensureDir(target.dir)
-      await Promise.all(hooks.map(async (hook) => {
-        const src = join(hooksSource, hook)
-        const dst = join(target.dir, hook)
-        if (existsSync(dst)) backupFile(dst)
-        await copyFile(src, dst)
-        report.added.push(`hook (${target.id}): ${hook}`)
-      }))
-      success(`${hooks.length} hooks instalados em ${target.dir}`)
-    }
-  }
+  await refreshHooks(selectedHarnessIds, report)
 
   // Step 4: Install skills
   section("skills/ — Frontend Design, Chronicle, Init e mais")
