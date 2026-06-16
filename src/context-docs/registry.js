@@ -23,6 +23,7 @@ export function buildContextRegistry() {
   return {
     schemaVersion: SCHEMA_VERSION,
     sources: { ...DOC_SOURCES },
+    db: ".gstack/context/context.db",
     sessionStart: {
       injectMode: "summary-only",
       maxDocsListed: 10,

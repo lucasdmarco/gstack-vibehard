@@ -274,7 +274,20 @@ try:
                     loop_line = f"\nLoop budget: maxIterations={lbj.get('maxIterations')}, delegacao={'on' if (lbj.get('delegation') or {}).get('enabled') else 'off'}"
                 except (json.JSONDecodeError, OSError):
                     pass
-            ctx_parts.append(f"## Context Docs (summary-only)\n{' · '.join(counts)}{loop_line}\nLeia docs/ sob demanda; nao foram injetados inteiros.")
+            # Índice Document Graph (1 query barata se o db existir) — summary-only.
+            index_line = ""
+            db = ctx_root / ".gstack" / "context" / "context.db"
+            if db.exists():
+                try:
+                    import sqlite3
+                    con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+                    nd = con.execute("SELECT COUNT(*) FROM documents").fetchone()[0]
+                    nc = con.execute("SELECT COUNT(*) FROM chunks").fetchone()[0]
+                    con.close()
+                    index_line = f"\nÍndice: {nd} docs / {nc} chunks (use `gstack_vibehard context search`)"
+                except (sqlite3.Error, OSError):
+                    pass
+            ctx_parts.append(f"## Context Docs (summary-only)\n{' · '.join(counts)}{loop_line}{index_line}\nLeia docs/ sob demanda; nao foram injetados inteiros.")
 except (OSError, ValueError):
     pass
 
