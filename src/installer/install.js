@@ -9,6 +9,7 @@ import { installCodex } from "../harness/codex.js"
 import { installClaude } from "../harness/claude.js"
 import { installOpenCode } from "../harness/opencode.js"
 import { installCursor } from "../harness/cursor.js"
+import { installHermes } from "../harness/hermes.js"
 import { writeInstructionalGuidance } from "../harness/instructional.js"
 import { installHeadroom } from "../harness/headroom.js"
 import { ensureDir, copyWithBackup, copyDirSync, backupFile } from "./merge.js"
@@ -563,6 +564,11 @@ export async function install(args = []) {
           break
         case "cursor":
           await installCursor({ hooks: true }, report)
+          break
+        case "hermes":
+          // Hermes fala MCP nas duas direções: skills + guidance (garantidos) +
+          // registro dos MCP servers via `hermes mcp add` (best-effort).
+          await installHermes({ mcp: true, skills: true }, report, { projectRoot: PROJECT_ROOT })
           break
         default: {
           // Harness sem API de hooks: integracao instrucional honesta —
