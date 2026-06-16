@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from "fs"
 import { join } from "path"
 import { ppList, ppSearch, PrintingPressError } from "../printing-press/cli.js"
+import { installTool, uninstallTool } from "../printing-press/install.js"
 import { success, warn, error, info, section } from "../cli/index.js"
 
 /** Caminho do registry do projeto no cwd. */
@@ -69,6 +70,53 @@ export async function toolsCommand(args = [], opts = {}) {
       }
       if (result.items.length === 0) info("  (nenhum resultado)")
       else printItems(result.items)
+      return
+    }
+
+    case "installed": {
+      section("tools — instaladas neste projeto")
+      const reg = readRegistry(cwd)
+      const installed = reg?.printingPress?.installed || []
+      if (installed.length === 0) info("  (nenhuma ferramenta instalada)")
+      else installed.forEach((t) => info(`  • ${t.name} [${t.status}]${t.cli ? " → " + t.cli : ""}`))
+      return
+    }
+
+    case "install": {
+      const slug = args[1]
+      section(`tools — install ${slug || ""}`)
+      const reg = readRegistry(cwd)
+      if (!reg) { warn("Sem .gstack/integrations.json aqui. Rode dentro de um projeto gstack."); return }
+      const result = installTool(slug, opts)
+      if (result.status === "installed") {
+        reg.printingPress.enabled = true
+        reg.printingPress.discoveryInstalled = true
+        reg.printingPress.installed = [
+          ...(reg.printingPress.installed || []).filter((t) => t.name !== slug),
+          result,
+        ]
+        writeRegistry(cwd, reg)
+        success(`${slug} instalado (${result.cli}). Registry atualizado.`)
+        info("Nenhuma credencial pedida. Se a ferramenta precisar de auth, veja `tools doctor`.")
+      } else if (result.status === "needs_go") {
+        warn(result.error)
+      } else {
+        error(`Falha ao instalar ${slug}: ${result.error || result.status}`)
+      }
+      return
+    }
+
+    case "uninstall": {
+      const slug = args[1]
+      section(`tools — uninstall ${slug || ""}`)
+      const reg = readRegistry(cwd)
+      const result = uninstallTool(slug, opts)
+      if (reg?.printingPress?.installed) {
+        reg.printingPress.installed = reg.printingPress.installed.filter((t) => t.name !== slug)
+        writeRegistry(cwd, reg)
+      }
+      if (result.status === "uninstalled") success(`${slug} removido e registry limpo.`)
+      else warn(`uninstall ${slug}: ${result.error || result.status} (entrada do registry removida)`)
       return
     }
 
