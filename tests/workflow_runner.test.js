@@ -69,3 +69,37 @@ test("runner: journal registra eventos do run", async () => {
     assert.ok(s.started && s.ended)
   })
 })
+
+test("runner: aplica maxWallTimeSeconds (deadline) -> handoff", async () => {
+  await withTmp(async (base) => {
+    const { runWorkflow } = await import(`${pathToFileURL(runnerMod)}?t=${Date.now()}`)
+    // relógio que ultrapassa o deadline na 1a checagem
+    let t = 0
+    const now = () => { t += 100000; return t } // +100s por chamada
+    const r = runWorkflow({
+      task: "t", journalBase: base, runId: "rw",
+      budget: { maxIterations: 99, maxWallTimeSeconds: 1, humanHandoffOnCap: true },
+      worker: () => ({ ok: true }), verifier: () => ({ passed: false }),
+      now,
+    })
+    assert.equal(r.status, "handoff")
+  })
+})
+
+test("runner: --run-id retoma e pula nós já concluídos (journal_hit)", async () => {
+  await withTmp(async (base) => {
+    const { runWorkflow } = await import(`${pathToFileURL(runnerMod)}?t=${Date.now()}`)
+    const { appendEvent } = await import(`${pathToFileURL(jMod)}?t=${Date.now()}`)
+    // simula um run anterior onde worker#1 concluiu e verifier#1 passou
+    appendEvent(base, "resume1", { event: "node_completed", nodeId: "worker#1" })
+    appendEvent(base, "resume1", { event: "node_completed", nodeId: "verifier#1" })
+    let workerCalls = 0
+    const r = runWorkflow({
+      task: "t", journalBase: base, runId: "resume1",
+      worker: () => { workerCalls++; return { ok: true } },
+      verifier: () => ({ passed: false }),
+    })
+    assert.equal(r.status, "passed", "verifier#1 ja passou -> run retomado como passed")
+    assert.equal(workerCalls, 0, "nao re-executa worker ja concluido")
+  })
+})

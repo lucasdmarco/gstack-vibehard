@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto"
 import { makeState } from "./schema.js"
-import { appendEvent, isJournalHit } from "./journal.js"
+import { appendEvent, isJournalHit, completedNodes } from "./journal.js"
 import { normalizeLoopBudget } from "../loop-budget/policy.js"
 import { runDelegation } from "../delegation/opencode.js"
 
@@ -31,30 +31,54 @@ export function runWorkflow(opts = {}) {
   const verifier = opts.verifier || defaultVerifier(cwd, opts.exec)
 
   const state = makeState(task)
-  log({ event: "run_started", task })
+  // Resume: reconstrói o ponto de retomada a partir do journal existente.
+  const resume = replayState(journalBase, runId)
+  if (resume.alreadyPassed) {
+    return { runId, status: "passed", iterations: resume.lastIteration, journalBase, resumed: true }
+  }
+  state.iteration = resume.lastIteration // continua da próxima iteração
+  log({ event: "run_started", task, resumed: resume.lastIteration > 0 })
 
   // Nós lineares com replay (planner/rubric só uma vez)
   runNodeOnce("planner", () => planner(state), state, journalBase, runId)
   runNodeOnce("rubric", () => rubric(state), state, journalBase, runId)
 
+  // Wall-time: deadline determinístico aplicado a CADA iteração.
+  const now = opts.now || (() => Date.now())
+  const deadline = now() + (budget.maxWallTimeSeconds || 900) * 1000
+
   // Loop worker→verifier com caps determinísticos
   while (true) {
+    // ARESTA: estourou o wall-time?
+    if (now() >= deadline) {
+      state.status = budget.humanHandoffOnCap ? "handoff" : "failed"
+      log({ event: "run_ended", nodeId: "human_handoff", reason: "max_wall_time_hit", status: state.status })
+      return { runId, status: state.status, iterations: state.iteration, journalBase }
+    }
+
     state.iteration += 1
     const wId = `worker#${state.iteration}`
-    log({ event: "node_started", nodeId: wId })
-    const w = worker(state)
-    if (w.ok === false) {
-      log({ event: "node_failed", nodeId: wId, signature: w.signature || "worker_failed" })
+    // REPLAY: worker já concluído nesta iteração? pula (journal_hit).
+    if (isJournalHit(journalBase, runId, wId)) {
+      log({ event: "journal_hit", nodeId: wId })
     } else {
-      log({ event: "node_completed", nodeId: wId, summary: (w.summary || "").slice(0, 200) })
+      log({ event: "node_started", nodeId: wId })
+      const w = worker(state)
+      if (w.ok === false) log({ event: "node_failed", nodeId: wId, signature: w.signature || "worker_failed" })
+      else log({ event: "node_completed", nodeId: wId, summary: (w.summary || "").slice(0, 200) })
     }
 
     const vId = `verifier#${state.iteration}`
+    // REPLAY: verifier já passou nesta iteração? então o run passou.
+    if (isJournalHit(journalBase, runId, vId)) {
+      log({ event: "journal_hit", nodeId: vId })
+      state.status = "passed"
+      break
+    }
     log({ event: "node_started", nodeId: vId })
     const v = verifier(state)
     const sig = v.signature || (v.passed ? "passed" : "failed")
 
-    // ARESTA determinística: passed?
     if (v.passed) {
       log({ event: "node_completed", nodeId: vId, signature: sig })
       state.status = "passed"
@@ -62,28 +86,41 @@ export function runWorkflow(opts = {}) {
     }
     log({ event: "node_failed", nodeId: vId, signature: sig })
 
-    // contabiliza falha consecutiva igual
     state.consecutiveSameFailure = (state.lastFailureSignature === sig) ? state.consecutiveSameFailure + 1 : 1
     state.lastFailureSignature = sig
 
-    // ARESTA: circuit breaker (mesma falha repetida)
     if (state.consecutiveSameFailure >= budget.maxConsecutiveSameFailure) {
       state.status = "handoff"
       log({ event: "node_completed", nodeId: "human_handoff", reason: `same_failure x${state.consecutiveSameFailure}` })
       break
     }
-    // ARESTA: cap de iterações
     if (state.iteration >= budget.maxIterations) {
       state.status = budget.humanHandoffOnCap ? "handoff" : "failed"
       log({ event: "node_completed", nodeId: "human_handoff", reason: "max_iterations_hit" })
       break
     }
-    // senão: retry (volta ao topo do loop)
     log({ event: "node_started", nodeId: `retry#${state.iteration}` })
   }
 
   log({ event: "run_ended", status: state.status, iterations: state.iteration })
   return { runId, status: state.status, iterations: state.iteration, journalBase }
+}
+
+/**
+ * Reconstrói o estado de retomada a partir do journal de um run.
+ * - alreadyPassed: algum verifier#N concluiu (passou) → run já estava OK.
+ * - lastIteration: maior N de worker#N concluído (continua da próxima).
+ */
+function replayState(journalBase, runId) {
+  const done = completedNodes(journalBase, runId)
+  let lastIteration = 0
+  let alreadyPassed = false
+  for (const node of done) {
+    const mW = /^worker#(\d+)$/.exec(node)
+    if (mW) lastIteration = Math.max(lastIteration, Number(mW[1]))
+    if (/^verifier#\d+$/.test(node)) alreadyPassed = true
+  }
+  return { lastIteration, alreadyPassed }
 }
 
 function runNodeOnce(nodeId, fn, state, journalBase, runId) {
