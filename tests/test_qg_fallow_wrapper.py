@@ -83,6 +83,21 @@ class FallowWrapperTest(unittest.TestCase):
             self.assertEqual(data["issues"][0]["rule"], "crap-complexity", result.stdout + result.stderr)
             self.assertTrue(data["issues"][0]["auto_fixable"])
 
+    def test_fallow_unavailable_skips_without_blocking(self):
+        """Fallow e dependencia opcional — ausente, o QG deve PULAR (pass), nao
+        bloquear criticamente."""
+        with tempfile.TemporaryDirectory() as tmp:
+            env = os.environ.copy()
+            env["PATH"] = tmp  # sem npx/node no PATH -> fallow indisponivel
+            result = subprocess.run(
+                [sys.executable, str(QG), "--path", tmp, "--level", "1"],
+                capture_output=True, text=True, env=env, timeout=20,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            data = json.loads(result.stdout)
+            self.assertTrue(data["pass"])
+            self.assertEqual(data["verdict"], "skipped")
+
 
 if __name__ == "__main__":
     unittest.main()

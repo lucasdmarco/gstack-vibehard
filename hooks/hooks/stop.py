@@ -674,11 +674,13 @@ def run_fallow_audit(cwd: str) -> dict:
 # ── Quality Gate (OPT-IN) ──
 # fallow audit + qg.py rodam `npx fallow audit` (ate 60s cada) — o Stop dispara
 # a cada turno, entao rodar sempre atrasaria toda resposta. Roda apenas com
-# GSTACK_STOP_AUDIT=on, ou automaticamente quando ha deploy/qg_level explicito.
+# GSTACK_STOP_AUDIT=on ou qg_level explicito.
+# NOTA: deploy (run_security) NAO ativa o audit pesado — o Security Gate ja roda
+# acima (checks locais rapidos). Acoplar os dois fazia um deploy travar ate 60s
+# antes de devolver o bloqueio.
 _stop_audit_on = (
     os.environ.get("GSTACK_STOP_AUDIT", "").lower() in ("on", "1")
     or run_qg_level > 0
-    or run_security
 )
 fallow_result = run_fallow_audit(cwd) if _stop_audit_on else {
     "status": "skipped", "summary": "audit off (defina GSTACK_STOP_AUDIT=on para ativar)"

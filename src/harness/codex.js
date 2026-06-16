@@ -106,14 +106,34 @@ export function mergeCodexConfig(configFile, readImpl = readFileSync, writeImpl 
     }
   }
   const merged = { ...existing }
-  // hooks: gstack vence nas suas chaves, mantem outras do usuario
-  merged.hooks = { ...(existing.hooks || {}), ...gstack.hooks }
+  // hooks: ANEXA os comandos gstack preservando os do usuario na mesma chave.
+  // Remove apenas entradas gstack antigas (apontam para nossos .py) para nao
+  // duplicar entre reinstalacoes/versoes.
+  merged.hooks = { ...(existing.hooks || {}) }
+  for (const [key, gstackCmds] of Object.entries(gstack.hooks)) {
+    const userCmds = toArray(existing.hooks?.[key]).filter(
+      (c) => typeof c === "string" && !isGstackHookCmd(c)
+    )
+    merged.hooks[key] = [...userCmds, ...gstackCmds]
+  }
   // agent: usuario vence
   merged.agent = { ...gstack.agent, ...(existing.agent || {}) }
   // mcp_servers: usuario vence (preserva config customizada dos servidores)
   merged.mcp_servers = { ...gstack.mcp_servers, ...(existing.mcp_servers || {}) }
 
   writeImpl(configFile, stringifyToml(merged))
+}
+
+function toArray(v) {
+  if (Array.isArray(v)) return v
+  return v != null ? [v] : []
+}
+
+const GSTACK_HOOK_SCRIPTS = [
+  "session_start.py", "stop.py", "pre_tool_use_security.py",
+]
+function isGstackHookCmd(cmd) {
+  return GSTACK_HOOK_SCRIPTS.some((s) => cmd.includes(s)) || cmd.includes(".gstack")
 }
 
 /**
@@ -129,7 +149,15 @@ export function stripGstackFromCodexConfig(configFile, readImpl = readFileSync, 
     return false
   }
   if (parsed.hooks) {
-    for (const k of GSTACK_HOOK_KEYS) delete parsed.hooks[k]
+    // Remove apenas os comandos gstack de cada array, preservando os do usuario
+    for (const k of GSTACK_HOOK_KEYS) {
+      if (!(k in parsed.hooks)) continue
+      const userCmds = toArray(parsed.hooks[k]).filter(
+        (c) => !(typeof c === "string" && isGstackHookCmd(c))
+      )
+      if (userCmds.length > 0) parsed.hooks[k] = userCmds
+      else delete parsed.hooks[k]
+    }
     if (Object.keys(parsed.hooks).length === 0) delete parsed.hooks
   }
   if (parsed.mcp_servers) {

@@ -17,6 +17,9 @@ const USER_CONFIG = `# config do usuario
 model = "o3"
 approval_policy = "on-request"
 
+[hooks]
+on_stop = ["meu-hook-pessoal.sh"]
+
 [mcp_servers.meu_server]
 command = "node"
 args = ["meu-mcp.js"]
@@ -42,8 +45,9 @@ test("mergeCodexConfig preserva config do usuario e adiciona hooks/mcp gstack", 
     assert.deepEqual(parsed.mcp_servers.meu_server.args, ["meu-mcp.js"])
     // usuario vence em servidor de mesmo nome (supabase customizado preservado)
     assert.deepEqual(parsed.mcp_servers.supabase.args, ["custom-supabase", "--minha-flag"])
-    // gstack adiciona seus hooks e servidores
-    assert.ok(parsed.hooks.on_stop[0].includes("stop.py"))
+    // hook do usuario na mesma chave (on_stop) e PRESERVADO + gstack anexado
+    assert.ok(parsed.hooks.on_stop.includes("meu-hook-pessoal.sh"), "hook do usuario preservado")
+    assert.ok(parsed.hooks.on_stop.some((c) => c.includes("stop.py")), "gstack anexado")
     assert.ok(parsed.mcp_servers.fallow)
     assert.ok(parsed.mcp_servers.headroom)
   } finally {
@@ -68,7 +72,9 @@ test("stripGstackFromCodexConfig remove so chaves gstack, preserva o resto", asy
     // chaves gstack removidas
     assert.equal(parsed.mcp_servers.fallow, undefined)
     assert.equal(parsed.mcp_servers.headroom, undefined)
-    assert.equal(parsed.hooks, undefined)
+    // hook do usuario em on_stop sobrevive ao strip; comando gstack removido
+    assert.ok(parsed.hooks.on_stop.includes("meu-hook-pessoal.sh"), "hook do usuario preservado no strip")
+    assert.ok(!parsed.hooks.on_stop.some((c) => c.includes("stop.py")), "comando gstack removido")
   } finally {
     await rm(tmp, { recursive: true, force: true })
   }

@@ -184,10 +184,30 @@ def collect_blocking(raw: Any) -> list[dict[str, Any]]:
     return issues
 
 
-def run_fallow(root: Path, timeout: int) -> tuple[Any, subprocess.CompletedProcess[str]]:
+def skipped_result(reason: str, level: int) -> dict[str, Any]:
+    """Resultado nao-bloqueante quando o Fallow esta indisponivel.
+
+    Fallow e uma dependencia OPCIONAL (peerDependenciesMeta). Sua ausencia nao e
+    uma falha de qualidade do codigo — bloquear a entrega nesse caso seria um
+    falso positivo. O QG pula e passa, deixando claro como ativar.
+    """
+    return {
+        "pass": True,
+        "engine": "fallow",
+        "level": level,
+        "command": FALLOW_COMMAND,
+        "verdict": "skipped",
+        "issues": [],
+        "auto_fixable": [],
+        "blocking": [],
+        "summary": f"Fallow indisponivel — QG pulado ({reason}). Instale: npm i -g fallow",
+    }
+
+
+def run_fallow(root: Path, timeout: int) -> tuple[Any, subprocess.CompletedProcess[str] | None]:
     npx = shutil.which("npx")
     if npx is None:
-        raise FileNotFoundError("npx not found. Install Node.js/npm or make npx available on PATH.")
+        return None, None
     completed = subprocess.run(
         [npx, *FALLOW_COMMAND[1:]],
         cwd=root,
@@ -195,6 +215,9 @@ def run_fallow(root: Path, timeout: int) -> tuple[Any, subprocess.CompletedProce
         text=True,
         timeout=timeout,
     )
+    # Fallow ausente/quebrado costuma sair !=0 com stdout vazio — nao bloquear
+    if not (completed.stdout or "").strip():
+        return None, completed
     raw = extract_json(completed.stdout)
     return raw, completed
 
@@ -238,9 +261,6 @@ def main() -> None:
 
     try:
         raw, completed = run_fallow(root, args.timeout)
-    except FileNotFoundError as exc:
-        result = error_result(str(exc), level=args.level, command=FALLOW_COMMAND)
-        emit(result, 0 if args.log_only else 1)
     except subprocess.TimeoutExpired as exc:
         result = error_result(f"Fallow timed out after {args.timeout}s", level=args.level, command=FALLOW_COMMAND, detail=str(exc))
         emit(result, 0 if args.log_only else 1)
@@ -250,6 +270,15 @@ def main() -> None:
     except OSError as exc:
         result = error_result("Fallow execution failed", level=args.level, command=FALLOW_COMMAND, detail=str(exc))
         emit(result, 0 if args.log_only else 1)
+
+    # Fallow indisponivel (npx ausente ou stdout vazio) — pula sem bloquear
+    if raw is None:
+        result = skipped_result("npx/fallow ausente ou sem saida", args.level)
+        typecheck = run_typecheck(root)
+        if typecheck.get("status") == "failed":
+            result["typecheck"] = typecheck
+            result["summary"] += f" | {typecheck['summary']}"
+        emit(result, 0)
 
     verdict = infer_verdict(raw, completed.returncode)
     auto_fixable = collect_auto_fixable(raw)

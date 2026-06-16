@@ -1393,7 +1393,7 @@ export async function createProject(options = {}) {
   logger.success(`Projeto '${projectName}' criado (template: ${templateName})`)
   logger.info(`  Diretorio: ${projectDir}`)
   logger.info(`  Template: ${templateName}`)
-  logger.info(`  IAM: http://localhost:8000 (admin/123)`)
+  if (!isLite) logger.info(`  IAM: http://localhost:8000 (admin/123)`)
   logger.info(`  Vault: ${vaultProjectDir}`)
   logger.info(`  Quality gate: npx fallow audit --format json`)
   logger.info(`  Dev: cd ${projectName} && pnpm dev`)
