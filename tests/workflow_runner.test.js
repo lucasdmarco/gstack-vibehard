@@ -86,6 +86,52 @@ test("runner: aplica maxWallTimeSeconds (deadline) -> handoff", async () => {
   })
 })
 
+test("runner: worker só-instrução (delegação OFF) -> executed:false + warning", async () => {
+  await withTmp(async (base) => {
+    const { runWorkflow } = await import(`${pathToFileURL(runnerMod)}?t=${Date.now()}`)
+    // SEM worker injetado -> usa defaultWorker; delegação OFF (default) => não executa.
+    const r = runWorkflow({
+      task: "t", journalBase: base, runId: "instr1",
+      verifier: () => ({ passed: true, signature: "tests_passed" }),
+    })
+    assert.equal(r.status, "passed")
+    assert.equal(r.executed, false, "nenhum trabalho real foi executado")
+    assert.ok(r.warning && /instruction_only/.test(r.warning), "expõe aviso instruction_only")
+  })
+})
+
+test("runner: worker que executa de fato -> executed:true, sem warning", async () => {
+  await withTmp(async (base) => {
+    const { runWorkflow } = await import(`${pathToFileURL(runnerMod)}?t=${Date.now()}`)
+    const r = runWorkflow({
+      task: "t", journalBase: base, runId: "exec1",
+      worker: () => ({ ok: true, executed: true, summary: "fez de verdade" }),
+      verifier: () => ({ passed: true }),
+    })
+    assert.equal(r.executed, true)
+    assert.equal(r.warning, undefined)
+  })
+})
+
+test("runner: crash entre worker#1 e verifier#1 -> retoma e roda o verifier que faltou", async () => {
+  await withTmp(async (base) => {
+    const { runWorkflow } = await import(`${pathToFileURL(runnerMod)}?t=${Date.now()}`)
+    const { appendEvent } = await import(`${pathToFileURL(jMod)}?t=${Date.now()}`)
+    // worker#1 concluiu, mas verifier#1 NUNCA rodou (processo morreu no meio).
+    appendEvent(base, "resumeV", { event: "node_completed", nodeId: "worker#1" })
+    let workerCalls = 0, verifierCalls = 0
+    const r = runWorkflow({
+      task: "t", journalBase: base, runId: "resumeV",
+      worker: () => { workerCalls++; return { ok: true, executed: true } },
+      verifier: () => { verifierCalls++; return { passed: true, signature: "tests_passed" } },
+    })
+    assert.equal(workerCalls, 0, "worker#1 vem do journal (journal_hit), não re-executa")
+    assert.equal(verifierCalls, 1, "roda o verifier#1 que ficou faltando")
+    assert.equal(r.status, "passed")
+    assert.equal(r.iterations, 1, "fecha na iteração 1, sem pular para 2")
+  })
+})
+
 test("runner: --run-id retoma e pula nós já concluídos (journal_hit)", async () => {
   await withTmp(async (base) => {
     const { runWorkflow } = await import(`${pathToFileURL(runnerMod)}?t=${Date.now()}`)

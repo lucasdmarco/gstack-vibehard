@@ -123,6 +123,27 @@ class ContextDbTest(unittest.TestCase):
             self.assertIn("depends_on", rels)
             self.assertIn("implemented_in", rels)
 
+    def test_graphify_implemented_in_atribuido_a_entidade_certa(self):
+        # Dois símbolos no MESMO doc, mas só 'Auth' casa um nó de código.
+        # 'implemented_in' deve pertencer a Auth, NUNCA a Casdoor (mesmo doc).
+        with tempfile.TemporaryDirectory() as tmp:
+            root = make_project(tmp)
+            (root / "docs" / "adr" / "001.md").write_text("# ADR\n[[Auth]] usa [[Casdoor]].\n", encoding="utf-8")
+            gdir = root / "graphify-out"
+            gdir.mkdir()
+            # grafo só tem o nó 'Auth' (Casdoor não existe no código)
+            (gdir / "graph.json").write_text(
+                '{"nodes":[{"id":"n1","name":"Auth"}],"edges":[]}', encoding="utf-8")
+            db = str(root / ".gstack" / "context" / "context.db")
+            run("index", "--db", db, "--root", str(root), "--graphify", str(gdir / "graph.json"))
+
+            rel_auth = json.loads(run("related", "--db", db, "--entity", "Auth", "--json").stdout)
+            rel_cas = json.loads(run("related", "--db", db, "--entity", "Casdoor", "--json").stdout)
+            self.assertIn("implemented_in", {c["relation"] for c in rel_auth.get("code", [])},
+                          "Auth (casado no grafo) deve ter implemented_in")
+            self.assertNotIn("implemented_in", {c["relation"] for c in rel_cas.get("code", [])},
+                             "Casdoor (não casado) NÃO pode herdar o implemented_in do mesmo doc")
+
     def test_graphify_ausente_nao_quebra(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = make_project(tmp)

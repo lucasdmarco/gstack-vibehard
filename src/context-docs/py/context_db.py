@@ -321,12 +321,15 @@ def bridge_graphify(con, graph_path: Path) -> None:
         nid = label_norm.get(e["normalized_name"])
         if nid:
             matched[e["id"]] = nid
-            # implemented_in: docs que mencionam a entidade -> código
+            # implemented_in: a ENTIDADE -> código que a implementa. from_id=entity_id
+            # (NÃO document_id) para que `related` atribua o código à entidade certa,
+            # e não a toda entidade citada no mesmo documento.
+            evidence = str(node_label.get(nid, nid))[:120]
             for de in con.execute("SELECT document_id FROM doc_entities WHERE entity_id=?", (e["id"],)).fetchall():
                 con.execute(
                     "INSERT INTO edges(from_type,from_id,to_type,to_id,relation,evidence,document_id) "
-                    "VALUES('document',?,'code',NULL,'implemented_in',?,?)",
-                    (de["document_id"], str(node_label.get(nid, nid))[:120], de["document_id"]))
+                    "VALUES('entity',?,'code',NULL,'implemented_in',?,?)",
+                    (e["id"], evidence, de["document_id"]))
 
     # depends_on: arestas do grafo de código entre entidades casadas
     nid_to_eid = {v: k for k, v in matched.items()}
@@ -392,8 +395,8 @@ def related_cmd(args) -> int:
         (ent["id"], ent["id"])).fetchall():
         code.append({"relation": e["relation"], "evidence": e["evidence"]})
     impl = con.execute(
-        "SELECT DISTINCT e.evidence FROM edges e JOIN doc_entities de ON de.document_id=e.document_id "
-        "WHERE e.relation='implemented_in' AND de.entity_id=?", (ent["id"],)).fetchall()
+        "SELECT DISTINCT evidence FROM edges "
+        "WHERE relation='implemented_in' AND from_type='entity' AND from_id=?", (ent["id"],)).fetchall()
     for r in impl:
         code.append({"relation": "implemented_in", "evidence": r["evidence"]})
 

@@ -74,6 +74,7 @@ export async function workflowCommand(args = [], opts = {}) {
       info(`${icon} run ${result.runId}: ${result.status} em ${result.iterations} iteração(ões)`)
       if (result.status === "handoff") warn("Circuit breaker — HUMAN HANDOFF: revise antes de re-tentar.")
       if (result.status === "passed") success("Verificação passou.")
+      if (result.warning) warn(result.warning)
       return result
     }
 
@@ -91,14 +92,20 @@ export async function workflowCommand(args = [], opts = {}) {
     case "inspect": {
       const flags = parseFlags(args.slice(1))
       const runId = flags._[0] || args[1]
+      // Valida runId ANTES de tocar o disco (readJournal exige string).
+      if (!runId) {
+        if (flags.json) { process.stdout.write(JSON.stringify({ error: "missing runId" }) + "\n"); return }
+        section("workflow inspect")
+        error("Forneça <runId>")
+        return
+      }
       const evs = readJournal(base, runId)
       if (flags.json) {
         // Saída JSON para automação (inspect --json)
         process.stdout.write(JSON.stringify({ runId, stats: runStats(base, runId), events: evs }, null, 2) + "\n")
         return { runId, events: evs }
       }
-      section(`workflow inspect ${runId || ""}`)
-      if (!runId) { error("Forneça <runId>"); return }
+      section(`workflow inspect ${runId}`)
       if (evs.length === 0) { warn("Run não encontrado ou vazio."); return }
       for (const e of evs) info(`  ${e.ts} ${e.event}${e.nodeId ? " " + e.nodeId : ""}${e.signature ? " [" + e.signature + "]" : ""}`)
       return

@@ -31,6 +31,19 @@ test("workflow run grava journal; runs e inspect leem (offline)", async () => {
   }
 })
 
+test("workflow inspect sem runId não quebra (valida antes de ler journal)", async () => {
+  const tmp = await mkdtemp(path.join(tmpdir(), "gstack-wfinsp-"))
+  try {
+    const { workflowCommand } = await import(`${pathToFileURL(cmdMod)}?t=${Date.now()}`)
+    // Antes do fix isto lançava "path must be of type string" em readJournal.
+    await assert.doesNotReject(workflowCommand(["inspect"], { cwd: tmp }))
+    // --json sem runId também não quebra
+    await assert.doesNotReject(workflowCommand(["inspect", "--json"], { cwd: tmp }))
+  } finally {
+    await rm(tmp, { recursive: true, force: true })
+  }
+})
+
 test("workflow run sem --task não executa", async () => {
   const tmp = await mkdtemp(path.join(tmpdir(), "gstack-wfobs2-"))
   try {

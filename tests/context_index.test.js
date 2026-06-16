@@ -29,6 +29,25 @@ test("context index/search via comando JS (bridge Python)", async () => {
   }
 })
 
+test("context search --json (sem índice) emite JSON PURO, sem banner", async () => {
+  const tmp = await mkdtemp(path.join(tmpdir(), "gstack-cjson-"))
+  const origWrite = process.stdout.write.bind(process.stdout)
+  let buf = ""
+  process.stdout.write = (s, ...rest) => { buf += String(s); return true }
+  try {
+    const { contextCommand } = await import(`${pathToFileURL(cmdMod)}?t=${Date.now()}`)
+    await contextCommand(["search", "x", "--json"], { cwd: tmp }) // sem db
+  } finally {
+    process.stdout.write = origWrite
+    await rm(tmp, { recursive: true, force: true })
+  }
+  const trimmed = buf.trim()
+  // Toda a saída deve ser UM objeto JSON parseável (nada de header/section).
+  const parsed = JSON.parse(trimmed)
+  assert.equal(parsed.error, "no_index")
+  assert.ok(!/context search/.test(buf), "não deve emitir o banner 'context search' no modo --json")
+})
+
 test("context search sem índice avisa (não quebra)", async () => {
   const tmp = await mkdtemp(path.join(tmpdir(), "gstack-cidx2-"))
   try {
