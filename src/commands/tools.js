@@ -3,6 +3,7 @@ import { join } from "path"
 import { ppList, ppSearch, PrintingPressError } from "../printing-press/cli.js"
 import { installTool, uninstallTool } from "../printing-press/install.js"
 import { enableMcp, disableMcp, listMcp } from "../printing-press/mcp.js"
+import { doctorAll } from "../printing-press/doctor.js"
 import { success, warn, error, info, section } from "../cli/index.js"
 
 /** Caminho do registry do projeto no cwd. */
@@ -170,6 +171,29 @@ export async function toolsCommand(args = [], opts = {}) {
       reg.printingPress.discoveryInstalled = true
       writeRegistry(cwd, reg)
       success("Printing Press habilitado neste projeto (discovery). Nada foi instalado.")
+      return
+    }
+
+    case "doctor": {
+      section("tools doctor — ferramentas instaladas")
+      const reg = readRegistry(cwd)
+      if (!reg) { warn("Sem .gstack/integrations.json aqui."); return }
+      const results = doctorAll(reg, opts)
+      if (results.length === 0) { info("  (nenhuma ferramenta instalada)"); return }
+      for (const r of results) {
+        const icon = r.status === "ok" ? "✓" : r.status === "warning" ? "⚠" : "✗"
+        info(`  ${icon} ${r.tool} — binary:${r.binary} version:${r.version} auth:${r.auth} mcp:${r.mcp} [${r.status}]`)
+      }
+      return
+    }
+
+    case "generate": {
+      // O gerador cli-printing-press (cauda-longa via HAR) ainda nao foi
+      // publicado no npm. Stub honesto: nao quebra, orienta.
+      section("tools generate — geracao via HAR (cauda-longa)")
+      warn("Gerador indisponivel: o pacote cli-printing-press ainda nao foi publicado.")
+      info("Quando disponivel, este comando forjara CLI+MCP de sistemas sem API a partir de capturas HAR.")
+      info("Por ora, use o catalogo: gstack_vibehard tools list / search / install")
       return
     }
 
