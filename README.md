@@ -1,4 +1,4 @@
-# 🚀 gstack-vibehard 2.2.4
+# 🚀 gstack-vibehard 2.3.0
 **A Máquina de Desenvolvimento Zero-Config Definitiva para Agentes de IA.**
 
 [![Test](https://github.com/lucasdmarco/gstack-vibehard/actions/workflows/test.yml/badge.svg)](https://github.com/lucasdmarco/gstack-vibehard/actions/workflows/test.yml)
@@ -135,6 +135,28 @@ No final de cada sessão, o Stop hook pode **detectar e rodar a suíte de testes
 - **`GSTACK_TEST_GATE=on`**: roda e reporta (não bloqueia) no `systemMessage`.
 - **`GSTACK_TEST_GATE=block`**: se os testes falham, devolve o controle ao agente para corrigir antes de finalizar (respeita `stop_hook_active` para evitar loop).
 - Timeout via `GSTACK_TEST_TIMEOUT` (default 300s).
+
+## 🔌 Integrações Híbridas (Composio + Printing Press)
+
+Arquitetura de **dupla via** para ferramentas externas — opt-in, project-scoped, não-destrutiva:
+
+| Via | Para quê |
+|---|---|
+| **Composio** (nuvem, `@composio/mcp`) | Auth OAuth + **ações de escrita** (criar ticket, deploy) nos apps padrão |
+| **Printing Press** (local, CLI Go + SQLite) | **Leitura** de alta frequência (SQL offline) + cauda-longa sem API. ~60–80% menos tokens |
+
+Todo projeto criado ganha `.gstack/integrations.json` com ferramentas **sugeridas** por template (nada é instalado). Comandos:
+
+```bash
+gstack_vibehard tools suggested          # sugeridas para este projeto
+gstack_vibehard tools list               # catálogo Printing Press
+gstack_vibehard tools search stripe      # buscar
+gstack_vibehard tools install stripe     # opt-in (requer Go; verifica o binário)
+gstack_vibehard tools mcp enable stripe  # registra pp-stripe no .mcp.json do projeto
+gstack_vibehard tools doctor             # valida binário/auth/MCP das instaladas
+```
+
+Roteamento padrão: **leitura → Printing Press (local, barato)**, **escrita → Composio (nuvem)**.
 
 ## ⚡ Instalação Rápida
 

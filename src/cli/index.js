@@ -5,6 +5,7 @@ import { createInterface } from "readline"
 import { install } from "../installer/install.js"
 import { doctor } from "../installer/doctor.js"
 import { uninstall, list } from "../installer/uninstall.js"
+import { toolsCommand } from "../commands/tools.js"
 import { createCommand } from "./create.js"
 import { initCommand } from "../commands/init.js"
 import { sprintCommand } from "../commands/sprint.js"
@@ -94,6 +95,7 @@ export function showHelp() {
   console.log(color("    gstack_vibehard doctor         Diagnosticar ambiente", COLORS.cyan))
   console.log(color("    gstack_vibehard sprint --save   Salvar decisoes e atualizar memorias", COLORS.cyan))
   console.log(color("    gstack_vibehard monitor        TUI: agentes, tokens, QG, ROI", COLORS.cyan))
+  console.log(color("    gstack_vibehard tools          Integracoes: Composio (nuvem) + Printing Press (local)", COLORS.cyan))
   console.log(color("    gstack_vibehard uninstall      Remover gstack_vibehard do ambiente", COLORS.cyan))
   console.log(color("    gstack_vibehard list           Listar componentes instalados", COLORS.cyan))
   console.log(color("    gstack_vibehard help           Mostrar esta ajuda\n", COLORS.cyan))
@@ -156,6 +158,10 @@ async function dispatch(command, args) {
       break
     case "monitor":
       await monitorCommand()
+      break
+    case "tools":
+    case "pp":
+      await toolsCommand(args)
       break
     case "help":
       showHelp()

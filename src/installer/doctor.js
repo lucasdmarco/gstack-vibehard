@@ -143,6 +143,22 @@ export async function doctor() {
     info(".mcp.json: nao configurado")
   }
 
+  // Integracoes — dupla via (Composio nuvem + Printing Press local)
+  section("Integracoes (Composio + Printing Press)")
+  // Composio (nuvem): auth/escrita
+  const composioEnv = process.env.COMPOSIO_API_KEY || process.env.COMPOSIO_TOKEN
+  let composioCli = false
+  try { execFileSync("composio", ["--version"], { stdio: "pipe", timeout: 3000 }); composioCli = true } catch { /* opcional */ }
+  if (composioEnv) success("Composio (nuvem): token presente — escrita/OAuth disponivel")
+  else if (composioCli) info("Composio (nuvem): CLI presente, sem token (rode `composio login`)")
+  else info("Composio (nuvem): nao configurado (opcional — para acoes de escrita/OAuth)")
+  // Printing Press (local): leitura/cauda-longa
+  let goOk = false
+  try { execFileSync("go", ["version"], { stdio: "pipe", timeout: 3000 }); goOk = true } catch { /* opcional */ }
+  if (goOk) success("Printing Press (local): Go presente — `tools install` disponivel")
+  else info("Printing Press (local): Go ausente — discovery (`tools list/search`) funciona; install precisa de Go")
+  info("Por projeto: veja .gstack/integrations.json e `gstack_vibehard tools`")
+
   // Playwright
   section("Playwright (browser testing)")
   const pwBrowsers = process.env.PLAYWRIGHT_BROWSERS_PATH
