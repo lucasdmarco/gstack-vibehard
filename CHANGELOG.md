@@ -1,5 +1,11 @@
 # Changelog - gstack-vibehard
 
+## [2.3.1] - 2026-06-15
+
+### Zero-config consistente: Go instalado sob demanda
+- `tools install <slug>` agora **instala o toolchain Go automaticamente** se ausente (como o projeto já faz com bun/uv/Rust/Chromium) — antes só orientava o usuário a instalar manualmente. Instalação **sob demanda** (não no bootstrap, para não forçar ~150MB em quem não usa Printing Press): Windows via winget/choco, macOS via brew, Linux via tarball oficial em `~/.local/go` (sem sudo). `ensureGo` adiciona o Go ao PATH da sessão e verifica antes de prosseguir; opt-out via `GSTACK_SKIP_GO=1`. Se a instalação do Go falhar, degrada para `needs_go` com instrução. (`src/printing-press/install.js`)
+- `doctor`: mensagem ajustada — `tools install` instala Go sob demanda.
+
 ## [2.3.0] - 2026-06-15
 
 **Integrações híbridas — Composio (nuvem) + Printing Press (local).**

@@ -156,7 +156,7 @@ export async function doctor() {
   let goOk = false
   try { execFileSync("go", ["version"], { stdio: "pipe", timeout: 3000 }); goOk = true } catch { /* opcional */ }
   if (goOk) success("Printing Press (local): Go presente — `tools install` disponivel")
-  else info("Printing Press (local): Go ausente — discovery (`tools list/search`) funciona; install precisa de Go")
+  else info("Printing Press (local): Go ausente — discovery funciona; `tools install` instala Go sob demanda")
   info("Por projeto: veja .gstack/integrations.json e `gstack_vibehard tools`")
 
   // Playwright
