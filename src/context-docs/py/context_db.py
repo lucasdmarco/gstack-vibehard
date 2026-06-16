@@ -121,8 +121,12 @@ def is_safe(path: Path) -> bool:
     return True
 
 
-def discover(root: Path) -> list[tuple[str, str, Path]]:
-    """Retorna (source, kind, path) das fontes a indexar."""
+def discover(root: Path, obsidian_dir: str | None = None) -> list[tuple[str, str, Path]]:
+    """Retorna (source, kind, path) das fontes a indexar.
+
+    obsidian_dir: pasta Obsidian EXPLICITAMENTE configurada (opt-in). Read-only;
+    nunca varre vault global implicitamente. Ausente/inacessível → ignorada.
+    """
     found = []
     for source, rel in DOC_GLOBS:
         d = root / rel
@@ -134,6 +138,17 @@ def discover(root: Path) -> list[tuple[str, str, Path]]:
         f = root / rel
         if f.exists() and f.is_file():
             found.append(("repo", kind, f))
+    # Obsidian: somente a pasta configurada, read-only.
+    if obsidian_dir:
+        od = Path(obsidian_dir)
+        if od.exists() and od.is_dir():
+            for f in sorted(od.rglob("*.md")):
+                # caminho do doc usa o nome relativo à pasta obsidian (prefixado)
+                try:
+                    if f.is_file() and is_safe(f):
+                        found.append(("obsidian", "obsidian", f))
+                except OSError:
+                    continue
     return found
 
 
@@ -195,12 +210,23 @@ def delete_document(con, doc_id):
     con.execute("DELETE FROM documents WHERE id=?", (doc_id,))
 
 
+def doc_path_key(root: Path, source: str, f: Path, obsidian_dir: str | None) -> str:
+    """Chave estável de path por documento. Obsidian é prefixado p/ não colidir."""
+    if source == "obsidian" and obsidian_dir:
+        try:
+            return "obsidian/" + f.relative_to(Path(obsidian_dir)).as_posix()
+        except ValueError:
+            return "obsidian/" + f.name
+    return f.relative_to(root).as_posix()
+
+
 def index_cmd(args) -> int:
     con = connect(args.db)
     has_fts = init_schema(con)
     root = Path(args.root).resolve()
-    discovered = discover(root)
-    disc_paths = {str(f.relative_to(root).as_posix()) for _, _, f in discovered}
+    obsidian_dir = getattr(args, "obsidian", None)
+    discovered = discover(root, obsidian_dir)
+    disc_paths = {doc_path_key(root, src, f, obsidian_dir) for src, _, f in discovered}
 
     # Remoção: documentos que sumiram das fontes
     for row in con.execute("SELECT id, path FROM documents").fetchall():
@@ -211,7 +237,7 @@ def index_cmd(args) -> int:
 
     indexed = 0
     for source, kind, f in discovered:
-        rel = f.relative_to(root).as_posix()
+        rel = doc_path_key(root, source, f, obsidian_dir)
         try:
             text = f.read_text(encoding="utf-8", errors="ignore")
         except OSError:
@@ -248,6 +274,14 @@ def index_cmd(args) -> int:
                 (doc_id, eid, rel_kind, (e["name"])[:80], doc_id))
         indexed += 1
 
+    # Graphify bridge (opt-in): liga entidades de doc ao grafo de CÓDIGO.
+    graphify_path = getattr(args, "graphify", None)
+    if graphify_path:
+        try:
+            bridge_graphify(con, Path(graphify_path))
+        except (OSError, ValueError, json.JSONDecodeError) as e:
+            sys.stderr.write(f"[graphify] ignorado: {e}\n")
+
     con.execute("INSERT OR REPLACE INTO index_meta(key,value) VALUES('indexed_at',?)", (now_iso(),))
     con.commit()
     out = {"indexed": indexed, "documents": count(con, "documents"), "fts_enabled": has_fts}
@@ -257,6 +291,54 @@ def index_cmd(args) -> int:
 
 def count(con, table) -> int:
     return con.execute(f"SELECT COUNT(*) c FROM {table}").fetchone()["c"]
+
+
+def bridge_graphify(con, graph_path: Path) -> None:
+    """Lê graphify-out/graph.json (grafo de código) e cria edges ligando
+    ENTIDADES de doc a símbolos/arquivos do código:
+      - implemented_in: entidade cujo nome casa um node do grafo de código
+      - depends_on: arestas de dependência do grafo entre nodes casados
+    Tolerante a formatos: aceita nodes como list[str|dict] e edges from/to.
+    """
+    data = json.loads(graph_path.read_text(encoding="utf-8", errors="ignore"))
+    raw_nodes = data.get("nodes", data.get("symbols", []))
+    # node_id -> label (nome do símbolo/arquivo)
+    node_label = {}
+    for n in raw_nodes:
+        if isinstance(n, str):
+            node_label[n] = n
+        elif isinstance(n, dict):
+            nid = n.get("id") or n.get("name") or n.get("path")
+            label = n.get("name") or n.get("label") or n.get("path") or nid
+            if nid:
+                node_label[nid] = label
+    # mapa normalizado label->node_id p/ casar entidades
+    label_norm = {str(lbl).split("/")[-1].split(".")[0].lower(): nid for nid, lbl in node_label.items()}
+
+    ents = con.execute("SELECT id, normalized_name, name FROM entities").fetchall()
+    matched = {}  # entity_id -> node_id
+    for e in ents:
+        nid = label_norm.get(e["normalized_name"])
+        if nid:
+            matched[e["id"]] = nid
+            # implemented_in: docs que mencionam a entidade -> código
+            for de in con.execute("SELECT document_id FROM doc_entities WHERE entity_id=?", (e["id"],)).fetchall():
+                con.execute(
+                    "INSERT INTO edges(from_type,from_id,to_type,to_id,relation,evidence,document_id) "
+                    "VALUES('document',?,'code',NULL,'implemented_in',?,?)",
+                    (de["document_id"], str(node_label.get(nid, nid))[:120], de["document_id"]))
+
+    # depends_on: arestas do grafo de código entre entidades casadas
+    nid_to_eid = {v: k for k, v in matched.items()}
+    for edge in data.get("edges", []):
+        if not isinstance(edge, dict):
+            continue
+        a, b = edge.get("from") or edge.get("source"), edge.get("to") or edge.get("target")
+        if a in nid_to_eid and b in nid_to_eid:
+            con.execute(
+                "INSERT INTO edges(from_type,from_id,to_type,to_id,relation,evidence,document_id) "
+                "VALUES('entity',?,'entity',?,'depends_on',?,NULL)",
+                (nid_to_eid[a], nid_to_eid[b], f"{node_label.get(a)}->{node_label.get(b)}"[:120]))
 
 
 def search_cmd(args) -> int:
@@ -303,14 +385,29 @@ def related_cmd(args) -> int:
         "JOIN documents d ON d.id=de.document_id "
         "JOIN edges e ON e.document_id=de.document_id AND e.to_id=de.entity_id "
         "WHERE de.entity_id=? GROUP BY d.path ORDER BY de.count DESC", (ent["id"],)).fetchall()
+    # Edges de código (Graphify bridge): depends_on com a entidade + implemented_in
+    code = []
+    for e in con.execute(
+        "SELECT relation, evidence FROM edges WHERE relation IN ('depends_on') AND (from_id=? OR to_id=?)",
+        (ent["id"], ent["id"])).fetchall():
+        code.append({"relation": e["relation"], "evidence": e["evidence"]})
+    impl = con.execute(
+        "SELECT DISTINCT e.evidence FROM edges e JOIN doc_entities de ON de.document_id=e.document_id "
+        "WHERE e.relation='implemented_in' AND de.entity_id=?", (ent["id"],)).fetchall()
+    for r in impl:
+        code.append({"relation": "implemented_in", "evidence": r["evidence"]})
+
     out = {"entity": ent["name"], "kind": ent["kind"], "found": True,
-           "documents": [{"path": d["path"], "title": d["title"], "count": d["count"], "relation": d["relation"]} for d in docs]}
+           "documents": [{"path": d["path"], "title": d["title"], "count": d["count"], "relation": d["relation"]} for d in docs],
+           "code": code}
     if args.json:
         print(json.dumps(out))
     else:
         print(f"{ent['name']} ({ent['kind']}):")
         for d in out["documents"]:
             print(f"  {d['relation']}: {d['path']} (x{d['count']})")
+        for c in code:
+            print(f"  {c['relation']}: {c['evidence']}")
     return 0
 
 
@@ -340,6 +437,8 @@ def main() -> int:
         if name == "index":
             sp.add_argument("--root", required=True)
             sp.add_argument("--reindex", action="store_true")
+            sp.add_argument("--obsidian", default=None)
+            sp.add_argument("--graphify", default=None)
         if name == "search":
             sp.add_argument("--query", required=True)
             sp.add_argument("--limit", type=int, default=10)
