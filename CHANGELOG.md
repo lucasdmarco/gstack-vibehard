@@ -1,5 +1,16 @@
 # Changelog - gstack-vibehard
 
+## [2.4.1] - 2026-06-16
+
+### Workflow runner replayable + delegação OpenCode segura (gaps do v2.4.0)
+Review do PRD identificou gaps reais na fundação v2.4.0 — corrigidos:
+- **`maxWallTimeSeconds` agora é aplicado** (deadline determinístico por iteração; antes era só anunciado). (`runner.js`)
+- **Replay completo:** `worker#N`/`verifier#N` também geram `journal_hit`; `workflow run --run-id <id>` **retoma** um run pulando nós já concluídos. (`runner.js`, `workflow.js`)
+- **`workflow inspect --json`** para automação. (`workflow.js`)
+- **`delegate --worktree`:** roda o OpenCode numa **git worktree isolada** — nunca toca o branch principal; commita o trabalho num branch efêmero e o **preserva para revisão** (`git merge <branch>`). (`delegation/worktree.js`, `opencode.js`)
+- **`delegate --max-iterations` agora tem efeito** (retenta em falha); a delegação **lê `.gstack/loop-budget.json`** (timeout = `maxWallTimeSeconds`, `maxIterations`). (`opencode.js`, `delegate.js`)
+- +8 testes (86 Node + 24 Python).
+
 ## [2.4.0] - 2026-06-16
 
 **Workflows agênticos: Context Docs + Loop Budget + Graph Runner determinístico + Delegação OpenCode.**
