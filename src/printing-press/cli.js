@@ -1,4 +1,5 @@
 import { execFileSync as defaultExecFileSync } from "child_process"
+import { npxArgv } from "../installer/deps.js"
 
 /**
  * Wrapper seguro para o catalogo Printing Press (@mvanhorn/printing-press-library).
@@ -27,8 +28,10 @@ export class PrintingPressError extends Error {}
 export function runPrintingPress(args, opts = {}) {
   const exec = opts.exec || defaultExecFileSync
   const timeout = opts.timeout || 60000
+  // Cross-platform via helper compartilhado (cmd.exe /c npx no Windows).
+  const { file, argv } = npxArgv(["-y", PP_PKG, ...args], opts.platform)
   try {
-    const out = exec("npx", ["-y", PP_PKG, ...args], {
+    const out = exec(file, argv, {
       stdio: "pipe", timeout, shell: false, encoding: "utf-8",
     })
     return { ok: true, stdout: (out || "").toString() }

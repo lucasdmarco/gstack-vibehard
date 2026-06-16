@@ -45,3 +45,14 @@ export function getBunCandidates(home, isWin) {
 export function isBinaryAvailable(bin, opts = {}) {
   return findWorkingBinary([bin], opts) !== ""
 }
+
+/**
+ * Invocacao cross-platform de `npx`. No Windows, `npx` e `npx.cmd` e
+ * execFileSync sem shell da ENOENT; rodamos via `cmd.exe /c npx ...` (sem
+ * shell:true, evitando a deprecation de args nao-escapados do Node).
+ * @returns {{ file: string, argv: string[] }}
+ */
+export function npxArgv(args, platform = process.platform) {
+  if (platform === "win32") return { file: "cmd.exe", argv: ["/c", "npx", ...args] }
+  return { file: "npx", argv: args }
+}

@@ -3,6 +3,7 @@ import { join, resolve } from "path"
 import { homedir } from "os"
 import { execFileSync } from "child_process"
 import { createInterface } from "readline"
+import { npxArgv } from "../installer/deps.js"
 
 const HOME = resolve(homedir() || process.env.USERPROFILE || process.env.HOME || "/tmp")
 const REFRESH_INTERVAL = 5000
@@ -104,7 +105,8 @@ function getHarnessStatus() {
 
 function getFallowSummary() {
   try {
-    const result = execFileSync("npx", ["fallow", "audit", "--format", "json"], { stdio: "pipe", timeout: 10000, encoding: "utf-8" })
+    const fa = npxArgv(["fallow", "audit", "--format", "json"])
+    const result = execFileSync(fa.file, fa.argv, { stdio: "pipe", timeout: 10000, encoding: "utf-8" })
     const data = JSON.parse(result)
     const issues = data.issues || data.findings || []
     return {

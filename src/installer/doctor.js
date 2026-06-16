@@ -4,6 +4,7 @@ import { join } from "path"
 import { execFileSync, execFile } from "child_process"
 import { getHarness, isWindows, isMacOS, getOSLabel } from "../harness/detector.js"
 import { checkAlreadyInstalled } from "./check.js"
+import { npxArgv } from "./deps.js"
 import { detectHarnesses } from "../harness/detector.js"
 import { section, success, warn, error, info } from "../cli/index.js"
 
@@ -166,7 +167,8 @@ export async function doctor() {
       ? join(HOME, "AppData", "Local", "ms-playwright")
       : join(HOME, ".cache", "ms-playwright"))
   try {
-    const pwVer = execFileSync("npx", ["playwright", "--version"], { encoding: "utf-8", stdio: "pipe", timeout: 10000 }).trim()
+    const pwd = npxArgv(["playwright", "--version"])
+    const pwVer = execFileSync(pwd.file, pwd.argv, { encoding: "utf-8", stdio: "pipe", timeout: 10000 }).trim()
     success(`Playwright CLI: ${pwVer}`)
   } catch {
     warn("Playwright CLI: nao disponivel (rode: npx playwright install chromium)")

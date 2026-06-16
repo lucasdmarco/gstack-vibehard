@@ -51,3 +51,13 @@ test("isBinaryAvailable reflete sucesso/falha do exec", async () => {
   assert.equal(isBinaryAvailable("node", { exec: () => Buffer.from("ok") }), true)
   assert.equal(isBinaryAvailable("nope", { exec: () => { throw new Error("x") } }), false)
 })
+
+test("npxArgv: Windows usa cmd.exe /c npx; unix usa npx direto", async () => {
+  const { npxArgv } = await import(`${pathToFileURL(depsModule)}?t=${Date.now()}`)
+  assert.deepEqual(npxArgv(["playwright", "--version"], "win32"), {
+    file: "cmd.exe", argv: ["/c", "npx", "playwright", "--version"],
+  })
+  assert.deepEqual(npxArgv(["playwright", "--version"], "linux"), {
+    file: "npx", argv: ["playwright", "--version"],
+  })
+})

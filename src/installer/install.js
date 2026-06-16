@@ -12,7 +12,7 @@ import { installCursor } from "../harness/cursor.js"
 import { writeInstructionalGuidance } from "../harness/instructional.js"
 import { installHeadroom } from "../harness/headroom.js"
 import { ensureDir, copyWithBackup, copyDirSync, backupFile } from "./merge.js"
-import { findWorkingBinary, getUvCandidates, getBunCandidates } from "./deps.js"
+import { findWorkingBinary, getUvCandidates, getBunCandidates, npxArgv } from "./deps.js"
 import { checkAlreadyInstalled } from "./check.js"
 import { installGeneratedAgentLayer, installGraphifyGitHooks } from "./agent-distribution.js"
 import { multiSelect, success, warn, error, info, section } from "../cli/index.js"
@@ -219,7 +219,8 @@ async function installDeps(warn, success, info, report, harnessIds) {
   // Playwright
   // ========================================
   try {
-    execFileSync("npx", ["playwright", "install", "chromium"], { stdio: "pipe", timeout: 120000 })
+    const pw = npxArgv(["playwright", "install", "chromium"])
+    execFileSync(pw.file, pw.argv, { stdio: "pipe", timeout: 120000 })
     const pwDir = isWindows()
       ? join(HOME, "AppData", "Local", "ms-playwright")
       : join(HOME, ".cache", "ms-playwright")

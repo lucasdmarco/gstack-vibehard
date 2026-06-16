@@ -10,15 +10,25 @@ const repoRoot = path.resolve(import.meta.dirname, "..")
 const cliModule = path.join(repoRoot, "src", "printing-press", "cli.js")
 const toolsModule = path.join(repoRoot, "src", "commands", "tools.js")
 
-test("runPrintingPress usa pin, args em array e shell:false", async () => {
+test("runPrintingPress usa pin, args em array e shell:false (unix)", async () => {
   const { runPrintingPress, PP_PKG } = await import(`${pathToFileURL(cliModule)}?t=${Date.now()}`)
   let captured
   const exec = (file, args, opts) => { captured = { file, args, opts }; return "[]" }
-  const res = runPrintingPress(["search", "stripe", "--json"], { exec })
+  const res = runPrintingPress(["search", "stripe", "--json"], { exec, platform: "linux" })
   assert.equal(res.ok, true)
   assert.equal(captured.file, "npx")
   assert.deepEqual(captured.args, ["-y", PP_PKG, "search", "stripe", "--json"])
   assert.equal(captured.opts.shell, false)
+})
+
+test("runPrintingPress no Windows usa cmd.exe /c npx (evita ENOENT, sem shell:true)", async () => {
+  const { runPrintingPress, PP_PKG } = await import(`${pathToFileURL(cliModule)}?t=${Date.now()}`)
+  let captured
+  const exec = (file, args, opts) => { captured = { file, args, opts }; return "[]" }
+  runPrintingPress(["list", "--json"], { exec, platform: "win32" })
+  assert.equal(captured.file, "cmd.exe")
+  assert.deepEqual(captured.args, ["/c", "npx", "-y", PP_PKG, "list", "--json"])
+  assert.equal(captured.opts.shell, false, "nunca shell:true (sem deprecation/injecao)")
 })
 
 test("ppSearch parseia JSON e rejeita query insegura", async () => {
