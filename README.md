@@ -1,4 +1,4 @@
-# 🚀 gstack-vibehard 2.3.5
+# 🚀 gstack-vibehard 2.4.0
 **A Máquina de Desenvolvimento Zero-Config Definitiva para Agentes de IA.**
 
 [![Test](https://github.com/lucasdmarco/gstack-vibehard/actions/workflows/test.yml/badge.svg)](https://github.com/lucasdmarco/gstack-vibehard/actions/workflows/test.yml)
@@ -216,6 +216,26 @@ gstack_vibehard tools doctor             # valida binário/auth/MCP das instalad
 ```
 
 Roteamento padrão: **leitura → Printing Press (local, barato)**, **escrita → Composio (nuvem)**.
+
+## 🔄 Workflows Agênticos (Context Docs + Loop Budget + Graph Runner)
+
+Governança determinística para tarefas agênticas — **o LLM decide dentro do nó, o código decide as arestas**. O gstack **não faz model calls**: delega ao OpenCode (seu modelo/free tier) e verifica de forma determinística (testes/Fallow).
+
+```bash
+# Context docs (consciência summary-only, economia de tokens)
+gstack_vibehard context init       # cria .gstack/context.json + docs/{adr,prd,plans,research}
+gstack_vibehard context status     # conta docs (offline)
+
+# Delegar uma tarefa ao OpenCode (opt-in, confirmação)
+gstack_vibehard delegate opencode --task "refatorar auth" --yes
+
+# Rodar um workflow determinístico (worker → verifier → retry/handoff, com caps)
+gstack_vibehard workflow run --task "implementar X" --max-iterations 3
+gstack_vibehard workflow runs               # listar runs
+gstack_vibehard workflow inspect <runId>    # ver journal (eventos, retries, hits)
+```
+
+**Guardrails** (em `.gstack/loop-budget.json`): `maxIterations`, `maxConsecutiveSameFailure` (circuit breaker → human handoff), `maxWallTimeSeconds`. Delegação **opt-in** (`enabled:false`, `requiresUserApproval:true`). Journal por run permite **replay** (nós concluídos são pulados — não refaz trabalho). Nunca persiste secrets nem transcripts completos.
 
 ## ⚡ Instalação Rápida
 

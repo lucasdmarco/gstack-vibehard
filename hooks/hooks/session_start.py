@@ -253,6 +253,31 @@ if session_file.exists():
     except (json.JSONDecodeError, OSError):
         pass
 
+# Context Docs (summary-only): consciencia do "porque" sem ler conteudo.
+# Barato: so conta .md por diretorio + le a policy de loop. Nao injeta conteudo.
+try:
+    if cwd:
+        ctx_root = Path(cwd)
+        ctx_cfg = ctx_root / ".gstack" / "context.json"
+        if ctx_cfg.exists():
+            doc_dirs = {"ADR": "docs/adr", "PRD": "docs/prd", "plans": "docs/plans", "research": "docs/research"}
+            counts = []
+            for label, rel in doc_dirs.items():
+                d = ctx_root / rel
+                n = len([f for f in d.glob("*.md")]) if d.exists() else 0
+                counts.append(f"{label} {n}")
+            lb = ctx_root / ".gstack" / "loop-budget.json"
+            loop_line = ""
+            if lb.exists():
+                try:
+                    lbj = json.loads(lb.read_text(encoding="utf-8"))
+                    loop_line = f"\nLoop budget: maxIterations={lbj.get('maxIterations')}, delegacao={'on' if (lbj.get('delegation') or {}).get('enabled') else 'off'}"
+                except (json.JSONDecodeError, OSError):
+                    pass
+            ctx_parts.append(f"## Context Docs (summary-only)\n{' · '.join(counts)}{loop_line}\nLeia docs/ sob demanda; nao foram injetados inteiros.")
+except (OSError, ValueError):
+    pass
+
 # 1. Identity injection (highermind)
 ctx_parts.append(IDENTITY_BLOCK)
 

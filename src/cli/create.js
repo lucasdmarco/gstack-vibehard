@@ -17,6 +17,8 @@ import { fileURLToPath } from "node:url"
 import { homedir, tmpdir } from "node:os"
 import { deepMerge } from "../installer/merge.js"
 import { buildIntegrationsRegistry } from "../printing-press/registry.js"
+import { buildContextRegistry, DOC_SOURCES as CONTEXT_DOC_SOURCES } from "../context-docs/registry.js"
+import { DEFAULT_LOOP_BUDGET } from "../loop-budget/policy.js"
 
 const HOME = resolve(homedir() || process.env.USERPROFILE || process.env.HOME || "/tmp")
 
@@ -635,6 +637,18 @@ export function writeRuntimeFiles({ projectDir, projectName, now, projectRoot, t
   // Declarativo: sugere ferramentas por template, NAO instala nada. Opt-in via
   // `gstack_vibehard tools`.
   writeJson(join(gstackDir, "integrations.json"), buildIntegrationsRegistry(templateName))
+
+  // Context docs + loop budget (governanca de workflows agenticos).
+  // Declarativo: context.json (summary-only no session_start) + loop-budget.json
+  // (caps/circuit breakers consumidos pelo graph runner; delegacao opt-in).
+  writeJson(join(gstackDir, "context.json"), buildContextRegistry())
+  writeJson(join(gstackDir, "loop-budget.json"), DEFAULT_LOOP_BUDGET)
+  for (const rel of Object.values(CONTEXT_DOC_SOURCES)) {
+    const d = join(projectDir, rel)
+    mkdirSync(d, { recursive: true })
+    const keep = join(d, ".gitkeep")
+    if (!existsSync(keep)) writeFileSync(keep, "")
+  }
 
   // Dockerfile por stack: AI = Python (uvicorn); demais = Node multi-stage.
   // Mobile (Expo) nao e containerizado — Docker cobre apenas a API.

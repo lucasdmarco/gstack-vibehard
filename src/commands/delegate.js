@@ -1,0 +1,62 @@
+import { runDelegation } from "../delegation/opencode.js"
+import { confirm, success, warn, error, info, section } from "../cli/index.js"
+
+function parseFlags(args) {
+  const out = { _: [] }
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i]
+    if (a === "--task") out.task = args[++i]
+    else if (a === "--model") out.model = args[++i]
+    else if (a === "--max-iterations") out.maxIterations = parseInt(args[++i], 10)
+    else if (a === "--yes" || a === "-y") out.yes = true
+    else out._.push(a)
+  }
+  return out
+}
+
+export async function delegateCommand(args = [], opts = {}) {
+  const target = args[0]
+  const flags = parseFlags(args.slice(1))
+  const cwd = opts.cwd || process.cwd()
+
+  if (target !== "opencode") {
+    section("delegate — delegar tarefa para outro harness")
+    info("  gstack_vibehard delegate opencode --task \"...\" [--model M] [--max-iterations N] [--yes]")
+    info("  Delega ao OpenCode (modelo/free tier configurado por você). Opt-in, com confirmação.")
+    return
+  }
+
+  const task = flags.task
+  section(`delegate opencode — ${task || "(sem task)"}`)
+  if (!task) { error("Forneça --task \"descrição da tarefa\""); return }
+
+  // Confirmação obrigatória (a menos de --yes / não-interativo controlado)
+  const skipConfirm = flags.yes || opts.yes
+  if (!skipConfirm) {
+    if (!process.stdin.isTTY) {
+      error("Modo não-interativo: confirme com --yes para delegar ao OpenCode.")
+      return
+    }
+    const ok = await confirm(`Delegar ao OpenCode? Vai rodar 'opencode run' no diretório atual.`, false)
+    if (!ok) { info("Delegação cancelada."); return }
+  }
+
+  const result = runDelegation({ task, cwd, model: flags.model, exec: opts.exec })
+  switch (result.status) {
+    case "ok":
+      success(result.summary)
+      if (result.changedFiles.length) info(`Alterados: ${result.changedFiles.slice(0, 20).join(", ")}`)
+      break
+    case "failed":
+      warn(result.summary)
+      if (result.stderrTail) info(`stderr (tail): ${result.stderrTail}`)
+      break
+    case "opencode_missing":
+    case "invalid_task":
+      error(result.summary)
+      break
+    default:
+      warn(`Resultado: ${result.status} — ${result.summary}`)
+  }
+  return result
+}
