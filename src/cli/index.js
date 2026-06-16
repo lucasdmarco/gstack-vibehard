@@ -9,6 +9,7 @@ import { toolsCommand } from "../commands/tools.js"
 import { contextCommand } from "../commands/context.js"
 import { delegateCommand } from "../commands/delegate.js"
 import { workflowCommand } from "../commands/workflow.js"
+import { a2aCommand } from "../commands/a2a.js"
 import { createCommand } from "./create.js"
 import { initCommand } from "../commands/init.js"
 import { sprintCommand } from "../commands/sprint.js"
@@ -102,6 +103,7 @@ export function showHelp() {
   console.log(color("    gstack_vibehard context        Context docs (ADR/PRD/plans/research) — init/status", COLORS.cyan))
   console.log(color("    gstack_vibehard delegate       Delegar tarefa ao OpenCode (opt-in, confirmação)", COLORS.cyan))
   console.log(color("    gstack_vibehard workflow       Graph runner determinístico — run/runs/inspect", COLORS.cyan))
+  console.log(color("    gstack_vibehard a2a            Agent Card A2A (offline, sem servidor)", COLORS.cyan))
   console.log(color("    gstack_vibehard uninstall      Remover gstack_vibehard do ambiente", COLORS.cyan))
   console.log(color("    gstack_vibehard list           Listar componentes instalados", COLORS.cyan))
   console.log(color("    gstack_vibehard help           Mostrar esta ajuda\n", COLORS.cyan))
@@ -128,7 +130,10 @@ export function section(title) {
 }
 
 export async function runCLI(command, args) {
-  logo()
+  // Saída-máquina (JSON) precisa de stdout limpo: suprime o banner quando há
+  // --json ou em comandos que emitem JSON puro (a2a).
+  const quiet = args.includes("--json") || command === "a2a"
+  if (!quiet) logo()
 
   try {
     await dispatch(command, args)
@@ -177,6 +182,9 @@ async function dispatch(command, args) {
       break
     case "workflow":
       await workflowCommand(args)
+      break
+    case "a2a":
+      await a2aCommand(args)
       break
     case "help":
       showHelp()

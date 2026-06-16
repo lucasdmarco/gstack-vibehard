@@ -3,6 +3,8 @@ import { join, dirname } from "path"
 import { fileURLToPath } from "url"
 import { execFileSync } from "child_process"
 import { buildContextRegistry, countDocs, DOC_SOURCES } from "../context-docs/registry.js"
+import { setObsidianPath, getObsidianPath } from "../context-docs/obsidian.js"
+import { findGraphifyOutput } from "../context-docs/graphify.js"
 import { success, warn, error, info, section } from "../cli/index.js"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -87,9 +89,38 @@ export async function contextCommand(args = [], opts = {}) {
       section("context index — Document Graph local (SQLite/FTS5)")
       mkdirSync(dirname(dbPath(cwd)), { recursive: true })
       const extra = args.includes("--reindex") ? ["--reindex"] : []
+      // Fontes opcionais opt-in: Obsidian (configurado) + Graphify (auto-detect).
+      const obs = getObsidianPath(cwd)
+      if (obs) extra.push("--obsidian", obs)
+      const gpath = findGraphifyOutput(cwd)
+      if (gpath) extra.push("--graphify", gpath)
       const r = runIndexer(["index", "--db", dbPath(cwd), "--root", cwd, ...extra])
-      if (r.ok) success(r.stdout.trim() || "Índice atualizado.")
-      else error(`Falha ao indexar: ${r.error || "ver python"}`)
+      if (r.ok) {
+        success(r.stdout.trim() || "Índice atualizado.")
+        if (obs) info(`Obsidian indexado (read-only): ${obs}`)
+        if (gpath) info(`Graphify bridge: ${gpath}`)
+      } else error(`Falha ao indexar: ${r.error || "ver python"}`)
+      return
+    }
+
+    case "obsidian": {
+      const action = args[1]
+      section(`context obsidian ${action || ""}`)
+      if (action === "set") {
+        const folder = args[2]
+        if (!folder) { error("Forneça a pasta: context obsidian set <pasta>"); return }
+        if (!existsSync(folder)) { warn(`Pasta não existe: ${folder} (registrada mesmo assim; será ignorada até existir)`) }
+        setObsidianPath(cwd, folder)
+        success(`Obsidian registrado (read-only, opt-in): ${folder}`)
+        info("Rode `context index` para indexar. Nada é aberto/criado; só leitura.")
+        return
+      }
+      if (action === "status") {
+        const p = getObsidianPath(cwd)
+        info(p ? `Obsidian configurado: ${p}` : "Obsidian: não configurado (opcional).")
+        return
+      }
+      info("Uso: context obsidian set <pasta> | context obsidian status")
       return
     }
 
