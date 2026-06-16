@@ -60,5 +60,10 @@ Só mergear quando **TODOS** verdes:
 - Nenhum item do checklist de falha grave disparado
 - `RETORNOGO.md` atualizado
 
+## Status da integração Printing Press
+- **PR1–PR5 concluídos**, 49 testes Node + 24 Python verdes, atestado E2E (create/tools/doctor) OK.
+- Nova âncora **pós-merge:** `master` @ v2.3.0. Para reverter a integração e voltar à base anterior: `git reset --hard 13185de` (v2.2.4) ou `git revert` do range de PRs.
+- Nenhum item do checklist de falha grave disparado no desenvolvimento.
+
 ---
 _Mantido atualizado a cada PR. Não deletar até a v2.3.0 estar estável em produção._
