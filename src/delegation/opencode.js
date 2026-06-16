@@ -1,4 +1,7 @@
 import { execFileSync as defaultExecFileSync } from "child_process"
+import { existsSync, readFileSync } from "fs"
+import { join } from "path"
+import { createWorktree, removeWorktree, commitWorktree, isGitRepo } from "./worktree.js"
 
 /**
  * Delegação para OpenCode — usa OUTRO modelo/free tier configurado pelo USUÁRIO.
@@ -51,15 +54,29 @@ export function isSafeTask(task) {
   return typeof task === "string" && task.trim().length > 0 && !UNSAFE_TASK.test(task)
 }
 
+/** Lê os defaults relevantes do .gstack/loop-budget.json (timeout, maxIterations). */
+export function readDelegationBudget(cwd) {
+  const out = { maxIterations: 1, timeoutMs: 600000 }
+  try {
+    const f = join(cwd, ".gstack", "loop-budget.json")
+    if (existsSync(f)) {
+      const lb = JSON.parse(readFileSync(f, "utf-8"))
+      if (Number.isInteger(lb.maxWallTimeSeconds) && lb.maxWallTimeSeconds > 0) out.timeoutMs = lb.maxWallTimeSeconds * 1000
+      if (Number.isInteger(lb.maxIterations) && lb.maxIterations > 0) out.maxIterations = lb.maxIterations
+    }
+  } catch { /* defaults */ }
+  return out
+}
+
 /**
- * Runner real de delegação ao OpenCode (Fase 2).
+ * Runner real de delegação ao OpenCode.
  *
- * O gstack NÃO chama modelo — delega ao `opencode run` (modelo configurado pelo
- * usuário). Captura stdout/stderr e arquivos alterados (via git status), e
- * retorna um resumo ESTRUTURADO (nunca o transcript completo por default).
+ * O gstack NÃO chama modelo — delega ao `opencode run` (modelo do usuário).
+ * Retorna resumo ESTRUTURADO (nunca transcript completo). Lê o loop-budget
+ * (timeout/maxIterations), retenta até maxIterations em falha, e — com
+ * `worktree:true` — roda numa git worktree isolada (não toca o branch principal).
  *
- * @param {object} p { task, cwd, model?, timeout?, exec?, gitStatus? }
- * @returns {{ status, exitCode, summary, changedFiles, stderrTail? }}
+ * @param {object} p { task, cwd, model?, timeout?, maxIterations?, worktree?, exec? }
  */
 export function runDelegation(p = {}) {
   const exec = p.exec || defaultExecFileSync
@@ -71,30 +88,69 @@ export function runDelegation(p = {}) {
     return { status: "opencode_missing", exitCode: null, summary: "OpenCode CLI não encontrado (instale: npm i -g opencode)", changedFiles: [] }
   }
 
-  // Args em array, shell:false → sem injeção. model opcional.
-  const args = ["run"]
-  if (p.model) args.push("-m", p.model)
-  args.push(p.task)
-  let exitCode = 0
-  let stdout = ""
-  let stderr = ""
-  try {
-    stdout = (exec("opencode", args, { cwd, stdio: "pipe", shell: false, timeout: p.timeout || 600000, encoding: "utf-8" }) || "").toString()
-  } catch (e) {
-    exitCode = typeof e.status === "number" ? e.status : 1
-    stdout = (e.stdout || "").toString()
-    stderr = (e.stderr || e.message || "").toString()
+  const budget = readDelegationBudget(cwd)
+  const timeout = p.timeout || budget.timeoutMs
+  const maxIterations = p.maxIterations || budget.maxIterations
+
+  // Isolamento opcional por worktree
+  let runCwd = cwd
+  let wt = null
+  if (p.worktree) {
+    if (!isGitRepo(cwd, exec)) {
+      return { status: "not_git", exitCode: null, summary: "--worktree exige um repositório git", changedFiles: [] }
+    }
+    try {
+      wt = createWorktree(cwd, { exec })
+      runCwd = wt.dir
+    } catch (e) {
+      return { status: "worktree_failed", exitCode: null, summary: `falha ao criar worktree: ${e.message}`, changedFiles: [] }
+    }
   }
 
-  // Arquivos alterados via git (determinístico) — escopo do que mudou.
-  const changedFiles = listChangedFiles(cwd, p.gitStatus || exec)
+  let keepBranch = false
+  try {
+    const args = ["run"]
+    if (p.model) args.push("-m", p.model)
+    args.push(p.task)
 
-  return {
-    status: exitCode === 0 ? "ok" : "failed",
-    exitCode,
-    summary: summarize(stdout, exitCode, changedFiles.length),
-    changedFiles,
-    ...(stderr ? { stderrTail: stderr.slice(-800) } : {}),
+    let exitCode = 0, stdout = "", stderr = "", attempts = 0
+    for (let i = 1; i <= maxIterations; i++) {
+      attempts = i
+      exitCode = 0; stdout = ""; stderr = ""
+      try {
+        stdout = (exec("opencode", args, { cwd: runCwd, stdio: "pipe", shell: false, timeout, encoding: "utf-8" }) || "").toString()
+        break // sucesso → não retenta
+      } catch (e) {
+        exitCode = typeof e.status === "number" ? e.status : 1
+        stdout = (e.stdout || "").toString()
+        stderr = (e.stderr || e.message || "").toString()
+        // retenta apenas se ainda há iterações
+      }
+    }
+
+    const changedFiles = listChangedFiles(runCwd, exec)
+    // Worktree: preserva o trabalho commitando no branch efêmero (não toca o
+    // branch principal). O usuário revisa/mergeia `wt.branch` depois.
+    let preservedBranch = null
+    if (wt && changedFiles.length > 0) {
+      try {
+        commitWorktree(wt.dir, `gstack delegate: ${p.task}`.slice(0, 200), { exec })
+        preservedBranch = wt.branch
+        keepBranch = true
+      } catch { /* sem commit — segue */ }
+    }
+    return {
+      status: exitCode === 0 ? "ok" : "failed",
+      exitCode,
+      attempts,
+      summary: summarize(stdout, exitCode, changedFiles.length) + (preservedBranch ? ` [branch ${preservedBranch} — revise e mergeie]` : (wt ? " [worktree sem mudanças]" : "")),
+      changedFiles,
+      ...(preservedBranch ? { reviewBranch: preservedBranch } : {}),
+      ...(stderr ? { stderrTail: stderr.slice(-800) } : {}),
+    }
+  } finally {
+    // Remove a worktree dir; mantém o branch SE houve trabalho commitado.
+    if (wt) removeWorktree(cwd, wt.dir, wt.branch, { exec, keepBranch })
   }
 }
 

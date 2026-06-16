@@ -43,6 +43,8 @@ function parseFlags(args) {
     const a = args[i]
     if (a === "--task") out.task = args[++i]
     else if (a === "--max-iterations") out.maxIterations = parseInt(args[++i], 10)
+    else if (a === "--run-id") out.runId = args[++i]
+    else if (a === "--json") out.json = true
     else out._.push(a)
   }
   return out
@@ -64,8 +66,9 @@ export async function workflowCommand(args = [], opts = {}) {
       const verifier = opts.verifier || makeTestVerifier(cwd, opts.exec)
       const result = runWorkflow({
         task: flags.task, cwd, budget, journalBase: base,
-        worker: opts.worker, verifier, exec: opts.exec, runId: opts.runId,
+        worker: opts.worker, verifier, exec: opts.exec, runId: opts.runId || flags.runId,
       })
+      if (result.resumed) info("(run retomado do journal)")
 
       const icon = result.status === "passed" ? "✓" : result.status === "handoff" ? "⚠" : "✗"
       info(`${icon} run ${result.runId}: ${result.status} em ${result.iterations} iteração(ões)`)
@@ -86,10 +89,16 @@ export async function workflowCommand(args = [], opts = {}) {
     }
 
     case "inspect": {
-      const runId = args[1]
+      const flags = parseFlags(args.slice(1))
+      const runId = flags._[0] || args[1]
+      const evs = readJournal(base, runId)
+      if (flags.json) {
+        // Saída JSON para automação (inspect --json)
+        process.stdout.write(JSON.stringify({ runId, stats: runStats(base, runId), events: evs }, null, 2) + "\n")
+        return { runId, events: evs }
+      }
       section(`workflow inspect ${runId || ""}`)
       if (!runId) { error("Forneça <runId>"); return }
-      const evs = readJournal(base, runId)
       if (evs.length === 0) { warn("Run não encontrado ou vazio."); return }
       for (const e of evs) info(`  ${e.ts} ${e.event}${e.nodeId ? " " + e.nodeId : ""}${e.signature ? " [" + e.signature + "]" : ""}`)
       return
