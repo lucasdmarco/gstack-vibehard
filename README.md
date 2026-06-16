@@ -1,4 +1,4 @@
-# 🚀 gstack-vibehard 2.6.0
+# 🚀 gstack-vibehard 2.6.1
 **A Máquina de Desenvolvimento Zero-Config Definitiva para Agentes de IA.**
 
 [![Test](https://github.com/lucasdmarco/gstack-vibehard/actions/workflows/test.yml/badge.svg)](https://github.com/lucasdmarco/gstack-vibehard/actions/workflows/test.yml)
@@ -229,7 +229,9 @@ gstack_vibehard context search "casdoor"   # busca FTS5 offline → path/heading
 gstack_vibehard context related Casdoor    # entidades e relações (mentions/links_to/tagged_as)
 gstack_vibehard context explain "auth"     # docs + entidades de um tópico
 gstack_vibehard context status --db        # documents/chunks/entities/edges + FTS status
-gstack_vibehard context obsidian set <pasta> # indexar pasta Obsidian (opt-in, read-only)
+gstack_vibehard context obsidian set <pasta> # indexar pasta Obsidian (read-only)
+# Obsidian detectado por padrão: na instalação/`context init` você ESCOLHE um vault
+# (detectado automaticamente) ou "pula". Nada é lido até você escolher.
 # Graphify: se graphify-out/graph.json existir, `related` mostra implemented_in/depends_on
 gstack_vibehard a2a card                   # Agent Card A2A (JSON, offline, sem servidor)
 

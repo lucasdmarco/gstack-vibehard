@@ -1,5 +1,14 @@
 # Changelog - gstack-vibehard
 
+## [2.6.1] - 2026-06-16
+
+### Obsidian por padrão — detecção automática + escolha obrigatória
+- O Obsidian agora é **parte padrão** do produto. Se o app estiver instalado, o `gstack_vibehard install` e o `context init` **detectam os vaults** (lendo o `obsidian.json` do OS) e **exigem uma escolha**: indexar um vault detectado, digitar outra pasta, ou **"pular por enquanto"**.
+- **Invariante de segurança mantida — detectar ≠ indexar:** a detecção lê só o `obsidian.json` (existência + paths), **nunca o conteúdo das notas**. A indexação (read-only) só ocorre da pasta **explicitamente escolhida**; "pular" → nada é lido. Nunca abre o app, cria cofre ou varre vault global implícito.
+- Default global em `~/.gstack/context-defaults.json` (projetos herdam); `getObsidianPath` resolve **projeto > global**.
+- **Não-interativo (CI) nunca trava** — pula com aviso para `context obsidian set`.
+- +3 testes (95 Node + Python verdes).
+
 ## [2.6.0] - 2026-06-16
 
 ### Document Graph: Obsidian + Graphify bridge + A2A Card (PR2/PR5/PR6 do PRD)

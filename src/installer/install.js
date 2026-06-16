@@ -15,7 +15,8 @@ import { ensureDir, copyWithBackup, copyDirSync, backupFile } from "./merge.js"
 import { findWorkingBinary, getUvCandidates, getBunCandidates, npxArgv } from "./deps.js"
 import { checkAlreadyInstalled } from "./check.js"
 import { installGeneratedAgentLayer, installGraphifyGitHooks } from "./agent-distribution.js"
-import { multiSelect, success, warn, error, info, section } from "../cli/index.js"
+import { multiSelect, select, prompt, success, warn, error, info, section } from "../cli/index.js"
+import { obsidianDetected, getGlobalObsidianDefault, setGlobalObsidianDefault, chooseObsidian } from "../context-docs/obsidian.js"
 
 const HOME = homedir()
 
@@ -621,6 +622,26 @@ export async function install(args = []) {
   // Step 11: Obsidian Vault Global (Segundo Cerebro)
   section("vault/ — Obsidian Vault Global (Segundo Cerebro)")
   setupObsidianVault(report)
+
+  // Step 12: Obsidian detectado → escolha obrigatória (com 'pular') do vault a
+  // indexar no Document Graph. Detecção lê só obsidian.json; NUNCA indexa aqui.
+  section("obsidian/ — Document Graph (escolha do vault)")
+  if (!obsidianDetected()) {
+    info("Obsidian nao detectado — pulado (configure depois com `context obsidian set`).")
+  } else if (getGlobalObsidianDefault()) {
+    info(`Obsidian ja configurado (default global): ${getGlobalObsidianDefault()}`)
+  } else if (!process.stdin.isTTY) {
+    info("Obsidian detectado, mas modo nao-interativo — rode `gstack_vibehard context obsidian set <pasta>`.")
+  } else {
+    const chosen = await chooseObsidian({ select, prompt })
+    if (chosen) {
+      setGlobalObsidianDefault(chosen)
+      success(`Obsidian default global: ${chosen} (read-only; indexado via \`context index\`)`)
+      report.added.push(`obsidian default: ${chosen}`)
+    } else {
+      info("Obsidian: pulado. Configure depois com `context obsidian set <pasta>`.")
+    }
+  }
 
   // Report
   printInstallReport(report)
