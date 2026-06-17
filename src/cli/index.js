@@ -14,6 +14,7 @@ import { createCommand } from "./create.js"
 import { initCommand } from "../commands/init.js"
 import { sprintCommand } from "../commands/sprint.js"
 import { monitorCommand } from "../commands/monitor.js"
+import { planCommand } from "../commands/plan.js"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const pkg = JSON.parse(readFileSync(resolve(__dirname, "../../package.json"), "utf-8"))
@@ -94,6 +95,8 @@ export function showHelp() {
   console.log(color("  Comandos:", COLORS.bold))
   console.log(color("    gstack_vibehard install        Instalar gstack_vibehard no ambiente", COLORS.cyan))
   console.log(color("      --skip-deps                  Pular instalacao de deps globais (bun, Rust...)", COLORS.dim))
+  console.log(color("    gstack_vibehard plan \"<objetivo>\" Gerar plano guiado (determinístico) — modo leve/completo", COLORS.cyan))
+  console.log(color("      --name <p> --mode lite|full  --json (puro) · --dry-run · --recipe <id>", COLORS.dim))
   console.log(color("    gstack_vibehard create <nome>  Criar workspace runtime omniharness", COLORS.cyan))
   console.log(color("    gstack_vibehard init <nome>    Criar novo projeto com estrutura completa", COLORS.cyan))
   console.log(color("    gstack_vibehard doctor         Diagnosticar ambiente", COLORS.cyan))
@@ -176,6 +179,9 @@ async function dispatch(command, args) {
       break
     case "context":
       await contextCommand(args)
+      break
+    case "plan":
+      await planCommand(args)
       break
     case "delegate":
       await delegateCommand(args)
