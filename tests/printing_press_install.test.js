@@ -68,24 +68,31 @@ test("ensureGo: presente -> present; ausente+instalavel -> installed; autoInstal
 
 test("ensureGo Linux: baixa o tarball da arch certa; arch desconhecida nao auto-instala", async () => {
   const { ensureGo } = await import(`${pathToFileURL(installModule)}?t=${Date.now()}`)
-  // arm64: deve tentar baixar e instalar
-  let urlBaixada = ""
-  const execArm = (file, args) => {
-    if (/[\\/]go(\.exe)?$/.test(file) || file === "go") {
-      if (urlBaixada) return Buffer.from("go1.22"); throw new Error("no go")
+  // HOME temporário GRAVÁVEL: installGoLinuxTarball faz mkdirSync(home/.local) real.
+  // Um path fixo tipo "/home/u" falha por permissão no CI Linux (e cria lixo no Windows).
+  const home = await mkdtemp(path.join(tmpdir(), "gstack-go-"))
+  try {
+    // arm64: deve tentar baixar e instalar
+    let urlBaixada = ""
+    const execArm = (file, args) => {
+      if (/[\\/]go(\.exe)?$/.test(file) || file === "go") {
+        if (urlBaixada) return Buffer.from("go1.22"); throw new Error("no go")
+      }
+      if (file === "curl") { urlBaixada = args[args.indexOf("-o") - 1] || args[2]; return Buffer.from("") }
+      if (file === "tar") return Buffer.from("")
+      throw new Error("unexpected " + file)
     }
-    if (file === "curl") { urlBaixada = args[args.indexOf("-o") - 1] || args[2]; return Buffer.from("") }
-    if (file === "tar") return Buffer.from("")
-    throw new Error("unexpected " + file)
-  }
-  const rArm = ensureGo({ exec: execArm, platform: "linux", arch: "arm64", home: "/home/u" })
-  assert.match(urlBaixada, /linux-arm64\.tar\.gz/, "baixa o tarball arm64")
-  assert.equal(rArm.status, "installed")
+    const rArm = ensureGo({ exec: execArm, platform: "linux", arch: "arm64", home })
+    assert.match(urlBaixada, /linux-arm64\.tar\.gz/, "baixa o tarball arm64")
+    assert.equal(rArm.status, "installed")
 
-  // arch desconhecida (riscv64): nao auto-instala
-  const rUnknown = ensureGo({ exec: makeExec({ hasGo: false }), platform: "linux", arch: "riscv64", home: "/home/u" })
-  assert.equal(rUnknown.status, "absent")
-  assert.match(rUnknown.error, /nao suportada|manual/i)
+    // arch desconhecida (riscv64): nao auto-instala
+    const rUnknown = ensureGo({ exec: makeExec({ hasGo: false }), platform: "linux", arch: "riscv64", home })
+    assert.equal(rUnknown.status, "absent")
+    assert.match(rUnknown.error, /nao suportada|manual/i)
+  } finally {
+    await rm(home, { recursive: true, force: true })
+  }
 })
 
 test("installTool: instala mas binario nao encontrado -> install_unverified", async () => {
