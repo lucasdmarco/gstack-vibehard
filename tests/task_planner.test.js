@@ -32,6 +32,16 @@ test("task-planner: gera workflow + delegate; OpenCode SEMPRE requer confirmaç�
   for (const s of plan.steps) assert.equal(s.command[0], "gstack_vibehard")
 })
 
+test("task-planner: escolhe loop pattern e delega em --worktree", async () => {
+  const { buildTaskPlan } = await imp("src/project-plan/task-planner.js")
+  const plan = buildTaskPlan({ request: "corrigir erro 500 no login", hasIndex: false })
+  assert.equal(plan.loopPattern, "runtime-debugging", "bug de runtime → runtime-debugging")
+  assert.ok(plan.verificationProfile === "runtime-debugging")
+  assert.ok(plan.loopReason && plan.loopConfidence > 0)
+  const delegate = plan.steps.find((s) => s.id === "delegate:opencode")
+  assert.ok(delegate.command.includes("--worktree"), "delegação isolada por worktree")
+})
+
 test("task-planner: com índice usa Document Graph (context search/related)", async () => {
   const { buildTaskPlan } = await imp("src/project-plan/task-planner.js")
   const plan = buildTaskPlan({ request: "corrigir bug no Checkout de pagamentos", hasIndex: true })
