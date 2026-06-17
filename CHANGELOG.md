@@ -1,5 +1,13 @@
 # Changelog - gstack-vibehard
 
+## [2.20.0] - 2026-06-17
+
+### Fase 3 (1/3) — Verify honesto + Dream Audit anti-placebo + Capability Matrix
+- **Verify honesto** (`verify-runner.js`): status agora é `ready` / `ready_with_warnings` / `blocked` / `pending_product` — **nunca declara "PRONTO" com runtime/preview pendente** quando o projeto roda (`start`/`dev`). Fallow/QG ausente vira **`tool_missing`** (não sucesso silencioso); roda **QG L1 e L2**; qualquer gate que falha bloqueia; `reducedTrust` quando o harness ativo é best-effort.
+- **Dream Audit** (`src/dream/auditor.js` + `gstack_vibehard dream audit`): **determinístico, sem LLM, somente-leitura** — compara promessas (CLAUDE.md/README/docs) contra evidência real no código e classifica cada claim **REAL / PARTIAL / PLACEBO / ROADMAP / RISK**. `dream status` mostra a matriz de confiança por harness.
+- **Harness Capability Matrix** (`src/dream/capabilities.js`): capacidades reais por harness; **honesta** — `supportsPreOutputInterception: false` em todos (uma CLI não intercepta o render do harness; o Output Guard é auditoria posterior, marcado como RISK no audit).
+- +5 testes + verify reescrito (173 Node + 33 Python verdes; lint limpo).
+
 ## [2.19.0] - 2026-06-17
 
 ### Camada de confiança (3/3) — `verify` (delivery gates honestos, Replit-like)
