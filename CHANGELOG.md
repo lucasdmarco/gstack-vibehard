@@ -1,5 +1,12 @@
 # Changelog - gstack-vibehard
 
+## [2.14.0] - 2026-06-17
+
+### Confiabilidade P1 (revisão Codex) — bugs ativos
+- **`workflow inspect --json` sem `<runId>`** tratava `"--json"` como runId (`flags._[0] || args[1]`) e retornava JSON "de sucesso" com `runId:"--json"`. Agora usa só `flags._[0]` (o parseFlags já separa flags de posicionais) → retorna `{"error":"missing runId"}`. Perigoso para automação, corrigido.
+- **`create` EBUSY no Windows:** os boots best-effort (AgentMemory/Graphify/Headroom) rodavam `npx` real contra o `projectDir` mesmo em teste, deixando handles presos → `EBUSY` na limpeza. Adicionado guard `GSTACK_SKIP_SIDE_EFFECTS` no `safeExec` (testes/CI não spawnam processos externos) + `maxRetries/retryDelay` na limpeza do teste.
+- +1 teste de regressão (147 Node + 33 Python verdes).
+
 ## [2.13.0] - 2026-06-17
 
 ### Pending-features (roadmap honesto) + fix de classificação

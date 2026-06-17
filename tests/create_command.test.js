@@ -17,6 +17,9 @@ test("create scaffolds with 5-phase DAG boot (Casdoor, Atomic, Daemons, Omniharn
 
     const commands = []
     process.env.GSTACK_SKIP_PREFLIGHT = "1"
+    // Sem side-effects externos (npx/docker/git): teste hermético, sem handles
+    // presos no projectDir → evita EBUSY na limpeza no Windows.
+    process.env.GSTACK_SKIP_SIDE_EFFECTS = "1"
     const { createProject } = await import(`${pathToFileURL(modulePath)}?t=${Date.now()}`)
     const result = await createProject({
       args: ["teste-app"],
@@ -106,6 +109,8 @@ test("create scaffolds with 5-phase DAG boot (Casdoor, Atomic, Daemons, Omniharn
     assert.equal(existsSync(path.join(appDir, ".claude", "teams", "validator.json")), true)
   } finally {
     delete process.env.GSTACK_SKIP_PREFLIGHT
-    await rm(tmp, { recursive: true, force: true })
+    delete process.env.GSTACK_SKIP_SIDE_EFFECTS
+    // maxRetries/retryDelay: defesa extra contra EBUSY/EPERM transitório no Windows.
+    await rm(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
   }
 })
