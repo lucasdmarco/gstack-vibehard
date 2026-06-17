@@ -1,7 +1,33 @@
 import { execFileSync } from "child_process"
-import { resolve } from "path"
+import { resolve, join, dirname } from "path"
+import { fileURLToPath } from "url"
 import { appendPlanEvent, completedSteps } from "./journal.js"
 import { setStepStatus, setPlanStatus } from "./state.js"
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+// Único binário permitido em planos. Planos são persistidos/editáveis em
+// .gstack/plans/*.json — a allowlist impede que um plano adulterado rode outra coisa.
+const ALLOWED_BIN = "gstack_vibehard"
+const CLI_ENTRY = join(__dirname, "..", "index.js")
+
+const SECRET_FLAG = /(token|key|secret|password|pat|apikey|api-key|authorization|bearer)/i
+
+/** Redige valores sensíveis do comando antes de ir ao journal (defense-in-depth). */
+export function sanitizeCommand(command) {
+  const parts = Array.isArray(command) ? command.slice() : [String(command)]
+  const out = []
+  for (let i = 0; i < parts.length; i++) {
+    const p = String(parts[i])
+    // flag de segredo → redige o PRÓXIMO token (o valor)
+    if (/^--?\w/.test(p) && SECRET_FLAG.test(p)) { out.push(p); if (i + 1 < parts.length) { out.push("***"); i++ } continue }
+    // KEY=VALUE com chave sensível
+    const kv = p.match(/^([A-Za-z0-9_]+)=(.+)$/)
+    if (kv && SECRET_FLAG.test(kv[1])) { out.push(`${kv[1]}=***`); continue }
+    // URL com credencial embutida user:pass@host
+    out.push(p.replace(/\/\/[^/@\s]+:[^/@\s]+@/g, "//***:***@"))
+  }
+  return out.join(" ")
+}
 
 /**
  * Executor de plano (PR5). Roda os PASSOS REAIS em ordem, com journal/estado e
@@ -16,12 +42,16 @@ import { setStepStatus, setPlanStatus } from "./state.js"
  * o executor é puro e determinístico (exec injetável para testes herméticos).
  */
 
-/** Runner padrão win32-aware: comandos `gstack_vibehard ...` via cmd.exe no Windows. */
+/**
+ * Runner padrão: invoca a PRÓPRIA CLI via Node (array de argumentos puro, SEM
+ * shell/cmd.exe) — cross-platform e imune a quoting/injeção do cmd.exe. Só aceita
+ * o binário da allowlist; qualquer outro comando (plano adulterado) é rejeitado.
+ */
 function defaultRunner(command, opts) {
-  if (process.platform === "win32") {
-    return execFileSync("cmd.exe", ["/c", ...command], { stdio: "pipe", timeout: 600000, ...opts })
+  if (!Array.isArray(command) || command.length === 0 || command[0] !== ALLOWED_BIN) {
+    throw new Error(`comando não permitido no plano: ${Array.isArray(command) ? command[0] : command}`)
   }
-  return execFileSync(command[0], command.slice(1), { stdio: "pipe", timeout: 600000, ...opts })
+  return execFileSync(process.execPath, [CLI_ENTRY, ...command.slice(1)], { stdio: "pipe", timeout: 600000, ...opts })
 }
 
 export function executePlan(opts = {}) {
@@ -54,7 +84,8 @@ export function executePlan(opts = {}) {
       continue
     }
 
-    appendPlanEvent(planDir, { event: "step_started", stepId: step.id, command: step.command.join(" ") })
+    // Journal só com RESUMO sanitizado — nunca o comando bruto (defense-in-depth).
+    appendPlanEvent(planDir, { event: "step_started", stepId: step.id, command: sanitizeCommand(step.command) })
     const cwd = resolve(baseCwd, step.cwd || ".")
     try {
       run(step.command, { cwd })

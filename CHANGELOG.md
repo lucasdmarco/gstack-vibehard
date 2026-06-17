@@ -1,5 +1,12 @@
 # Changelog - gstack-vibehard
 
+## [2.15.0] - 2026-06-17
+
+### Endurecimento P2 do executor de planos (revisão Codex)
+- **Sem `cmd.exe /c`:** o runner agora invoca a **própria CLI via Node** (`process.execPath` + `src/index.js`) com **array de argumentos puro** — cross-platform e imune a quoting/injeção do `cmd.exe`. Como planos ficam persistidos/editáveis em `.gstack/plans/*.json`, há **allowlist**: só `gstack_vibehard` é executável; comando adulterado é rejeitado antes de rodar.
+- **Journal sem segredos:** `step_started` grava o comando **sanitizado** (`sanitizeCommand` redige valores após flags sensíveis `--token/--key/--secret/...`, `KEY=VALUE` sensível e credenciais embutidas em URL) — nunca o comando bruto.
+- +3 testes (150 Node + 33 Python verdes).
+
 ## [2.14.0] - 2026-06-17
 
 ### Confiabilidade P1 (revisão Codex) — bugs ativos
