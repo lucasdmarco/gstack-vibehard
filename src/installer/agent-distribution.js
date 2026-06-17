@@ -2,6 +2,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "fs"
 import { execFileSync as defaultExecFileSync } from "child_process"
 import { homedir } from "os"
 import { dirname, join } from "path"
+import { loadManifest, recordItem, saveManifest } from "./manifest.js"
 
 const AGENT_NAMESPACE = "gstack-vibehard"
 
@@ -183,24 +184,21 @@ export async function installGeneratedAgentLayer(options = {}) {
     }
   }
 
-  const manifest = {
-    version: 1,
-    installedAt: now(),
-    generatedAgents: {
-      source: generatedRoot,
-      manifest: sourceManifest,
-    },
-    harnesses: detectedHarnesses.map((harness) => ({
-      id: harness.id,
-      label: harness.label,
-    })),
-    agentDirectories,
-    agentmemory,
+  // Preserva o `items[]` (ownership) já registrado por safe-write/skills/scripts.
+  const manifest = loadManifest(home)
+  manifest.version = 1
+  manifest.installedAt = manifest.installedAt || now()
+  manifest.generatedAgents = { source: generatedRoot, manifest: sourceManifest }
+  manifest.harnesses = detectedHarnesses.map((harness) => ({ id: harness.id, label: harness.label }))
+  manifest.agentDirectories = agentDirectories
+  manifest.agentmemory = agentmemory
+  for (const dir of Object.values(agentDirectories)) {
+    recordItem(manifest, { path: dir, kind: "dir", action: "created", component: "agents", backup: null, restoreOnUninstall: false })
   }
   const manifestPath = join(home, ".gstack_vibehard", "install-manifest.json")
   try {
     ensureDir(dirname(manifestPath))
-    writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n", "utf8")
+    saveManifest(manifest, home)
     report.updated.push("~/.gstack_vibehard/install-manifest.json")
   } catch (e) {
     warn(`install manifest: ${e.message}`)
