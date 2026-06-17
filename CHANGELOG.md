@@ -1,5 +1,12 @@
 # Changelog - gstack-vibehard
 
+## [2.18.0] - 2026-06-17
+
+### Camada de confiança (2/3) — Uninstall restaurativo + Integrity Doctor
+- **Uninstall manifest-driven + flags:** `--dry-run` (mostra o plano de rollback do manifest sem tocar em nada), `--restore-only` (só restaura backups), `--remove-vault` (remove `~/gstack-vault`), `--remove-deps`/`--include-projects` (honestos: não automatizam remoção de deps globais nem apagam projetos). `removeSkills` agora é **manifest-driven** — remove só skills que o manifest prova serem nossas (nunca uma skill do usuário com nome colidente); fallback ao padrão para instalações legadas.
+- **`doctor --install-integrity` (`src/installer/integrity.js`):** valida manifest presente, backups existentes, **drift de hash** (arquivo alterado desde a instalação), itens registrados presentes e configs JSON parseáveis; diz se o **uninstall seria seguro**.
+- +4 testes (162 Node + 33 Python verdes; lint limpo).
+
 ## [2.17.0] - 2026-06-17
 
 ### Camada de confiança (1/3) — Safe Write + Manifest como fonte de verdade

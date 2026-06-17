@@ -1,4 +1,4 @@
-# 🚀 gstack-vibehard 2.17.0
+# 🚀 gstack-vibehard 2.18.0
 **A Máquina de Desenvolvimento Zero-Config Definitiva para Agentes de IA.**
 
 [![Test](https://github.com/lucasdmarco/gstack-vibehard/actions/workflows/test.yml/badge.svg)](https://github.com/lucasdmarco/gstack-vibehard/actions/workflows/test.yml)

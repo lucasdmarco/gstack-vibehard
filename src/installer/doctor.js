@@ -7,11 +7,29 @@ import { checkAlreadyInstalled } from "./check.js"
 import { npxArgv } from "./deps.js"
 import { detectHarnesses } from "../harness/detector.js"
 import { inspectOpenCodeConfig } from "../harness/opencode-config.js"
+import { checkInstallIntegrity } from "./integrity.js"
 import { section, success, warn, error, info } from "../cli/index.js"
 
 const HOME = homedir()
 
-export async function doctor() {
+export async function doctor(args = []) {
+  // Modo integridade: valida manifest/backups/hashes/configs e se uninstall é seguro.
+  if (args.includes("--install-integrity")) {
+    section("Integridade da Instalacao (manifest/backups/hashes)")
+    const r = checkInstallIntegrity(HOME)
+    if (!r.manifestExists) { warn("Manifest ausente — nada a verificar (instale com `gstack_vibehard install`)."); return }
+    success(`Manifest presente — ${r.items} item(ns) registrados`)
+    info(`Backups OK: ${r.backupsOk}`)
+    if (r.drift > 0) warn(`Drift: ${r.drift} arquivo(s) alterado(s) desde a instalacao (editado por voce/outro)`)
+    if (r.issues.length === 0) success("Sem problemas — uninstall seria SEGURO")
+    else {
+      error(`${r.issues.length} problema(s):`)
+      r.issues.forEach((i) => warn(`  ${i}`))
+      warn("Rode `gstack_vibehard uninstall --dry-run` para ver o plano de rollback.")
+    }
+    return
+  }
+
   section("Diagnostico do Ambiente")
 
   info(`Sistema: ${getOSLabel()}`)

@@ -1,9 +1,10 @@
-import { existsSync, readdirSync, unlinkSync, renameSync, rmSync, readFileSync, writeFileSync } from "fs"
+import { existsSync, readdirSync, unlinkSync, renameSync, rmSync, readFileSync, writeFileSync, copyFileSync } from "fs"
 import { homedir } from "os"
 import { join, dirname } from "path"
 import { fileURLToPath } from "url"
 import { getInstalledComponents, getInstalledScripts, getInstalledSkills } from "./check.js"
 import { stripGstackFromCodexConfig } from "../harness/codex.js"
+import { loadManifest, findItems } from "./manifest.js"
 import { confirm, success, warn, error, info, section } from "../cli/index.js"
 
 const HOME = homedir()
@@ -168,11 +169,47 @@ function packageSkillNames() {
 }
 
 function removeSkills(report) {
-  // Somente skills que existem no pacote E estao instaladas
+  // PREFERE o manifest (ownership): remove só skills que o manifest prova serem
+  // nossas — nunca uma skill do usuário com nome colidente. Sem itens no manifest
+  // (instalação legada), cai no padrão pacote∩instaladas.
+  const manifest = loadManifest(HOME)
+  const skillItems = findItems(manifest, (x) => x.kind === "skill" && x.removeOnUninstall !== false)
+  if (skillItems.length > 0) {
+    const count = skillItems.filter((it) => removeDir(it.path, report)).length
+    if (count > 0) success(`${count} skills removidas (via manifest) de ~/.agents/skills/`)
+    return
+  }
   const installedSkills = new Set(getInstalledSkills())
   const targets = packageSkillNames().filter((skill) => installedSkills.has(skill))
   const count = targets.filter((skill) => removeDir(join(HOME, ".agents", "skills", skill), report)).length
   if (count > 0) success(`${count} skills removidas de ~/.agents/skills/`)
+}
+
+/**
+ * Restaura backups registrados no manifest (versionado: usa item.backup exato).
+ * Restaura sempre do backup MAIS ANTIGO disponível (o original do usuário).
+ */
+function restoreFromManifest(report, { dryRun } = {}) {
+  const manifest = loadManifest(HOME)
+  const items = findItems(manifest, (x) => x.restoreOnUninstall && x.backup)
+  for (const it of items) {
+    if (!existsSync(it.backup)) { report.skipped.push(`restore: backup ausente ${it.backup}`); continue }
+    if (dryRun) { report.restored.push(`(dry-run) ${it.path} ← ${it.backup}`); continue }
+    try {
+      copyFileSync(it.backup, it.path)
+      report.restored.push(`${it.path} (de ${it.backup})`)
+    } catch (e) {
+      report.errors.push(`restore ${it.path}: ${e.message}`)
+    }
+  }
+}
+
+/** Monta o plano de rollback a partir do manifest (para --dry-run). */
+function buildRollbackPlan() {
+  const manifest = loadManifest(HOME)
+  const restore = findItems(manifest, (x) => x.restoreOnUninstall && x.backup).map((x) => x.path)
+  const remove = findItems(manifest, (x) => x.removeOnUninstall !== false && !x.restoreOnUninstall).map((x) => x.path)
+  return { restore, remove, items: (manifest.items || []).length }
 }
 
 function removeScripts(report) {
@@ -220,7 +257,28 @@ function removeHermes(report) {
 
 export async function uninstall(args = []) {
   const hasYesFlag = args.includes("--yes") || args.includes("-y")
+  const dryRun = args.includes("--dry-run")
+  const restoreOnly = args.includes("--restore-only")
+  const removeVault = args.includes("--remove-vault")
+  const removeDeps = args.includes("--remove-deps")
+  const includeProjects = args.includes("--include-projects")
   const report = { removed: [], restored: [], skipped: [], errors: [] }
+
+  // --dry-run: mostra o plano de rollback SEM tocar em nada.
+  if (dryRun) {
+    section("gstack_vibehard Uninstaller — DRY RUN (nada será alterado)")
+    const plan = buildRollbackPlan()
+    info(`Manifest: ${plan.items} item(ns) registrados`)
+    info("Será RESTAURADO de backup:")
+    plan.restore.forEach((p) => info(`  ~ ${p}`))
+    if (plan.restore.length === 0) info("  (nenhum backup no manifest)")
+    info("Será REMOVIDO (criado pelo gstack):")
+    plan.remove.forEach((p) => info(`  - ${p}`))
+    if (plan.remove.length === 0) info("  (nenhum item exclusivo no manifest — limpeza por padrão)")
+    info("Será PRESERVADO: projetos criados, ~/gstack-vault (salvo --remove-vault), deps globais")
+    info("Rode sem --dry-run para aplicar (com --yes em modo não-interativo).")
+    return report
+  }
 
   // Sem TTY e sem --yes: abortar — remocao silenciosa sem consentimento e inaceitavel
   if (!process.stdin.isTTY && !hasYesFlag) {
@@ -229,6 +287,20 @@ export async function uninstall(args = []) {
     return report
   }
   const skipConfirm = hasYesFlag
+
+  // --restore-only: apenas restaura backups do manifest, sem remover nada.
+  if (restoreOnly) {
+    section("gstack_vibehard Uninstaller — RESTORE ONLY")
+    if (!skipConfirm) {
+      const ok = await confirm("Restaurar todos os backups do manifest?", false)
+      if (!ok) { info("Cancelado."); return report }
+    }
+    restoreFromManifest(report, { dryRun: false })
+    info(`Restaurados de backup: ${report.restored.length}`)
+    if (report.errors.length) report.errors.forEach((e) => warn(`  ${e}`))
+    success("Restore concluido.")
+    return report
+  }
 
   section("gstack_vibehard Uninstaller")
   info("Sera removido apenas o que o instalador criou (backups .bak sao restaurados):")
@@ -269,6 +341,22 @@ export async function uninstall(args = []) {
   removeWithRestore(join(HOME, "gstack_vibehard-install.bat"), report)
   removeWithRestore(join(HOME, "gstack_vibehard-install.sh"), report)
   removeDir(join(HOME, ".gstack_vibehard"), report)
+
+  // Flags opcionais
+  if (removeVault) {
+    removeDir(join(HOME, "gstack-vault"), report)
+    success("~/gstack-vault removido (--remove-vault)")
+  } else {
+    report.skipped.push("~/gstack-vault preservado (use --remove-vault para remover)")
+  }
+  if (removeDeps) {
+    warn("--remove-deps: remoção de deps globais (bun/uv/Rust/headroom) NÃO é automatizada por segurança.")
+    info("  Remova manualmente o que não usar mais. O gstack não desinstala binários globais.")
+  }
+  if (includeProjects) {
+    warn("--include-projects: o uninstall global NÃO apaga projetos criados.")
+    info("  Para remover a integração de um projeto, rode dentro dele (escopo separado).")
+  }
 
   section("Relatorio da Remocao")
   info(`Removidos: ${report.removed.length}`)
