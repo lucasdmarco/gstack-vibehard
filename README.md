@@ -1,4 +1,4 @@
-# 🚀 gstack-vibehard 2.10.0
+# 🚀 gstack-vibehard 2.11.0
 **A Máquina de Desenvolvimento Zero-Config Definitiva para Agentes de IA.**
 
 [![Test](https://github.com/lucasdmarco/gstack-vibehard/actions/workflows/test.yml/badge.svg)](https://github.com/lucasdmarco/gstack-vibehard/actions/workflows/test.yml)
@@ -282,6 +282,24 @@ gstack_vibehard create meu-projeto
 - **Project Name Allowlist:** `^[a-zA-Z0-9._-]+$` — sem injeção via `$()`, backtick, `;`
 - **No Shell Execution:** código principal em `src/` migrado para `execFileSync`/`execFile` com argumentos em array; scripts auxiliares legados continuam em migração contínua
 - **GitOps Seguro:** `git push` apenas com consentimento explícito
+
+---
+
+## 🛟 Troubleshooting — OpenCode (`opencode.json` vs `opencode.jsonc`)
+
+O gstack integra com o OpenCode **por diretórios auto-carregados** (`~/.config/opencode/plugins/` e skills em `~/.agents/skills/`), conforme a [doc oficial](https://opencode.ai/docs/config) — **sem precisar escrever config**. Por segurança:
+
+- Se você tem **só `opencode.jsonc`** (ex.: Desktop com plugin OAuth), o gstack **nunca cria** `opencode.json` (evita sombrear seus providers/OAuth).
+- Se existir **`opencode.json` e `opencode.jsonc` juntos**, o gstack **não altera nenhum** e o `doctor` alerta.
+
+Se suspeitar de conflito, com o **OpenCode fechado**, faça backup manual (nunca apague):
+
+```powershell
+Move-Item "$env:USERPROFILE\.config\opencode\opencode.json" `
+  "$env:USERPROFILE\.config\opencode\opencode.json.gstack-bak"
+```
+
+Depois reabra o OpenCode e verifique provider/OAuth. Rode `gstack_vibehard doctor` para o diagnóstico.
 
 ---
 

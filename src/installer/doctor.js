@@ -6,6 +6,7 @@ import { getHarness, isWindows, isMacOS, getOSLabel } from "../harness/detector.
 import { checkAlreadyInstalled } from "./check.js"
 import { npxArgv } from "./deps.js"
 import { detectHarnesses } from "../harness/detector.js"
+import { inspectOpenCodeConfig } from "../harness/opencode-config.js"
 import { section, success, warn, error, info } from "../cli/index.js"
 
 const HOME = homedir()
@@ -53,14 +54,25 @@ export async function doctor() {
     warn("Claude Code — nao detectado")
   }
 
-  const opencodeConfig = join(HOME, ".config", "opencode", "opencode.json")
-  if (existsSync(opencodeConfig)) {
+  const oc = inspectOpenCodeConfig(HOME)
+  if (oc.hasJson || oc.hasJsonc) {
     success("OpenCode CLI — detectado")
-    info(`  Config: ${opencodeConfig}`)
+    if (oc.hasJson) info(`  Config JSON:  ${oc.jsonPath}`)
+    if (oc.hasJsonc) info(`  Config JSONC: ${oc.jsoncPath}`)
+    if (oc.hasConflict) {
+      warn("  Conflito: opencode.json E opencode.jsonc coexistem.")
+      warn("  Pode sombrear plugins/OAuth do Desktop. O gstack NAO altera esses arquivos.")
+      info("  Remediacao (OpenCode fechado): renomeie opencode.json -> opencode.json.gstack-bak")
+    }
+    const ocPlugins = join(HOME, ".config", "opencode", "plugins")
+    const gstackPlugins = ["gstack-security.js", "gstack-session.js", "gstack-prompt.js"]
+      .filter((f) => existsSync(join(ocPlugins, f)))
+    if (gstackPlugins.length > 0) success(`  Plugins gstack: ${gstackPlugins.length} (auto-load)`)
+    else info("  Plugins gstack: nenhum (rode `gstack_vibehard install`)")
   } else {
     try {
       const ver = execFileSync("opencode", ["--version"], { encoding: "utf-8", timeout: 3000 }).trim()
-      success(`OpenCode CLI — detectado (v${ver}, sem config)`)
+      success(`OpenCode CLI — detectado (v${ver}, sem config — integracao por plugins/skills)`)
     } catch {
       warn("OpenCode CLI — nao detectado")
     }
