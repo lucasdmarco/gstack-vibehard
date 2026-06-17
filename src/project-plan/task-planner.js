@@ -10,6 +10,9 @@
  * Módulo PURO (sem I/O): retorna o plano; a camada de comando imprime/persiste.
  */
 
+import { classifyLoop } from "./loop-classifier.js"
+import { getLoopPattern } from "./loop-patterns.js"
+
 const CLI = "gstack_vibehard"
 
 /** Heurística simples: termo mais "substantivo" do pedido para `context related`. */
@@ -26,6 +29,11 @@ function pickEntity(request) {
 export function buildTaskPlan(opts = {}) {
   const request = String(opts.request || "").trim()
   const hasIndex = opts.hasIndex === true
+
+  // Escolhe o CICLO (loop pattern) determinístico para esta tarefa.
+  const loop = classifyLoop({ task: request, hasFailingTest: opts.hasFailingTest, hasRuntimeError: opts.hasRuntimeError })
+  const pattern = getLoopPattern(loop.loopPattern)
+
   const steps = []
 
   if (hasIndex) {
@@ -37,9 +45,12 @@ export function buildTaskPlan(opts = {}) {
   }
 
   steps.push({ id: "workflow:run", label: "Rodar workflow determinístico (planner→worker→verifier→testes)", command: [CLI, "workflow", "run", "--task", request], kind: "work", optional: false, requiresConfirmation: false })
-  steps.push({ id: "delegate:opencode", label: "Delegar implementação ao OpenCode (worktree isolado)", command: [CLI, "delegate", "opencode", "--task", request], kind: "delegate", optional: true, requiresConfirmation: true })
+  // Delegação em WORKTREE isolado (não toca o branch principal) — sempre opt-in.
+  steps.push({ id: "delegate:opencode", label: "Delegar implementação ao OpenCode (worktree isolado)", command: [CLI, "delegate", "opencode", "--task", request, "--worktree"], kind: "delegate", optional: true, requiresConfirmation: true })
 
   const notes = [
+    `Loop escolhido: ${pattern.label} — ${loop.reason} (confiança ${loop.confidence}).`,
+    `Verificação: perfil ${pattern.verificationProfile} (testes/QG); diff revisável antes do aceite.`,
     "Os passos de contexto são leitura segura (offline, sem LLM).",
     "O OpenCode NUNCA é executado sem sua confirmação explícita.",
     hasIndex ? "Índice encontrado — o plano usa o Document Graph." : "Sem índice: rode `context index` para enriquecer a descoberta.",
@@ -49,6 +60,10 @@ export function buildTaskPlan(opts = {}) {
     id: `task_${Math.random().toString(36).slice(2, 10)}`,
     request,
     hasIndex,
+    loopPattern: pattern.id,
+    loopReason: loop.reason,
+    loopConfidence: loop.confidence,
+    verificationProfile: pattern.verificationProfile,
     createdAt: new Date().toISOString(),
     steps,
     notes,

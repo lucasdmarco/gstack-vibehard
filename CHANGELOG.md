@@ -1,5 +1,15 @@
 # Changelog - gstack-vibehard
 
+## [2.12.0] - 2026-06-17
+
+### Loop Patterns library — o `task` escolhe o ciclo certo (inspirado no Kilo)
+Biblioteca determinística (sem LLM) que faz o Loop Engineer (`task`) escolher o ciclo seguro por tipo de trabalho:
+- **`src/project-plan/loop-patterns.js`** — 5 padrões: `test-driven`, `compiler-driven`, `review-driven`, `runtime-debugging`, `product-iteration`. Cada um com contexto, estratégia de ação, perfil de verificação, regras de parada e **comandos reais** (`context search`, `workflow run`, `delegate opencode --worktree`).
+- **`verification-profiles.js`** — sinais/critérios e comandos preferidos+fallback por perfil; preview/browser é **opcional** (runtime futuro).
+- **`stopping-rules.js`** — regras mapeadas para o `loop-budget` real (`maxIterations`, `maxConsecutiveSameFailure`, `maxWallTimeSeconds`, `humanHandoffOnCap`); as demais ficam declarativas.
+- **`loop-classifier.js`** — classifica o pedido por keywords + sinais (`hasFailingTest`/`hasRuntimeError`); sem sinais → `test-driven` (mais seguro).
+- **Integração no `task`:** o plano agora traz `loopPattern`/`loopReason`/`verificationProfile`, imprime "Loop escolhido: …", e a delegação OpenCode usa **`--worktree`** (isolado). Nenhum loop executa comando real. +12 testes (143 Node + 33 Python verdes).
+
 ## [2.11.0] - 2026-06-17
 
 ### Segurança OpenCode — não sombrear `opencode.jsonc` (config do Desktop/OAuth)

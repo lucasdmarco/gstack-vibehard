@@ -46,6 +46,8 @@ export async function taskCommand(args = [], opts = {}) {
   if (json) { process.stdout.write(JSON.stringify({ plan, savedTo: dir }) + "\n"); return }
 
   section(`task — ${request}`)
+  info(`  Loop escolhido: ${plan.loopPattern}  (${plan.loopReason})`)
+  info("")
   info("  Plano de feature (comandos reais; nada foi executado):")
   plan.steps.forEach((s, i) => {
     const tag = s.requiresConfirmation ? " [requer confirmação]" : s.optional ? " [opcional]" : ""
