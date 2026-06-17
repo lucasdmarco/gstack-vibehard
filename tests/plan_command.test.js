@@ -47,12 +47,33 @@ test("plan sem objetivo: erro em JSON puro", async () => {
   }
 })
 
-test("plan run <id>: honesto sobre executor pendente (não finge executar)", async () => {
+test("plan run <id> inexistente: erro not_found em JSON", async () => {
   const tmp = await mkdtemp(path.join(tmpdir(), "gstack-plan3-"))
   try {
     const { planCommand } = await import(`${pathToFileURL(cmdMod)}?t=${Date.now()}`)
-    const buf = await capture(() => planCommand(["run", "plan_x", "--json"], { cwd: tmp }))
-    assert.equal(JSON.parse(buf.trim()).error, "executor_pending")
+    const buf = await capture(() => planCommand(["run", "plan_inexistente", "--json", "--yes"], { cwd: tmp }))
+    assert.equal(JSON.parse(buf.trim()).error, "not_found")
+  } finally {
+    await rm(tmp, { recursive: true, force: true })
+  }
+})
+
+test("plan run: gera, executa com exec injetado (--yes) e reporta done; status reflete", async () => {
+  const tmp = await mkdtemp(path.join(tmpdir(), "gstack-plan4-"))
+  try {
+    const { planCommand } = await import(`${pathToFileURL(cmdMod)}?t=${Date.now()}`)
+    // 1) gera e persiste o plano
+    const genBuf = await capture(() => planCommand(["web app", "--name", "loja", "--json"], { cwd: tmp }))
+    const planId = JSON.parse(genBuf.trim()).plan.id
+    // 2) executa com exec injetado (não roda comandos reais)
+    const ran = []
+    const runBuf = await capture(() => planCommand(["run", planId, "--json", "--yes"], { cwd: tmp, exec: (c) => ran.push(c.join(" ")) }))
+    const res = JSON.parse(runBuf.trim())
+    assert.equal(res.status, "done")
+    assert.ok(ran.some((c) => c.includes("create loja")))
+    // 3) status reflete done
+    const stBuf = await capture(() => planCommand(["status", planId, "--json"], { cwd: tmp }))
+    assert.equal(JSON.parse(stBuf.trim()).status, "done")
   } finally {
     await rm(tmp, { recursive: true, force: true })
   }

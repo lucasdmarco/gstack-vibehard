@@ -1,5 +1,13 @@
 # Changelog - gstack-vibehard
 
+## [2.9.0] - 2026-06-17
+
+### Camada Replit-like — executor de planos (PR5)
+Agora o plano **executa de verdade**, com execução segura:
+- **`src/project-plan/executor.js` + `journal.js` + `state.js`:** roda os passos reais em ordem, grava `.gstack/plans/<id>/journal.jsonl` (só **resumo** — nunca output bruto/secrets) e `status.json` por passo. **Para no primeiro erro** de passo obrigatório (não esconde falha); passo opcional que falha não derruba o plano; **retomável** (passos concluídos viram `journal_hit` e não re-executam); `pendingFeature` é pulado.
+- **`plan run <id>` / `plan status <id>` / `plan explain <id>`:** `run` mostra o plano e **pede confirmação** antes de executar (sem TTY exige `--yes`; recusa execução silenciosa); `--with-optional` habilita passos opt-in; `explain` diz **por que** cada passo existe; `--json` puro em todos.
+- Runner win32-aware (comandos `gstack_vibehard …` via `cmd.exe` no Windows). +9 testes (118 Node + 33 Python verdes).
+
 ## [2.8.0] - 2026-06-17
 
 ### Camada Replit-like — fundação Project Plan + comando `plan` (PRs 1–3)
