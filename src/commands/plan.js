@@ -50,7 +50,7 @@ function persistPlan(cwd, plan) {
   return dir
 }
 
-function printPlanHuman(plan) {
+export function printPlanHuman(plan) {
   const mode = getMode(plan.mode)
   section(`plan — ${plan.objective || "(sem objetivo)"}`)
   info(`  intent:           ${plan.intent}`)
