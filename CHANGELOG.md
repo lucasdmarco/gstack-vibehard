@@ -1,5 +1,12 @@
 # Changelog - gstack-vibehard
 
+## [2.22.0] - 2026-06-17
+
+### Fase 3 (3/3) — Trust fixes + OpenCode JSONC doctor
+- **OpenCode `doctor --fix [--dry-run]`** (`src/installer/opencode-jsonc.js`): resolve o conflito `opencode.json` + `opencode.jsonc` com **parser JSONC tolerante** (comentários, trailing commas, respeitando strings). Faz **merge preservando OAuth/plugin/provider do usuário**, consolida em `opencode.json` e faz **backup de ambos**; só aplica com confirmação (`--yes` no não-interativo). `--dry-run` mostra o plano sem tocar em nada. JSONC realmente malformado cai em `manual` (não arrisca merge).
+- **Trust fixes:** `safeCopyDir` agora faz **backup por arquivo interno** antes de sobrescrever; **Headroom não usa mais `uv pip install --system` por padrão** — usa ambiente isolado (`uv tool install`) ou `pip --user`; `--system` só com `GSTACK_HEADROOM_SYSTEM=1` (opt-in explícito).
+- +13 testes (185 Node + 38 Python verdes; lint limpo). Fecha a fatia honesta da Fase 3 (audit→verify→segurança→trust/JSONC); `dream improve` (adapter local) fica para a próxima.
+
 ## [2.21.0] - 2026-06-17
 
 ### Fase 3 (2/3) — Redaction lib + GitOps sanitizado

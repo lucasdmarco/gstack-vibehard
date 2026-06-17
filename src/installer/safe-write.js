@@ -84,7 +84,12 @@ export function safeCopyDir(src, dst, opts = {}) {
     const s = join(src, e.name)
     const d = join(dst, e.name)
     if (e.isDirectory()) safeCopyDir(s, d, { ...opts, _skipRecord: true })
-    else copyFileSync(s, d)
+    else {
+      // Backup por arquivo INTERNO: nunca sobrescreve um arquivo do usuário sem
+      // preservar o original (versionado).
+      if (existsSync(d)) versionedBackup(d)
+      copyFileSync(s, d)
+    }
   }
   if (!opts._skipRecord) {
     const manifest = loadManifest(home)

@@ -8,19 +8,23 @@ import { isWindows } from "./detector.js"
 const HOME = homedir()
 const MCP_CONFIG = join(HOME, ".mcp.json")
 
-async function installHeadroomPkg(warn, info, uvBin) {
+export async function installHeadroomPkg(warn, info, uvBin, exec = execFileSync) {
   const attempts = [
     { label: "headroom-ai[proxy] (latest)", pkg: "headroom-ai[proxy]" },
     { label: "headroom-ai[proxy]==0.20.15 (wheel)", pkg: "headroom-ai[proxy]==0.20.15" },
     { label: "headroom-ai==0.20.15 (wheel, sem extras)", pkg: "headroom-ai==0.20.15" },
   ]
+  // Opt-in explícito para tocar o Python do SISTEMA (default: isolado, sem poluir).
+  const allowSystem = process.env.GSTACK_HEADROOM_SYSTEM === "1"
 
   for (const attempt of attempts) {
     try {
       if (uvBin) {
-        execFileSync(uvBin, ["pip", "install", "--system", attempt.pkg], { stdio: "pipe", timeout: 120000, shell: false })
+        // `uv tool install` = ambiente ISOLADO (como o graphify), sem --system.
+        exec(uvBin, ["tool", "install", attempt.pkg], { stdio: "pipe", timeout: 120000, shell: false })
       } else {
-        execFileSync("pip", ["install", "--break-system-packages", attempt.pkg], { stdio: "pipe", timeout: 120000, shell: false })
+        // pip no site do USUÁRIO (não no sistema).
+        exec("pip", ["install", "--user", attempt.pkg], { stdio: "pipe", timeout: 120000, shell: false })
       }
       return true
     } catch (e) {
@@ -28,13 +32,15 @@ async function installHeadroomPkg(warn, info, uvBin) {
     }
   }
 
-  // Last ditch: try with uv even if uvBin was empty
-  if (!uvBin) {
+  // Último recurso explícito: só toca o Python do sistema com GSTACK_HEADROOM_SYSTEM=1.
+  if (allowSystem) {
     try {
-      execFileSync("uv", ["pip", "install", "--system", "headroom-ai==0.20.15"], { stdio: "pipe", timeout: 120000, shell: false })
+      const bin = uvBin || "uv"
+      exec(bin, ["pip", "install", "--system", "headroom-ai==0.20.15"], { stdio: "pipe", timeout: 120000, shell: false })
+      warn("headroom: instalado no Python do SISTEMA (GSTACK_HEADROOM_SYSTEM=1).")
       return true
     } catch (e) {
-      info(`headroom: uv fallback — falhou (${e.message || e})`)
+      info(`headroom: fallback --system — falhou (${e.message || e})`)
     }
   }
 

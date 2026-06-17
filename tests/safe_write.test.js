@@ -82,6 +82,23 @@ test("safeCopyDir: registra ownership do diretório criado", async () => {
   } finally { await rm(home, { recursive: true, force: true }) }
 })
 
+test("safeCopyDir: faz backup de arquivo INTERNO existente antes de sobrescrever", async () => {
+  const home = await tmpHome()
+  try {
+    const { safeCopyDir } = await imp(swMod)
+    const src = path.join(home, "src-skill")
+    await mkdir(src, { recursive: true })
+    await writeFile(path.join(src, "SKILL.md"), "# novo")
+    // destino já existe com conteúdo do usuário
+    const dst = path.join(home, "dst-skill")
+    await mkdir(dst, { recursive: true })
+    await writeFile(path.join(dst, "SKILL.md"), "# DO USUARIO")
+    safeCopyDir(src, dst, { home, component: "skills", kind: "skill" })
+    assert.equal(readFileSync(path.join(dst, "SKILL.md"), "utf-8"), "# novo", "sobrescreveu")
+    assert.equal(readFileSync(path.join(dst, "SKILL.md.gstack_vibehard.bak"), "utf-8"), "# DO USUARIO", "backup interno preservado")
+  } finally { await rm(home, { recursive: true, force: true }) }
+})
+
 test("manifest: recordItem é idempotente por path+kind e conta backups", async () => {
   const home = await tmpHome()
   try {

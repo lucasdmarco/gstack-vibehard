@@ -8,11 +8,35 @@ import { npxArgv } from "./deps.js"
 import { detectHarnesses } from "../harness/detector.js"
 import { inspectOpenCodeConfig } from "../harness/opencode-config.js"
 import { checkInstallIntegrity } from "./integrity.js"
-import { section, success, warn, error, info } from "../cli/index.js"
+import { planOpenCodeFix, applyOpenCodeFix } from "./opencode-jsonc.js"
+import { section, success, warn, error, info, confirm } from "../cli/index.js"
 
 const HOME = homedir()
 
 export async function doctor(args = []) {
+  // Correção assistida do drift OpenCode (json + jsonc).
+  if (args.includes("--fix")) {
+    const dryRun = args.includes("--dry-run")
+    section("doctor --fix — OpenCode config (opencode.json + opencode.jsonc)")
+    const plan = planOpenCodeFix(HOME)
+    if (plan.action === "none") { success("OpenCode: sem conflito json+jsonc — nada a corrigir."); return }
+    if (plan.action === "manual") {
+      warn("Conflito detectado, mas o parse automático falhou (ajuste manual):")
+      warn(`  ${plan.parseError}`)
+      return
+    }
+    info("Conflito: opencode.json + opencode.jsonc coexistem.")
+    info(`  Plano: merge preservando o que é do usuário (${(plan.userKeysPreserved || []).join(", ") || "—"}) — OAuth/plugin/provider mantidos.`)
+    info(`  → escreve o merge em ${plan.jsonPath}`)
+    info("  → backup de AMBOS (.gstack_vibehard.bak); remove o .jsonc (preservado no backup)")
+    if (dryRun) { info("(--dry-run: nada foi alterado)"); return }
+    const ok = args.includes("--yes") || (process.stdin.isTTY && await confirm("Aplicar o merge agora?", false))
+    if (!ok) { info("Cancelado (use --yes em modo não-interativo)."); return }
+    const r = applyOpenCodeFix(HOME)
+    if (r.applied) success("OpenCode: merge aplicado. Reabra o OpenCode e verifique provider/OAuth.")
+    else warn("Não aplicado.")
+    return
+  }
   // Modo integridade: valida manifest/backups/hashes/configs e se uninstall é seguro.
   if (args.includes("--install-integrity")) {
     section("Integridade da Instalacao (manifest/backups/hashes)")
