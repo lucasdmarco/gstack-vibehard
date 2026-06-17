@@ -3,25 +3,55 @@ import { join, dirname } from "path"
 import { homedir } from "os"
 import { fileURLToPath } from "url"
 import { writeWithBackup, ensureDir, readJsonFile, mergeJson } from "../installer/merge.js"
+import { inspectOpenCodeConfig, shouldWriteOpenCodeJson } from "./opencode-config.js"
 
 const HOME = homedir()
-const OPENCODE_CONFIG = join(HOME, ".config", "opencode", "opencode.json")
-const OPENCODE_SKILLS = join(HOME, ".config", "opencode", "skills")
-const OPENCODE_PLUGINS = join(HOME, ".config", "opencode", "plugins")
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const PLUGIN_SRC = join(__dirname, "..", "plugins", "opencode")
 
-export async function installOpenCode(config, report) {
-  ensureDir(join(HOME, ".config", "opencode"))
-  ensureDir(OPENCODE_SKILLS)
-  ensureDir(OPENCODE_PLUGINS)
+/**
+ * Integra o gstack ao OpenCode SEM sombrear a config do usuário.
+ *
+ * A doc oficial confirma que plugins (`~/.config/opencode/plugins/`) e skills
+ * (`~/.config/opencode/skills/` e `~/.agents/skills/`) AUTO-CARREGAM sem entrada
+ * no config. Por isso a integração é por DIRETÓRIO; só escrevemos `opencode.json`
+ * quando ele já existe sozinho (merge não-destrutivo). Havendo `opencode.jsonc`
+ * (sozinho ou junto), NÃO tocamos em config — preservamos OAuth/providers/plugins.
+ *
+ * @param {object} deps  { home? } — seam para testes herméticos.
+ */
+export async function installOpenCode(config, report, deps = {}) {
+  const home = deps.home || HOME
+  const configDir = join(home, ".config", "opencode")
+  const skillsDir = join(configDir, "skills")
+  const pluginsDir = join(configDir, "plugins")
+  ensureDir(configDir)
+  ensureDir(skillsDir)
+  ensureDir(pluginsDir)
 
-  if (config.hooks) {
+  // 1) Plugins SEMPRE (auto-load garantido pela doc — não depende de config).
+  if (existsSync(PLUGIN_SRC)) {
+    const pluginFiles = ["gstack-security.js", "gstack-session.js", "gstack-prompt.js"]
+    for (const file of pluginFiles) {
+      const src = join(PLUGIN_SRC, file)
+      const dst = join(pluginsDir, file)
+      if (existsSync(src)) {
+        cpSync(src, dst, { force: true })
+        report.updated.push(`~/.config/opencode/plugins/${file}`)
+      }
+    }
+  }
+
+  // 2) Config: só escreve opencode.json quando é seguro (estratégia json_merge).
+  const inspect = inspectOpenCodeConfig(home)
+  for (const w of inspect.warnings) report.skipped.push(`opencode: ${w}`)
+
+  if (config.hooks && shouldWriteOpenCodeJson(inspect)) {
     const gstackConfig = {
       $schema: "https://opencode.ai/config.json",
-      skills: {
-        paths: [OPENCODE_SKILLS],
-      },
+      // skills.paths é redundante (skills auto-carregam de ~/.agents/skills), mas
+      // mantido aqui para usuários que já tinham opencode.json com nossa marca.
+      skills: { paths: [skillsDir] },
       instructions: [
         "Comandos disponiveis:",
         "  /newproject — Guided Architecture Walkthrough (9 passos de arquitetura)",
@@ -32,26 +62,17 @@ export async function installOpenCode(config, report) {
         "Sempre rode Quality Gate (python ~/.gstack/hooks/qg.py ou ~/.codex/hooks/qg.py) antes de entregar output.",
       ],
     }
-
-    // MERGE com a config existente do usuario — nunca sobrescrever.
-    // Prioridade do usuario em conflito (mergeJson preserva chaves existentes
-    // e une arrays sem duplicar).
-    const existing = readJsonFile(OPENCODE_CONFIG)
+    // MERGE não-destrutivo — prioridade do usuário em conflito.
+    const existing = readJsonFile(inspect.jsonPath)
     const merged = existing ? mergeJson(gstackConfig, existing) : gstackConfig
-    writeWithBackup(OPENCODE_CONFIG, JSON.stringify(merged, null, 2))
+    writeWithBackup(inspect.jsonPath, JSON.stringify(merged, null, 2))
     report.updated.push("~/.config/opencode/opencode.json (merge)")
-  }
-
-  if (existsSync(PLUGIN_SRC)) {
-    const pluginFiles = ["gstack-security.js", "gstack-session.js", "gstack-prompt.js"]
-    for (const file of pluginFiles) {
-      const src = join(PLUGIN_SRC, file)
-      const dst = join(OPENCODE_PLUGINS, file)
-      if (existsSync(src)) {
-        cpSync(src, dst, { force: true })
-        report.updated.push(`~/.config/opencode/plugins/${file}`)
-      }
-    }
+  } else if (config.hooks) {
+    // jsonc presente (sozinho ou em conflito) ou nenhum config: integração por
+    // diretórios auto-load; NÃO escrevemos config (preserva o que o usuário tem).
+    report.skipped.push(
+      `opencode: config não escrita (${inspect.preferredStrategy}) — integração via plugins/skills (auto-load)`
+    )
   }
 
   return report

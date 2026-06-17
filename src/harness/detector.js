@@ -56,7 +56,8 @@ const HARNESS_PATHS = {
     detect: () => {
       try {
         const cfg = join(OPENCODE_CONFIG_DIR, "opencode.json")
-        if (existsSync(OPENCODE_HOME_DIR) || existsSync(OPENCODE_CONFIG_DIR) || existsSync(cfg)) return true
+        const cfgc = join(OPENCODE_CONFIG_DIR, "opencode.jsonc") // OpenCode suporta JSONC
+        if (existsSync(OPENCODE_HOME_DIR) || existsSync(OPENCODE_CONFIG_DIR) || existsSync(cfg) || existsSync(cfgc)) return true
         execFileSync("opencode", ["--version"], { stdio: "pipe", timeout: 3000 }); return true
       } catch {
         return false

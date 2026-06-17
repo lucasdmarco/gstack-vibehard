@@ -35,15 +35,24 @@ export function checkAlreadyInstalled(harnessIds) {
       // ultracode.md e o marcador definitivo escrito por installClaude
       installed.push(harnessId)
     } else if (harnessId === "opencode") {
-      const cfgFile = join(HOME, ".config", "opencode", "opencode.json")
-      if (existsSync(cfgFile)) {
-        try {
-          const content = readFileSync(cfgFile, "utf-8")
-          if (content.includes("gstack_vibehard")) installed.push("opencode")
-        } catch (e) {
-          console.warn(`check: erro lendo opencode config: ${e.message || e}`)
+      // Integração OpenCode é por diretório (plugins/skills auto-load) OU config.
+      // Marca instalado se QUALQUER sinal gstack existir — não exige opencode.json.
+      const ocDir = join(HOME, ".config", "opencode")
+      const pluginMarks = [
+        join(ocDir, "plugins", "gstack-security.js"),
+        join(ocDir, "plugins", "gstack-session.js"),
+      ]
+      // Plugins gstack são arquivos específicos (sinal confiável); o dir skills/
+      // é genérico do OpenCode, então NÃO serve de marca. Config conta se tiver "gstack".
+      const hasPlugin = pluginMarks.some((p) => existsSync(p))
+      let hasConfigMark = false
+      for (const name of ["opencode.json", "opencode.jsonc"]) {
+        const f = join(ocDir, name)
+        if (existsSync(f)) {
+          try { if (readFileSync(f, "utf-8").includes("gstack")) hasConfigMark = true } catch { /* ignore */ }
         }
       }
+      if (hasPlugin || hasConfigMark) installed.push("opencode")
     }
   }
 
