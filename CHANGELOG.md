@@ -1,5 +1,12 @@
 # Changelog - gstack-vibehard
 
+## [2.19.0] - 2026-06-17
+
+### Camada de confiança (3/3) — `verify` (delivery gates honestos, Replit-like)
+- **`gstack_vibehard verify [--profile scaffold|full] [--json]`:** orquestra os gates de entrega do projeto — `deps` → `lint` → `typecheck` → `test` → `build` → `qg-l1`. **Só roda o que existe**; gates ausentes viram `not_applicable` (nunca finge passar). `runtime:start`/`preview:open` são `pending_feature` (roadmap). Salva `.gstack/runs/<runId>/verify.json`. `ready` só é `true` quando nenhum gate falhou.
+- `src/project-plan/verify-runner.js` (puro, `exec` injetável, win32-aware) + `src/commands/verify.js`.
+- Fecha a camada transversal de confiança (safe-write/manifest → uninstall restaurativo/integrity → verify). +3 testes (165 Node + 33 Python verdes; lint limpo).
+
 ## [2.18.0] - 2026-06-17
 
 ### Camada de confiança (2/3) — Uninstall restaurativo + Integrity Doctor
