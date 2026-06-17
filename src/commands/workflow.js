@@ -91,7 +91,9 @@ export async function workflowCommand(args = [], opts = {}) {
 
     case "inspect": {
       const flags = parseFlags(args.slice(1))
-      const runId = flags._[0] || args[1]
+      // parseFlags já separa flags (--json) de posicionais; NÃO usar args[1]
+      // como fallback (senão `inspect --json` capturaria "--json" como runId).
+      const runId = flags._[0]
       // Valida runId ANTES de tocar o disco (readJournal exige string).
       if (!runId) {
         if (flags.json) { process.stdout.write(JSON.stringify({ error: "missing runId" }) + "\n"); return }

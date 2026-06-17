@@ -78,6 +78,9 @@ function findBinary(name) {
 }
 
 function safeExec(file, args, opts) {
+  // Side-effects OFF (testes/CI): não spawna processos externos (npx/docker/git),
+  // evitando handles presos no projectDir (EBUSY na limpeza no Windows).
+  if (process.env.GSTACK_SKIP_SIDE_EFFECTS === "1") return null
   try { return execFileSync(file, args, { stdio: "pipe", timeout: 30000, ...opts }) }
   catch { return null }
 }

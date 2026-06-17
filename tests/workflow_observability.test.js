@@ -44,6 +44,23 @@ test("workflow inspect sem runId não quebra (valida antes de ler journal)", asy
   }
 })
 
+test("workflow inspect --json sem runId → erro estruturado, NUNCA runId='--json'", async () => {
+  const tmp = await mkdtemp(path.join(tmpdir(), "gstack-wfinsp2-"))
+  const origWrite = process.stdout.write.bind(process.stdout)
+  let buf = ""
+  process.stdout.write = (s) => { buf += String(s); return true }
+  try {
+    const { workflowCommand } = await import(`${pathToFileURL(cmdMod)}?t=${Date.now()}`)
+    await workflowCommand(["inspect", "--json"], { cwd: tmp })
+  } finally {
+    process.stdout.write = origWrite
+    await rm(tmp, { recursive: true, force: true })
+  }
+  const out = JSON.parse(buf.trim())
+  assert.equal(out.error, "missing runId", "não trata --json como runId")
+  assert.equal(out.runId, undefined, "não retorna runId:'--json'")
+})
+
 test("workflow run sem --task não executa", async () => {
   const tmp = await mkdtemp(path.join(tmpdir(), "gstack-wfobs2-"))
   try {
