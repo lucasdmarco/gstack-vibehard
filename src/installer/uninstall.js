@@ -196,6 +196,10 @@ function removeHermes(report) {
     const count = packageSkillNames().filter((skill) => removeDir(join(skillsDir, skill), report)).length
     if (count > 0) success(`${count} skills gstack removidas de ~/.hermes/skills/`)
   }
+  // Snippet de MCP que o gstack gera quando o config.yaml já existia (seguro remover).
+  // NUNCA tocamos no ~/.hermes/config.yaml do usuário (pode tê-lo editado / VPS).
+  const snippet = join(HOME, ".hermes", "gstack-mcp-servers.yaml")
+  if (existsSync(snippet)) removeWithRestore(snippet, report)
   const agents = join(HOME, ".hermes", "AGENTS.md")
   if (existsSync(agents)) {
     try {
