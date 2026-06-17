@@ -1,5 +1,14 @@
 # Changelog - gstack-vibehard
 
+## [2.17.0] - 2026-06-17
+
+### Camada de confiança (1/3) — Safe Write + Manifest como fonte de verdade
+Primeira fatia do "fechar em produção com rollback" (PRDs faseprebuilt). Decisão: **ownership por manifest** em vez de renomear 109 skills para `g_` (mesma garantia de segurança, sem rename arriscado).
+- **`src/installer/safe-write.js`:** camada única de escrita global — `safeWriteFile`/`safeCopyFile`/`safeCopyDir`/`safeAppendBlock`. **Backup obrigatório versionado** (`.gstack_vibehard.bak`, depois `.bak.1`/`.bak.2`, nunca sobrescreve), **escrita atômica**, **hashes** (original + instalado) e registro no manifest. Falha no backup **bloqueia** a escrita.
+- **`src/installer/manifest.js`:** manifest em `~/.gstack_vibehard/install-manifest.json` com `items[]` (`path/kind/action/owner/component/backup/hashes/removeOnUninstall/restoreOnUninstall`). Backward-compatible (preserva `agentDirectories`/`agentmemory`).
+- **Ownership real:** `install` registra skills/scripts criados (e não os pré-existentes do usuário); `agent-distribution` preserva `items[]` em vez de sobrescrever o manifest. Base para o uninstall manifest-driven (próxima release).
+- +5 testes (158 Node + 33 Python verdes; lint limpo).
+
 ## [2.16.0] - 2026-06-17
 
 ### Hermes MCP seguro (VPS-safe) + gates honestos (revisão Codex P3)

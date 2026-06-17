@@ -13,6 +13,7 @@ import { installHermes } from "../harness/hermes.js"
 import { writeInstructionalGuidance } from "../harness/instructional.js"
 import { installHeadroom } from "../harness/headroom.js"
 import { ensureDir, copyWithBackup, copyDirSync, backupFile } from "./merge.js"
+import { safeCopyDir, safeCopyFile } from "./safe-write.js"
 import { findWorkingBinary, getUvCandidates, getBunCandidates, npxArgv } from "./deps.js"
 import { checkAlreadyInstalled } from "./check.js"
 import { installGeneratedAgentLayer, installGraphifyGitHooks } from "./agent-distribution.js"
@@ -488,8 +489,8 @@ export async function install(args = []) {
       const src = join(scriptsSource, script)
       const dst = join(scriptsDir, script)
       ensureDir(dirname(dst))
-      if (existsSync(dst)) backupFile(dst)
-      await copyFile(src, dst)
+      // safe-write: backup (se existir) + registro de ownership no manifest.
+      safeCopyFile(src, dst, { component: "scripts", kind: "script" })
       if (!isWindows()) {
         try {
           execFileSync("chmod", ["+x", dst], { stdio: "pipe", timeout: 5000 })
@@ -517,9 +518,11 @@ export async function install(args = []) {
       const src = join(skillsSource, skill.name)
       const dst = join(skillsDir, skill.name)
       if (!existsSync(dst)) {
-        copyDirSync(src, dst)
+        // safe-write: copia + registra ownership (uninstall só remove o que criamos).
+        safeCopyDir(src, dst, { component: "skills", kind: "skill" })
         report.added.push(`skill: ${skill.name}`)
       } else {
+        // NÃO sobrescreve skill pré-existente do usuário — e não registra ownership.
         report.skipped.push(`skill: ${skill.name} (ja existe)`)
       }
     }
