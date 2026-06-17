@@ -105,6 +105,7 @@ export function showHelp() {
   console.log(color("    gstack_vibehard create <nome>  Criar workspace runtime omniharness", COLORS.cyan))
   console.log(color("    gstack_vibehard init <nome>    Criar novo projeto com estrutura completa", COLORS.cyan))
   console.log(color("    gstack_vibehard doctor         Diagnosticar ambiente", COLORS.cyan))
+  console.log(color("      --install-integrity          Validar manifest/backups/hashes (uninstall seguro?)", COLORS.dim))
   console.log(color("    gstack_vibehard sprint --save   Salvar decisoes e atualizar memorias", COLORS.cyan))
   console.log(color("    gstack_vibehard monitor        TUI: agentes, tokens, QG, ROI", COLORS.cyan))
   console.log(color("    gstack_vibehard tools          Integracoes: Composio (nuvem) + Printing Press (local)", COLORS.cyan))
@@ -113,6 +114,7 @@ export function showHelp() {
   console.log(color("    gstack_vibehard workflow       Graph runner determinístico — run/runs/inspect", COLORS.cyan))
   console.log(color("    gstack_vibehard a2a            Agent Card A2A (offline, sem servidor)", COLORS.cyan))
   console.log(color("    gstack_vibehard uninstall      Remover gstack_vibehard do ambiente", COLORS.cyan))
+  console.log(color("      --dry-run --restore-only --remove-vault --remove-deps  (rollback via manifest)", COLORS.dim))
   console.log(color("    gstack_vibehard list           Listar componentes instalados", COLORS.cyan))
   console.log(color("    gstack_vibehard help           Mostrar esta ajuda\n", COLORS.cyan))
 }
@@ -164,7 +166,7 @@ async function dispatch(command, args) {
       await initCommand(args)
       break
     case "doctor":
-      await doctor()
+      await doctor(args)
       break
     case "uninstall":
       await uninstall(args)
