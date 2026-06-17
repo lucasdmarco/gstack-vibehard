@@ -46,12 +46,13 @@ export const RECIPES = [
     template: "saas-auth-stripe",
     recommendedMode: "full",
     modeReasons: ["login + pagamento + produto real exigem governança e quality gates"],
-    optionalSteps: ["tools:install:stripe", "tools:mcp:enable:stripe", "runtime:start"],
+    optionalSteps: ["tools:install:stripe", "tools:mcp:enable:stripe", "runtime:start", "deploy:preview"],
   }),
   recipe({
     id: "mobile-backend",
     label: "App mobile com backend",
-    intentKeywords: ["mobile", "app", "ios", "android", "expo", "react native", "aplicativo", "celular"],
+    // "app" sozinho é greedy demais (rouba "web app"); mobile casa por mobile/ios/android/aplicativo.
+    intentKeywords: ["mobile", "ios", "android", "expo", "react native", "aplicativo", "celular"],
     template: "mobile-backend",
     recommendedMode: "lite",
     modeReasons: ["MVP mobile valida rápido em modo leve"],
@@ -73,7 +74,7 @@ export const RECIPES = [
     template: "fullstack-monorepo",
     recommendedMode: "lite",
     modeReasons: ["web app comum começa leve e cresce sob demanda"],
-    optionalSteps: ["runtime:start"],
+    optionalSteps: ["runtime:start", "deploy:preview"],
   }),
   recipe({
     id: "api-only",

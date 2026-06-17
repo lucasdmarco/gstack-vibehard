@@ -1,5 +1,13 @@
 # Changelog - gstack-vibehard
 
+## [2.13.0] - 2026-06-17
+
+### Pending-features (roadmap honesto) + fix de classificação
+- **`src/project-plan/pending-features.js`:** registro único de features futuras (`runtime:start|logs|open`, `dashboard:open`, `deploy:preview|production`). O `planner` passou a consultar esse registro (fonte única) em vez de tratar `runtime:start` inline — todos viram `pendingFeature` (sem comando), aparecem no plano como "ainda não implementado" e o executor **nunca** os roda.
+- Recipes `saas-auth-stripe` e `web-app` ganham `deploy:preview` como passo de roadmap.
+- **Fix de classificação:** a keyword greedy `"app"` na recipe `mobile-backend` roubava "web app" → removida. Agora "web app" → `web-app` e "app mobile" continua → `mobile-backend`.
+- +3 testes (146 Node + 33 Python verdes). Encerra os 4 PRDs pendentes (só PR8/dashboard-contract fica como roadmap).
+
 ## [2.12.0] - 2026-06-17
 
 ### Loop Patterns library — o `task` escolhe o ciclo certo (inspirado no Kilo)
