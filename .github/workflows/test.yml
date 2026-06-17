@@ -18,6 +18,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
+      - run: npm ci
+        name: "Install dependencies"
       - run: node src/index.js doctor
         name: "Doctor check"
 
@@ -31,6 +33,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - run: npm ci
+        name: "Install dependencies"
       - run: npm test
         name: "Unit tests (Node)"
 
@@ -44,6 +48,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - run: npm ci
+        name: "Install dependencies"
       - run: pip install pytest
         name: "Install pytest"
       - run: python -m pytest tests/ -v
