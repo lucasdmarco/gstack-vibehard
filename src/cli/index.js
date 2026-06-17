@@ -17,6 +17,7 @@ import { monitorCommand } from "../commands/monitor.js"
 import { planCommand } from "../commands/plan.js"
 import { startCommand } from "../commands/start.js"
 import { taskCommand } from "../commands/task.js"
+import { verifyCommand } from "../commands/verify.js"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const pkg = JSON.parse(readFileSync(resolve(__dirname, "../../package.json"), "utf-8"))
@@ -102,6 +103,7 @@ export function showHelp() {
   console.log(color("      --name <p> --mode lite|full --json --dry-run --recipe <id>", COLORS.dim))
   console.log(color("      plan run <id> [--yes] · plan status <id> · plan explain <id>", COLORS.dim))
   console.log(color("    gstack_vibehard task \"<pedido>\"  Loop Engineer: plano de feature (Document Graph + workflow + delegate)", COLORS.cyan))
+  console.log(color("    gstack_vibehard verify         Delivery gates: deps/lint/typecheck/test/build/QG (--profile, --json)", COLORS.cyan))
   console.log(color("    gstack_vibehard create <nome>  Criar workspace runtime omniharness", COLORS.cyan))
   console.log(color("    gstack_vibehard init <nome>    Criar novo projeto com estrutura completa", COLORS.cyan))
   console.log(color("    gstack_vibehard doctor         Diagnosticar ambiente", COLORS.cyan))
@@ -195,6 +197,9 @@ async function dispatch(command, args) {
       break
     case "task":
       await taskCommand(args)
+      break
+    case "verify":
+      await verifyCommand(args)
       break
     case "delegate":
       await delegateCommand(args)
