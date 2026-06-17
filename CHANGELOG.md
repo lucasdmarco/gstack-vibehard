@@ -1,5 +1,15 @@
 # Changelog - gstack-vibehard
 
+## [2.16.0] - 2026-06-17
+
+### Hermes MCP seguro (VPS-safe) + gates honestos (revisão Codex P3)
+- **Hermes MCP reescrito a partir da doc oficial** (`hermes_cli/mcp_config.py`, config reference): o `hermes mcp add` é **interativo** (podia travar um install) e os flags assumidos estavam errados. Agora o gstack escreve `mcp_servers` em `~/.hermes/config.yaml` com o **schema verificado** (`command`/`args`/`env` + `enabled`), de forma **VPS-safe**:
+  - `config.yaml` **ausente** → cria com `mcp_servers` e **`enabled: false`** (Hermes não tenta conectar até o usuário habilitar o que tem).
+  - `config.yaml` **existente** → **nunca tocado**; gera um snippet mergeável em `~/.hermes/gstack-mcp-servers.yaml` + orientação (mesclar e `/reload-mcp`).
+  - Zero dependência nova; nada interativo; uninstall remove o snippet sem tocar no `config.yaml`.
+- **Gates honestos:** novo `npm run lint` (zero-dep — `node --check` em todo `src/`+`tests/`+`scripts/`) e `npm run typecheck` honesto (declara que o projeto é ESM puro, sem TS; não finge gate). Meta-teste trava o lint no CI.
+- +5 testes Hermes reescritos + lint test (153 Node + 33 Python verdes).
+
 ## [2.15.0] - 2026-06-17
 
 ### Endurecimento P2 do executor de planos (revisão Codex)
