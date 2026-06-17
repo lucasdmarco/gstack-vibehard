@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Optional
 
 from _output_guard import output_guard, SENSITIVE_PATTERNS, ALLOWED_ROLES_HIERARCHY
+from _redact import redact_secrets, log_redaction_event
 from _paths import chronicle_dir, hook_support_path, migrate_legacy, GSTACK_DIR
 from _harness import parse_stdin, normalize_input
 from datetime import datetime
@@ -1093,7 +1094,16 @@ def gitops_issue_create(fallow: dict, instincts_path: Path) -> Optional[str]:
     if len(reasons) > 1:
         title += f" (+{len(reasons)-1})"
 
-    # Run body through Output Guard before publishing to GitHub
+    # Redaction PRE-PUBLICACAO: se a origem tinha segredo, ABORTA e loga evento
+    # sanitizado (fingerprint, nunca o segredo). Nada externo recebe dado sensivel.
+    body_text, _redaction_events = redact_secrets(body_text)
+    title, _title_events = redact_secrets(title)
+    if _redaction_events or _title_events:
+        log_redaction_event(GSTACK_DIR, "gitops_issue", _redaction_events + _title_events)
+        sys.stderr.write(f"[gitops] issue NAO criada — {len(_redaction_events) + len(_title_events)} segredo(s) na origem (evento registrado)\n")
+        return None
+
+    # Run body through Output Guard before publishing to GitHub (segunda camada)
     user_role = os.environ.get("GSTACK_USER_ROLE", "viewer")
     blocked, guard_reason = output_guard(body_text, user_role)
     if blocked:
@@ -1155,7 +1165,11 @@ def gitops_pr_create(summary_text: str, root: Optional[Path]) -> Optional[str]:
                        cwd=str(root), capture_output=True, text=True, timeout=15)
         subprocess.run(["git", "add", "--", "*.md", "docs/", "wiki/"],
                        cwd=str(root), capture_output=True, text=True, timeout=15)
-        commit_msg = f"[gstack] {summary_text[:100]}"
+        # Redige segredo do summary antes do commit (defesa — commit pode virar push).
+        _safe_summary, _commit_events = redact_secrets(summary_text or "")
+        if _commit_events:
+            log_redaction_event(GSTACK_DIR, "gitops_pr_commit", _commit_events)
+        commit_msg = f"[gstack] {_safe_summary[:100]}"
         allow_dirty = os.environ.get("GSTACK_ALLOW_DIRTY_COMMIT", "") == "1"
         commit_cmd = ["git", "commit", "-m", commit_msg]
         if allow_dirty:

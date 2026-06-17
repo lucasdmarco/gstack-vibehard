@@ -1,5 +1,13 @@
 # Changelog - gstack-vibehard
 
+## [2.21.0] - 2026-06-17
+
+### Fase 3 (2/3) — Redaction lib + GitOps sanitizado
+- **Lib de redaction reutilizável** (`hooks/hooks/_redact.py` + `src/security/redact.js`, padrões em sincronia com `_output_guard`): `redact_secrets`/`redactSecrets` **mascaram** segredos/PII (o Output Guard só detectava). Eventos registrados têm **fingerprint (hash)**, nunca o segredo bruto.
+- **GitOps sanitizado** (`stop.py`): antes de `gh issue create`, o body e o título passam por redaction; se a origem tinha segredo, a issue **NÃO é criada** e um evento sanitizado é gravado em `~/.gstack/security/events.jsonl` (fingerprint, sem segredo). O commit local do `gitops_pr_create` também redige o summary.
+- **Reframe honesto:** isto é uma lib de redaction **pré-publicação**, não um interceptor do stream de render do harness (uma CLI não controla esse render — refletido na capability matrix, `supportsPreOutputInterception: false`).
+- +8 testes (3 JS + 5 Python) (176 Node + 38 Python verdes; lint limpo).
+
 ## [2.20.0] - 2026-06-17
 
 ### Fase 3 (1/3) — Verify honesto + Dream Audit anti-placebo + Capability Matrix
