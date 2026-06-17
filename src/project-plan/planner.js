@@ -8,6 +8,7 @@
 import { makePlan, validatePlan, MODE_IDS } from "./schema.js"
 import { classify } from "./classifier.js"
 import { getRecipe, DEFAULT_RECIPE_ID } from "./recipes.js"
+import { isPendingFeature, getPendingFeature } from "./pending-features.js"
 
 const CLI = "gstack_vibehard"
 
@@ -46,9 +47,11 @@ export function expandStep(stepId, ctx) {
     const tool = stepId.slice("tools:mcp:enable:".length)
     return { id: stepId, label: `Habilitar MCP: ${tool}`, command: [CLI, "tools", "mcp", "enable", tool], cwd, required: false }
   }
-  if (stepId === "runtime:start") {
-    // Runtime manager ainda não existe como comando — fica pendente, sem comando.
-    return { id: "runtime:start", label: "Runtime manager (feature futura — pulado)", command: null, cwd, required: false, pendingFeature: true }
+  // Features futuras (runtime/dashboard/deploy): fonte única em pending-features.
+  // Nunca carregam comando — o executor as pula.
+  if (isPendingFeature(stepId)) {
+    const pf = getPendingFeature(stepId)
+    return { id: stepId, label: `${pf.label} — ainda não implementado`, command: null, cwd, required: false, pendingFeature: true }
   }
   // Desconhecido: marca como pendente (nunca inventa comando).
   return { id: stepId, label: `Passo não mapeado: ${stepId}`, command: null, cwd, required: false, pendingFeature: true }
