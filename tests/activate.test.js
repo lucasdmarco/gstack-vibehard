@@ -75,6 +75,25 @@ test("status de projeto intocado = INATIVO (não cria nada)", async () => {
   }
 })
 
+test("enable com .gstack/ ativo + .gstack-disabled/ residual: already_active e avisa do resíduo", async () => {
+  const tmp = await mkdtemp(path.join(tmpdir(), "gstack-act-"))
+  try {
+    const { activateCommand } = await load()
+    await activateCommand("enable", [], { cwd: tmp })
+    await mkdir(path.join(tmp, ".gstack-disabled"), { recursive: true })
+    let buf = ""
+    const orig = process.stdout.write.bind(process.stdout)
+    process.stdout.write = (s) => { buf += String(s); return true }
+    let r
+    try { r = await activateCommand("enable", [], { cwd: tmp }) } finally { process.stdout.write = orig }
+    assert.equal(r.status, "already_active")
+    assert.match(buf, /residual/, "avisa do .gstack-disabled/ residual")
+    assert.ok(existsSync(path.join(tmp, ".gstack-disabled")), "não apaga o resíduo automaticamente")
+  } finally {
+    await rm(tmp, { recursive: true, force: true })
+  }
+})
+
 test("disable sem .gstack/ = already_inactive (no-op)", async () => {
   const tmp = await mkdtemp(path.join(tmpdir(), "gstack-act-"))
   try {

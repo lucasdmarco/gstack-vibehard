@@ -29,7 +29,11 @@ function enable(cwd) {
     success("gstack REATIVADO neste projeto (dados preservados). Regras/hooks voltam a agir aqui.")
     return { status: "reactivated" }
   }
-  if (existsSync(gdir(cwd))) { info("gstack já está ATIVO neste projeto."); return { status: "already_active" } }
+  if (existsSync(gdir(cwd))) {
+    info("gstack já está ATIVO neste projeto.")
+    if (existsSync(gdisabled(cwd))) warn("Há um `.gstack-disabled/` residual (de um disable anterior) — remova quando quiser, não é mais usado.")
+    return { status: "already_active" }
+  }
   mkdirSync(gdir(cwd), { recursive: true })
   const p = join(gdir(cwd), "context.json")
   if (!existsSync(p)) writeFileSync(p, JSON.stringify(buildContextRegistry(), null, 2) + "\n")

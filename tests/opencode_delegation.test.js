@@ -17,6 +17,7 @@ function makeExec({ hasOpencode = true, runOk = true } = {}) {
       if (runOk) return Buffer.from("done: applied changes")
       const e = new Error("run failed"); e.status = 7; e.stdout = "partial"; e.stderr = "rate limit"; throw e
     }
+    if (file === "git" && args[0] === "ls-files") return Buffer.from("") // sem .env rastreado
     if (file === "git") return Buffer.from(" M src/app.ts\n?? new.ts\n")
     throw new Error("unexpected " + file)
   }
@@ -88,4 +89,12 @@ test("delegate --worktree --allow-tracked-secrets: segue mesmo com .env rastread
   const m = makeExecTrackedEnv({})
   const r = await delegateCommand(["opencode", "--task", "x", "--worktree", "--allow-tracked-secrets", "--yes"], { cwd: "/x", exec: m.exec })
   assert.notEqual(r.status, "blocked_tracked_secrets", "override libera a delegação")
+})
+
+test("delegate SEM --worktree com .env rastreado: TAMBÉM bloqueia (roda no dir real)", async () => {
+  const { delegateCommand } = await import(`${pathToFileURL(cmdMod)}?t=${Date.now()}`)
+  const m = makeExecTrackedEnv({})
+  const r = await delegateCommand(["opencode", "--task", "x", "--yes"], { cwd: "/x", exec: m.exec })
+  assert.equal(r.status, "blocked_tracked_secrets", "bloqueia também no modo padrão (sem worktree)")
+  assert.equal(m.ran(), false, "não delegou com segredo rastreado")
 })
