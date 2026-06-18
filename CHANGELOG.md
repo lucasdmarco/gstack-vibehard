@@ -1,5 +1,15 @@
 # Changelog - gstack-vibehard
 
+## [2.28.0] - 2026-06-18
+
+### Ligar/desligar o gstack POR PROJETO (claro) + delegação não vaza segredos
+Fecha a dúvida do dono: "como ativo/desativo o gstack num projeto que já está rodando?". Antes, "ativar" era efeito colateral de `context init` — nada óbvio. Agora há comandos diretos, e projetos em andamento ficam **intocados** até você decidir.
+- **`gstack_vibehard enable` / `disable` / `status`** (`src/commands/activate.js`): controle explícito por projeto. O marcador é a pasta `.gstack/` (o que os hooks já checam via `is_gstack_project`). `disable` **preserva os dados** renomeando `.gstack/` → `.gstack-disabled/` (hooks ficam passivos); `enable` recria ou **reativa** preservando contexto/planos; `status` mostra ATIVO / DESATIVADO / INATIVO. Não sobrescreve em conflito.
+- **Modelo de ativação na mensagem do `install`:** o gstack vem **ATIVO por padrão em projetos NOVOS** (`create`) e **DESATIVADO em projetos em andamento** — ativar com `enable`. Projeto que você não ativar fica intocado (só o bloqueio de comando destrutivo continua global, como rede de segurança).
+- **[P1] Delegação BLOQUEIA `.env` rastreado** (`src/commands/delegate.js`): com `--worktree`, se houver `.env` versionado no git, o gstack **não delega** (a outra IA veria seus segredos no checkout da worktree) — instrui a corrigir (`git rm --cached .env`) ou liberar explicitamente com `--allow-tracked-secrets`. Antes só avisava.
+- **[P1] Commit delegado não vaza segredos** (`src/delegation/worktree.js` `commitWorktree`): removido `--no-verify` (respeita os hooks de pre-commit do usuário) e o staging agora **exclui `.env`/`.env.*`** — o branch revisável nunca contém o `.env`.
+- +9 testes Node (toggle enable/disable/status com preservação de dados; bloqueio/override de delegação; higiene do commit). 203 Node + 48 Python verdes; lint/typecheck limpos.
+
 ## [2.27.0] - 2026-06-18
 
 ### Infra global, ATIVAÇÃO por projeto — seguro para máquina com vários projetos

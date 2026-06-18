@@ -35,11 +35,19 @@ export function removeWorktree(repoCwd, dir, branch, opts = {}) {
   }
 }
 
-/** Commita as mudanças na worktree (preserva o trabalho no branch efêmero). */
+/**
+ * Commita as mudanças na worktree (preserva no branch efêmero). Seguro:
+ *  - NÃO inclui `.env`/`.env.*` no commit (segredo não vai pro branch revisável);
+ *  - SEM `--no-verify` (respeita os hooks de pre-commit do usuário).
+ */
 export function commitWorktree(worktreeDir, message, opts = {}) {
   const exec = opts.exec || defaultExecFileSync
   exec("git", ["add", "-A"], { cwd: worktreeDir, stdio: "pipe", shell: false, timeout: 30000 })
-  exec("git", ["commit", "-m", message, "--no-verify"], { cwd: worktreeDir, stdio: "pipe", shell: false, timeout: 30000 })
+  // Tira qualquer .env do staging (mesmo que estivesse rastreado) — não vaza segredo.
+  try {
+    exec("git", ["reset", "-q", "--", ".env", ".env.*", "**/.env", "**/.env.*"], { cwd: worktreeDir, stdio: "pipe", shell: false, timeout: 15000 })
+  } catch { /* sem .env staged — ok */ }
+  exec("git", ["commit", "-m", message], { cwd: worktreeDir, stdio: "pipe", shell: false, timeout: 30000 })
 }
 
 /**

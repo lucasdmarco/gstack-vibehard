@@ -59,3 +59,33 @@ test("delegate command: com --yes delega e retorna resultado", async () => {
   const r = await delegateCommand(["opencode", "--task", "corrigir bug", "--yes"], { cwd: "/x", exec: makeExec({}) })
   assert.equal(r.status, "ok")
 })
+
+// exec que simula um .env RASTREADO no git (ls-files -z retorna ".env")
+function makeExecTrackedEnv({ runOk = true } = {}) {
+  let ran = false
+  const exec = (file, args) => {
+    if (file === "opencode" && args[0] === "--version") return Buffer.from("opencode 1.0")
+    if (file === "opencode" && args[0] === "run") { ran = true; if (!runOk) { const e = new Error("x"); e.status = 1; throw e } return Buffer.from("done") }
+    if (file === "git" && args[0] === "ls-files") return Buffer.from(".env\0")
+    if (file === "git" && args[0] === "rev-parse") return Buffer.from("true")
+    if (file === "git") return Buffer.from("")
+    throw new Error("unexpected " + file)
+  }
+  return { exec, ran: () => ran }
+}
+
+test("delegate --worktree com .env rastreado: BLOQUEIA e nao chama OpenCode", async () => {
+  const { delegateCommand } = await import(`${pathToFileURL(cmdMod)}?t=${Date.now()}`)
+  const m = makeExecTrackedEnv({})
+  const r = await delegateCommand(["opencode", "--task", "x", "--worktree", "--yes"], { cwd: "/x", exec: m.exec })
+  assert.equal(r.status, "blocked_tracked_secrets")
+  assert.deepEqual(r.tracked, [".env"])
+  assert.equal(m.ran(), false, "nao delegou com segredo rastreado")
+})
+
+test("delegate --worktree --allow-tracked-secrets: segue mesmo com .env rastreado", async () => {
+  const { delegateCommand } = await import(`${pathToFileURL(cmdMod)}?t=${Date.now()}`)
+  const m = makeExecTrackedEnv({})
+  const r = await delegateCommand(["opencode", "--task", "x", "--worktree", "--allow-tracked-secrets", "--yes"], { cwd: "/x", exec: m.exec })
+  assert.notEqual(r.status, "blocked_tracked_secrets", "override libera a delegação")
+})

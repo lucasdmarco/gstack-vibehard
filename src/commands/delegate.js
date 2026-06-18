@@ -10,6 +10,7 @@ function parseFlags(args) {
     else if (a === "--model") out.model = args[++i]
     else if (a === "--max-iterations") out.maxIterations = parseInt(args[++i], 10)
     else if (a === "--worktree") out.worktree = true
+    else if (a === "--allow-tracked-secrets") out.allowTrackedSecrets = true
     else if (a === "--yes" || a === "-y") out.yes = true
     else out._.push(a)
   }
@@ -26,6 +27,7 @@ export async function delegateCommand(args = [], opts = {}) {
     info("  gstack_vibehard delegate opencode --task \"...\" [--model M] [--max-iterations N] [--worktree] [--yes]")
     info("  Delega ao OpenCode (modelo/free tier configurado por você). Opt-in, com confirmação.")
     info("  --worktree: roda numa git worktree isolada (não toca o branch principal).")
+    info("  Com --worktree, BLOQUEIA se houver .env rastreado no git (libere com --allow-tracked-secrets).")
     return
   }
 
@@ -37,9 +39,17 @@ export async function delegateCommand(args = [], opts = {}) {
   // RASTREADO no git, ele apareceria no checkout. Avisa antes de delegar isolado.
   if (flags.worktree) {
     const tracked = checkTrackedSecrets(cwd, opts.exec)
-    if (tracked.length) {
-      warn(`Atenção: ${tracked.length} arquivo(s) .env RASTREADO(s) no git (${tracked.slice(0, 3).join(", ")}).`)
-      warn("Eles entram no checkout da worktree — o agente delegado os veria. Remova do versionamento (git rm --cached .env) e gitignore.")
+    if (tracked.length && !flags.allowTrackedSecrets) {
+      // BLOQUEIA por padrão: o .env versionado entraria no checkout da worktree e
+      // o agente delegado (outra IA) veria seus segredos. Exige override explícito.
+      error(`BLOQUEADO: ${tracked.length} arquivo(s) .env RASTREADO(s) no git (${tracked.slice(0, 3).join(", ")}).`)
+      warn("Eles entrariam na cópia da worktree e a outra IA os veria. NÃO deleguei.")
+      info("Corrija: `git rm --cached .env && echo .env >> .gitignore`.")
+      info("Ou, se tiver CERTEZA, libere explicitamente com `--allow-tracked-secrets`.")
+      return { status: "blocked_tracked_secrets", tracked }
+    }
+    if (tracked.length && flags.allowTrackedSecrets) {
+      warn(`Prosseguindo com ${tracked.length} .env rastreado(s) — você liberou via --allow-tracked-secrets.`)
     }
   }
 

@@ -20,6 +20,7 @@ import { taskCommand } from "../commands/task.js"
 import { verifyCommand } from "../commands/verify.js"
 import { dreamCommand } from "../commands/dream.js"
 import { proxyCommand } from "../commands/proxy.js"
+import { activateCommand } from "../commands/activate.js"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const pkg = JSON.parse(readFileSync(resolve(__dirname, "../../package.json"), "utf-8"))
@@ -108,6 +109,9 @@ export function showHelp() {
   console.log(color("    gstack_vibehard verify         Delivery gates: deps/lint/typecheck/test/build/QG (--profile, --json)", COLORS.cyan))
   console.log(color("    gstack_vibehard dream          Auto-melhoria: audit (promessas vs evidência) · status (matriz de confiança)", COLORS.cyan))
   console.log(color("    gstack_vibehard proxy          Proxy de redaction pré-output (opt-in) — interceptação real em trânsito", COLORS.cyan))
+  console.log(color("    gstack_vibehard enable         Ativar o gstack NESTE projeto (projeto novo já vem ativo)", COLORS.cyan))
+  console.log(color("    gstack_vibehard disable        Desativar neste projeto (preserva dados em .gstack-disabled/)", COLORS.cyan))
+  console.log(color("    gstack_vibehard status         Ver se o gstack está ativo neste projeto", COLORS.cyan))
   console.log(color("    gstack_vibehard create <nome>  Criar workspace runtime omniharness", COLORS.cyan))
   console.log(color("    gstack_vibehard init <nome>    Criar novo projeto com estrutura completa", COLORS.cyan))
   console.log(color("    gstack_vibehard doctor         Diagnosticar ambiente", COLORS.cyan))
@@ -174,6 +178,15 @@ async function dispatch(command, args) {
       break
     case "doctor":
       await doctor(args)
+      break
+    case "enable":
+      await activateCommand("enable", args)
+      break
+    case "disable":
+      await activateCommand("disable", args)
+      break
+    case "status":
+      await activateCommand("status", args)
       break
     case "uninstall":
       await uninstall(args)

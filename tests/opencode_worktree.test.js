@@ -37,6 +37,18 @@ test("worktree: createWorktree usa git worktree add com branch seguro", async ()
   assert.ok(calls.some((c) => c.startsWith("git worktree add -b gstack/x /tmp/wt")))
 })
 
+test("commitWorktree: nao usa --no-verify e exclui .env do staging", async () => {
+  const { commitWorktree } = await import(`${pathToFileURL(wtMod)}?t=${Date.now()}`)
+  const calls = []
+  const exec = (file, args) => { calls.push([file, ...args].join(" ")); return Buffer.from("") }
+  commitWorktree("/tmp/wt", "delega: x", { exec })
+  assert.ok(calls.some((c) => c.startsWith("git add -A")), "stage inicial")
+  assert.ok(calls.some((c) => c.startsWith("git reset -q -- .env")), "remove .env do staging")
+  const commit = calls.find((c) => c.startsWith("git commit"))
+  assert.ok(commit, "commitou")
+  assert.ok(!commit.includes("--no-verify"), "respeita hooks de pre-commit (sem --no-verify)")
+})
+
 test("runDelegation --worktree: isola, commita mudancas e preserva branch", async () => {
   const { runDelegation } = await import(`${pathToFileURL(delMod)}?t=${Date.now()}`)
   const { exec, calls } = recordingExec({ changes: true })
