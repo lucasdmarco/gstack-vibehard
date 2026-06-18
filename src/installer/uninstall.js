@@ -168,10 +168,9 @@ function packageSkillNames() {
   }
 }
 
-function removeSkills(report) {
+function removeSkills(report, opts = {}) {
   // PREFERE o manifest (ownership): remove só skills que o manifest prova serem
-  // nossas — nunca uma skill do usuário com nome colidente. Sem itens no manifest
-  // (instalação legada), cai no padrão pacote∩instaladas.
+  // nossas — nunca uma skill do usuário com nome colidente.
   const manifest = loadManifest(HOME)
   const skillItems = findItems(manifest, (x) => x.kind === "skill" && x.removeOnUninstall !== false)
   if (skillItems.length > 0) {
@@ -179,10 +178,19 @@ function removeSkills(report) {
     if (count > 0) success(`${count} skills removidas (via manifest) de ~/.agents/skills/`)
     return
   }
+  // SEM manifest (instalação legada): remover por NOME pode apagar skill do usuário
+  // com nome colidente. Só faz isso com opt-in explícito (--legacy-name-cleanup).
   const installedSkills = new Set(getInstalledSkills())
   const targets = packageSkillNames().filter((skill) => installedSkills.has(skill))
+  if (targets.length === 0) return
+  if (!opts.legacyAllowed) {
+    warn(`Sem manifest: ${targets.length} skill(s) com nome do pacote seriam removidas POR NOME (risco de colisão com a sua).`)
+    info("  Não removidas. Para limpar instalação legada por nome: `gstack_vibehard uninstall --legacy-name-cleanup`")
+    report.skipped.push(`skills legadas por nome: ${targets.length} (use --legacy-name-cleanup)`)
+    return
+  }
   const count = targets.filter((skill) => removeDir(join(HOME, ".agents", "skills", skill), report)).length
-  if (count > 0) success(`${count} skills removidas de ~/.agents/skills/`)
+  if (count > 0) success(`${count} skills removidas (legado, por nome) de ~/.agents/skills/`)
 }
 
 /**
@@ -266,6 +274,7 @@ export async function uninstall(args = []) {
   const removeVault = args.includes("--remove-vault")
   const removeDeps = args.includes("--remove-deps")
   const includeProjects = args.includes("--include-projects")
+  const legacyNameCleanup = args.includes("--legacy-name-cleanup")
   const report = { removed: [], restored: [], skipped: [], errors: [] }
 
   // --dry-run: mostra o plano de rollback SEM tocar em nada.
@@ -343,7 +352,7 @@ export async function uninstall(args = []) {
   removeWithRestore(join(HOME, ".claude", "rules", "ultracode.md"), report)
   removeWithRestore(join(HOME, "CLAUDE.md"), report)
   removeGeneratedAgents(report)
-  removeSkills(report)
+  removeSkills(report, { legacyAllowed: legacyNameCleanup })
   removeScripts(report)
   removeHermes(report)
   removeWithRestore(join(HOME, "gstack_vibehard-install.bat"), report)

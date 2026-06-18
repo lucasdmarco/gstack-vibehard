@@ -39,6 +39,7 @@ export async function dreamCommand(args = [], opts = {}) {
   if (json) { process.stdout.write(JSON.stringify({ audit: audit({ root }).summary, harnesses: HARNESS_CAPABILITIES }) + "\n"); return }
   section("dream status")
   const r = audit({ root })
+  info("  Modo: AUDIT ON (read-only) · auto-IMPROVE no roadmap (worktree/verify/accept-reject — ainda não executável)")
   info(`  Audit: ${Object.entries(r.summary).map(([k, v]) => `${k}:${v}`).join(" · ")}`)
   info("  Confiança por harness (matriz de capacidades):")
   for (const c of Object.values(HARNESS_CAPABILITIES)) {

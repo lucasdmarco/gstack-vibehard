@@ -1,8 +1,22 @@
 import { existsSync, readFileSync, writeFileSync, copyFileSync, statSync, renameSync, mkdirSync, readdirSync } from "fs"
 import { createHash } from "crypto"
-import { homedir } from "os"
+import { homedir, tmpdir } from "os"
 import { join, dirname } from "path"
 import { loadManifest, recordItem, saveManifest } from "./manifest.js"
+
+/**
+ * Decide se um caminho deve ser registrado no manifest GLOBAL.
+ * Cuidado Windows: `tmpdir()` (AppData\Local\Temp) fica SOB `homedir()`, então
+ * `startsWith(home)` sozinho daria true para arquivos temporários de teste —
+ * poluindo/corrompendo o manifest real do desenvolvedor. Só registra quando o
+ * `home` foi passado explicitamente (intenção do caller/teste) OU o caminho NÃO
+ * está sob `tmpdir()`.
+ */
+export function shouldRecordManifest(filePath, home, explicitHome) {
+  if (!filePath.startsWith(home)) return false
+  if (explicitHome) return true
+  return !filePath.startsWith(tmpdir())
+}
 
 /**
  * Camada ÚNICA de escrita global segura (PRD faseprebuilt). Toda alteração fora
@@ -54,9 +68,8 @@ export function safeWriteFile(filePath, content, opts = {}) {
   const buf = Buffer.isBuffer(content) ? content : Buffer.from(String(content))
   atomicWrite(filePath, buf)
   const installedHash = sha256(buf)
-  // Manifest só registra mudanças GLOBAIS (sob o home). Escrita em projeto/temp
-  // (fora do home) faz backup+escrita atômica, mas não polui o manifest global.
-  if (filePath.startsWith(home)) {
+  // Manifest só registra mudanças GLOBAIS de verdade (ver shouldRecordManifest).
+  if (shouldRecordManifest(filePath, home, opts.home != null)) {
     const manifest = loadManifest(home)
     recordItem(manifest, {
       path: filePath,
@@ -82,20 +95,24 @@ export function safeCopyFile(src, dst, opts = {}) {
 /** Copia um diretório recursivamente e registra o DIR no manifest (1 item). */
 export function safeCopyDir(src, dst, opts = {}) {
   const home = opts.home || homedir()
+  const explicitHome = opts.home != null
   const existed = existsSync(dst)
+  // Acumula arquivos internos sobrescritos (com backup) p/ registrá-los como
+  // RESTAURÁVEIS no manifest — senão o uninstall não restaura o que o usuário tinha.
+  const overwritten = opts._overwritten || []
   mkdirSync(dst, { recursive: true })
   for (const e of readdirSync(src, { withFileTypes: true })) {
     const s = join(src, e.name)
     const d = join(dst, e.name)
-    if (e.isDirectory()) safeCopyDir(s, d, { ...opts, _skipRecord: true })
+    if (e.isDirectory()) safeCopyDir(s, d, { ...opts, _skipRecord: true, _overwritten: overwritten })
     else {
       // Backup por arquivo INTERNO: nunca sobrescreve um arquivo do usuário sem
-      // preservar o original (versionado).
-      if (existsSync(d)) versionedBackup(d)
+      // preservar o original (versionado) — e marca p/ restauração no manifest.
+      if (existsSync(d)) { const bak = versionedBackup(d); if (bak) overwritten.push({ path: d, backup: bak }) }
       copyFileSync(s, d)
     }
   }
-  if (!opts._skipRecord && dst.startsWith(home)) {
+  if (!opts._skipRecord && shouldRecordManifest(dst, home, explicitHome)) {
     const manifest = loadManifest(home)
     recordItem(manifest, {
       path: dst,
@@ -106,6 +123,14 @@ export function safeCopyDir(src, dst, opts = {}) {
       removeOnUninstall: opts.removeOnUninstall != null ? opts.removeOnUninstall : !existed,
       restoreOnUninstall: false,
     })
+    // Cada arquivo interno do USUÁRIO sobrescrito vira item restaurável.
+    for (const it of overwritten) {
+      recordItem(manifest, {
+        path: it.path, kind: "file", action: "modified",
+        component: opts.component || "unknown", backup: it.backup,
+        removeOnUninstall: false, restoreOnUninstall: true,
+      })
+    }
     saveManifest(manifest, home)
   }
   return { existed }

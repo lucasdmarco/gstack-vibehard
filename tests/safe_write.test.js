@@ -99,6 +99,42 @@ test("safeCopyDir: faz backup de arquivo INTERNO existente antes de sobrescrever
   } finally { await rm(home, { recursive: true, force: true }) }
 })
 
+test("shouldRecordManifest: NÃO registra arquivo temp sem home explícito (Windows: tmp⊂home)", async () => {
+  const { shouldRecordManifest } = await imp(swMod)
+  const { tmpdir, homedir } = await import("node:os")
+  const path = await import("node:path")
+  const home = homedir()
+  const tmpFile = path.join(tmpdir(), "gstack-x", "cfg.json") // sob tmpdir (e sob home no Windows)
+  // sem home explícito → NÃO registra (evita corromper o manifest real)
+  assert.equal(shouldRecordManifest(tmpFile, home, false), false)
+  // com home explícito (intenção do teste/caller) → registra
+  assert.equal(shouldRecordManifest(tmpFile, tmpdir(), true), true)
+  // install REAL (sob home, fora de tmpdir) → registra
+  assert.equal(shouldRecordManifest(path.join(home, ".claude", "settings.json"), home, false), true)
+  // fora do home → nunca
+  assert.equal(shouldRecordManifest("/etc/whatever", home, false), false)
+})
+
+test("safeCopyDir: arquivo interno sobrescrito vira item RESTAURÁVEL no manifest", async () => {
+  const home = await tmpHome()
+  try {
+    const { safeCopyDir } = await imp(swMod)
+    const { loadManifest } = await imp(mMod)
+    const src = path.join(home, "src-skill")
+    await mkdir(src, { recursive: true })
+    await writeFile(path.join(src, "SKILL.md"), "# novo")
+    const dst = path.join(home, ".agents", "skills", "x")
+    await mkdir(dst, { recursive: true })
+    await writeFile(path.join(dst, "SKILL.md"), "# DO USUARIO")
+    safeCopyDir(src, dst, { home, component: "skills", kind: "skill" })
+    const items = loadManifest(home).items
+    const internal = items.find((i) => i.path === path.join(dst, "SKILL.md"))
+    assert.ok(internal, "arquivo interno registrado no manifest")
+    assert.equal(internal.restoreOnUninstall, true, "marcado como restaurável")
+    assert.ok(internal.backup && readFileSync(internal.backup, "utf-8") === "# DO USUARIO", "backup do original")
+  } finally { await rm(home, { recursive: true, force: true }) }
+})
+
 test("manifest: recordItem é idempotente por path+kind e conta backups", async () => {
   const home = await tmpHome()
   try {

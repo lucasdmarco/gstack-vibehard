@@ -121,7 +121,7 @@ export function showHelp() {
   console.log(color("    gstack_vibehard workflow       Graph runner determinístico — run/runs/inspect", COLORS.cyan))
   console.log(color("    gstack_vibehard a2a            Agent Card A2A (offline, sem servidor)", COLORS.cyan))
   console.log(color("    gstack_vibehard uninstall      Remover gstack_vibehard do ambiente", COLORS.cyan))
-  console.log(color("      --dry-run --restore-only --remove-vault --remove-deps  (rollback via manifest)", COLORS.dim))
+  console.log(color("      --dry-run --restore-only --remove-vault --remove-deps --legacy-name-cleanup  (rollback via manifest)", COLORS.dim))
   console.log(color("    gstack_vibehard list           Listar componentes instalados", COLORS.cyan))
   console.log(color("    gstack_vibehard help           Mostrar esta ajuda\n", COLORS.cyan))
 }
