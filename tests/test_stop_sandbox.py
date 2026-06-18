@@ -67,6 +67,7 @@ class StopSandboxTest(unittest.TestCase):
             args_file = Path(tmp) / "openhands_args.json"
             post_sprint_marker = Path(tmp) / "post_sprint_called.txt"
             root.mkdir()
+            (root / ".gstack").mkdir(exist_ok=True)
             home.mkdir()
             bin_dir.mkdir()
             (root / "package.json").write_text("{}\n", encoding="utf-8")
@@ -111,6 +112,7 @@ class StopSandboxTest(unittest.TestCase):
             home = Path(tmp) / "home"
             bin_dir = Path(tmp) / "bin"
             root.mkdir()
+            (root / ".gstack").mkdir(exist_ok=True)
             home.mkdir()
             bin_dir.mkdir()
             (root / "package.json").write_text("{}\n", encoding="utf-8")

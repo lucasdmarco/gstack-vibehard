@@ -33,6 +33,7 @@ class StopNonIntrusiveTest(unittest.TestCase):
             root = Path(tmp) / "repo"
             home = Path(tmp) / "home"
             root.mkdir()
+            (root / ".gstack").mkdir(exist_ok=True)
             home.mkdir()
             (root / "package.json").write_text("{}\n", encoding="utf-8")
 
@@ -56,6 +57,7 @@ class StopNonIntrusiveTest(unittest.TestCase):
             root = Path(tmp) / "repo"
             home = Path(tmp) / "home"
             root.mkdir()
+            (root / ".gstack").mkdir(exist_ok=True)
             home.mkdir()
             subprocess.run(["git", "init", "-q"], cwd=root, capture_output=True)
             subprocess.run(["git", "config", "user.email", "t@t.co"], cwd=root, capture_output=True)
