@@ -1,5 +1,12 @@
 # Changelog - gstack-vibehard
 
+## [2.28.1] - 2026-06-18
+
+### Patch de segurança (code review da v2.28.0)
+- **[crítico] Delegação SEM `--worktree` não bloqueava `.env` rastreado.** O bloqueio de segredo da v2.28.0 ficava dentro de `if (flags.worktree)`, mas a delegação **padrão** (sem `--worktree`) roda `opencode run` no **diretório real** — a outra IA lia o `.env` direto do disco, sem nenhum bloqueio. Era o caminho mais exposto e o default. Agora o bloqueio guarda **toda** delegação (`src/commands/delegate.js`): `.env` rastreado → BLOQUEADO em ambos os modos (libere com `--allow-tracked-secrets`).
+- **[robustez] `enable` avisa sobre `.gstack-disabled/` residual** quando o projeto já está ativo (antes ignorava o resíduo silenciosamente).
+- +2 testes Node (bloqueio no modo sem worktree; aviso de resíduo). 205 Node + 48 Python verdes; lint/typecheck limpos.
+
 ## [2.28.0] - 2026-06-18
 
 ### Ligar/desligar o gstack POR PROJETO (claro) + delegação não vaza segredos
