@@ -3,9 +3,22 @@
 import json, sys, re
 from pathlib import Path
 
-inp = json.loads(sys.stdin.read())
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _paths import is_gstack_project
+
+# FAIL-OPEN: roda em todo prompt de todo projeto — erro de parsing não pode travar.
+try:
+    inp = json.loads(sys.stdin.read())
+except Exception:
+    sys.exit(0)
+if not isinstance(inp, dict):
+    sys.exit(0)
 prompt = inp.get("prompt", "")
 cwd = inp.get("cwd", "")
+
+# ATIVAÇÃO POR PROJETO: hints de skill gstack só em projeto gstack (.gstack/).
+if not is_gstack_project(cwd):
+    sys.exit(0)
 
 prompt_lower = prompt.lower()
 

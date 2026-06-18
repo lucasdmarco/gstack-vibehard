@@ -1,5 +1,16 @@
 # Changelog - gstack-vibehard
 
+## [2.27.0] - 2026-06-18
+
+### Infra global, ATIVAÇÃO por projeto — seguro para máquina com vários projetos
+Responde "instalar o gstack põe meus projetos em andamento em risco?": agora **não**. A infra é instalada globalmente, mas as **regras gstack só ativam em projetos com `.gstack/`**.
+- **Helper único `find_gstack_root()`/`is_gstack_project()`** (`hooks/hooks/_paths.py`): sobe a árvore procurando `.gstack/`. **Ignora o home** — `~/.gstack` é o dir GLOBAL, não marcador de projeto (senão todo projeto sob a home pareceria gstack-ativo).
+- **Ativação por projeto:** `stop.py` (chronicle/gates/sandbox), `session_start.py` (identidade/quality-bar) e `user_prompt_submit.py` (hints) **só agem em projeto gstack**. Projeto alheio sem `.gstack/` → o gstack não interfere. (Só o bloqueio de comando destrutivo continua global, como rede de segurança.)
+- **Hooks fail-OPEN:** `pre_tool_use_security.py` (e demais hooks globais) nunca crasham/travam o turno — input malformado → `exit 0` (libera). Corrige `json.loads(stdin)` sem try/except que podia bloquear Write/Edit/Bash em qualquer projeto.
+- **`~/CLAUDE.md` auto-escopado:** o bloco global instrui o agente a aplicar as regras gstack **só** em projetos `.gstack/`; fora deles, comportar-se normalmente.
+- **Mensagem do `install`** explica a ativação por projeto (`context init` p/ ativar projeto existente; `create` p/ novo) + rollback.
+- +10 testes Python (gate por projeto + fail-open + destrutivo global). 194 Node + 48 Python verdes; lint/typecheck limpos.
+
 ## [2.26.0] - 2026-06-18
 
 ### Hardening de produto (correções da revisão)

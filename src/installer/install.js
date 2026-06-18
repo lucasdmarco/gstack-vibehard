@@ -654,13 +654,23 @@ export async function install(args = []) {
   printInstallReport(report)
 
   section("Instalacao Concluida!")
+  section("Ativacao POR PROJETO (importante)")
+  info("A infra foi instalada GLOBALMENTE, mas as REGRAS gstack (Quality Gate,")
+  info("design-system, chronicle, identidade) so ATIVAM em projetos com pasta .gstack/.")
+  info("Seus projetos em andamento SEM .gstack/ NAO sao afetados (so o bloqueio de")
+  info("comando destrutivo continua valendo, como rede de seguranca).")
+  info("")
+  info("  • Projeto EXISTENTE: rode `gstack_vibehard context init` na raiz dele para ativar.")
+  info("  • Projeto NOVO: `gstack_vibehard create <nome>` ja nasce com .gstack/ ativo.")
+  info("  • Tudo tem backup/rollback: `gstack_vibehard uninstall` (--dry-run para o plano).")
+  info("")
   info("Comandos uteis:")
   info("  gstack_vibehard doctor    — diagnosticar ambiente")
   info("  gstack_vibehard uninstall — remover gstack_vibehard do ambiente")
   info("  gstack_vibehard init      — criar novo projeto com estrutura completa")
   if (selectedHarnessIds.includes("claude")) {
     info("")
-    info("Claude Code: novas regras ativas na proxima sessao")
+    info("Claude Code: regras gstack ativam na proxima sessao SOMENTE em projetos .gstack/")
   }
 
   console.log()

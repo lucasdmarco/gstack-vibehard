@@ -9,6 +9,41 @@ GSTACK_VIBEHARD_DIR = Path.home() / ".gstack_vibehard"
 MOM_DB_PATH = Path.home() / ".mom" / "mom.db"
 
 
+def find_gstack_root(cwd, max_depth=30):
+    """Sobe a árvore a partir de `cwd` procurando um projeto gstack (`.gstack/`).
+
+    É a chave da ATIVAÇÃO POR PROJETO: a infra dos hooks é global, mas as regras
+    gstack (chronicle, gates, identidade) só agem onde existe `.gstack/`. Projeto
+    alheio (sem `.gstack/`) → retorna None → hooks ficam passivos. Retorna o Path
+    do root do projeto gstack, ou None.
+    """
+    if not cwd:
+        return None
+    try:
+        d = Path(cwd).resolve()
+        home = Path.home().resolve()
+    except Exception:
+        return None
+    for _ in range(max_depth):
+        try:
+            # IMPORTANTE: `~/.gstack` é o dir GLOBAL do gstack (chronicle/hooks), NÃO
+            # um marcador de projeto. Ignorar o próprio home evita que TODO projeto
+            # sob a home pareça "gstack-ativo" (falso positivo que furaria o gate).
+            if d != home and (d / ".gstack").is_dir():
+                return d
+        except Exception:
+            return None
+        if d.parent == d:
+            break
+        d = d.parent
+    return None
+
+
+def is_gstack_project(cwd):
+    """True se `cwd` está dentro de um projeto gstack (tem `.gstack/`)."""
+    return find_gstack_root(cwd) is not None
+
+
 def chronicle_dir():
     d = GSTACK_DIR / "chronicle"
     d.mkdir(parents=True, exist_ok=True)

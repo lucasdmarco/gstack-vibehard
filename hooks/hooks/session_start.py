@@ -11,7 +11,7 @@ from pathlib import Path
 
 from _chronicle import build_chronicle_index, search_chronicle
 from _output_guard import output_guard
-from _paths import chronicle_dir, hook_support_path, read_with_fallback, GSTACK_VIBEHARD_DIR
+from _paths import chronicle_dir, hook_support_path, read_with_fallback, GSTACK_VIBEHARD_DIR, is_gstack_project
 
 
 def run_gc_check(cwd: str) -> str | None:
@@ -219,6 +219,11 @@ except json.JSONDecodeError:
 cwd = inp.get("cwd", "")
 project_name = Path(cwd).name if cwd else "unknown"
 
+# ATIVAÇÃO POR PROJETO: a identidade/quality-bar gstack só é injetada em projeto
+# gstack (.gstack/). Em projeto alheio em andamento, o gstack não muda o
+# comportamento do agente (sem injeção de identidade).
+gstack_active = is_gstack_project(cwd)
+
 ctx_parts = []
 
 # 0. Governance, payload filtering and cost routing
@@ -291,8 +296,9 @@ try:
 except (OSError, ValueError):
     pass
 
-# 1. Identity injection (highermind)
-ctx_parts.append(IDENTITY_BLOCK)
+# 1. Identity injection (highermind) — SÓ em projeto gstack (não polui projeto alheio)
+if gstack_active:
+    ctx_parts.append(IDENTITY_BLOCK)
 
 # 1. GStack Check (gc.py)
 gc_diag = run_gc_check(cwd)

@@ -10,14 +10,24 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _harness import emit_permission_decision, normalize_input
 
-inp = json.loads(sys.stdin.read())
-tool_input = inp.get("tool_input", {})
+# FAIL-OPEN: este hook roda em TODO Write/Edit/Bash de TODO projeto. Input
+# malformado/ausente NUNCA pode crashar e travar o turno do usuário — em qualquer
+# erro de parsing, libera (exit 0). A segurança (BLOCK_PATTERNS) só age se o
+# parsing der certo; um crash não deve "bloquear por acidente".
+try:
+    inp = json.loads(sys.stdin.read())
+except Exception:
+    sys.exit(0)
+tool_input = inp.get("tool_input", {}) if isinstance(inp, dict) else {}
 # Claude/Codex: tool_input.command | Cursor beforeShellExecution: command no top-level
 cmd = tool_input.get("command", "") or inp.get("command", "")
 # Write/Edit/apply_patch enviam file_path (nao command)
 file_path = tool_input.get("file_path", "") or tool_input.get("path", "")
 tool_name = inp.get("tool_name", "")
-cwd = normalize_input(inp)["cwd"]
+try:
+    cwd = normalize_input(inp)["cwd"]
+except Exception:
+    cwd = ""
 
 # ═══════════════════════════════════════════════════════
 #  DESIGN SYSTEM MANDATE — Paperclip pre-tool gate pattern
@@ -104,8 +114,12 @@ for pattern, reason in BLOCK_PATTERNS:
     if re.search(pattern, cmd, re.IGNORECASE):
         emit_permission_decision(inp, "deny", reason)
 
-# Design system mandate check (runs after security check)
-blocked, reason = check_design_system_mandate()
+# Design system mandate — só aplica em projeto gstack (.gstack/). Fail-open: se a
+# checagem (que lê arquivos) der qualquer erro, NÃO bloqueia.
+try:
+    blocked, reason = check_design_system_mandate()
+except Exception:
+    blocked, reason = False, ""
 if blocked:
     emit_permission_decision(inp, "deny", reason)
 
