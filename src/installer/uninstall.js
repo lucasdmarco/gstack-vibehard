@@ -191,13 +191,17 @@ function removeSkills(report) {
  */
 function restoreFromManifest(report, { dryRun } = {}) {
   const manifest = loadManifest(HOME)
-  const items = findItems(manifest, (x) => x.restoreOnUninstall && x.backup)
+  const items = findItems(manifest, (x) => x.restoreOnUninstall)
   for (const it of items) {
-    if (!existsSync(it.backup)) { report.skipped.push(`restore: backup ausente ${it.backup}`); continue }
-    if (dryRun) { report.restored.push(`(dry-run) ${it.path} ← ${it.backup}`); continue }
+    // Restaura SEMPRE o ORIGINAL do usuário: o primeiro `.gstack_vibehard.bak`
+    // (versionedBackup nunca o sobrescreve). Cai pro item.backup se preciso.
+    const original = it.path + ".gstack_vibehard.bak"
+    const src = existsSync(original) ? original : (it.backup && existsSync(it.backup) ? it.backup : null)
+    if (!src) { report.skipped.push(`restore: sem backup p/ ${it.path}`); continue }
+    if (dryRun) { report.restored.push(`(dry-run) ${it.path} ← ${src}`); continue }
     try {
-      copyFileSync(it.backup, it.path)
-      report.restored.push(`${it.path} (de ${it.backup})`)
+      copyFileSync(src, it.path)
+      report.restored.push(`${it.path} (de ${src})`)
     } catch (e) {
       report.errors.push(`restore ${it.path}: ${e.message}`)
     }
@@ -320,6 +324,10 @@ export async function uninstall(args = []) {
       return report
     }
   }
+
+  // RESTAURA os originais (manifest) ANTES de qualquer remoção — o rollback não
+  // pode depender de cobertura por padrão, e o manifest é apagado só no fim.
+  restoreFromManifest(report)
 
   unregisterHooks(report)
   removeHooks(report)

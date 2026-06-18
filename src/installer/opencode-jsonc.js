@@ -1,8 +1,8 @@
-import { existsSync, readFileSync, writeFileSync, unlinkSync } from "fs"
+import { existsSync, readFileSync, renameSync } from "fs"
 import { homedir } from "os"
 import { join } from "path"
 import { mergeJson } from "./merge.js"
-import { versionedBackup } from "./safe-write.js"
+import { versionedBackup, safeWriteFile } from "./safe-write.js"
 
 /**
  * Correção assistida do drift OpenCode (PRD Fase 3 §7): quando `opencode.json` e
@@ -63,13 +63,18 @@ export function planOpenCodeFix(home = homedir()) {
   return { action: "merge", jsonPath, jsoncPath, merged, userKeysPreserved: userKeys }
 }
 
-/** Aplica o merge: backup dos dois, escreve o merge no .json, remove o .jsonc (preservado no backup). */
+/**
+ * Aplica o merge de forma manifest-driven e NÃO-DESTRUTIVA:
+ *  - escreve o merge no .json via safe-write (backup do json + registro no manifest);
+ *  - backup do .jsonc e PRESERVA-o renomeando para `.jsonc.gstack-disabled`
+ *    (não apaga — o usuário/Desktop pode reverter).
+ */
 export function applyOpenCodeFix(home = homedir()) {
   const plan = planOpenCodeFix(home)
   if (plan.action !== "merge") return { applied: false, ...plan }
-  versionedBackup(plan.jsonPath)
   versionedBackup(plan.jsoncPath)
-  writeFileSync(plan.jsonPath, JSON.stringify(plan.merged, null, 2) + "\n")
-  unlinkSync(plan.jsoncPath) // conflito resolvido; original preservado no .gstack_vibehard.bak
-  return { applied: true, jsonPath: plan.jsonPath, jsoncPath: plan.jsoncPath }
+  safeWriteFile(plan.jsonPath, JSON.stringify(plan.merged, null, 2) + "\n", { component: "opencode", removeOnUninstall: false })
+  const disabledPath = plan.jsoncPath + ".gstack-disabled"
+  renameSync(plan.jsoncPath, disabledPath) // preserva o .jsonc (não apaga)
+  return { applied: true, jsonPath: plan.jsonPath, jsoncPath: plan.jsoncPath, disabledPath }
 }

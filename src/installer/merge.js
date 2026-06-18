@@ -1,5 +1,19 @@
 import { readFileSync, writeFileSync, copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, statSync } from "fs"
 import { join, dirname } from "path"
+import { safeWriteFile, safeCopyFile, safeCopyDir } from "./safe-write.js"
+
+/** Infere o componente do manifest a partir do caminho global (ownership). */
+function inferComponent(p) {
+  const s = String(p)
+  if (s.includes(".hermes")) return "hermes"
+  if (s.includes("opencode")) return "opencode"
+  if (s.includes(".codex")) return "codex"
+  if (s.includes(".claude") || s.endsWith("CLAUDE.md")) return "claude"
+  if (s.includes(".cursor")) return "cursor"
+  if (s.endsWith(".mcp.json")) return "mcp"
+  if (s.includes("gstack-vault")) return "vault"
+  return "config"
+}
 
 /**
  * Non-destructive merge engine.
@@ -56,26 +70,18 @@ export function mergeJson(existing, gvConfig) {
   return deepMerge(existing, gvConfig)
 }
 
+// Toda escrita/cópia global passa pela camada segura (backup versionado + manifest).
+// Mantém a mesma assinatura — migra claude/codex/headroom/etc. sem reescrever callers.
 export function writeWithBackup(filePath, content) {
-  backupFile(filePath)
-  ensureDir(dirname(filePath))
-  writeFileSync(filePath, content, "utf-8")
+  safeWriteFile(filePath, content, { component: inferComponent(filePath), kind: "config" })
 }
 
 export function copyWithBackup(src, dst) {
-  if (existsSync(dst)) {
-    backupFile(dst)
-  }
-  ensureDir(dirname(dst))
-  copyFileSync(src, dst)
+  safeCopyFile(src, dst, { component: inferComponent(dst), kind: "file" })
 }
 
 export function copyDirSync(src, dst) {
-  if (existsSync(dst)) {
-    backupFile(dst)
-  }
-  ensureDir(dirname(dst))
-  cpSync(src, dst, { recursive: true })
+  safeCopyDir(src, dst, { component: inferComponent(dst), kind: "dir" })
 }
 
 export { readJsonFile } from "../harness/detector.js"

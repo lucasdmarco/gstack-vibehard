@@ -13,7 +13,7 @@ import { installHermes } from "../harness/hermes.js"
 import { writeInstructionalGuidance } from "../harness/instructional.js"
 import { installHeadroom } from "../harness/headroom.js"
 import { ensureDir, copyWithBackup, copyDirSync, backupFile } from "./merge.js"
-import { safeCopyDir, safeCopyFile } from "./safe-write.js"
+import { safeCopyDir, safeCopyFile, safeWriteFile, safeAppendBlock } from "./safe-write.js"
 import { findWorkingBinary, getUvCandidates, getBunCandidates, npxArgv } from "./deps.js"
 import { checkAlreadyInstalled } from "./check.js"
 import { installGeneratedAgentLayer, installGraphifyGitHooks } from "./agent-distribution.js"
@@ -293,13 +293,15 @@ function setupObsidianVault(report) {
     showUnsupportedFiles: true,
     userIgnoreFilters: ["node_modules", ".git", "dist"],
   }
-  writeFileSync(join(vaultDir, ".obsidian", "app.json"), JSON.stringify(obsidianConfig, null, 2) + "\n")
+  // Vault: registrado no manifest (ownership/integridade) mas PRESERVADO no
+  // uninstall (removeOnUninstall:false) — só sai com --remove-vault.
+  safeWriteFile(join(vaultDir, ".obsidian", "app.json"), JSON.stringify(obsidianConfig, null, 2) + "\n", { component: "vault", removeOnUninstall: false })
   report.added.push("vault: .obsidian/app.json configurado")
   success("Cofre Obsidian configurado em ~/gstack-vault")
 
   const vaultReadme = join(vaultDir, "README.md")
   if (!existsSync(vaultReadme)) {
-    writeFileSync(vaultReadme, [
+    safeWriteFile(vaultReadme, [
       "---", "tags: [gstack-vault, segundo-cerebro]", "---", "",
       "# gstack-vault — Segundo Cerebro Global", "",
       "Este vault Obsidian e o centro nervoso do ecossistema gstack_vibehard.", "",
@@ -316,7 +318,7 @@ function setupObsidianVault(report) {
       "- **Graphify** — graph.json de cada projeto linkado simbolicamente",
       "- **Chat Import Pipeline** — logs de sessoes → wikilinks → notas permanentes",
       "- **GitOps** — falhas CRITICAS viram Issues; documentacao nova vira PRs", "",
-    ].join("\n") + "\n")
+    ].join("\n") + "\n", { component: "vault", removeOnUninstall: false })
     report.added.push("vault: README.md criado")
     success("README do vault criado")
   }
@@ -325,17 +327,13 @@ function setupObsidianVault(report) {
   const codexConfigDir = join(HOME, ".codex")
   if (existsSync(codexConfigDir)) {
     const codexEnv = join(codexConfigDir, ".env")
-    const envLine = `\n# AgentMemory MD Obsidian Export — espelha memorias no vault global\nAGENTMEMORY_MD_EXPORT_PATH=${vaultDir}/agents\n`
-    if (existsSync(codexEnv)) {
-      const currentEnv = readFileSync(codexEnv, "utf-8")
-      if (!currentEnv.includes("AGENTMEMORY_MD_EXPORT_PATH")) {
-        writeFileSync(codexEnv, currentEnv.trimEnd() + "\n" + envLine)
-        report.updated.push("vault: AGENTMEMORY_MD_EXPORT_PATH em ~/.codex/.env")
-      }
-    } else {
-      writeFileSync(codexEnv, envLine.trimStart() + "\n")
-      report.added.push("vault: ~/.codex/.env criado com AGENTMEMORY_MD_EXPORT_PATH")
-    }
+    // Bloco MARCADO via safe-write: backup + manifest; no uninstall só o bloco sai.
+    safeAppendBlock(codexEnv, `AGENTMEMORY_MD_EXPORT_PATH=${vaultDir}/agents`, {
+      beginMarker: "# >>> gstack_vibehard:agentmemory",
+      endMarker: "# <<< gstack_vibehard:agentmemory",
+      component: "codex",
+    })
+    report.updated.push("vault: AGENTMEMORY_MD_EXPORT_PATH (bloco) em ~/.codex/.env")
     success("AgentMemory configurado para exportar .md para o vault")
   }
 }
