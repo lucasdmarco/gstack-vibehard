@@ -1,4 +1,5 @@
 import { runDelegation } from "../delegation/opencode.js"
+import { checkTrackedSecrets } from "../delegation/worktree.js"
 import { confirm, success, warn, error, info, section } from "../cli/index.js"
 
 function parseFlags(args) {
@@ -31,6 +32,16 @@ export async function delegateCommand(args = [], opts = {}) {
   const task = flags.task
   section(`delegate opencode — ${task || "(sem task)"}`)
   if (!task) { error("Forneça --task \"descrição da tarefa\""); return }
+
+  // Higiene de segredos: o gstack NÃO copia .env p/ worktree, mas se houver .env
+  // RASTREADO no git, ele apareceria no checkout. Avisa antes de delegar isolado.
+  if (flags.worktree) {
+    const tracked = checkTrackedSecrets(cwd, opts.exec)
+    if (tracked.length) {
+      warn(`Atenção: ${tracked.length} arquivo(s) .env RASTREADO(s) no git (${tracked.slice(0, 3).join(", ")}).`)
+      warn("Eles entram no checkout da worktree — o agente delegado os veria. Remova do versionamento (git rm --cached .env) e gitignore.")
+    }
+  }
 
   // Confirmação obrigatória (a menos de --yes / não-interativo controlado)
   const skipConfirm = flags.yes || opts.yes
