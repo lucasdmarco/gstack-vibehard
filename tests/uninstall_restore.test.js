@@ -43,6 +43,27 @@ test("uninstall --dry-run: mostra plano e NÃO altera nada", async () => {
   })
 })
 
+test("uninstall NORMAL --yes: restaura originais (manifest) ANTES de apagar o manifest", async () => {
+  await withHome(async (home) => {
+    const { saveManifest, freshManifest, recordItem } = await import(`${pathToFileURL(mMod)}?t=${Date.now()}`)
+    // config que o gstack modificou: settings.json (pós-install) + .bak (original do usuário)
+    const f = path.join(home, ".claude", "settings.json")
+    await mkdir(path.dirname(f), { recursive: true })
+    await writeFile(f, "{\"gstack\":true}")
+    await writeFile(f + ".gstack_vibehard.bak", "{\"user\":1}")
+    const m = freshManifest()
+    recordItem(m, { path: f, kind: "config", action: "modified", component: "claude", backup: f + ".gstack_vibehard.bak", removeOnUninstall: false })
+    saveManifest(m, home)
+
+    const { uninstall } = await import(`${pathToFileURL(unMod)}?t=${Date.now()}`)
+    await uninstall(["--yes"]) // fluxo NORMAL (não restore-only)
+
+    // original restaurado E manifest apagado (rollback completo no fluxo normal)
+    assert.equal(await readFile(f, "utf-8"), "{\"user\":1}", "config restaurada no uninstall normal")
+    assert.ok(!existsSync(path.join(home, ".gstack_vibehard")), "manifest removido por último")
+  })
+})
+
 test("uninstall --restore-only --yes: restaura backup do manifest, sem remover", async () => {
   await withHome(async (home) => {
     const { saveManifest, freshManifest, recordItem } = await import(`${pathToFileURL(mMod)}?t=${Date.now()}`)

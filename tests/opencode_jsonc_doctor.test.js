@@ -54,7 +54,7 @@ test("planOpenCodeFix: conflito → merge preserva OAuth/plugin do jsonc (usuár
   } finally { await rm(home, { recursive: true, force: true }) }
 })
 
-test("applyOpenCodeFix: consolida em opencode.json, faz backup dos dois, remove jsonc", async () => {
+test("applyOpenCodeFix: consolida em opencode.json, backup dos dois, PRESERVA jsonc (renomeado)", async () => {
   const home = await ocHome(
     JSON.stringify({ instructions: ["gstack"] }),
     `{ "plugin": ["oauth-x"] }`
@@ -66,11 +66,12 @@ test("applyOpenCodeFix: consolida em opencode.json, faz backup dos dois, remove 
     const merged = JSON.parse(await readFile(r.jsonPath, "utf-8"))
     assert.deepEqual(merged.plugin, ["oauth-x"])
     assert.ok(Array.isArray(merged.instructions))
-    // backups de ambos
-    assert.ok(existsSync(r.jsonPath + ".gstack_vibehard.bak"))
-    assert.ok(existsSync(r.jsoncPath + ".gstack_vibehard.bak"), "jsonc preservado no backup")
-    // jsonc removido (conflito resolvido)
-    assert.ok(!existsSync(r.jsoncPath))
+    // backups
+    assert.ok(existsSync(r.jsonPath + ".gstack_vibehard.bak"), "json original no backup")
+    assert.ok(existsSync(r.jsoncPath + ".gstack_vibehard.bak"), "jsonc no backup")
+    // jsonc NÃO é apagado — é preservado como .gstack-disabled (reversível)
+    assert.ok(!existsSync(r.jsoncPath), "jsonc original saiu do caminho ativo")
+    assert.ok(existsSync(r.disabledPath), "jsonc preservado como .gstack-disabled")
   } finally { await rm(home, { recursive: true, force: true }) }
 })
 

@@ -1,5 +1,16 @@
 # Changelog - gstack-vibehard
 
+## [2.23.0] - 2026-06-17
+
+### Contrato de confiança unificado (1/3) — toda escrita global via safe-write + uninstall restaurativo
+Fecha a dívida apontada na revisão: "a camada de confiança estava dividida (parte manifest/safe-write, parte escrevia por fora)".
+- **`merge.js` agora delega ao safe-write:** `writeWithBackup`/`copyWithBackup`/`copyDirSync` passam por `safeWriteFile`/`safeCopyFile`/`safeCopyDir` (backup versionado + **registro no manifest** com componente inferido). Isso migra **claude, codex, headroom** de uma vez, sem reescrever cada caller.
+- **`install.js` (vault + `~/.codex/.env`) e `hermes.js` (config.yaml/snippet)** passam por safe-write. O `.env` usa **bloco marcado** (`safeAppendBlock`); o vault é registrado mas **preservado** (`removeOnUninstall:false`).
+- **Guard `underHome`:** o manifest só registra escrita GLOBAL (sob o home) — escrita em projeto/temp faz backup+atômica sem poluir o manifest (e sem poluir o `~` real em testes).
+- **uninstall NORMAL agora restaura via manifest** (originais `.gstack_vibehard.bak`) **ANTES** de remover qualquer coisa; o manifest é apagado por último. Antes o restore real só rodava em `--restore-only`.
+- **`doctor --fix` não-destrutivo:** escreve o merge via safe-write (manifest) e **preserva o `.jsonc`** renomeando para `.jsonc.gstack-disabled` (não apaga mais).
+- +2 testes; suíte intacta (186 Node + 38 Python verdes; lint limpo).
+
 ## [2.22.0] - 2026-06-17
 
 ### Fase 3 (3/3) — Trust fixes + OpenCode JSONC doctor

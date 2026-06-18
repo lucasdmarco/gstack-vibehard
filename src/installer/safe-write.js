@@ -54,20 +54,24 @@ export function safeWriteFile(filePath, content, opts = {}) {
   const buf = Buffer.isBuffer(content) ? content : Buffer.from(String(content))
   atomicWrite(filePath, buf)
   const installedHash = sha256(buf)
-  const manifest = loadManifest(home)
-  recordItem(manifest, {
-    path: filePath,
-    kind: opts.kind || "config",
-    action: opts.action || (existed ? "modified" : "created"),
-    component: opts.component || "unknown",
-    backup,
-    originalHash,
-    installedHash,
-    // arquivo que JÁ existia (do usuário) não é removido no uninstall — é restaurado.
-    removeOnUninstall: opts.removeOnUninstall != null ? opts.removeOnUninstall : !existed,
-    restoreOnUninstall: !!backup,
-  })
-  saveManifest(manifest, home)
+  // Manifest só registra mudanças GLOBAIS (sob o home). Escrita em projeto/temp
+  // (fora do home) faz backup+escrita atômica, mas não polui o manifest global.
+  if (filePath.startsWith(home)) {
+    const manifest = loadManifest(home)
+    recordItem(manifest, {
+      path: filePath,
+      kind: opts.kind || "config",
+      action: opts.action || (existed ? "modified" : "created"),
+      component: opts.component || "unknown",
+      backup,
+      originalHash,
+      installedHash,
+      // arquivo que JÁ existia (do usuário) não é removido no uninstall — é restaurado.
+      removeOnUninstall: opts.removeOnUninstall != null ? opts.removeOnUninstall : !existed,
+      restoreOnUninstall: !!backup,
+    })
+    saveManifest(manifest, home)
+  }
   return { backup, originalHash, installedHash }
 }
 
@@ -91,7 +95,7 @@ export function safeCopyDir(src, dst, opts = {}) {
       copyFileSync(s, d)
     }
   }
-  if (!opts._skipRecord) {
+  if (!opts._skipRecord && dst.startsWith(home)) {
     const manifest = loadManifest(home)
     recordItem(manifest, {
       path: dst,

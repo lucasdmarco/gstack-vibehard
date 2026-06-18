@@ -1,8 +1,9 @@
-import { existsSync, readFileSync, readdirSync, writeFileSync } from "fs"
+import { existsSync, readFileSync, readdirSync } from "fs"
 import { join, dirname } from "path"
 import { homedir } from "os"
 import { fileURLToPath } from "url"
 import { ensureDir, copyDirSync, readJsonFile } from "../installer/merge.js"
+import { safeWriteFile } from "../installer/safe-write.js"
 import { writeInstructionalGuidance } from "./instructional.js"
 
 /**
@@ -108,11 +109,12 @@ export async function installHermes(config = {}, report, deps = {}) {
 
     if (!configExisted) {
       // Não existe → criamos um config mínimo (nada do usuário a preservar).
-      writeFileSync(configYaml, YAML_HEADER + block)
+      // removeOnUninstall:false — VPS-safe (usuário pode editar depois).
+      safeWriteFile(configYaml, YAML_HEADER + block, { component: "hermes", removeOnUninstall: false })
       report.added.push("hermes mcp: ~/.hermes/config.yaml criado (mcp_servers, enabled:false)")
     } else {
       // JÁ existe → NÃO tocamos. Snippet lateral mergeável + orientação.
-      writeFileSync(snippetYaml, YAML_HEADER + block)
+      safeWriteFile(snippetYaml, YAML_HEADER + block, { component: "hermes" })
       report.skipped.push(
         "hermes mcp: config.yaml preservado — snippet em ~/.hermes/gstack-mcp-servers.yaml. " +
         "Mescle em `mcp_servers` (habilite os que tem) e rode /reload-mcp."
