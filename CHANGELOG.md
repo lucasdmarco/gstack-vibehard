@@ -1,5 +1,14 @@
 # Changelog - gstack-vibehard
 
+## [2.24.0] - 2026-06-18
+
+### Contrato de confiança (2/3) — create project-scoped + status honestos
+- **`create` agora é PROJECT-SCOPED:** parou de escrever config GLOBAL (`~/.config/opencode/hooks.json`, `~/.claude/settings.json`) — era a causa do EPERM e tocava o ambiente global sem manifest/backup. A config global de harness é responsabilidade do `install`. (Bônus: o `hooks.json` do OpenCode estava errado — OpenCode usa plugins.)
+- **`verify` honesto p/ automação:** `ready` agora é **estrito** (só `true` quando tudo aplicável passou, sem `tool_missing`); novo campo **`usable`** = sem blockers (mas pode faltar Fallow/QG). Consumidor que olha só `ready` não libera fluxo sem ferramenta de confiança.
+- **`workflow run` instruction-only ≠ `passed`:** quando nenhum trabalho real é executado (delegação OFF), o status vira **`instructed`** (não `passed`) — não engana o usuário leigo. Resume (journal_hit) e worker custom contam como executado.
+- **`build_agents.js`** usa `execFileSync` com array (sem shell/string); **`typecheck`** roda check de parse REAL (`node --check`), rotulado honestamente (ESM puro, sem TS) — fim do placebo que sempre passava.
+- Testes atualizados ao novo contrato (186 Node + 38 Python verdes; lint/typecheck limpos).
+
 ## [2.23.0] - 2026-06-17
 
 ### Contrato de confiança unificado (1/3) — toda escrita global via safe-write + uninstall restaurativo

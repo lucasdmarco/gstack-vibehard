@@ -63,13 +63,17 @@ export function runWorkflow(opts = {}) {
 
     state.iteration += 1
     const wId = `worker#${state.iteration}`
-    // REPLAY: worker já concluído nesta iteração? pula (journal_hit).
+    // REPLAY: worker já concluído nesta iteração? pula (journal_hit). O trabalho
+    // FOI feito numa execução anterior → conta como executado (não é instruction_only).
     if (isJournalHit(journalBase, runId, wId)) {
       log({ event: "journal_hit", nodeId: wId })
+      anyExecuted = true
     } else {
       log({ event: "node_started", nodeId: wId })
       const w = worker(state)
-      if (w.executed) anyExecuted = true
+      // Só o defaultWorker (instrução, delegação OFF) retorna executed:false explícito.
+      // Worker custom/injetado sem flag conta como trabalho executado.
+      if (w.executed !== false) anyExecuted = true
       if (w.ok === false) log({ event: "node_failed", nodeId: wId, signature: w.signature || "worker_failed" })
       else log({ event: "node_completed", nodeId: wId, summary: (w.summary || "").slice(0, 200), executed: w.executed === true })
     }
@@ -108,14 +112,16 @@ export function runWorkflow(opts = {}) {
     log({ event: "node_started", nodeId: `retry#${state.iteration}` })
   }
 
-  // Aviso: "passed" sem nenhum trabalho executado = só instrução ao harness
-  // (delegação OFF). O verde reflete o estado pré-existente, não a tarefa feita.
-  const warning = (state.status === "passed" && !anyExecuted)
-    ? "instruction_only: nenhum worker executou trabalho (delegação OFF); 'passed' reflete o estado pré-existente"
+  // HONESTO: "passed" sem nenhum trabalho executado NÃO é "passed" — só instrução
+  // ao harness (delegação OFF). Status vira `instructed` (não engana o consumidor).
+  const instructionOnly = state.status === "passed" && !anyExecuted
+  const finalStatus = instructionOnly ? "instructed" : state.status
+  const warning = instructionOnly
+    ? "instruction_only: nenhum worker executou trabalho (delegação OFF); status `instructed`, não `passed`"
     : undefined
   if (warning) log({ event: "run_warning", reason: "instruction_only" })
-  log({ event: "run_ended", status: state.status, iterations: state.iteration, executed: anyExecuted })
-  return { runId, status: state.status, iterations: state.iteration, journalBase, executed: anyExecuted, warning }
+  log({ event: "run_ended", status: finalStatus, iterations: state.iteration, executed: anyExecuted })
+  return { runId, status: finalStatus, iterations: state.iteration, journalBase, executed: anyExecuted, warning }
 }
 
 /**

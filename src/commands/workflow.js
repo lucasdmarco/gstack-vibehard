@@ -70,10 +70,11 @@ export async function workflowCommand(args = [], opts = {}) {
       })
       if (result.resumed) info("(run retomado do journal)")
 
-      const icon = result.status === "passed" ? "✓" : result.status === "handoff" ? "⚠" : "✗"
+      const icon = result.status === "passed" ? "✓" : result.status === "handoff" ? "⚠" : result.status === "instructed" ? "•" : "✗"
       info(`${icon} run ${result.runId}: ${result.status} em ${result.iterations} iteração(ões)`)
       if (result.status === "handoff") warn("Circuit breaker — HUMAN HANDOFF: revise antes de re-tentar.")
       if (result.status === "passed") success("Verificação passou.")
+      if (result.status === "instructed") warn("Apenas INSTRUÇÃO ao harness (nenhum trabalho executado) — não confunda com 'passed'.")
       if (result.warning) warn(result.warning)
       return result
     }
