@@ -1,5 +1,13 @@
 # Changelog - gstack-vibehard
 
+## [2.25.0] - 2026-06-18
+
+### Contrato de confiança (3/3) — proxy de interceptação real (opt-in) + higiene de worktree
+- **`gstack_vibehard proxy`** (`src/security/redact-proxy.js`): proxy reverso **opt-in** que redige a **resposta do modelo antes de chegar ao harness/tela** — a única forma honesta de "interceptação em trânsito" a partir de uma CLI. Aponte `ANTHROPIC_BASE_URL`/`OPENAI_BASE_URL` para ele. **Honesto:** só funciona onde o harness aceita base-URL custom (não é universal); SSE é best-effort por linha. Reusa a lib única de redaction.
+- **Higiene de worktree** (`checkTrackedSecrets`): o gstack **não copia `.env`** para worktrees (usa `git worktree add` puro; autosave exclui `.env`; não existe `.worktreeinclude`). O risco real é ter `.env` **rastreado** no git — `delegate --worktree` agora **avisa** se detectar. README atualizado desmentindo o mito do `.worktreeinclude`.
+- README §Segurança: documenta redaction do GitOps, higiene de worktree e o caminho honesto de interceptação (proxy opt-in vs Output Guard pós-resposta).
+- +6 testes (192 Node + 38 Python verdes; lint/typecheck limpos). Fecha o contrato de confiança (Fase 3 honesta completa).
+
 ## [2.24.0] - 2026-06-18
 
 ### Contrato de confiança (2/3) — create project-scoped + status honestos

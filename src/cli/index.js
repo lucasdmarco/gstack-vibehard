@@ -19,6 +19,7 @@ import { startCommand } from "../commands/start.js"
 import { taskCommand } from "../commands/task.js"
 import { verifyCommand } from "../commands/verify.js"
 import { dreamCommand } from "../commands/dream.js"
+import { proxyCommand } from "../commands/proxy.js"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const pkg = JSON.parse(readFileSync(resolve(__dirname, "../../package.json"), "utf-8"))
@@ -106,6 +107,7 @@ export function showHelp() {
   console.log(color("    gstack_vibehard task \"<pedido>\"  Loop Engineer: plano de feature (Document Graph + workflow + delegate)", COLORS.cyan))
   console.log(color("    gstack_vibehard verify         Delivery gates: deps/lint/typecheck/test/build/QG (--profile, --json)", COLORS.cyan))
   console.log(color("    gstack_vibehard dream          Auto-melhoria: audit (promessas vs evidência) · status (matriz de confiança)", COLORS.cyan))
+  console.log(color("    gstack_vibehard proxy          Proxy de redaction pré-output (opt-in) — interceptação real em trânsito", COLORS.cyan))
   console.log(color("    gstack_vibehard create <nome>  Criar workspace runtime omniharness", COLORS.cyan))
   console.log(color("    gstack_vibehard init <nome>    Criar novo projeto com estrutura completa", COLORS.cyan))
   console.log(color("    gstack_vibehard doctor         Diagnosticar ambiente", COLORS.cyan))
@@ -206,6 +208,9 @@ async function dispatch(command, args) {
       break
     case "dream":
       await dreamCommand(args)
+      break
+    case "proxy":
+      await proxyCommand(args)
       break
     case "delegate":
       await delegateCommand(args)

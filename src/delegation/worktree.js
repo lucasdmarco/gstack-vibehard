@@ -42,6 +42,21 @@ export function commitWorktree(worktreeDir, message, opts = {}) {
   exec("git", ["commit", "-m", message, "--no-verify"], { cwd: worktreeDir, stdio: "pipe", shell: false, timeout: 30000 })
 }
 
+/**
+ * Higiene de segredos: o gstack NÃO copia `.env` para worktrees (usa `git worktree
+ * add` puro, e o autosave exclui `.env`). O risco real é o usuário ter `.env`
+ * RASTREADO no git — aí ele apareceria no checkout da worktree. Esta função detecta
+ * isso para avisar antes de delegar. Retorna a lista de arquivos sensíveis rastreados.
+ */
+export function checkTrackedSecrets(repoCwd, exec = defaultExecFileSync) {
+  try {
+    const out = exec("git", ["ls-files", "-z", "--", ".env", ".env.*", "**/.env", "**/.env.*"], { cwd: repoCwd, stdio: "pipe", encoding: "utf-8", timeout: 10000 })
+    return String(out || "").split("\0").filter(Boolean)
+  } catch {
+    return []
+  }
+}
+
 /** True se o cwd está dentro de um repositório git. */
 export function isGitRepo(cwd, exec = defaultExecFileSync) {
   try {
