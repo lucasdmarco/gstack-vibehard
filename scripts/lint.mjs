@@ -36,5 +36,11 @@ for (const f of files) {
   }
 }
 
-console.log(`lint: ${files.length} arquivos checados, ${errors} com erro de sintaxe`)
+// Modo --typecheck: mesmo check de parse REAL (node --check), rotulado com
+// honestidade — o projeto é ESM puro (sem TypeScript), então "typecheck" aqui é
+// verificação de sintaxe/parse de cada módulo, não inferência de tipos.
+const label = process.argv.includes("--typecheck")
+  ? "typecheck (ESM puro — parse/sintaxe via node --check, sem TS)"
+  : "lint"
+console.log(`${label}: ${files.length} arquivos checados, ${errors} com erro de sintaxe`)
 process.exit(errors ? 1 : 0)

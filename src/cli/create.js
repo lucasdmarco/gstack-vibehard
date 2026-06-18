@@ -771,35 +771,14 @@ Sempre passe pelo Quality Gate local antes de finalizar o codigo.
 Eventos de ferramentas devem ser logados via agent-hooks.
 `)
 
-    const openCodeHooksPath = join(homedir(), ".config", "opencode", "hooks.json")
-    const openCodeConfig = {
-      "tool.execute.before": "gstack-agent-bridge",
-      "session.idle": "gstack-agent-bridge",
-    }
-    await writeJsonMerge(openCodeHooksPath, openCodeConfig, opts)
-
-    const claudeSettingsPath = join(homedir(), ".claude", "settings.json")
+    // NOTA: `create` é PROJECT-SCOPED. A config GLOBAL de harness (Claude
+    // settings.json, OpenCode plugins) é responsabilidade do `install` — não do
+    // create. Escrever em ~/.config/opencode ou ~/.claude aqui causava EPERM e
+    // tocava o ambiente global do usuário sem manifest/backup. Removido.
     const pyCmd = resolvePythonCmd()
-
-    // Resolve hooks dir: ~/.gstack/hooks/ primary, ~/.codex/hooks/ fallback
     const gstackHooksDir = join(homedir(), ".gstack", "hooks")
     const codexHooksDir = join(homedir(), ".codex", "hooks")
     const hooksDir = existsSync(gstackHooksDir) ? gstackHooksDir : codexHooksDir
-
-    // Formato REAL de hooks do Claude Code (settings.json):
-    // hooks.<Evento> = [{ matcher?, hooks: [{ type: "command", command, timeout }] }]
-    const claudeConfig = {
-      hooks: {
-        PreToolUse: [{
-          matcher: "Write|Edit|Bash",
-          hooks: [{ type: "command", command: `${pyCmd} "${join(hooksDir, "pre_tool_use_security.py")}"`, timeout: 30 }],
-        }],
-        Stop: [{
-          hooks: [{ type: "command", command: `${pyCmd} "${join(hooksDir, "stop.py")}"`, timeout: 600 }],
-        }],
-      },
-    }
-    await writeJsonMerge(claudeSettingsPath, claudeConfig, opts)
 
     // Cursor: hooks.json em nivel de projeto (formato oficial version: 1)
     const cursorHooksPath = join(cwd, ".cursor", "hooks.json")

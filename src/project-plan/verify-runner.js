@@ -89,8 +89,11 @@ export function runVerify(opts = {}) {
   else status = "ready"
 
   const reducedTrust = opts.harness ? !isStrongTrust(opts.harness) : false
-  // ready (compat): sem blockers e sem pendência de produto.
-  const ready = status === "ready" || status === "ready_with_warnings"
+  // `ready` é ESTRITO: só true quando TUDO aplicável passou (sem tool_missing).
+  // Consumidor automático que olha só `ready` não libera sem ferramenta de confiança.
+  // `usable` = sem blockers (mas pode faltar gate de confiança / haver avisos).
+  const ready = status === "ready"
+  const usable = ready || status === "ready_with_warnings"
 
-  return { profile, status, ready, reducedTrust, harness: opts.harness || null, steps, failed, toolMissing }
+  return { profile, status, ready, usable, reducedTrust, harness: opts.harness || null, steps, failed, toolMissing }
 }

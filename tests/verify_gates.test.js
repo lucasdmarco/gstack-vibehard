@@ -31,7 +31,8 @@ test("verify: QG ausente → tool_missing e status ready_with_warnings (não sil
     assert.equal(byId.test, "passed")
     assert.equal(byId.qg, "tool_missing", "Fallow/QG ausente vira tool_missing")
     assert.equal(r.status, "ready_with_warnings")
-    assert.equal(r.ready, true, "sem blockers")
+    assert.equal(r.ready, false, "ready ESTRITO: false sem ferramenta de confiança")
+    assert.equal(r.usable, true, "usable: sem blockers")
   } finally { await rm(cwd, { recursive: true, force: true }) }
 })
 

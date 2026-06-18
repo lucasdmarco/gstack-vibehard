@@ -94,7 +94,7 @@ test("runner: worker só-instrução (delegação OFF) -> executed:false + warni
       task: "t", journalBase: base, runId: "instr1",
       verifier: () => ({ passed: true, signature: "tests_passed" }),
     })
-    assert.equal(r.status, "passed")
+    assert.equal(r.status, "instructed", "instruction_only NÃO é 'passed'")
     assert.equal(r.executed, false, "nenhum trabalho real foi executado")
     assert.ok(r.warning && /instruction_only/.test(r.warning), "expõe aviso instruction_only")
   })

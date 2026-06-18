@@ -3,7 +3,7 @@ import { existsSync } from "node:fs"
 import fs from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { execSync } from "node:child_process"
+import { execSync, execFileSync } from "node:child_process"
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url))
 const DEFAULT_ROOT = path.resolve(SCRIPT_DIR, "..", "..")
@@ -387,8 +387,12 @@ async function securityScanGenerated(root, generatedRoot, options) {
   // Try ecc-agentshield first
   if (!options.check && !options.dryRun) {
     try {
-      const scanCmd = `npx ecc-agentshield scan --dir ${path.join(root, "core")} --json 2>&1`
-      const scanOutput = execSync(scanCmd, { timeout: 60000, encoding: "utf8", stdio: "pipe" })
+      // execFileSync com array (sem shell): caminho com metacaracteres não vira injeção.
+      const coreDir = path.join(root, "core")
+      const isWin = process.platform === "win32"
+      const scanOutput = isWin
+        ? execFileSync("cmd.exe", ["/c", "npx", "ecc-agentshield", "scan", "--dir", coreDir, "--json"], { timeout: 60000, encoding: "utf8", stdio: "pipe" })
+        : execFileSync("npx", ["ecc-agentshield", "scan", "--dir", coreDir, "--json"], { timeout: 60000, encoding: "utf8", stdio: "pipe" })
       const scanResult = JSON.parse(scanOutput)
       findings.push(...(scanResult.findings || []))
       log(`ecc-agentshield: ${scanResult.summary || "scan complete"}`)
