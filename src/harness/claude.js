@@ -62,7 +62,8 @@ O hook pre_tool_use_security.py bloqueia escrita de UI ate essa pergunta ser res
 Se ~/.gstack_vibehard/update_status.json mostrar latest > local, avise e sugira /g_update
 
 ## Dream
-Auto-dream ON. Memorias persistentes entre sessoes.
+Dream audit ON (\`gstack_vibehard dream audit\` — promessas vs evidencia). Memorias persistentes entre sessoes.
+Auto-improve (worktree/verify/accept-reject) esta no roadmap, ainda nao executavel.
 `
 
 const ultracodeContent = `# Ultracode — gstack_vibehard quality standards

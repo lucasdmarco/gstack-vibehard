@@ -1,5 +1,14 @@
 # Changelog - gstack-vibehard
 
+## [2.26.0] - 2026-06-18
+
+### Hardening de produto (correções da revisão)
+- **[crítico] Isolamento de teste do manifest:** o guard `underHome` usava só `startsWith(home)`, mas no Windows `tmpdir()` fica **sob** `homedir()` — então rodar `npm test` gravava/corrompia o `~/.gstack_vibehard/install-manifest.json` **real** do desenvolvedor. Novo `shouldRecordManifest` só registra quando o `home` é explícito (intenção do caller) **ou** o caminho **não** está sob `tmpdir()`. Prova: o md5 do manifest real fica idêntico antes/depois da suíte.
+- **`safeCopyDir` restaurável:** cada arquivo interno do usuário sobrescrito agora é registrado no manifest como item **restaurável** (`restoreOnUninstall:true` + backup) — antes só o dir pai era registrado e o uninstall não restaurava arquivos internos.
+- **Auto Dream honesto:** o bloco escrito no `CLAUDE.md` deixou de afirmar "Auto-dream ON" → agora "**Dream audit ON** — auto-improve (worktree/verify/accept-reject) no roadmap". `dream status` idem.
+- **uninstall — fallback legado seguro:** sem manifest, remover skill por **nome** (risco de colisão com a do usuário) agora exige `--legacy-name-cleanup`; por padrão avisa e **não remove**.
+- +2 testes (`shouldRecordManifest`, `safeCopyDir` restaurável); 194 Node + 38 Python verdes; lint/typecheck limpos.
+
 ## [2.25.0] - 2026-06-18
 
 ### Contrato de confiança (3/3) — proxy de interceptação real (opt-in) + higiene de worktree
