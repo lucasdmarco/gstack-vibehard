@@ -21,21 +21,23 @@ test("checkTrackedSecrets: sem .env rastreado → lista vazia; erro git → vazi
   assert.deepEqual(checkTrackedSecrets("/repo", () => { throw new Error("not a repo") }), [])
 })
 
-test("delegate --worktree: avisa quando há .env rastreado (não bloqueia)", async () => {
+test("delegate --worktree: BLOQUEIA quando há .env rastreado (não delega)", async () => {
   const dmod = path.join(repoRoot, "src", "commands", "delegate.js")
   const { delegateCommand } = await import(`${pathToFileURL(dmod)}?t=${Date.now()}`)
   let buf = ""
   const orig = process.stdout.write.bind(process.stdout)
   process.stdout.write = (s) => { buf += String(s); return true }
+  let r
   try {
-    // exec serve tanto p/ git ls-files (.env) quanto p/ a delegação (opencode ausente)
-    await delegateCommand(["opencode", "--task", "x", "--worktree", "--yes"], {
+    // exec só responde a git ls-files (.env); se delegar, opencode lançaria
+    r = await delegateCommand(["opencode", "--task", "x", "--worktree", "--yes"], {
       cwd: "/repo",
       exec: (file, args) => {
         if (file === "git" && (args || []).includes("ls-files")) return ".env\0"
-        throw new Error("opencode missing")
+        throw new Error("não deveria delegar com .env rastreado")
       },
     })
   } finally { process.stdout.write = orig }
-  assert.match(buf, /\.env RASTREADO/, "avisa sobre o .env rastreado")
+  assert.equal(r.status, "blocked_tracked_secrets", "bloqueia a delegação")
+  assert.match(buf, /BLOQUEADO/, "informa que bloqueou")
 })

@@ -114,6 +114,16 @@ gstack_vibehard install --skip-deps  # só configura harnesses (pula bun/Rust/Ch
 ```
 Registra os **hooks reais** (Claude Code `settings.json`, Cursor `hooks.json`, OpenCode plugins), copia agentes/skills, configura MCP e escreve orientação instrucional para os harnesses sem hooks API. Idempotente e não-destrutivo (faz backup `.bak`).
 
+### `enable` / `disable` / `status` — ativar o gstack num projeto existente (opcional)
+A infra é instalada **globalmente**, mas as regras gstack só **agem em projetos com `.gstack/`**. Por isso: **projeto novo** (`create`) já nasce **ativo**; **projeto em andamento** fica **intocado** até você ativar.
+```bash
+cd meu-projeto-em-andamento
+gstack_vibehard enable     # ativa o gstack AQUI (QG, design-system, chronicle passam a agir)
+gstack_vibehard status     # ATIVO / DESATIVADO / INATIVO neste projeto
+gstack_vibehard disable    # desativa preservando dados (renomeia .gstack/ → .gstack-disabled/)
+```
+`disable` **não apaga nada** — `enable` depois reativa preservando contexto/planos. O que você não ativar continua intocado (só o bloqueio de comando destrutivo permanece global, como rede de segurança).
+
 ### `create <nome>` — criar um workspace runtime
 ```bash
 gstack_vibehard create meu-app                                   # template padrão (fullstack-monorepo)
