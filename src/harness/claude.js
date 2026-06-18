@@ -29,6 +29,13 @@ function resolvePythonCmd() {
 
 const claudeMdContent = `# CLAUDE.md — gstack_vibehard
 
+## Escopo (ATIVACAO POR PROJETO)
+Estas regras gstack (Quality Gate, Security Gate, design-system, dream) valem
+SOMENTE em projetos que contenham a pasta \`.gstack/\` no diretorio raiz.
+Em qualquer outro projeto (sem \`.gstack/\`), IGNORE este arquivo e trabalhe
+normalmente — o gstack nao deve mudar seu comportamento fora de projetos gstack.
+Para ativar o gstack num projeto existente: rode \`gstack_vibehard context init\`.
+
 ## Identity
 Sou fundador e CTO. Construo porque nao consigo nao construir.
 O padrao e world-class. Inegociavel.

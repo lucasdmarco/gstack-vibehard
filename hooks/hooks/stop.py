@@ -22,7 +22,7 @@ from typing import Optional
 
 from _output_guard import output_guard, SENSITIVE_PATTERNS, ALLOWED_ROLES_HIERARCHY
 from _redact import redact_secrets, log_redaction_event
-from _paths import chronicle_dir, hook_support_path, migrate_legacy, GSTACK_DIR
+from _paths import chronicle_dir, hook_support_path, migrate_legacy, GSTACK_DIR, is_gstack_project
 from _harness import parse_stdin, normalize_input
 from datetime import datetime
 
@@ -441,9 +441,22 @@ sys.excepthook = _crash_handler
 # ═══════════════════════════════════════════════════════════════
 #  MAIN
 # ═══════════════════════════════════════════════════════════════
-inp = parse_stdin()
-norm = normalize_input(inp)
+# FAIL-OPEN: o Stop hook roda em TODO turno de TODO projeto. Erro de parsing não
+# pode quebrar o turno — sai limpo (exit 0).
+try:
+    inp = parse_stdin()
+    norm = normalize_input(inp)
+except Exception:
+    sys.exit(0)
 cwd = norm["cwd"]
+
+# ATIVAÇÃO POR PROJETO: a infra do hook é global, mas as REGRAS gstack (chronicle,
+# security gate, sandbox, identidade) só agem em projeto gstack (.gstack/ presente).
+# Projeto alheio em andamento (sem .gstack/) → o gstack não interfere. Sai limpo.
+# Test gate / GitOps continuam opt-in por env mesmo em projeto gstack.
+if not is_gstack_project(cwd):
+    sys.exit(0)
+
 last_msg = norm["last_assistant_message"]
 turn_id = norm["turn_id"]
 flags = norm["flags"]
