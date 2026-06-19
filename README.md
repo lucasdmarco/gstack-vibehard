@@ -107,12 +107,19 @@ gstack_vibehard doctor
 ```
 Mostra: Node/Python, harnesses detectados e nível de integração (hooks reais / instrucional / detecção), hooks instalados, skills, deps globais (bun, uv, Rust, Go, pytest, headroom), seção **Integrações** (Composio + Printing Press) e Playwright. **Rode primeiro** para ver o que falta.
 
-### `install` — configurar o ambiente
+### `install` — configurar o ambiente (Safe Install: preflight-first)
 ```bash
-gstack_vibehard install              # instala deps globais + configura todos os harnesses
-gstack_vibehard install --skip-deps  # só configura harnesses (pula bun/Rust/Chromium pesados)
+gstack_vibehard install --audit-only   # PREFLIGHT: lista o impacto global por categoria, SEM escrever nada
+gstack_vibehard install --project-only # impacto global mínimo (sem deps/MCP global/vault)
+gstack_vibehard install --harness claude   # instala só um harness
+gstack_vibehard install                # instalação completa (mostra o impacto e PEDE confirmação)
+gstack_vibehard install --yes          # confirma o impacto global (necessário em modo não-interativo)
+gstack_vibehard install --global-mcp   # opt-in: escrever MCP global (por padrão NÃO escreve)
+gstack_vibehard install --skip-deps    # pula bun/Rust/Chromium pesados
 ```
-Registra os **hooks reais** (Claude Code `settings.json`, Cursor `hooks.json`, OpenCode plugins), copia agentes/skills, configura MCP e escreve orientação instrucional para os harnesses sem hooks API. Idempotente e não-destrutivo (faz backup `.bak`).
+**Preflight-first:** antes de qualquer escrita global, o `install` mostra o impacto por categoria e pede confirmação (em modo não-interativo exige `--yes`/`--global`). **MCP global é opt-in** (`--global-mcp`). Registra os **hooks reais** (Claude `settings.json`, Cursor `hooks.json`, OpenCode plugins), copia agentes/skills e escreve orientação instrucional para os harnesses sem hooks API. Idempotente e não-destrutivo (backup `.bak` + manifest). Auditar/reverter: `gstack_vibehard doctor --impact` · `doctor --install-integrity` · `uninstall --dry-run`/`--resolve-drift`.
+
+> **Honestidade de scripts:** `npm run syntaxcheck` (alias `typecheck`) faz checagem de **sintaxe ESM** via `node --check` — não é typecheck TypeScript. O nome `syntaxcheck` reflete o que realmente roda.
 
 ### `enable` / `disable` / `status` — ativar o gstack num projeto existente (opcional)
 A infra é instalada **globalmente**, mas as regras gstack só **agem em projetos com `.gstack/`**. Por isso: **projeto novo** (`create`) já nasce **ativo**; **projeto em andamento** fica **intocado** até você ativar.

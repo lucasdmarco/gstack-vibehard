@@ -1,5 +1,20 @@
 # Changelog - gstack-vibehard
 
+## [3.0.0] - 2026-06-19
+
+### Safe & adaptive by default — flip do default do `install` (Fases 5–6, fecha o master plan)
+
+**BREAKING CHANGES (instalação):**
+- **`install` é preflight-first:** antes de qualquer escrita global, mostra o impacto por categoria e **exige confirmação**. Em modo **não-interativo** agora exige `--yes` (ou `--global`) — antes instalava direto. Migração: use `gstack_vibehard install --yes` (completa) ou `--project-only --yes` (impacto mínimo).
+- **MCP global é opt-in:** o `install` **não escreve mais MCP global por padrão** — use `--global-mcp` (ou `--global`). Antes era escrito automaticamente. (Codex AC8.)
+
+**Honestidade & docs (Fase 5):**
+- `npm run syntaxcheck` (novo nome honesto; `typecheck` mantido como alias) — deixa claro que é checagem de **sintaxe ESM** (`node --check`), não TypeScript.
+- README: seção de Safe Install (preflight/`--audit-only`/`--project-only`/`--harness`/`--global-mcp`), nota de honestidade dos scripts, ponteiros de auditoria/rollback.
+
+**Fecha o master plan `entregafinal.md`:** AC1–AC8 do Codex cobertas; duas camadas (contexto/identidade + checks determinísticos por arquétipo) entregues; tudo testado de ponta a ponta sem tocar a máquina real (DI de `home`/`exec`), com a invariante de md5 do manifest.
+- +1 teste Node (MCP opt-in no impacto). 240 Node + 56 Python verdes; lint/syntaxcheck limpos.
+
 ## [2.32.0] - 2026-06-19
 
 ### Delegação que não vaza segredo + uninstall que não perde sua edição (Fase 4)

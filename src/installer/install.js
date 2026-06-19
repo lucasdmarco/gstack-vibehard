@@ -390,6 +390,10 @@ export async function install(args = []) {
   const onlyHarness = hi !== -1 && args[hi + 1] && !args[hi + 1].startsWith("--") ? args[hi + 1] : null
   // project-only NÃO toca deps globais (impacto global mínimo).
   const skipDeps = args.includes("--skip-deps") || projectOnly || process.env.GSTACK_SKIP_DEPS === "1"
+  const yes = args.includes("--yes") || args.includes("-y")
+  const globalConfirmed = args.includes("--global") || yes
+  // MCP global é OPT-IN (AC8): só escreve com --global-mcp (ou --global). project-only nunca.
+  const globalMcp = !projectOnly && (args.includes("--global-mcp") || args.includes("--global"))
   const report = { added: [], updated: [], skipped: [], errors: [] }
 
   section("gstack_vibehard Installer")
@@ -443,6 +447,30 @@ export async function install(args = []) {
     if (h.id === "gemini") {
       warn("Gemini IDE: nao possui hooks API — Quality Gate rodara em modo Best-Effort (instrucional)")
       warn("  Os agentes podem ignorar a instrucao de rodar o Fallow sem serem bloqueados.")
+    }
+  }
+
+  // PREFLIGHT-FIRST (Safe Install / Codex AC1): mostra o impacto global por
+  // categoria e EXIGE confirmação antes de qualquer escrita global. Interativo →
+  // confirma; não-interativo → exige --yes/--global (senão aborta com orientação).
+  {
+    const impact = buildInstallImpact({ home: HOME, harnessIds: allHarnessIds, withDeps: !skipDeps, withMcp: globalMcp, projectOnly })
+    section("Impacto desta instalação (preflight)")
+    for (const c of impact) info(`  • ${c.label}${c.optional ? " (opcional)" : ""}: ${c.items.length} item(ns)`)
+    if (!globalMcp && !projectOnly) info("  • MCP global: NÃO será escrito (opt-in: use --global-mcp)")
+    info("")
+    info("Detalhe completo sem instalar: `gstack_vibehard install --audit-only`.")
+    if (!globalConfirmed) {
+      if (process.stdin.isTTY) {
+        const ok = await confirm("Prosseguir com a instalação? (ou Ctrl-C e use --project-only)", false)
+        if (!ok) { info("Instalação cancelada. Dica: `--project-only` (impacto mínimo) ou `--audit-only`."); return report }
+      } else {
+        error("Modo não-interativo: confirme explicitamente o impacto global.")
+        info("  gstack_vibehard install --yes            (instalação completa)")
+        info("  gstack_vibehard install --project-only --yes  (impacto mínimo)")
+        info("  gstack_vibehard install --audit-only     (só o relatório de impacto)")
+        return report
+      }
     }
   }
 
@@ -589,8 +617,8 @@ export async function install(args = []) {
           break
         case "claude":
           // hooks: true = REGISTRO no settings.json (Step 3 ja copiou os .py)
-          // project-only NÃO escreve MCP global (impacto global mínimo).
-          await installClaude({ hooks: true, claudeMd: true, ultracode: true, mcp: !projectOnly }, report)
+          // MCP global é OPT-IN (--global-mcp/--global); senão não escreve.
+          await installClaude({ hooks: true, claudeMd: true, ultracode: true, mcp: globalMcp }, report)
           break
         case "opencode":
           await installOpenCode({ hooks: true }, report)
@@ -601,7 +629,7 @@ export async function install(args = []) {
         case "hermes":
           // Hermes fala MCP nas duas direções: skills + guidance (garantidos) +
           // registro dos MCP servers via `hermes mcp add` (best-effort).
-          await installHermes({ mcp: !projectOnly, skills: true }, report, { projectRoot: PROJECT_ROOT })
+          await installHermes({ mcp: globalMcp, skills: true }, report, { projectRoot: PROJECT_ROOT })
           break
         default: {
           // Harness sem API de hooks: integracao instrucional honesta —
