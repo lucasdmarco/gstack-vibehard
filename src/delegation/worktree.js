@@ -35,26 +35,34 @@ export function removeWorktree(repoCwd, dir, branch, opts = {}) {
   }
 }
 
+/** True se o caminho é segredo, artefato de build ou binário — NÃO vai pro commit. */
+export function isExcludedFromCommit(file) {
+  const p = String(file).replace(/\\/g, "/")
+  const base = p.split("/").pop() || ""
+  if (base === ".env" || base.startsWith(".env.")) return true
+  if (/(^|\/)(node_modules|dist|build|\.next|out|coverage|\.turbo)(\/|$)/.test(p)) return true
+  // binários/artefatos por extensão (lockfiles ficam — dep change legítima os altera)
+  if (/\.(png|jpe?g|gif|webp|ico|pdf|zip|tar|gz|tgz|exe|dll|so|dylib|node|woff2?|ttf|eot|mp4|mov|class|wasm|map)$/i.test(base)) return true
+  return false
+}
+
 /**
  * Commita as mudanças na worktree (preserva no branch efêmero). Seguro:
- *  - NÃO inclui `.env`/`.env.*` no commit (segredo não vai pro branch revisável);
+ *  - **Staging por ALLOWLIST** (NÃO `git add -A`): adiciona explicitamente só os
+ *    arquivos alterados que NÃO são segredo/artefato/binário (`isExcludedFromCommit`);
  *  - SEM `--no-verify` (respeita os hooks de pre-commit do usuário).
+ * Retorna { staged, excluded }.
  */
 export function commitWorktree(worktreeDir, message, opts = {}) {
   const exec = opts.exec || defaultExecFileSync
-  exec("git", ["add", "-A"], { cwd: worktreeDir, stdio: "pipe", shell: false, timeout: 30000 })
-  // Tira do staging segredos E artefatos que não pertencem a um branch revisável:
-  // .env (segredo), saídas de build e diretórios pesados. Mantém lockfiles (uma
-  // mudança de dependência delegada legitimamente os altera).
-  const EXCLUDE = [
-    ".env", ".env.*", "**/.env", "**/.env.*",
-    "dist", "build", ".next", "out", "coverage", ".turbo", "node_modules",
-    "**/dist", "**/build",
-  ]
-  try {
-    exec("git", ["reset", "-q", "--", ...EXCLUDE], { cwd: worktreeDir, stdio: "pipe", shell: false, timeout: 15000 })
-  } catch { /* nada a desestaging — ok */ }
+  const out = String(exec("git", ["status", "--porcelain"], { cwd: worktreeDir, stdio: "pipe", shell: false, encoding: "utf-8", timeout: 15000 }) || "")
+  const changed = out.split("\n").map((l) => l.slice(3).trim()).filter(Boolean).map((p) => p.split(" -> ").pop())
+  const allow = changed.filter((f) => !isExcludedFromCommit(f))
+  if (allow.length === 0) return { staged: 0, excluded: changed.length }
+  // add explícito (em um único comando; args em array, shell:false — sem injeção)
+  exec("git", ["add", "--", ...allow], { cwd: worktreeDir, stdio: "pipe", shell: false, timeout: 30000 })
   exec("git", ["commit", "-m", message], { cwd: worktreeDir, stdio: "pipe", shell: false, timeout: 30000 })
+  return { staged: allow.length, excluded: changed.length - allow.length }
 }
 
 /**

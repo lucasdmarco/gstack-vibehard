@@ -37,16 +37,40 @@ test("worktree: createWorktree usa git worktree add com branch seguro", async ()
   assert.ok(calls.some((c) => c.startsWith("git worktree add -b gstack/x /tmp/wt")))
 })
 
-test("commitWorktree: nao usa --no-verify e exclui .env do staging", async () => {
+test("commitWorktree: staging por ALLOWLIST (sem git add -A), exclui .env/artefatos, sem --no-verify", async () => {
+  const { commitWorktree, isExcludedFromCommit } = await import(`${pathToFileURL(wtMod)}?t=${Date.now()}`)
+  const calls = []
+  const exec = (file, args) => {
+    calls.push([file, ...args].join(" "))
+    if (file === "git" && args[0] === "status") return Buffer.from(" M src/a.js\n?? .env\n M dist/bundle.js\n?? logo.png\n")
+    return Buffer.from("")
+  }
+  const r = commitWorktree("/tmp/wt", "delega: x", { exec })
+  // NUNCA usa `git add -A`
+  assert.ok(!calls.some((c) => c.startsWith("git add -A")), "não usa git add -A")
+  // adiciona explicitamente só os elegíveis
+  const add = calls.find((c) => c.startsWith("git add -- "))
+  assert.ok(add.includes("src/a.js"), "adiciona o fonte alterado")
+  assert.ok(!add.includes(".env") && !add.includes("dist/bundle.js") && !add.includes("logo.png"), "não adiciona .env/build/binário")
+  assert.equal(r.staged, 1); assert.equal(r.excluded, 3)
+  const commit = calls.find((c) => c.startsWith("git commit"))
+  assert.ok(commit && !commit.includes("--no-verify"), "commita sem --no-verify")
+  // sanidade do predicado
+  assert.ok(isExcludedFromCommit(".env") && isExcludedFromCommit("dist/x.js") && isExcludedFromCommit("a.png"))
+  assert.ok(!isExcludedFromCommit("src/index.js") && !isExcludedFromCommit("package-lock.json"))
+})
+
+test("commitWorktree: sem arquivos elegíveis não força commit", async () => {
   const { commitWorktree } = await import(`${pathToFileURL(wtMod)}?t=${Date.now()}`)
   const calls = []
-  const exec = (file, args) => { calls.push([file, ...args].join(" ")); return Buffer.from("") }
-  commitWorktree("/tmp/wt", "delega: x", { exec })
-  assert.ok(calls.some((c) => c.startsWith("git add -A")), "stage inicial")
-  assert.ok(calls.some((c) => c.startsWith("git reset -q -- .env")), "remove .env do staging")
-  const commit = calls.find((c) => c.startsWith("git commit"))
-  assert.ok(commit, "commitou")
-  assert.ok(!commit.includes("--no-verify"), "respeita hooks de pre-commit (sem --no-verify)")
+  const exec = (file, args) => {
+    calls.push([file, ...args].join(" "))
+    if (file === "git" && args[0] === "status") return Buffer.from("?? .env\n")
+    return Buffer.from("")
+  }
+  const r = commitWorktree("/tmp/wt", "x", { exec })
+  assert.equal(r.staged, 0)
+  assert.ok(!calls.some((c) => c.startsWith("git commit")), "não commita quando só há excluídos")
 })
 
 test("runDelegation --worktree: isola, commita mudancas e preserva branch", async () => {

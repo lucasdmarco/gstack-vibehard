@@ -1,5 +1,15 @@
 # Changelog - gstack-vibehard
 
+## [3.0.2] - 2026-06-19
+
+### Fechamento de qualidade — auditoria 4 pontos (rumo ao 10/10)
+- **[qg.py] Timeout robusto + JSON garantido** (`hooks/hooks/qg.py`): o Fallow agora roda via `Popen` em grupo/sessão própria; no timeout o gstack **mata a árvore inteira** (`taskkill /T` no Windows, `killpg` no POSIX) — antes o `--timeout` não cortava em cache frio do `npx` porque netos seguravam o pipe (trava >60s no Windows). Em timeout, o JSON de erro é **sempre** emitido.
+- **[delegação] Staging por ALLOWLIST** (`src/delegation/worktree.js`): `commitWorktree` deixa de usar `git add -A`. Agora lista o `git status --porcelain` e adiciona **explicitamente** só os arquivos elegíveis (exclui `.env`, build/saídas, binários; mantém lockfiles). `isExcludedFromCommit` exportada e testada. Não força commit quando só há excluídos.
+- **[autosave] `--no-verify` agora é OPT-IN** (`hooks/hooks/git_worktree_autosave.py`): por padrão **respeita os hooks de pre-commit**; só pula com `GSTACK_AUTOSAVE_NO_VERIFY=1`.
+- **[README] Claims 100% alinhados ao código**: versão do topo atualizada; `delegate` **bloqueia** `.env` rastreado (antes dizia "avisa"); a afirmação de "`git add -A` removido / staging explícito" agora é **verdadeira** (delegação + autosave usam allowlist).
+- +2 testes Node (allowlist staging; sem commit quando só excluídos). 241 Node + 56 Python verdes; lint/syntaxcheck limpos.
+- Nota honesta: o `verify` usa o `qg.py` **instalado** (`~/.codex`/`~/.gstack`), que reflete o ambiente real do usuário; ele fica em sincronia com o pacote ao rodar `gstack_vibehard install` (atualiza hooks obsoletos). Itens do `dream audit` (Output Guard, Auto-dream, Zero-Trust) seguem honestamente como PARTIAL/RISK no roadmap.
+
 ## [3.0.1] - 2026-06-19
 
 ### Pacote npm estado-da-arte — sem artefatos Python no tarball

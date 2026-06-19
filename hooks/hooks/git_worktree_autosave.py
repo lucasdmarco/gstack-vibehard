@@ -120,10 +120,14 @@ def autosave_worktree(wt_path: Path) -> dict:
                 capture_output=True, text=True, timeout=30, cwd=str(wt_path)
             )
 
-        # Commit (even if only previously staged changes exist)
+        # Commit (even if only previously staged changes exist).
+        # `--no-verify` (pular hooks de pre-commit) é OPT-IN explícito via
+        # GSTACK_AUTOSAVE_NO_VERIFY=1 — por padrão o autosave RESPEITA os hooks.
+        commit_args = ["git", "commit", "-m", "gstack auto-save agent checkpoint", "--allow-empty"]
+        if os.environ.get("GSTACK_AUTOSAVE_NO_VERIFY") == "1":
+            commit_args.append("--no-verify")
         commit = subprocess.run(
-            ["git", "commit", "-m", "gstack auto-save agent checkpoint",
-             "--allow-empty", "--no-verify"],
+            commit_args,
             capture_output=True, text=True, timeout=30, cwd=str(wt_path)
         )
 

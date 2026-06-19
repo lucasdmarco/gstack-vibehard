@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -215,21 +216,53 @@ def skipped_result(reason: str, level: int) -> dict[str, Any]:
     }
 
 
+def _kill_tree(proc) -> None:
+    """Mata a ÁRVORE de processos (npx → node → fallow). `subprocess.run(timeout=)`
+    sozinho só mata o filho direto; netos seguram o pipe e a chamada trava no
+    Windows. Aqui usamos taskkill /T (Windows) ou killpg (POSIX)."""
+    try:
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                           capture_output=True, timeout=10)
+        else:
+            import signal
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+    except Exception:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+
+
 def run_fallow(root: Path, timeout: int) -> tuple[Any, subprocess.CompletedProcess[str] | None]:
     npx = shutil.which("npx")
     if npx is None:
         return None, None
-    completed = subprocess.run(
-        [npx, *FALLOW_COMMAND[1:]],
-        cwd=root,
-        capture_output=True,
-        text=True,
-        timeout=timeout,
+    # Popen em grupo/sessão própria → no timeout matamos a árvore inteira e o
+    # `--timeout` é SEMPRE respeitado (não trava por netos segurando o pipe).
+    kwargs = {}
+    if os.name == "nt":
+        kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        kwargs["start_new_session"] = True
+    proc = subprocess.Popen(
+        [npx, *FALLOW_COMMAND[1:]], cwd=str(root),
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, **kwargs,
     )
+    try:
+        stdout, _stderr = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        _kill_tree(proc)
+        try:
+            proc.communicate(timeout=5)
+        except Exception:
+            pass
+        raise  # o main captura e SEMPRE emite o JSON de timeout
+    completed = subprocess.CompletedProcess(proc.args, proc.returncode, stdout, _stderr)
     # Fallow ausente/quebrado costuma sair !=0 com stdout vazio — nao bloquear
-    if not (completed.stdout or "").strip():
+    if not (stdout or "").strip():
         return None, completed
-    raw = extract_json(completed.stdout)
+    raw = extract_json(stdout)
     return raw, completed
 
 
