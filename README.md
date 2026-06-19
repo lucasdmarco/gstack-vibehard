@@ -122,7 +122,16 @@ gstack_vibehard enable     # ativa o gstack AQUI (QG, design-system, chronicle p
 gstack_vibehard status     # ATIVO / DESATIVADO / INATIVO neste projeto
 gstack_vibehard disable    # desativa preservando dados (renomeia .gstack/ → .gstack-disabled/)
 ```
-`disable` **não apaga nada** — `enable` depois reativa preservando contexto/planos. O que você não ativar continua intocado (só o bloqueio de comando destrutivo permanece global, como rede de segurança).
+`disable` **não apaga nada** — `enable` depois reativa preservando contexto/planos. O que você não ativar continua intocado (só o bloqueio de comando destrutivo permanece global, como rede de segurança). Ao ativar, o gstack **detecta o arquétipo** do projeto (lib/CLI/web/service/...) e grava `.gstack/profile.json` em **modo observe** — os gates passam a **reportar, nunca bloquear**.
+
+### `publish-guard` — check determinístico pré-publish (de graça em tokens)
+Automatiza o ritual de release, sem LLM e sem rede obrigatória:
+```bash
+gstack_vibehard publish-guard          # tree limpa? versão bumpada? CHANGELOG? tag? CI verde?
+gstack_vibehard publish-guard --json   # saída-máquina
+gstack_vibehard publish-guard --no-ci  # pula a checagem de CI (gh)
+```
+Sai com código ≠0 se houver pendência obrigatória (working tree suja, versão não bumpada, CHANGELOG sem entrada). Complementa o `verify`, que para **lib/CLI** já roda `publish-guard` e `diff-hygiene` (varredura dos arquivos mudados) como gates **advisory**.
 
 ### `create <nome>` — criar um workspace runtime
 ```bash

@@ -21,6 +21,13 @@ test("enable cria .gstack/ e status reflete ATIVO", async () => {
     assert.equal(r.status, "activated")
     assert.ok(existsSync(path.join(tmp, ".gstack")), "criou .gstack/")
     assert.ok(existsSync(path.join(tmp, ".gstack", "context.json")), "criou context.json")
+    // profile.json: adoção observe-only com arquétipo detectado
+    const pj = path.join(tmp, ".gstack", "profile.json")
+    assert.ok(existsSync(pj), "criou profile.json")
+    const prof = JSON.parse(await readFile(pj, "utf-8"))
+    assert.equal(prof.mode, "observe", "adoção em modo observe (não bloqueia)")
+    assert.equal(prof.tokenBudget, "standard")
+    assert.ok(typeof prof.profile === "string" && prof.profile.length > 0, "arquétipo detectado")
     const s = await activateCommand("status", [], { cwd: tmp })
     assert.equal(s.status, "active")
   } finally {
