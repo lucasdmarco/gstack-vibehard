@@ -13,6 +13,7 @@ import { installHermes } from "../harness/hermes.js"
 import { writeInstructionalGuidance } from "../harness/instructional.js"
 import { installHeadroom } from "../harness/headroom.js"
 import { ensureDir, copyWithBackup, copyDirSync, backupFile } from "./merge.js"
+import { buildInstallImpact, renderImpactMarkdown } from "./impact.js"
 import { safeCopyDir, safeCopyFile, safeWriteFile, safeAppendBlock } from "./safe-write.js"
 import { findWorkingBinary, getUvCandidates, getBunCandidates, npxArgv } from "./deps.js"
 import { checkAlreadyInstalled } from "./check.js"
@@ -383,14 +384,44 @@ async function refreshHooks(harnessIds, report) {
 }
 
 export async function install(args = []) {
-  const skipDeps = args.includes("--skip-deps") || process.env.GSTACK_SKIP_DEPS === "1"
+  const auditOnly = args.includes("--audit-only")
+  const projectOnly = args.includes("--project-only")
+  const hi = args.indexOf("--harness")
+  const onlyHarness = hi !== -1 && args[hi + 1] && !args[hi + 1].startsWith("--") ? args[hi + 1] : null
+  // project-only NÃO toca deps globais (impacto global mínimo).
+  const skipDeps = args.includes("--skip-deps") || projectOnly || process.env.GSTACK_SKIP_DEPS === "1"
   const report = { added: [], updated: [], skipped: [], errors: [] }
 
   section("gstack_vibehard Installer")
-  info("Instalando pacote completo...")
 
   // Detect harnesses
-  const harnesses = detectHarnesses()
+  let harnesses = detectHarnesses()
+  if (onlyHarness) harnesses = harnesses.filter((h) => h.id === onlyHarness)
+
+  // SAFE INSTALL — preflight de impacto (AC1/AC2): com --audit-only NÃO escreve
+  // nada; apenas lista, por categoria, os caminhos globais que seriam tocados.
+  if (auditOnly) {
+    const impact = buildInstallImpact({ home: HOME, harnessIds: harnesses.map((h) => h.id), withDeps: !skipDeps, projectOnly })
+    section("install --audit-only — preflight (nada será escrito)")
+    for (const c of impact) {
+      info("")
+      info(`${c.label}${c.optional ? " (opcional)" : ""}:`)
+      for (const it of c.items) info(`  • [${it.action}] ${it.path}`)
+    }
+    const md = renderImpactMarkdown(impact, { when: new Date().toISOString(), harnessIds: harnesses.map((h) => h.id) })
+    try {
+      ensureDir(join(HOME, ".gstack_vibehard"))
+      const reportPath = join(HOME, ".gstack_vibehard", `install-report-${Date.now()}.md`)
+      writeFileSync(reportPath, md + "\n")
+      info("")
+      success(`Relatório salvo em ${reportPath}`)
+    } catch (e) { warn(`Não consegui salvar o relatório: ${e.message}`) }
+    info("")
+    info("Para instalar de fato: `gstack_vibehard install` (ou `--project-only` p/ impacto mínimo).")
+    return report
+  }
+
+  info(projectOnly ? "Instalando (modo project-only — impacto global mínimo)..." : "Instalando pacote completo...")
   const allHarnessIds = harnesses.map((h) => h.id)
 
   if (harnesses.length === 0) {
@@ -558,7 +589,8 @@ export async function install(args = []) {
           break
         case "claude":
           // hooks: true = REGISTRO no settings.json (Step 3 ja copiou os .py)
-          await installClaude({ hooks: true, claudeMd: true, ultracode: true, mcp: true }, report)
+          // project-only NÃO escreve MCP global (impacto global mínimo).
+          await installClaude({ hooks: true, claudeMd: true, ultracode: true, mcp: !projectOnly }, report)
           break
         case "opencode":
           await installOpenCode({ hooks: true }, report)
@@ -569,7 +601,7 @@ export async function install(args = []) {
         case "hermes":
           // Hermes fala MCP nas duas direções: skills + guidance (garantidos) +
           // registro dos MCP servers via `hermes mcp add` (best-effort).
-          await installHermes({ mcp: true, skills: true }, report, { projectRoot: PROJECT_ROOT })
+          await installHermes({ mcp: !projectOnly, skills: true }, report, { projectRoot: PROJECT_ROOT })
           break
         default: {
           // Harness sem API de hooks: integracao instrucional honesta —
@@ -626,9 +658,14 @@ export async function install(args = []) {
     }
   }
 
-  // Step 11: Obsidian Vault Global (Segundo Cerebro)
-  section("vault/ — Obsidian Vault Global (Segundo Cerebro)")
-  setupObsidianVault(report)
+  // Step 11: Obsidian Vault Global (Segundo Cerebro) — pulado em project-only
+  if (projectOnly) {
+    info("Vault global: pulado (--project-only)")
+    report.skipped.push("vault global (--project-only)")
+  } else {
+    section("vault/ — Obsidian Vault Global (Segundo Cerebro)")
+    setupObsidianVault(report)
+  }
 
   // Step 12: Obsidian detectado → escolha obrigatória (com 'pular') do vault a
   // indexar no Document Graph. Detecção lê só obsidian.json; NUNCA indexa aqui.
@@ -663,9 +700,15 @@ export async function install(args = []) {
   info("  • Para DESLIGAR num projeto:  gstack_vibehard disable")
   info("  • Para VER o estado:          gstack_vibehard status")
   info("")
-  info("Projetos em andamento que voce NAO ativar ficam intocados (so o bloqueio")
-  info("de comando destrutivo continua global, como rede de seguranca).")
-  info("Tudo tem backup/rollback: `gstack_vibehard uninstall` (--dry-run para o plano).")
+  info("Os GATES PESADOS do gstack so agem em projetos com `.gstack/`. Ainda assim,")
+  info("esta instalacao registrou COMPONENTES GLOBAIS do harness (hooks, skills/scripts,")
+  info(projectOnly ? "config dos harnesses) — em modo project-only (sem MCP global/vault/deps)." : "config, e — em modo completo — MCP global/vault/deps).")
+  info("Projetos que voce NAO ativar ficam intocados (so o bloqueio de comando")
+  info("destrutivo continua global, como rede de seguranca).")
+  info("")
+  info("Auditar o impacto e o rollback:")
+  info("  gstack_vibehard doctor --install-integrity   (manifest/backups/hashes)")
+  info("  gstack_vibehard uninstall --dry-run          (plano de remocao)")
   info("")
   info("Comandos uteis:")
   info("  gstack_vibehard doctor    — diagnosticar ambiente")

@@ -1,5 +1,16 @@
 # Changelog - gstack-vibehard
 
+## [2.31.0] - 2026-06-19
+
+### Safe Install — preflight de impacto e instalação de impacto mínimo (Fase 3, bloqueador de produção do Codex)
+Responde ao P1 do `FINALPRODUCAO.MD`: o `install` deixa de ser global-first cego.
+- **`install --audit-only`** (AC2): preflight que **lista, por categoria, os caminhos globais** que seriam criados/modificados (`[create]`/`[modify]`) — **sem escrever nada** — e salva `~/.gstack_vibehard/install-report-<ts>.md`. Provado: o manifest real fica intacto.
+- **`install --project-only`**: impacto global mínimo — pula deps globais, **MCP global**, e o vault Obsidian (mantém hooks + config dos harnesses).
+- **`install --harness <claude|opencode|cursor|codex>`**: instala só um harness (ativação incremental).
+- **`buildInstallImpact()` / `renderImpactMarkdown()`** (`src/installer/impact.js`): função pura (home injetável) que enumera o impacto por categoria — base testável do preflight e do relatório.
+- **Mensagem final precisa** (Codex §6 P2): admite que componentes globais foram registrados e aponta `doctor --install-integrity` + `uninstall --dry-run`.
+- +5 testes Node (impacto por categoria, project-only, filtro de harness, modify vs create). 236 Node + 56 Python verdes; lint/typecheck limpos.
+
 ## [2.30.0] - 2026-06-18
 
 ### QG honesto por severidade + dial de token nas duas camadas (Fases 1–2 do master plan)
