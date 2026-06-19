@@ -30,7 +30,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--level", type=int, choices=[1, 2, 3], default=1, help="Compatibility flag for existing hooks")
     parser.add_argument("--log-only", action="store_true", help="Emit report but do not fail process")
     parser.add_argument("--timeout", type=int, default=120, help="Fallow timeout in seconds")
+    parser.add_argument("--profile", default=None, help="Arquetipo do projeto (library/cli/web-app/...) — ciente de arquetipo")
     return parser.parse_args()
+
+
+# Gating por SEVERIDADE: so CRITICO/ALTO bloqueiam a entrega. Achados MEDIO/BAIXO
+# (ex.: "remove unused export") sao reportados, nao reprovam — alinha com o stop.py
+# ("blocked = critical>0 or high>0") e evita falso-positivo auto-fixable de baixo risco.
+BLOCKING_SEVERITIES = {"CRITICO", "CRITICAL", "ALTO", "HIGH"}
+
+
+def has_blocking_severity(issues) -> bool:
+    return any(str(i.get("severity", "")).upper() in BLOCKING_SEVERITIES for i in issues)
 
 
 def emit(result: dict[str, Any], exit_code: int) -> None:
@@ -280,21 +291,29 @@ def main() -> None:
             result["summary"] += f" | {typecheck['summary']}"
         emit(result, 0)
 
-    verdict = infer_verdict(raw, completed.returncode)
     auto_fixable = collect_auto_fixable(raw)
     blocking = collect_blocking(raw)
-    passed = verdict == "pass"
-    summary = f"Fallow Quality Gate: {verdict.upper()} ({len(auto_fixable)} auto-fixable, {len(blocking)} blocking issue(s))"
+    # Gating por severidade: so CRITICO/ALTO reprovam (ver BLOCKING_SEVERITIES).
+    all_findings = auto_fixable + blocking
+    blockers = [i for i in all_findings if str(i.get("severity", "")).upper() in BLOCKING_SEVERITIES]
+    passed = len(blockers) == 0
+    verdict = "pass" if passed else "fail"
+    summary = (
+        f"Fallow Quality Gate: {verdict.upper()} "
+        f"({len(blockers)} blocker(s) CRITICO/ALTO, {len(auto_fixable)} auto-fixable, {len(all_findings)} achado(s))"
+    )
     result = {
         "pass": passed,
         "engine": "fallow",
         "level": args.level,
+        "profile": args.profile,
         "command": FALLOW_COMMAND,
         "verdict": verdict,
         "returncode": completed.returncode,
         "issues": auto_fixable,
         "auto_fixable": auto_fixable,
         "blocking": blocking,
+        "blocking_severity_count": len(blockers),
         "summary": summary,
     }
 

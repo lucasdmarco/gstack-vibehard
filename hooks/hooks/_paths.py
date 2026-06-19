@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 import shutil
 import os
 
@@ -42,6 +43,33 @@ def find_gstack_root(cwd, max_depth=30):
 def is_gstack_project(cwd):
     """True se `cwd` está dentro de um projeto gstack (tem `.gstack/`)."""
     return find_gstack_root(cwd) is not None
+
+
+def read_project_profile(cwd):
+    """Lê o `.gstack/profile.json` do projeto (arquétipo + modo + dial de token).
+
+    Fail-open: ausente/inválido → defaults seguros (`observe`/`standard`). É o que
+    deixa a Camada A (contexto/identidade/memória) escalar por projeto sem pesar.
+    """
+    defaults = {"profile": "unknown", "mode": "observe", "tokenBudget": "standard"}
+    root = find_gstack_root(cwd)
+    if not root:
+        return defaults
+    try:
+        p = root / ".gstack" / "profile.json"
+        if p.exists():
+            data = json.loads(p.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                return {**defaults, **data}
+    except Exception:
+        return defaults
+    return defaults
+
+
+def token_budget(cwd):
+    """Nível do dial de token do projeto: `minimal` | `standard` | `full`."""
+    tb = str(read_project_profile(cwd).get("tokenBudget", "standard")).lower()
+    return tb if tb in ("minimal", "standard", "full") else "standard"
 
 
 def chronicle_dir():

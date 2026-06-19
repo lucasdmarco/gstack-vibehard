@@ -22,7 +22,7 @@ from typing import Optional
 
 from _output_guard import output_guard, SENSITIVE_PATTERNS, ALLOWED_ROLES_HIERARCHY
 from _redact import redact_secrets, log_redaction_event
-from _paths import chronicle_dir, hook_support_path, migrate_legacy, GSTACK_DIR, is_gstack_project
+from _paths import chronicle_dir, hook_support_path, migrate_legacy, GSTACK_DIR, is_gstack_project, token_budget
 from _harness import parse_stdin, normalize_input
 from datetime import datetime
 
@@ -806,10 +806,16 @@ note_lines.append("")
 
 note = "\n".join(note_lines)
 
-chronicle_file = chronicle_dir_path / f"{project_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
-chronicle_file.write_text(note, encoding="utf-8")
-
-msg_parts = [f"Memorias salvas em {chronicle_file.name}"]
+# Dial de token (Camada A): no nível `minimal` o chronicle por turno é PULADO
+# (loop barato). `standard`/`full` gravam a memória normalmente. Fail-open.
+_budget = token_budget(cwd)
+if _budget == "minimal":
+    chronicle_file = None
+    msg_parts = ["Memorias: puladas (tokenBudget=minimal)"]
+else:
+    chronicle_file = chronicle_dir_path / f"{project_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
+    chronicle_file.write_text(note, encoding="utf-8")
+    msg_parts = [f"Memorias salvas em {chronicle_file.name}"]
 if _stop_audit_on:
     msg_parts[0] += " + QG executado"
 if fallow_result.get("status") in ("passed", "auto_fixable"):

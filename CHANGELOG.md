@@ -1,5 +1,13 @@
 # Changelog - gstack-vibehard
 
+## [2.30.0] - 2026-06-18
+
+### QG honesto por severidade + dial de token nas duas camadas (Fases 1–2 do master plan)
+- **[Fallow ciente de severidade] `qg.py`** (`hooks/hooks/qg.py`): o Quality Gate deixa de reprovar a entrega por achado **MÉDIO/auto-fixable** (ex.: "remove unused export"). Agora **só CRÍTICO/ALTO bloqueiam** (`BLOCKING_SEVERITIES`), alinhado ao `stop.py` (`blocked = critical>0 or high>0`). Aceita `--profile <arquétipo>` (contrato de ruleset por arquétipo). Resolve o falso-positivo que reprovava o próprio repo (lib/CLI) por questão de baixo risco. Fallow ausente continua **pulando sem bloquear** (peer dep opcional).
+- **[Dial de token — Camada A] `.gstack/profile.json` → `tokenBudget`** (`hooks/hooks/_paths.py` `read_project_profile`/`token_budget`; aplicado em `session_start.py` e `stop.py`): `minimal` = loop barato (sem injeção de identidade/chronicle/frameworks pesados); `standard` (default) = enxuto (sem MOM basal); `full` = comportamento atual. **A camada de contexto/identidade/memória continua disponível** — só deixa de ser sempre "full". Fail-open → `standard`.
+- +8 testes (2 Python qg severidade, 6 Python dial de token). 231 Node + 56 Python verdes; lint/typecheck limpos.
+- Nota: a cópia **instalada** do `qg.py` (`~/.codex/hooks`) atualiza ao reinstalar (`gstack_vibehard install` atualiza hooks obsoletos) — o fonte versionado é o que entra na release.
+
 ## [2.29.0] - 2026-06-18
 
 ### Núcleo de arquétipo — checks determinísticos que cabem em QUALQUER projeto (Fase 1 do master plan `entregafinal.md`)

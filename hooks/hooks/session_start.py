@@ -11,7 +11,7 @@ from pathlib import Path
 
 from _chronicle import build_chronicle_index, search_chronicle
 from _output_guard import output_guard
-from _paths import chronicle_dir, hook_support_path, read_with_fallback, GSTACK_VIBEHARD_DIR, is_gstack_project
+from _paths import chronicle_dir, hook_support_path, read_with_fallback, GSTACK_VIBEHARD_DIR, is_gstack_project, token_budget
 
 
 def run_gc_check(cwd: str) -> str | None:
@@ -223,6 +223,9 @@ project_name = Path(cwd).name if cwd else "unknown"
 # gstack (.gstack/). Em projeto alheio em andamento, o gstack não muda o
 # comportamento do agente (sem injeção de identidade).
 gstack_active = is_gstack_project(cwd)
+# Dial de token (Camada A): minimal = loop barato (sem identidade/chronicle/frameworks
+# pesados); standard = enxuto (sem MOM basal); full = tudo. Fail-open → "standard".
+budget = token_budget(cwd)
 
 ctx_parts = []
 
@@ -296,8 +299,8 @@ try:
 except (OSError, ValueError):
     pass
 
-# 1. Identity injection (highermind) — SÓ em projeto gstack (não polui projeto alheio)
-if gstack_active:
+# 1. Identity injection (highermind) — SÓ em projeto gstack e fora do dial `minimal`
+if gstack_active and budget != "minimal":
     ctx_parts.append(IDENTITY_BLOCK)
 
 # 1. GStack Check (gc.py)
@@ -310,8 +313,8 @@ else:
         skill_names = [d.name for d in skills_dir.iterdir() if d.is_dir()]
         ctx_parts.append(f"## Skills disponiveis ({len(skill_names)})\n{', '.join(sorted(skill_names))}")
 
-# 2. Chroniclé — busca indexada
-chronicle_index = build_chronicle_index()
+# 2. Chroniclé — busca indexada (memória da Camada A; pulada no dial `minimal`)
+chronicle_index = build_chronicle_index() if budget != "minimal" else None
 if chronicle_index:
     last = chronicle_index[0]
     ctx_parts.append(f"## Ultima sessao ({last['project']})\n{last['summary'][:500]}")
@@ -322,8 +325,8 @@ if chronicle_index:
             extra.append(f"- {h['project']}: {h['summary'][:200]}")
         ctx_parts.append(f"## Memorias relacionadas a '{project_name}'\n" + "\n".join(extra))
 
-# 2b. MOM basal reading (macOS only)
-mom_bin = shutil.which("mom")
+# 2b. MOM basal reading (macOS only) — memória externa pesada: só no dial `full`
+mom_bin = shutil.which("mom") if budget == "full" else None
 if mom_bin:
     try:
         mom_basal = subprocess.run(
@@ -346,10 +349,11 @@ if config_toml:
     if mcps:
         ctx_parts.append(f"## MCP Servers configurados\n{', '.join(mcps)}")
 
-# 4. Stack decision framework (highermind)
-ctx_parts.append(STACK_DECISION_FRAMEWORK)
+# 4. Stack decision framework (highermind) — pulado no dial `minimal`
+if budget != "minimal":
+    ctx_parts.append(STACK_DECISION_FRAMEWORK)
 
-# 5. Security baseline reminder (highermind)
+# 5. Security baseline reminder (highermind) — sempre (barato e essencial)
 ctx_parts.append(SECURITY_BASELINE)
 
 # 6. Update check (1x/24h)
