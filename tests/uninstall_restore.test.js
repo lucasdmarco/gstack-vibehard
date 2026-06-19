@@ -5,7 +5,9 @@ import { existsSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
+import { createHash } from "node:crypto"
 
+const sha = (s) => "sha256:" + createHash("sha256").update(Buffer.from(s)).digest("hex")
 const repoRoot = path.resolve(import.meta.dirname, "..")
 const unMod = path.join(repoRoot, "src", "installer", "uninstall.js")
 const mMod = path.join(repoRoot, "src", "installer", "manifest.js")
@@ -61,6 +63,42 @@ test("uninstall NORMAL --yes: restaura originais (manifest) ANTES de apagar o ma
     // original restaurado E manifest apagado (rollback completo no fluxo normal)
     assert.equal(await readFile(f, "utf-8"), "{\"user\":1}", "config restaurada no uninstall normal")
     assert.ok(!existsSync(path.join(home, ".gstack_vibehard")), "manifest removido por último")
+  })
+})
+
+test("uninstall drift-safe: arquivo editado após install NÃO é sobrescrito", async () => {
+  await withHome(async (home) => {
+    const { saveManifest, freshManifest, recordItem } = await import(`${pathToFileURL(mMod)}?t=${Date.now()}`)
+    const f = path.join(home, ".claude", "settings.json")
+    await mkdir(path.dirname(f), { recursive: true })
+    const installed = "{\"gstack\":true}"                 // o que o gstack escreveu
+    const edited = "{\"gstack\":true,\"userEdit\":42}"    // editado DEPOIS do install
+    await writeFile(f, edited)
+    await writeFile(f + ".gstack_vibehard.bak", "{\"user\":1}")
+    const m = freshManifest()
+    recordItem(m, { path: f, kind: "config", action: "modified", component: "claude", backup: f + ".gstack_vibehard.bak", removeOnUninstall: false, installedHash: sha(installed) })
+    saveManifest(m, home)
+
+    const { uninstall } = await import(`${pathToFileURL(unMod)}?t=${Date.now()}`)
+    await uninstall(["--restore-only", "--yes"])
+    assert.equal(await readFile(f, "utf-8"), edited, "edição posterior preservada (não sobrescreve cegamente)")
+  })
+})
+
+test("uninstall --resolve-drift: força a restauração mesmo com drift", async () => {
+  await withHome(async (home) => {
+    const { saveManifest, freshManifest, recordItem } = await import(`${pathToFileURL(mMod)}?t=${Date.now()}`)
+    const f = path.join(home, ".claude", "settings.json")
+    await mkdir(path.dirname(f), { recursive: true })
+    await writeFile(f, "{\"gstack\":true,\"userEdit\":42}")
+    await writeFile(f + ".gstack_vibehard.bak", "{\"user\":1}")
+    const m = freshManifest()
+    recordItem(m, { path: f, kind: "config", action: "modified", component: "claude", backup: f + ".gstack_vibehard.bak", removeOnUninstall: false, installedHash: sha("{\"gstack\":true}") })
+    saveManifest(m, home)
+
+    const { uninstall } = await import(`${pathToFileURL(unMod)}?t=${Date.now()}`)
+    await uninstall(["--restore-only", "--yes", "--resolve-drift"])
+    assert.equal(await readFile(f, "utf-8"), "{\"user\":1}", "--resolve-drift força o restore do original")
   })
 })
 

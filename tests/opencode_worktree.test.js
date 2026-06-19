@@ -61,6 +61,30 @@ test("runDelegation --worktree: isola, commita mudancas e preserva branch", asyn
   assert.ok(!calls.some((c) => c.startsWith("git branch -D")), "branch preservada")
 })
 
+test("runDelegation --worktree: commit com segredo no diff -> needs_review", async () => {
+  const { runDelegation } = await import(`${pathToFileURL(delMod)}?t=${Date.now()}`)
+  // exec que finge mudança em a.js; o arquivo real no worktree tem um segredo (AWS key)
+  const { mkdtempSync, writeFileSync } = await import("node:fs")
+  const { tmpdir } = await import("node:os")
+  const wtdir = mkdtempSync(path.join(tmpdir(), "gstack-wtneeds-"))
+  writeFileSync(path.join(wtdir, "a.js"), "const k = 'AKIAIOSFODNN7EXAMPLE'\n")
+  const exec = (file, args) => {
+    if (file === "opencode" && args[0] === "--version") return Buffer.from("oc 1")
+    if (file === "git" && args[0] === "rev-parse") return Buffer.from("true")
+    if (file === "git" && args[0] === "worktree" && args[1] === "add") return Buffer.from("")
+    if (file === "git" && args[0] === "worktree" && args[1] === "remove") return Buffer.from("")
+    if (file === "git" && args[0] === "status") return Buffer.from(" M a.js\n")
+    if (file === "git") return Buffer.from("") // add/reset/commit/branch
+    if (file === "opencode" && args[0] === "run") return Buffer.from("done")
+    throw new Error("unexpected " + file)
+  }
+  const r = runDelegation({ task: "x", cwd: "/repo", worktree: true, exec, worktreeDir: wtdir })
+  assert.equal(r.status, "needs_review", "segredo no diff bloqueia o 'ok'")
+  assert.ok(r.reviewFindings.some((f) => f.rule === "aws-key"))
+  const { rmSync } = await import("node:fs")
+  rmSync(wtdir, { recursive: true, force: true })
+})
+
 test("runDelegation --worktree sem git -> not_git (nao executa opencode)", async () => {
   const { runDelegation } = await import(`${pathToFileURL(delMod)}?t=${Date.now()}`)
   const exec = (file, args) => {

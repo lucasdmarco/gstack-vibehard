@@ -2,6 +2,7 @@ import { execFileSync as defaultExecFileSync } from "child_process"
 import { existsSync, readFileSync } from "fs"
 import { join } from "path"
 import { createWorktree, removeWorktree, commitWorktree, isGitRepo } from "./worktree.js"
+import { diffHygiene } from "../project-plan/diff-hygiene.js"
 
 /**
  * Delegação para OpenCode — usa OUTRO modelo/free tier configurado pelo USUÁRIO.
@@ -100,7 +101,7 @@ export function runDelegation(p = {}) {
       return { status: "not_git", exitCode: null, summary: "--worktree exige um repositório git", changedFiles: [] }
     }
     try {
-      wt = createWorktree(cwd, { exec })
+      wt = createWorktree(cwd, { exec, dir: p.worktreeDir })
       runCwd = wt.dir
     } catch (e) {
       return { status: "worktree_failed", exitCode: null, summary: `falha ao criar worktree: ${e.message}`, changedFiles: [] }
@@ -132,20 +133,32 @@ export function runDelegation(p = {}) {
     // Worktree: preserva o trabalho commitando no branch efêmero (não toca o
     // branch principal). O usuário revisa/mergeia `wt.branch` depois.
     let preservedBranch = null
+    let reviewFindings = null
     if (wt && changedFiles.length > 0) {
       try {
+        // Verificação ANTES de marcar revisável (AC6): diff-hygiene determinística
+        // nos arquivos alterados. Achado HIGH (segredo/debugger) → needs_review.
+        try {
+          const dh = diffHygiene({ cwd: wt.dir, files: changedFiles, exec })
+          if (dh.high > 0) reviewFindings = dh.findings.filter((f) => f.severity === "HIGH")
+        } catch { /* hygiene best-effort */ }
         commitWorktree(wt.dir, `gstack delegate: ${p.task}`.slice(0, 200), { exec })
         preservedBranch = wt.branch
         keepBranch = true
       } catch { /* sem commit — segue */ }
     }
+    const needsReview = !!(preservedBranch && reviewFindings && reviewFindings.length)
+    const baseStatus = exitCode === 0 ? "ok" : "failed"
     return {
-      status: exitCode === 0 ? "ok" : "failed",
+      status: needsReview ? "needs_review" : baseStatus,
       exitCode,
       attempts,
-      summary: summarize(stdout, exitCode, changedFiles.length) + (preservedBranch ? ` [branch ${preservedBranch} — revise e mergeie]` : (wt ? " [worktree sem mudanças]" : "")),
+      summary: summarize(stdout, exitCode, changedFiles.length)
+        + (preservedBranch ? ` [branch ${preservedBranch} — revise e mergeie]` : (wt ? " [worktree sem mudanças]" : ""))
+        + (needsReview ? ` [NEEDS_REVIEW: ${reviewFindings.length} achado(s) HIGH de higiene]` : ""),
       changedFiles,
       ...(preservedBranch ? { reviewBranch: preservedBranch } : {}),
+      ...(needsReview ? { reviewFindings } : {}),
       ...(stderr ? { stderrTail: stderr.slice(-800) } : {}),
     }
   } finally {

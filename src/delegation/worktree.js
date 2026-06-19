@@ -43,10 +43,17 @@ export function removeWorktree(repoCwd, dir, branch, opts = {}) {
 export function commitWorktree(worktreeDir, message, opts = {}) {
   const exec = opts.exec || defaultExecFileSync
   exec("git", ["add", "-A"], { cwd: worktreeDir, stdio: "pipe", shell: false, timeout: 30000 })
-  // Tira qualquer .env do staging (mesmo que estivesse rastreado) — não vaza segredo.
+  // Tira do staging segredos E artefatos que não pertencem a um branch revisável:
+  // .env (segredo), saídas de build e diretórios pesados. Mantém lockfiles (uma
+  // mudança de dependência delegada legitimamente os altera).
+  const EXCLUDE = [
+    ".env", ".env.*", "**/.env", "**/.env.*",
+    "dist", "build", ".next", "out", "coverage", ".turbo", "node_modules",
+    "**/dist", "**/build",
+  ]
   try {
-    exec("git", ["reset", "-q", "--", ".env", ".env.*", "**/.env", "**/.env.*"], { cwd: worktreeDir, stdio: "pipe", shell: false, timeout: 15000 })
-  } catch { /* sem .env staged — ok */ }
+    exec("git", ["reset", "-q", "--", ...EXCLUDE], { cwd: worktreeDir, stdio: "pipe", shell: false, timeout: 15000 })
+  } catch { /* nada a desestaging — ok */ }
   exec("git", ["commit", "-m", message], { cwd: worktreeDir, stdio: "pipe", shell: false, timeout: 30000 })
 }
 

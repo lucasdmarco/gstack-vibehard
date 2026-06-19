@@ -1,5 +1,13 @@
 # Changelog - gstack-vibehard
 
+## [2.32.0] - 2026-06-19
+
+### Delegação que não vaza segredo + uninstall que não perde sua edição (Fase 4)
+- **[AC6] Commit delegado verificado** (`src/delegation/worktree.js`, `src/delegation/opencode.js`): o `commitWorktree` agora exclui do staging também **build/saídas pesadas** (`dist`, `build`, `.next`, `out`, `coverage`, `node_modules`) além do `.env`. Antes de marcar o branch como revisável, roda **`diff-hygiene` determinística** nos arquivos alterados; achado **HIGH** (segredo/`debugger`) → status **`needs_review`** (não `ok`), com os achados listados. `delegate` instrui a revisar antes de mergear.
+- **[AC7] Uninstall drift-safe** (`src/installer/uninstall.js`): antes de restaurar um backup, compara o hash atual do arquivo com o `installedHash` do manifest. Se você **editou o arquivo depois da instalação**, o restore é **PULADO** (sua edição é preservada) — a menos de `gstack_vibehard uninstall --resolve-drift`.
+- **`doctor --impact`** (`src/installer/doctor.js`): mostra os **componentes globais ativos** por categoria (hooks, config de harness, MCP global, skills/scripts, vault) e avisa o que afeta qualquer projeto; aponta o rollback.
+- +6 testes Node (needs_review na delegação, drift-safe + resolve-drift, impacto). 239 Node + 56 Python verdes; lint/typecheck limpos.
+
 ## [2.31.0] - 2026-06-19
 
 ### Safe Install — preflight de impacto e instalação de impacto mínimo (Fase 3, bloqueador de produção do Codex)
