@@ -21,6 +21,7 @@ import { verifyCommand } from "../commands/verify.js"
 import { dreamCommand } from "../commands/dream.js"
 import { proxyCommand } from "../commands/proxy.js"
 import { activateCommand } from "../commands/activate.js"
+import { publishGuardCommand } from "../commands/publish-guard.js"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const pkg = JSON.parse(readFileSync(resolve(__dirname, "../../package.json"), "utf-8"))
@@ -106,7 +107,8 @@ export function showHelp() {
   console.log(color("      --name <p> --mode lite|full --json --dry-run --recipe <id>", COLORS.dim))
   console.log(color("      plan run <id> [--yes] · plan status <id> · plan explain <id>", COLORS.dim))
   console.log(color("    gstack_vibehard task \"<pedido>\"  Loop Engineer: plano de feature (Document Graph + workflow + delegate)", COLORS.cyan))
-  console.log(color("    gstack_vibehard verify         Delivery gates: deps/lint/typecheck/test/build/QG (--profile, --json)", COLORS.cyan))
+  console.log(color("    gstack_vibehard verify         Delivery gates: deps/lint/typecheck/test/build/QG + gates por arquétipo (--profile, --json)", COLORS.cyan))
+  console.log(color("    gstack_vibehard publish-guard  Check determinístico pré-publish: tree/bump/CHANGELOG/tag/CI (--json, --no-ci)", COLORS.cyan))
   console.log(color("    gstack_vibehard dream          Auto-melhoria: audit (promessas vs evidência) · status (matriz de confiança)", COLORS.cyan))
   console.log(color("    gstack_vibehard proxy          Proxy de redaction pré-output (opt-in) — interceptação real em trânsito", COLORS.cyan))
   console.log(color("    gstack_vibehard enable         Ativar o gstack NESTE projeto (projeto novo já vem ativo)", COLORS.cyan))
@@ -218,6 +220,9 @@ async function dispatch(command, args) {
       break
     case "verify":
       await verifyCommand(args)
+      break
+    case "publish-guard":
+      await publishGuardCommand(args)
       break
     case "dream":
       await dreamCommand(args)

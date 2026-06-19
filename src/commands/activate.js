@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync, renameSync } from "fs"
 import { join } from "path"
 import { buildContextRegistry } from "../context-docs/registry.js"
+import { detectProfile } from "../project-plan/detect-profile.js"
 import { success, warn, info, section } from "../cli/index.js"
 
 /**
@@ -37,9 +38,18 @@ function enable(cwd) {
   mkdirSync(gdir(cwd), { recursive: true })
   const p = join(gdir(cwd), "context.json")
   if (!existsSync(p)) writeFileSync(p, JSON.stringify(buildContextRegistry(), null, 2) + "\n")
-  success("gstack ATIVADO neste projeto — regras/hooks (Quality Gate, design-system, chronicle) passam a agir aqui.")
+  // Detecta o ARQUÉTIPO e grava o profile.json: adoção observe-only (reporta,
+  // nunca bloqueia) + dial de token padrão. Isso deixa os gates/regras se
+  // adaptarem ao TIPO do projeto (lib/CLI/web/...), não a um molde "SaaS".
+  const { profile, signals } = detectProfile(cwd)
+  const profilePath = join(gdir(cwd), "profile.json")
+  if (!existsSync(profilePath)) {
+    writeFileSync(profilePath, JSON.stringify({ profile, signals, mode: "observe", tokenBudget: "standard", detectedAt: new Date().toISOString() }, null, 2) + "\n")
+  }
+  success(`gstack ATIVADO neste projeto (arquétipo: ${profile}, modo: observe).`)
+  info("Regras/gates passam a agir aqui — em modo observe, REPORTAM e nunca bloqueiam.")
   info("Desligar depois: `gstack_vibehard disable`. Ver estado: `gstack_vibehard status`.")
-  return { status: "activated" }
+  return { status: "activated", profile }
 }
 
 function disable(cwd) {

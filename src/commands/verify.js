@@ -29,10 +29,11 @@ export async function verifyCommand(args = [], opts = {}) {
 
   if (json) { process.stdout.write(JSON.stringify({ runId, ...report }) + "\n"); return report }
 
-  section(`verify — perfil ${report.profile} · status ${report.status}`)
+  section(`verify — perfil ${report.profile} · arquétipo ${report.archetype} · status ${report.status}`)
   for (const s of report.steps) {
     const icon = s.status === "passed" ? "✓" : s.status === "failed" ? "✗"
-      : s.status === "pending_feature" ? "◷" : s.status === "tool_missing" ? "⚠" : "–"
+      : s.status === "pending_feature" ? "◷" : s.status === "tool_missing" ? "⚠"
+      : s.status === "advisory" ? "•" : "–"
     const note = s.detail ? ` (${s.detail})` : ""
     info(`  ${icon} ${s.id}: ${s.status}${note}`)
   }

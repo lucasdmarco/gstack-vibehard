@@ -1,5 +1,17 @@
 # Changelog - gstack-vibehard
 
+## [2.29.0] - 2026-06-18
+
+### Núcleo de arquétipo — checks determinísticos que cabem em QUALQUER projeto (Fase 1 do master plan `entregafinal.md`)
+O gstack passa a **detectar o tipo do projeto** e a entregar valor determinístico (de graça em tokens) a repos que não são site/SaaS — começando pelo próprio repo dele (uma lib/CLI npm).
+- **`detectProfile()`** (`src/project-plan/detect-profile.js`): classificação determinística (sem LLM, sem rede) em `library | cli | web-app | service | mobile-backend | data-ml | monorepo | unknown`, a partir de `package.json` + presença de arquivos. Base que adapta gates e regras ao arquétipo.
+- **`publish-guard`** (`src/project-plan/publish-guard.js` + comando `gstack_vibehard publish-guard`): o ritual de release automatizado e determinístico — working tree limpa, versão bumpada vs última tag, CHANGELOG com entrada, tag, CI verde (via `gh`, opcional). Exit ≠0 em pendência HARD. `--json`, `--no-ci`.
+- **`diff-hygiene`** (`src/project-plan/diff-hygiene.js`): varredura só dos arquivos mudados (git) — `debugger`, segredo hardcoded (AWS/GitHub/Slack/chave privada), `.only`/`.skip` em teste, catch vazio, TODO/FIXME. **Não** flagra `console.log` (numa CLI o stdout é o produto).
+- **`verify` ciente de arquétipo** (`src/project-plan/verify-runner.js`): para lib/CLI roda publish-guard + diff-hygiene como gates **advisory** (reportam, nunca bloqueiam) e marca runtime/preview como `not_applicable` (não se aplica a lib/CLI). Mostra o arquétipo no relatório.
+- **Adoção observe-only** (`src/commands/activate.js`): `enable` detecta o arquétipo e grava `.gstack/profile.json` `{profile, mode:"observe", tokenBudget:"standard"}` — em modo observe os gates reportam e nunca bloqueiam.
+- +26 testes Node (detecção por arquétipo, publish-guard, diff-hygiene, comando, profile.json). 231 Node + 48 Python verdes; lint/typecheck limpos.
+- Nota honesta: o gate QG (Fallow) ainda bloqueia em achados MÉDIO/auto-fixable; torná-lo ciente de arquétipo (bloquear só CRÍTICO/ALTO) está na próxima etapa da Fase 1.
+
 ## [2.28.1] - 2026-06-18
 
 ### Patch de segurança (code review da v2.28.0)

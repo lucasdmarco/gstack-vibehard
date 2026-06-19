@@ -3,6 +3,9 @@ import { join } from "path"
 import { homedir } from "os"
 import { execFileSync } from "child_process"
 import { isStrongTrust } from "../dream/capabilities.js"
+import { detectProfile } from "./detect-profile.js"
+import { publishGuard } from "./publish-guard.js"
+import { diffHygiene } from "./diff-hygiene.js"
 
 /**
  * Delivery gates HONESTOS (PRD Fase 3 §6). Orquestra só os gates que existem;
@@ -46,6 +49,8 @@ export function runVerify(opts = {}) {
   const hasPyTests = ["pytest.ini", "pyproject.toml", "requirements.txt"].some((f) => existsSync(join(cwd, f)))
   const hasRunScript = !!(scripts.start || scripts.dev) // projeto que "roda" (app/web)
   const qgHook = findQgHook(home)
+  const { profile: archetype } = detectProfile(cwd)
+  const isLibCli = archetype === "library" || archetype === "cli"
   const steps = []
 
   const run = (id, file, args, { required = false } = {}) => {
@@ -73,9 +78,28 @@ export function runVerify(opts = {}) {
   } else {
     steps.push({ id: "qg", status: "tool_missing", required: false, detail: "Fallow/QG não instalado" })
   }
-  // 7. runtime/preview — roadmap. productCritical quando o projeto precisa rodar.
-  steps.push({ id: "runtime:start", status: "pending_feature", productCritical: hasRunScript })
-  steps.push({ id: "preview:open", status: "pending_feature", productCritical: hasRunScript })
+  // 7. Gates por arquétipo (lib/CLI) — ADVISORY: reportam, nunca bloqueiam o verify
+  //    (filosofia observe-only). publish-guard e diff-hygiene são determinísticos.
+  if (isLibCli) {
+    try {
+      const pg = publishGuard({ cwd, exec, checkCi: false })
+      steps.push({ id: "publish-guard", status: pg.status === "pass" ? "passed" : "advisory", detail: pg.status === "pass" ? "pronto p/ publicar" : `pendências: ${pg.failed.join(", ")}` })
+    } catch { steps.push({ id: "publish-guard", status: "advisory", detail: "guard indisponível" }) }
+    try {
+      const dh = diffHygiene({ cwd, exec })
+      steps.push({ id: "diff-hygiene", status: dh.findings.length === 0 ? "passed" : "advisory", detail: dh.findings.length ? `${dh.findings.length} achado(s), ${dh.high} HIGH` : "limpo" })
+    } catch { steps.push({ id: "diff-hygiene", status: "advisory", detail: "hygiene indisponível" }) }
+  }
+
+  // 8. runtime/preview — não se aplica a lib/CLI; para app/web fica pending_feature
+  //    (roadmap). productCritical quando o projeto precisa rodar.
+  if (isLibCli) {
+    na("runtime:start", "não se aplica a lib/CLI")
+    na("preview:open", "não se aplica a lib/CLI")
+  } else {
+    steps.push({ id: "runtime:start", status: "pending_feature", productCritical: hasRunScript })
+    steps.push({ id: "preview:open", status: "pending_feature", productCritical: hasRunScript })
+  }
 
   // Qualquer gate que FALHOU bloqueia "ready" (lint quebrado não é "pronto").
   const failed = steps.filter((s) => s.status === "failed").map((s) => s.id)
@@ -95,5 +119,5 @@ export function runVerify(opts = {}) {
   const ready = status === "ready"
   const usable = ready || status === "ready_with_warnings"
 
-  return { profile, status, ready, usable, reducedTrust, harness: opts.harness || null, steps, failed, toolMissing }
+  return { profile, archetype, status, ready, usable, reducedTrust, harness: opts.harness || null, steps, failed, toolMissing }
 }
