@@ -1,4 +1,5 @@
 import { existsSync, readdirSync, unlinkSync, renameSync, rmSync, readFileSync, writeFileSync, copyFileSync } from "fs"
+import { createHash } from "crypto"
 import { homedir } from "os"
 import { join, dirname } from "path"
 import { fileURLToPath } from "url"
@@ -197,7 +198,9 @@ function removeSkills(report, opts = {}) {
  * Restaura backups registrados no manifest (versionado: usa item.backup exato).
  * Restaura sempre do backup MAIS ANTIGO disponível (o original do usuário).
  */
-function restoreFromManifest(report, { dryRun } = {}) {
+function sha256(buf) { return "sha256:" + createHash("sha256").update(buf).digest("hex") }
+
+function restoreFromManifest(report, { dryRun, resolveDrift } = {}) {
   const manifest = loadManifest(HOME)
   const items = findItems(manifest, (x) => x.restoreOnUninstall)
   for (const it of items) {
@@ -206,6 +209,16 @@ function restoreFromManifest(report, { dryRun } = {}) {
     const original = it.path + ".gstack_vibehard.bak"
     const src = existsSync(original) ? original : (it.backup && existsSync(it.backup) ? it.backup : null)
     if (!src) { report.skipped.push(`restore: sem backup p/ ${it.path}`); continue }
+    // DRIFT-SAFE (AC7): se o arquivo atual difere do que o gstack instalou, o
+    // usuário o editou DEPOIS da instalação — não sobrescrever cegamente.
+    if (it.installedHash && existsSync(it.path) && !resolveDrift) {
+      try {
+        if (sha256(readFileSync(it.path)) !== it.installedHash) {
+          report.skipped.push(`restore PULADO — ${it.path} foi editado após a instalação. Backup preservado em ${src}. Force com \`--resolve-drift\` (ou compare manualmente).`)
+          continue
+        }
+      } catch { /* ilegível → segue conservador e tenta restaurar */ }
+    }
     if (dryRun) { report.restored.push(`(dry-run) ${it.path} ← ${src}`); continue }
     try {
       copyFileSync(src, it.path)
@@ -275,6 +288,7 @@ export async function uninstall(args = []) {
   const removeDeps = args.includes("--remove-deps")
   const includeProjects = args.includes("--include-projects")
   const legacyNameCleanup = args.includes("--legacy-name-cleanup")
+  const resolveDrift = args.includes("--resolve-drift")
   const report = { removed: [], restored: [], skipped: [], errors: [] }
 
   // --dry-run: mostra o plano de rollback SEM tocar em nada.
@@ -308,7 +322,7 @@ export async function uninstall(args = []) {
       const ok = await confirm("Restaurar todos os backups do manifest?", false)
       if (!ok) { info("Cancelado."); return report }
     }
-    restoreFromManifest(report, { dryRun: false })
+    restoreFromManifest(report, { dryRun: false, resolveDrift })
     info(`Restaurados de backup: ${report.restored.length}`)
     if (report.errors.length) report.errors.forEach((e) => warn(`  ${e}`))
     success("Restore concluido.")
@@ -336,7 +350,7 @@ export async function uninstall(args = []) {
 
   // RESTAURA os originais (manifest) ANTES de qualquer remoção — o rollback não
   // pode depender de cobertura por padrão, e o manifest é apagado só no fim.
-  restoreFromManifest(report)
+  restoreFromManifest(report, { resolveDrift })
 
   unregisterHooks(report)
   removeHooks(report)

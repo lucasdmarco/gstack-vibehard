@@ -121,6 +121,7 @@ export function showHelp() {
   console.log(color("    gstack_vibehard init <nome>    Criar novo projeto com estrutura completa", COLORS.cyan))
   console.log(color("    gstack_vibehard doctor         Diagnosticar ambiente", COLORS.cyan))
   console.log(color("      --install-integrity          Validar manifest/backups/hashes (uninstall seguro?)", COLORS.dim))
+  console.log(color("      --impact                     Mostrar componentes GLOBAIS ativos (o que afeta qualquer projeto)", COLORS.dim))
   console.log(color("      --fix [--dry-run]            Corrigir conflito OpenCode json/jsonc (merge assistido, backup)", COLORS.dim))
   console.log(color("    gstack_vibehard sprint --save   Salvar decisoes e atualizar memorias", COLORS.cyan))
   console.log(color("    gstack_vibehard monitor        TUI: agentes, tokens, QG, ROI", COLORS.cyan))
@@ -131,6 +132,7 @@ export function showHelp() {
   console.log(color("    gstack_vibehard a2a            Agent Card A2A (offline, sem servidor)", COLORS.cyan))
   console.log(color("    gstack_vibehard uninstall      Remover gstack_vibehard do ambiente", COLORS.cyan))
   console.log(color("      --dry-run --restore-only --remove-vault --remove-deps --legacy-name-cleanup  (rollback via manifest)", COLORS.dim))
+  console.log(color("      --resolve-drift              Forçar restore mesmo se o arquivo mudou após a instalação (por padrão preserva)", COLORS.dim))
   console.log(color("    gstack_vibehard list           Listar componentes instalados", COLORS.cyan))
   console.log(color("    gstack_vibehard help           Mostrar esta ajuda\n", COLORS.cyan))
 }

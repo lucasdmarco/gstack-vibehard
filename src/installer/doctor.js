@@ -8,6 +8,7 @@ import { npxArgv } from "./deps.js"
 import { detectHarnesses } from "../harness/detector.js"
 import { inspectOpenCodeConfig } from "../harness/opencode-config.js"
 import { checkInstallIntegrity } from "./integrity.js"
+import { buildInstallImpact } from "./impact.js"
 import { planOpenCodeFix, applyOpenCodeFix } from "./opencode-jsonc.js"
 import { section, success, warn, error, info, confirm } from "../cli/index.js"
 
@@ -35,6 +36,28 @@ export async function doctor(args = []) {
     const r = applyOpenCodeFix(HOME)
     if (r.applied) success("OpenCode: merge aplicado. Reabra o OpenCode e verifique provider/OAuth.")
     else warn("Não aplicado.")
+    return
+  }
+  // Modo impacto: mostra quais componentes GLOBAIS estão ativos nesta máquina
+  // (o que afeta QUALQUER projeto dos harnesses), por categoria.
+  if (args.includes("--impact")) {
+    section("doctor --impact — componentes globais ativos")
+    const impact = buildInstallImpact({ home: HOME })
+    for (const c of impact) {
+      const present = c.items.filter((it) => it.action === "modify")
+      if (c.category === "deps") continue
+      if (present.length === 0) { info(`${c.label}: nenhum instalado`); continue }
+      const tag = c.category === "mcp-global" || c.category === "harness-config"
+        ? " — AFETA QUALQUER PROJETO deste harness/usuário" : ""
+      warn(`${c.label}: ${present.length} ativo(s)${tag}`)
+      for (const it of present) info(`  • ${it.path}`)
+    }
+    const ocPlugins = join(HOME, ".config", "opencode", "plugins")
+    info("")
+    info(existsSync(ocPlugins)
+      ? "OpenCode plugins globais ATIVOS: carregam em qualquer sessão OpenCode deste usuário."
+      : "OpenCode plugins globais: nenhum.")
+    info("Rollback: `gstack_vibehard uninstall --dry-run` · Integridade: `--install-integrity`.")
     return
   }
   // Modo integridade: valida manifest/backups/hashes/configs e se uninstall é seguro.

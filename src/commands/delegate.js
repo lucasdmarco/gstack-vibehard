@@ -72,6 +72,11 @@ export async function delegateCommand(args = [], opts = {}) {
       if (result.changedFiles.length) info(`Alterados: ${result.changedFiles.slice(0, 20).join(", ")}`)
       if (result.reviewBranch) info(`Revise/mergeie: git merge ${result.reviewBranch}`)
       break
+    case "needs_review":
+      warn(result.summary)
+      for (const f of (result.reviewFindings || []).slice(0, 5)) warn(`  • ${f.file}:${f.line} ${f.rule} — ${f.message}`)
+      if (result.reviewBranch) info(`NÃO mergeie direto — revise o branch primeiro: git diff ${result.reviewBranch}`)
+      break
     case "failed":
       warn(result.summary)
       if (result.stderrTail) info(`stderr (tail): ${result.stderrTail}`)
