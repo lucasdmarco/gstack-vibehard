@@ -1,4 +1,4 @@
-# 🚀 gstack-vibehard 2.22.0
+# 🚀 gstack-vibehard 3.0.2
 **A Máquina de Desenvolvimento Zero-Config Definitiva para Agentes de IA.**
 
 [![Test](https://github.com/lucasdmarco/gstack-vibehard/actions/workflows/test.yml/badge.svg)](https://github.com/lucasdmarco/gstack-vibehard/actions/workflows/test.yml)
@@ -308,7 +308,7 @@ gstack_vibehard create meu-projeto
 - **Project Name Allowlist:** `^[a-zA-Z0-9._-]+$` — sem injeção via `$()`, backtick, `;`
 - **No Shell Execution:** código principal em `src/` migrado para `execFileSync`/`execFile` com argumentos em array; scripts auxiliares legados continuam em migração contínua
 - **GitOps Seguro:** `git push` apenas com consentimento explícito; body de issue/PR passa por **redaction** antes do `gh` (aborta + registra evento com fingerprint se houver segredo)
-- **Worktrees não copiam segredos:** o gstack usa `git worktree add` puro (um `.env` no `.gitignore` **não** vai pra worktree) e o autosave **exclui `.env`**. NÃO existe `.worktreeinclude` que copie segredos. O único risco real é ter `.env` **rastreado** no git — `delegate --worktree` avisa se detectar isso.
+- **Worktrees não copiam segredos:** o gstack usa `git worktree add` puro (um `.env` no `.gitignore` **não** vai pra worktree) e o autosave usa **staging por allowlist** (exclui `.env`/build/binários). O único risco real é ter `.env` **rastreado** no git — `delegate` (com ou sem `--worktree`) **BLOQUEIA** se detectar isso (libere explicitamente com `--allow-tracked-secrets`). O commit delegado também usa **allowlist** (sem `git add -A`) e roda `diff-hygiene` antes de marcar o branch como revisável (`needs_review` se houver segredo).
 - **Interceptação real (opt-in):** o Output Guard é auditoria **pós-resposta** (honesto: nenhum harness permite interceptar o render via CLI). Para redaction **pré-output em trânsito**, use `gstack_vibehard proxy` e aponte o harness (`ANTHROPIC_BASE_URL`) para ele — funciona onde o harness aceita base-URL custom; não é universal.
 
 ---
