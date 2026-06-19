@@ -15,6 +15,7 @@ export function buildInstallImpact(opts = {}) {
   const home = opts.home || homedir()
   const harnessIds = opts.harnessIds || ["codex", "claude", "cursor", "opencode"]
   const withDeps = opts.withDeps !== false
+  const withMcp = opts.withMcp !== false
   const projectOnly = !!opts.projectOnly
   const h = (...p) => join(home, ...p)
   const cat = (category, label, paths, { global = true, optional = false } = {}) => ({
@@ -36,8 +37,8 @@ export function buildInstallImpact(opts = {}) {
   if (harnessIds.includes("opencode")) harnessPaths.push(h(".config", "opencode", "plugins"), h(".config", "opencode", "opencode.json"))
   if (harnessPaths.length) out.push(cat("harness-config", "Config dos harnesses", harnessPaths))
 
-  // MCP global (opt-in recomendado) — pode mudar ferramentas em todos os projetos
-  if (!projectOnly) {
+  // MCP global (opt-in: só com --global-mcp) — muda ferramentas em todo projeto
+  if (!projectOnly && withMcp) {
     out.push(cat("mcp-global", "MCP global (muda ferramentas em todo projeto)", [
       h(".mcp.json"), h(".claude.json"),
     ], { optional: true }))

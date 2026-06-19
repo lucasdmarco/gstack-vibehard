@@ -104,6 +104,8 @@ export function showHelp() {
   console.log(color("      --audit-only                 Preflight: lista o impacto global SEM escrever nada (recomendado 1a vez)", COLORS.dim))
   console.log(color("      --project-only               Impacto global minimo (sem deps/MCP global/vault)", COLORS.dim))
   console.log(color("      --harness <claude|opencode|cursor|codex>  Instala so um harness", COLORS.dim))
+  console.log(color("      --global-mcp                 Escrever MCP global (opt-in; por padrao NAO escreve)", COLORS.dim))
+  console.log(color("      --yes/--global               Confirmar impacto global (necessario em modo nao-interativo)", COLORS.dim))
   console.log(color("      --skip-deps                  Pular instalacao de deps globais (bun, Rust...)", COLORS.dim))
   console.log(color("    gstack_vibehard start          Assistente guiado (Replit-like): objetivo → plano → execução", COLORS.cyan))
   console.log(color("    gstack_vibehard plan \"<objetivo>\" Gerar plano guiado (determinístico) — modo leve/completo", COLORS.cyan))

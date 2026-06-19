@@ -42,6 +42,17 @@ test("buildInstallImpact: project-only remove MCP global, vault e deps", async (
   } finally { await rm(home, { recursive: true, force: true }) }
 })
 
+test("buildInstallImpact: withMcp:false remove MCP global (opt-in)", async () => {
+  const home = await mkdtemp(path.join(tmpdir(), "gstack-impact-"))
+  try {
+    const { buildInstallImpact } = await imp()
+    const off = buildInstallImpact({ home, withMcp: false }).map((c) => c.category)
+    assert.ok(!off.includes("mcp-global"), "sem --global-mcp não lista MCP global")
+    const on = buildInstallImpact({ home }).map((c) => c.category)
+    assert.ok(on.includes("mcp-global"), "default ainda informa MCP global como possível")
+  } finally { await rm(home, { recursive: true, force: true }) }
+})
+
 test("buildInstallImpact: --harness filtra a config de harness", async () => {
   const home = await mkdtemp(path.join(tmpdir(), "gstack-impact-"))
   try {
