@@ -1,5 +1,10 @@
 # Changelog - gstack-vibehard
 
+## [3.0.1] - 2026-06-19
+
+### Pacote npm estado-da-arte — sem artefatos Python no tarball
+- O `files` (allowlist) incluía `__pycache__/*.pyc` gerados localmente sob `hooks/`/`src/` no tarball publicado (ruído inofensivo, mas não-limpo). Agora um hook **`prepack`** (`scripts/clean-pkg.mjs`) remove todo `__pycache__`/`.pyc`/`.pyo` automaticamente antes de cada `npm pack`/`npm publish` → o pacote sai **100% limpo, sempre**. Também exposto como `npm run clean`.
+
 ## [3.0.0] - 2026-06-19
 
 ### Safe & adaptive by default — flip do default do `install` (Fases 5–6, fecha o master plan)
