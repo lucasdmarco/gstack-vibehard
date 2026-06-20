@@ -1,5 +1,12 @@
 # Changelog - gstack-vibehard
 
+## [3.0.7] - 2026-06-19
+
+### OpenCode plugins manifest-owned + kill switch (PR4 do finalprd10.md)
+- **Plugins do OpenCode agora são manifest-owned** (`src/harness/opencode.js`): a cópia dos 3 plugins (`gstack-security/session/prompt.js`) deixa de usar `cpSync(force:true)` e passa por **`safeCopyFile`** → backup versionado + registro no manifest. Plugin **novo** do gstack → `removeOnUninstall` (uninstall remove); plugin **homônimo do usuário** → backup + `restoreOnUninstall` (uninstall restaura o do usuário). Zero resíduo após uninstall.
+- **Kill switch `GSTACK_OPENCODE_DISABLE=1`** (`src/plugins/opencode/*.js`): cada plugin retorna sem hooks quando a env var está setada — desliga o comportamento gstack no OpenCode em runtime sem desinstalar.
+- +3 testes Node (3 plugins no manifest; backup/restore do homônimo; kill switch). 261 Node + 58 Python verdes; lint/syntaxcheck limpos; manifest real intacto.
+
 ## [3.0.6] - 2026-06-19
 
 ### MCP global opt-in no Codex (PR3 do finalprd10.md)

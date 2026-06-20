@@ -30,6 +30,7 @@ const SAFE_PATTERNS = [
 ]
 
 export const GstackSecurity = async () => {
+  if (process.env.GSTACK_OPENCODE_DISABLE === "1") return {} // kill switch (P0.4)
   return {
     "tool.execute.before": async (input, output) => {
       if (input.tool !== "bash") return

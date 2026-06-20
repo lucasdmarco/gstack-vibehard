@@ -9,6 +9,7 @@ async function resolvePythonCmd() {
 }
 
 export const GstackSession = async ({ $ }) => {
+  if (process.env.GSTACK_OPENCODE_DISABLE === "1") return {} // kill switch (P0.4)
   const { readFileSync, writeFileSync, existsSync, mkdirSync } = await import("fs")
   const { join } = await import("path")
   const { homedir } = await import("os")

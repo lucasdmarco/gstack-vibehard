@@ -1,8 +1,9 @@
-import { existsSync, cpSync } from "fs"
+import { existsSync } from "fs"
 import { join, dirname } from "path"
 import { homedir } from "os"
 import { fileURLToPath } from "url"
 import { writeWithBackup, ensureDir, readJsonFile, mergeJson } from "../installer/merge.js"
+import { safeCopyFile } from "../installer/safe-write.js"
 import { inspectOpenCodeConfig, shouldWriteOpenCodeJson } from "./opencode-config.js"
 
 const HOME = homedir()
@@ -30,13 +31,16 @@ export async function installOpenCode(config, report, deps = {}) {
   ensureDir(pluginsDir)
 
   // 1) Plugins SEMPRE (auto-load garantido pela doc — não depende de config).
+  //    MANIFEST-OWNED (P0.4): via safeCopyFile → backup do plugin do usuário (se
+  //    homônimo) + registro no manifest. Uninstall remove os nossos e restaura o
+  //    do usuário. Kill switch: GSTACK_OPENCODE_DISABLE=1 desliga em runtime.
   if (existsSync(PLUGIN_SRC)) {
     const pluginFiles = ["gstack-security.js", "gstack-session.js", "gstack-prompt.js"]
     for (const file of pluginFiles) {
       const src = join(PLUGIN_SRC, file)
       const dst = join(pluginsDir, file)
       if (existsSync(src)) {
-        cpSync(src, dst, { force: true })
+        safeCopyFile(src, dst, { home, component: "opencode-plugin" })
         report.updated.push(`~/.config/opencode/plugins/${file}`)
       }
     }
