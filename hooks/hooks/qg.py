@@ -22,7 +22,11 @@ from pathlib import Path
 from typing import Any
 
 
-FALLOW_COMMAND = ["npx", "fallow", "audit", "--format", "json"]
+QG_VERSION = "3.0.3"
+FALLOW_ARGS = ["audit", "--format", "json"]
+# Contrato historico: o JSON expoe `command` como `npx fallow ...` (o caminho de
+# fallback). A resolucao REAL prefere binario local/global (ver _resolve_fallow).
+FALLOW_COMMAND = ["npx", "fallow", *FALLOW_ARGS]
 
 
 def parse_args() -> argparse.Namespace:
@@ -32,7 +36,38 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--log-only", action="store_true", help="Emit report but do not fail process")
     parser.add_argument("--timeout", type=int, default=120, help="Fallow timeout in seconds")
     parser.add_argument("--profile", default=None, help="Arquetipo do projeto (library/cli/web-app/...) — ciente de arquetipo")
+    parser.add_argument("--strict", action="store_true",
+                        help="Fallow ausente vira tool_missing/exit!=0 (CI/release) em vez de pular (default humano).")
     return parser.parse_args()
+
+
+def _self_hash() -> str:
+    """sha256 do proprio qg.py — usado pelo verify p/ detectar drift de hook."""
+    try:
+        import hashlib
+        with open(__file__, "rb") as f:
+            return "sha256:" + hashlib.sha256(f.read()).hexdigest()
+    except Exception:
+        return "sha256:unknown"
+
+
+def _resolve_fallow(root: Path):
+    """Resolve o comando do Fallow preferindo binario LOCAL/global antes de `npx`
+    (evita o cold-start lento do npx no Windows). Retorna a lista de comando."""
+    candidates = []
+    binname = "fallow.cmd" if os.name == "nt" else "fallow"
+    local = root / "node_modules" / ".bin" / binname
+    if local.exists():
+        candidates.append(str(local))
+    glob = shutil.which("fallow")
+    if glob:
+        candidates.append(glob)
+    if candidates:
+        return [candidates[0], *FALLOW_ARGS]
+    npx = shutil.which("npx")
+    if npx:
+        return [npx, *FALLOW_COMMAND[1:]]
+    return None
 
 
 # Gating por SEVERIDADE: so CRITICO/ALTO bloqueiam a entrega. Achados MEDIO/BAIXO
@@ -46,6 +81,9 @@ def has_blocking_severity(issues) -> bool:
 
 
 def emit(result: dict[str, Any], exit_code: int) -> None:
+    # Identidade do QG em TODO caminho de saida → o verify detecta drift de hook.
+    result.setdefault("qg_version", QG_VERSION)
+    result.setdefault("qg_hash", _self_hash())
     print(json.dumps(result, indent=2, ensure_ascii=False))
     sys.exit(exit_code)
 
@@ -235,8 +273,8 @@ def _kill_tree(proc) -> None:
 
 
 def run_fallow(root: Path, timeout: int) -> tuple[Any, subprocess.CompletedProcess[str] | None]:
-    npx = shutil.which("npx")
-    if npx is None:
+    cmd = _resolve_fallow(root)
+    if cmd is None:
         return None, None
     # Popen em grupo/sessão própria → no timeout matamos a árvore inteira e o
     # `--timeout` é SEMPRE respeitado (não trava por netos segurando o pipe).
@@ -246,7 +284,7 @@ def run_fallow(root: Path, timeout: int) -> tuple[Any, subprocess.CompletedProce
     else:
         kwargs["start_new_session"] = True
     proc = subprocess.Popen(
-        [npx, *FALLOW_COMMAND[1:]], cwd=str(root),
+        cmd, cwd=str(root),
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, **kwargs,
     )
     try:
@@ -315,8 +353,19 @@ def main() -> None:
         result = error_result("Fallow execution failed", level=args.level, command=FALLOW_COMMAND, detail=str(exc))
         emit(result, 0 if args.log_only else 1)
 
-    # Fallow indisponivel (npx ausente ou stdout vazio) — pula sem bloquear
+    # Fallow indisponivel (npx/fallow ausente ou stdout vazio).
     if raw is None:
+        strict = args.strict or os.environ.get("GSTACK_QG_STRICT") == "1"
+        if strict:
+            # CI/release: NUNCA sucesso silencioso — sinaliza tool_missing e falha.
+            result = {
+                "pass": False, "engine": "fallow", "level": args.level,
+                "profile": args.profile, "command": FALLOW_COMMAND,
+                "verdict": "tool_missing", "issues": [], "auto_fixable": [], "blocking": [],
+                "summary": "Fallow indisponivel e --strict ativo — gate NAO passou (tool_missing).",
+            }
+            emit(result, 1)
+        # Default humano: pula sem bloquear (peer dep opcional).
         result = skipped_result("npx/fallow ausente ou sem saida", args.level)
         typecheck = run_typecheck(root)
         if typecheck.get("status") == "failed":

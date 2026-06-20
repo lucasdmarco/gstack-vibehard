@@ -412,14 +412,20 @@ export async function install(args = []) {
       info(`${c.label}${c.optional ? " (opcional)" : ""}:`)
       for (const it of c.items) info(`  • [${it.action}] ${it.path}`)
     }
-    const md = renderImpactMarkdown(impact, { when: new Date().toISOString(), harnessIds: harnesses.map((h) => h.id) })
-    try {
-      ensureDir(join(HOME, ".gstack_vibehard"))
-      const reportPath = join(HOME, ".gstack_vibehard", `install-report-${Date.now()}.md`)
-      writeFileSync(reportPath, md + "\n")
+    // READ-ONLY por padrão (P0.3): NÃO escreve nada. Só com --save-report grava.
+    if (args.includes("--save-report")) {
+      try {
+        ensureDir(join(HOME, ".gstack_vibehard"))
+        const reportPath = join(HOME, ".gstack_vibehard", `install-report-${Date.now()}.md`)
+        const md = renderImpactMarkdown(impact, { when: new Date().toISOString(), harnessIds: harnesses.map((h) => h.id) })
+        writeFileSync(reportPath, md + "\n")
+        info("")
+        warn(`--save-report: relatório GRAVADO em ${reportPath} (único efeito colateral).`)
+      } catch (e) { warn(`Não consegui salvar o relatório: ${e.message}`) }
+    } else {
       info("")
-      success(`Relatório salvo em ${reportPath}`)
-    } catch (e) { warn(`Não consegui salvar o relatório: ${e.message}`) }
+      info("(audit-only é READ-ONLY: nada foi escrito. Use `--save-report` p/ salvar o relatório.)")
+    }
     info("")
     info("Para instalar de fato: `gstack_vibehard install` (ou `--project-only` p/ impacto mínimo).")
     return report

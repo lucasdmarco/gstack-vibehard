@@ -162,6 +162,31 @@ class FallowWrapperTest(unittest.TestCase):
             data = json.loads(result.stdout)
             self.assertTrue(data["pass"])
             self.assertEqual(data["verdict"], "skipped")
+            # identidade do QG presente em TODO caminho (drift detection do verify)
+            self.assertIn("qg_version", data)
+            self.assertTrue(str(data.get("qg_hash", "")).startswith("sha256:"))
+
+    def test_strict_fallow_ausente_tool_missing_exit1(self):
+        """--strict (CI/release): Fallow ausente NAO pode virar pass silencioso."""
+        with tempfile.TemporaryDirectory() as tmp:
+            env = os.environ.copy()
+            env["PATH"] = tmp  # sem npx/fallow no PATH
+            result = subprocess.run(
+                [sys.executable, str(QG), "--path", tmp, "--level", "1", "--strict"],
+                capture_output=True, text=True, env=env, timeout=20,
+            )
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            data = json.loads(result.stdout)
+            self.assertFalse(data["pass"])
+            self.assertEqual(data["verdict"], "tool_missing")
+
+    def test_emite_versao_em_falha_de_payload(self):
+        """qg_version aparece tambem no caminho de findings (nao so no skip)."""
+        payload = {"verdict": "fail", "issues": [
+            {"rule": "x", "title": "y", "severity": "HIGH", "auto_fixable": True}]}
+        result = self._run_with_fallow_payload(payload, 1)
+        data = json.loads(result.stdout)
+        self.assertEqual(data.get("qg_version"), "3.0.3")
 
 
 if __name__ == "__main__":
