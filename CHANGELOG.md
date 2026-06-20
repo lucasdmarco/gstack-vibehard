@@ -1,5 +1,13 @@
 # Changelog - gstack-vibehard
 
+## [3.0.9] - 2026-06-19
+
+### Política de download remoto — opt-in (PR6 do finalprd10.md)
+- **Por padrão o gstack NÃO baixa nem executa scripts remotos** (`src/installer/remote-policy.js`): novo módulo com allowlist de origens HTTPS (`bun.sh`, `sh.rustup.rs`, `astral.sh`, `atomic-vcs.dev`, ...) e `checkRemoteDownload()`. Só executa com opt-in explícito (`--allow-remote-downloads` ou `GSTACK_ALLOW_REMOTE_DOWNLOADS=1`) **E** origem na allowlist.
+- **`install` e `create` gateados**: os instaladores remotos (Bun/uv/Rust no `install.js`; Atomic VCS no `create.js`) agora **só rodam com `--allow-remote-downloads`** — caso contrário imprimem a instrução manual e seguem. Fecha o vetor `curl|sh` / `irm|iex` / `ExecutionPolicy Bypass` por padrão.
+- **Guard test anti-regressão**: um teste varre `src/` e **falha** se algum arquivo fizer execução remota perigosa (`ExecutionPolicy Bypass`) sem passar pela `remote-policy`.
+- +4 testes Node (allowlist HTTPS, default bloqueia/opt-in libera, env, guard). 267 Node + 58 Python verdes; lint/syntaxcheck limpos.
+
 ## [3.0.8] - 2026-06-19
 
 ### `create` LITE e project-scoped por padrão (PR5 do finalprd10.md)

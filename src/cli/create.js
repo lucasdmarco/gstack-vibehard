@@ -16,6 +16,7 @@ import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { homedir, tmpdir } from "node:os"
 import { deepMerge } from "../installer/merge.js"
+import { checkRemoteDownload } from "../installer/remote-policy.js"
 import { npxArgv } from "../installer/deps.js"
 import { buildIntegrationsRegistry } from "../printing-press/registry.js"
 import { buildContextRegistry, DOC_SOURCES as CONTEXT_DOC_SOURCES } from "../context-docs/registry.js"
@@ -85,7 +86,15 @@ function safeExec(file, args, opts) {
   catch { return null }
 }
 
-function safeDownloadAndRun(url, logger, label) {
+function safeDownloadAndRun(url, logger, label, opts = {}) {
+  // POLÍTICA REMOTA (P0.6): por padrão NÃO baixa/executa script remoto — sugere o
+  // comando manual. Só prossegue com opt-in explícito + origem na allowlist HTTPS.
+  const policy = checkRemoteDownload(url, opts)
+  if (!policy.allowed) {
+    logger.warn(`${label}: download remoto NÃO executado (${policy.reason}).`)
+    logger.warn(`  Para instalar manualmente: veja ${url} (ou rode com --allow-remote-downloads).`)
+    return false
+  }
   const tmp = join(tmpdir(), `gstack-dl-${Date.now()}${process.platform === "win32" ? ".ps1" : ".sh"}`)
   try {
     // curl existe nativamente no Windows 10 1803+ ("curl.exe") e em Unix.
@@ -199,17 +208,17 @@ function writeCasdoorProjectConfig(projectDir) {
 //  PHASE 2: Parallelism (Atomic VCS)
 // ─────────────────────────────────────────────────────────────
 
-function initAtomic(logger, projectDir) {
+function initAtomic(logger, projectDir, opts = {}) {
   if (process.env.GSTACK_SKIP_PREFLIGHT) {
     logger.info("GSTACK_SKIP_PREFLIGHT set — skipping Atomic init")
     return
   }
   if (!findBinary("atomic")) {
-    logger.warn("Atomic CLI nao encontrado. Tentando instalar (download seguro)...")
+    logger.warn("Atomic CLI nao encontrado.")
     const url = process.platform === "win32"
       ? "https://atomic-vcs.dev/install.ps1"
       : "https://atomic-vcs.dev/install.sh"
-    const ok = safeDownloadAndRun(url, logger, "Atomic CLI")
+    const ok = safeDownloadAndRun(url, logger, "Atomic CLI", { allowRemote: opts.allowRemote })
     if (!ok) {
       logger.warn("Atomic CLI nao pode ser instalado — continuando sem VCS atomico")
       logger.warn("  Instale manualmente: curl -fsSL https://atomic-vcs.dev/install.sh | sh")
@@ -1319,7 +1328,7 @@ export async function createProject(options = {}) {
 
     console.log(`\n  === Fase 2/5: Atomic VCS ===`)
     writeAtomicConfig(projectDir)
-    initAtomic(logger, projectDir)
+    initAtomic(logger, projectDir, { allowRemote: args.includes("--allow-remote-downloads") })
     phases.atomic = { status: "configured" }
   }
 

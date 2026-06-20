@@ -14,6 +14,7 @@ import { writeInstructionalGuidance } from "../harness/instructional.js"
 import { installHeadroom } from "../harness/headroom.js"
 import { ensureDir, copyWithBackup, copyDirSync, backupFile } from "./merge.js"
 import { buildInstallImpact, renderImpactMarkdown } from "./impact.js"
+import { checkRemoteDownload } from "./remote-policy.js"
 import { safeCopyDir, safeCopyFile, safeWriteFile, safeAppendBlock } from "./safe-write.js"
 import { findWorkingBinary, getUvCandidates, getBunCandidates, npxArgv } from "./deps.js"
 import { checkAlreadyInstalled } from "./check.js"
@@ -35,7 +36,14 @@ function getProjectRoot() {
 
 const PROJECT_ROOT = getProjectRoot()
 
-function safeDownloadAndRun(url, label) {
+function safeDownloadAndRun(url, label, opts = {}) {
+  // POLÍTICA REMOTA (P0.6): por padrão NÃO executa download remoto — só com
+  // --allow-remote-downloads (ou GSTACK_ALLOW_REMOTE_DOWNLOADS=1) e origem na allowlist.
+  const policy = checkRemoteDownload(url, opts)
+  if (!policy.allowed) {
+    warn(`${label}: download remoto NÃO executado (${policy.reason}). Instale manualmente: ${url}`)
+    return false
+  }
   const tmp = join(tmpdir(), `gstack-dl-${Date.now()}${isWindows() ? ".ps1" : ".sh"}`)
   try {
     // curl existe nativamente no Windows 10 1803+ ("curl.exe") e em Unix.
@@ -71,7 +79,8 @@ function refreshPath() {
   } catch (e) { console.error("refreshPath (non-critical):", e.message) }
 }
 
-async function installDeps(warn, success, info, report, harnessIds) {
+async function installDeps(warn, success, info, report, harnessIds, allowRemote = false) {
+  const remoteOpts = { allowRemote }
   section("deps/ — Instalando dependencias globais")
 
   // ========================================
@@ -83,7 +92,7 @@ async function installDeps(warn, success, info, report, harnessIds) {
     info("bun: nao encontrado. Instalando (download seguro)...")
     try {
       const bunUrl = isWindows() ? "https://bun.sh/install.ps1" : "https://bun.sh/install"
-      const ok = safeDownloadAndRun(bunUrl, "Bun")
+      const ok = safeDownloadAndRun(bunUrl, "Bun", remoteOpts)
       if (ok) {
         refreshPath()
         bunFound = findWorkingBinary(getBunCandidates(HOME, isWindows())) !== ""
@@ -121,9 +130,9 @@ async function installDeps(warn, success, info, report, harnessIds) {
     info("uv: nao encontrado. Instalando (download seguro)...")
     try {
       if (isWindows()) {
-        safeDownloadAndRun("https://astral.sh/uv/install.ps1", "uv (Windows)")
+        safeDownloadAndRun("https://astral.sh/uv/install.ps1", "uv (Windows)", remoteOpts)
       } else {
-        safeDownloadAndRun("https://astral.sh/uv/install.sh", "uv (Unix)")
+        safeDownloadAndRun("https://astral.sh/uv/install.sh", "uv (Unix)", remoteOpts)
       }
       refreshPath()
       uvBin = findWorkingBinary(uvCandidates)
@@ -190,9 +199,9 @@ async function installDeps(warn, success, info, report, harnessIds) {
           try { unlinkSync(rustupTmp) } catch (e) { console.error("cleanup rustup-init:", e.message) }
         }
       } else if (isMacOS()) {
-        safeDownloadAndRun("https://sh.rustup.rs", "Rustup (macOS)")
+        safeDownloadAndRun("https://sh.rustup.rs", "Rustup (macOS)", remoteOpts)
       } else {
-        safeDownloadAndRun("https://sh.rustup.rs", "Rustup (Linux)")
+        safeDownloadAndRun("https://sh.rustup.rs", "Rustup (Linux)", remoteOpts)
       }
       const cargoBin = join(HOME, ".cargo", "bin")
       if (isWindows() && existsSync(cargoBin)) {
@@ -391,6 +400,8 @@ export async function install(args = []) {
   // project-only NÃO toca deps globais (impacto global mínimo).
   const skipDeps = args.includes("--skip-deps") || projectOnly || process.env.GSTACK_SKIP_DEPS === "1"
   const yes = args.includes("--yes") || args.includes("-y")
+  // Política remota (P0.6): instaladores remotos (Bun/uv/Rust) só rodam com opt-in.
+  const allowRemote = args.includes("--allow-remote-downloads")
   const globalConfirmed = args.includes("--global") || yes
   // MCP global é OPT-IN (AC8): só escreve com --global-mcp (ou --global). project-only nunca.
   const globalMcp = !projectOnly && (args.includes("--global-mcp") || args.includes("--global"))
@@ -496,7 +507,7 @@ export async function install(args = []) {
     info("Deps globais: puladas (--skip-deps)")
     report.skipped.push("deps globais (--skip-deps)")
   } else {
-    await installDeps(warn, success, info, report, allHarnessIds)
+    await installDeps(warn, success, info, report, allHarnessIds, allowRemote)
   }
 
   // Check which harnesses already have gstack_vibehard
