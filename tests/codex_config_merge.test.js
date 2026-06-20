@@ -29,14 +29,14 @@ command = "npx"
 args = ["custom-supabase", "--minha-flag"]
 `
 
-test("mergeCodexConfig preserva config do usuario e adiciona hooks/mcp gstack", async () => {
+test("mergeCodexConfig com mcp:true preserva config do usuario e adiciona hooks/mcp gstack", async () => {
   const tmp = await mkdtemp(path.join(tmpdir(), "gstack-codex-"))
   try {
     const cfg = path.join(tmp, "config.toml")
     await writeFile(cfg, USER_CONFIG)
     const { mergeCodexConfig } = await import(`${pathToFileURL(codexModule)}?t=${Date.now()}`)
 
-    mergeCodexConfig(cfg, read, write)
+    mergeCodexConfig(cfg, { mcp: true, readImpl: read, writeImpl: write })
 
     const parsed = parseToml(await readFile(cfg, "utf-8"))
     // chaves do usuario preservadas
@@ -55,13 +55,47 @@ test("mergeCodexConfig preserva config do usuario e adiciona hooks/mcp gstack", 
   }
 })
 
+test("mergeCodexConfig DEFAULT (opt-out): NÃO escreve mcp_servers gstack; preserva os do usuário", async () => {
+  const tmp = await mkdtemp(path.join(tmpdir(), "gstack-codex-nomcp-"))
+  try {
+    const cfg = path.join(tmp, "config.toml")
+    await writeFile(cfg, USER_CONFIG)
+    const { mergeCodexConfig } = await import(`${pathToFileURL(codexModule)}?t=${Date.now()}`)
+    mergeCodexConfig(cfg, { readImpl: read, writeImpl: write }) // sem mcp
+    const parsed = parseToml(await readFile(cfg, "utf-8"))
+    assert.equal(parsed.mcp_servers.fallow, undefined, "sem --global-mcp não injeta fallow")
+    assert.equal(parsed.mcp_servers.context7, undefined)
+    // servidores do usuário preservados; hooks gstack ainda escritos
+    assert.deepEqual(parsed.mcp_servers.meu_server.args, ["meu-mcp.js"])
+    assert.ok(parsed.hooks.on_stop.some((c) => c.includes("stop.py")))
+  } finally {
+    await rm(tmp, { recursive: true, force: true })
+  }
+})
+
+test("mergeCodexConfig com mcpServers=['playwright']: escreve SÓ o playwright", async () => {
+  const tmp = await mkdtemp(path.join(tmpdir(), "gstack-codex-one-"))
+  try {
+    const cfg = path.join(tmp, "config.toml")
+    const { mergeCodexConfig } = await import(`${pathToFileURL(codexModule)}?t=${Date.now()}`)
+    mergeCodexConfig(cfg, { mcp: true, mcpServers: ["playwright"], readImpl: read, writeImpl: write })
+    const parsed = parseToml(await readFile(cfg, "utf-8"))
+    assert.ok(parsed.mcp_servers.playwright, "playwright presente")
+    assert.equal(parsed.mcp_servers.supabase, undefined, "supabase placeholder NÃO escrito")
+    assert.equal(parsed.mcp_servers.context7, undefined, "context7 placeholder NÃO escrito")
+    assert.equal(parsed.mcp_servers.fallow, undefined)
+  } finally {
+    await rm(tmp, { recursive: true, force: true })
+  }
+})
+
 test("stripGstackFromCodexConfig remove so chaves gstack, preserva o resto", async () => {
   const tmp = await mkdtemp(path.join(tmpdir(), "gstack-codex-strip-"))
   try {
     const cfg = path.join(tmp, "config.toml")
     await writeFile(cfg, USER_CONFIG)
     const { mergeCodexConfig, stripGstackFromCodexConfig } = await import(`${pathToFileURL(codexModule)}?t=${Date.now()}`)
-    mergeCodexConfig(cfg, read, write)
+    mergeCodexConfig(cfg, { mcp: true, readImpl: read, writeImpl: write })
     stripGstackFromCodexConfig(cfg, read, write)
 
     const parsed = parseToml(await readFile(cfg, "utf-8"))
@@ -85,7 +119,7 @@ test("mergeCodexConfig em arquivo inexistente escreve config gstack pura", async
   try {
     const cfg = path.join(tmp, "config.toml")
     const { mergeCodexConfig } = await import(`${pathToFileURL(codexModule)}?t=${Date.now()}`)
-    mergeCodexConfig(cfg, read, write)
+    mergeCodexConfig(cfg, { mcp: true, readImpl: read, writeImpl: write })
     const parsed = parseToml(await readFile(cfg, "utf-8"))
     assert.ok(parsed.hooks.on_stop[0].includes("stop.py"))
     assert.ok(parsed.mcp_servers.fallow)

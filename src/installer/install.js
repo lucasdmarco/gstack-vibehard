@@ -394,6 +394,16 @@ export async function install(args = []) {
   const globalConfirmed = args.includes("--global") || yes
   // MCP global é OPT-IN (AC8): só escreve com --global-mcp (ou --global). project-only nunca.
   const globalMcp = !projectOnly && (args.includes("--global-mcp") || args.includes("--global"))
+  // --mcp-server <name> (repetível ou CSV): com --global-mcp, escreve só os escolhidos.
+  const mcpServers = (() => {
+    const out = []
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === "--mcp-server" && args[i + 1] && !args[i + 1].startsWith("--")) {
+        out.push(...args[i + 1].split(",").map((s) => s.trim()).filter(Boolean))
+      }
+    }
+    return out.length ? out : null
+  })()
   const report = { added: [], updated: [], skipped: [], errors: [] }
 
   section("gstack_vibehard Installer")
@@ -619,7 +629,7 @@ export async function install(args = []) {
     try {
       switch (harnessId) {
         case "codex":
-          await installCodex({ hooks: false, template: true }, report)
+          await installCodex({ hooks: false, template: true, mcp: globalMcp, mcpServers }, report)
           break
         case "claude":
           // hooks: true = REGISTRO no settings.json (Step 3 ja copiou os .py)

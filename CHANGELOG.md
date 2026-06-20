@@ -1,5 +1,13 @@
 # Changelog - gstack-vibehard
 
+## [3.0.6] - 2026-06-19
+
+### MCP global opt-in no Codex (PR3 do finalprd10.md)
+- **`install --yes` deixa de escrever `mcp_servers` do gstack no Codex** (`src/harness/codex.js`): o `mergeCodexConfig` agora só injeta os servidores MCP quando `mcp:true` (via `--global-mcp`/`--global`). Antes adicionava fallow/supabase/playwright/context7/etc. sempre — inclusive placeholders como `${SUPABASE_PROJECT_REF}`. Hooks e config do usuário continuam preservados.
+- **`--mcp-server <name>`** (repetível ou CSV): com `--global-mcp`, escreve **só** os servidores escolhidos (ex.: `--global-mcp --mcp-server playwright` → só Playwright, sem placeholders de Supabase/Context7).
+- `installCodex({ mcp, mcpServers })` + parsing de `--mcp-server` no `install.js`.
+- +2 testes Node (opt-out default sem MCP; `--mcp-server` único) e testes existentes ajustados p/ a nova assinatura. 258 Node + 58 Python verdes; lint/syntaxcheck limpos.
+
 ## [3.0.5] - 2026-06-19
 
 ### Doctor JSON + resiliência (PR2 do finalprd10.md)

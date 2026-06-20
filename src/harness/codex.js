@@ -36,8 +36,8 @@ export async function installCodex(config, report) {
   }
 
   if (config.template) {
-    mergeCodexConfig(configFile)
-    report.updated.push("~/.codex/config.toml (merge nao-destrutivo)")
+    mergeCodexConfig(configFile, { mcp: !!config.mcp, mcpServers: config.mcpServers || null })
+    report.updated.push(`~/.codex/config.toml (merge nao-destrutivo${config.mcp ? ", com MCP global" : ", sem MCP global"})`)
   }
 
   return report
@@ -94,7 +94,8 @@ function buildGstackConfig() {
  * - agent / mcp_servers: usuario vence (preserva customizacoes); gstack so adiciona o que falta
  * Exportada para teste com path injetavel.
  */
-export function mergeCodexConfig(configFile, readImpl = readFileSync, writeImpl = writeWithBackup) {
+export function mergeCodexConfig(configFile, opts = {}) {
+  const { mcp = false, mcpServers = null, readImpl = readFileSync, writeImpl = writeWithBackup } = opts
   const gstack = buildGstackConfig()
   let existing = {}
   if (existsSync(configFile)) {
@@ -118,8 +119,18 @@ export function mergeCodexConfig(configFile, readImpl = readFileSync, writeImpl 
   }
   // agent: usuario vence
   merged.agent = { ...gstack.agent, ...(existing.agent || {}) }
-  // mcp_servers: usuario vence (preserva config customizada dos servidores)
-  merged.mcp_servers = { ...gstack.mcp_servers, ...(existing.mcp_servers || {}) }
+  // mcp_servers: OPT-IN (P0.3). Sem `mcp`, NÃO injeta servidores gstack — só
+  // preserva os do usuario. Com `mcp`, adiciona os defaults (filtrados por
+  // `mcpServers` quando o usuario escolheu servidores específicos); usuario vence.
+  if (mcp) {
+    let add = gstack.mcp_servers
+    if (Array.isArray(mcpServers) && mcpServers.length) {
+      add = Object.fromEntries(Object.entries(gstack.mcp_servers).filter(([k]) => mcpServers.includes(k)))
+    }
+    merged.mcp_servers = { ...add, ...(existing.mcp_servers || {}) }
+  } else if (existing.mcp_servers) {
+    merged.mcp_servers = existing.mcp_servers
+  }
 
   writeImpl(configFile, stringifyToml(merged))
 }
