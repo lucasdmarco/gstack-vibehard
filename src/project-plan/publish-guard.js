@@ -46,7 +46,13 @@ export function publishGuard(opts = {}) {
   } else {
     const latest = semverTags.reduce((a, b) => (semverGt(b, a) ? b : a))
     if (semverGt(version, latest)) add("version-bump", "passed", `${version} > ${latest}`)
-    else add("version-bump", "failed", `versão ${version} não está acima da última tag ${latest}`)
+    else {
+      const sameTag = latest.replace(/^v/, "") === version.replace(/^v/, "")
+      const guide = sameTag
+        ? `versão ${version} já tem tag ${latest} — se é NOVA release, bump para a próxima; se é só validação local, use o verify normal (publish é advisory em lib/CLI)`
+        : `versão ${version} não está acima da última tag ${latest} — faça o bump antes de publicar`
+      add("version-bump", "failed", guide)
+    }
   }
 
   // 3. CHANGELOG com entrada da versão

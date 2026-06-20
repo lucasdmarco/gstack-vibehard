@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises"
+import { mkdtemp, rm, writeFile, mkdir, copyFile } from "node:fs/promises"
 import { existsSync, readFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
@@ -16,7 +16,9 @@ async function projectWith(scripts, extra = {}) {
   await writeFile(path.join(cwd, "package.json"), JSON.stringify({ name: "x", scripts }))
   if (extra.qg) {
     await mkdir(path.join(cwd, ".gstack", "hooks"), { recursive: true })
-    await writeFile(path.join(cwd, ".gstack", "hooks", "qg.py"), "#")
+    // Copia o qg.py EMPACOTADO → instalado == empacotado, sem drift (P0.1).
+    if (extra.qgDrift) await writeFile(path.join(cwd, ".gstack", "hooks", "qg.py"), "# qg antigo divergente\n")
+    else await copyFile(path.join(repoRoot, "hooks", "hooks", "qg.py"), path.join(cwd, ".gstack", "hooks", "qg.py"))
   }
   return cwd
 }
@@ -76,6 +78,47 @@ test("verify: reducedTrust quando harness é best-effort (ex.: hermes)", async (
     const weak = runVerify({ cwd, profile: "scaffold", home: cwd, harness: "hermes", exec: () => {} })
     assert.equal(strong.reducedTrust, false)
     assert.equal(weak.reducedTrust, true)
+  } finally { await rm(cwd, { recursive: true, force: true }) }
+})
+
+test("verify: reporta qg.version/hash/origin e qgDrift=false quando QG == empacotado", async () => {
+  const cwd = await projectWith({ test: "x" }, { qg: true })
+  try {
+    const { runVerify } = await imp(runnerMod)
+    const r = runVerify({ cwd, profile: "scaffold", home: cwd, exec: () => {} })
+    assert.equal(r.qgDrift, false)
+    assert.equal(r.qg.origin, "gstack")
+    assert.ok(r.qg.version, "reporta a versão do QG")
+    assert.ok(String(r.qg.hash).startsWith("sha256:"))
+    assert.equal(r.status, "ready")
+  } finally { await rm(cwd, { recursive: true, force: true }) }
+})
+
+test("verify: QG instalado DIVERGENTE do empacotado → qgDrift e ready_with_warnings (não ready silencioso)", async () => {
+  const cwd = await projectWith({ test: "x" }, { qg: true, qgDrift: true })
+  try {
+    const { runVerify } = await imp(runnerMod)
+    const r = runVerify({ cwd, profile: "scaffold", home: cwd, exec: () => {} })
+    assert.equal(r.qgDrift, true)
+    assert.equal(r.status, "ready_with_warnings")
+    assert.equal(r.ready, false, "não é ready silencioso com drift de QG")
+  } finally { await rm(cwd, { recursive: true, force: true }) }
+})
+
+test("verify --quick: pula install/test/typecheck/build e qg-l2; segunda run = cache_hit", async () => {
+  const cwd = await projectWith({ test: "x", lint: "x", typecheck: "x", build: "x" }, { qg: true })
+  try {
+    const { runVerify } = await imp(runnerMod)
+    const r1 = runVerify({ cwd, profile: "quick", home: cwd, exec: () => {} })
+    const ids = Object.fromEntries(r1.steps.map((s) => [s.id, s.status]))
+    assert.equal(ids.test, "not_applicable", "quick pula a suíte")
+    assert.equal(ids.deps, "passed", "quick checa deps (npm ls), não install")
+    assert.ok(!r1.steps.find((s) => s.id === "qg-l2"), "quick não roda QG L2")
+    assert.ok(r1.steps.find((s) => s.id === "qg-l1"), "quick roda QG L1")
+    // segunda run sem mudanças → cache_hit
+    const r2 = runVerify({ cwd, profile: "quick", home: cwd, exec: () => { throw new Error("não deveria reexecutar gate no cache") } })
+    assert.equal(r2.cached, true)
+    assert.ok(r2.steps.every((s) => s.status === "cache_hit"))
   } finally { await rm(cwd, { recursive: true, force: true }) }
 })
 

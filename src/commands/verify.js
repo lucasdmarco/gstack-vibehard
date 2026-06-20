@@ -13,7 +13,9 @@ export async function verifyCommand(args = [], opts = {}) {
   const cwd = opts.cwd || process.cwd()
   const json = args.includes("--json")
   const pi = args.indexOf("--profile")
-  const profile = pi !== -1 && args[pi + 1] ? args[pi + 1] : "full"
+  const profile = args.includes("--quick") ? "quick"
+    : args.includes("--release") ? "release"
+    : pi !== -1 && args[pi + 1] ? args[pi + 1] : "full"
   const hi = args.indexOf("--harness")
   const harness = hi !== -1 && args[hi + 1] ? args[hi + 1] : opts.harness
 
@@ -29,11 +31,15 @@ export async function verifyCommand(args = [], opts = {}) {
 
   if (json) { process.stdout.write(JSON.stringify({ runId, ...report }) + "\n"); return report }
 
-  section(`verify — perfil ${report.profile} · arquétipo ${report.archetype} · status ${report.status}`)
+  section(`verify — perfil ${report.profile} · arquétipo ${report.archetype} · status ${report.status}${report.cached ? " (cache)" : ""}`)
+  if (report.qg && report.qg.path) {
+    info(`  QG: ${report.qg.origin} v${report.qg.version || "?"} (${report.qg.path})`)
+    if (report.qgDrift) warn(`  QG DRIFT: o qg.py instalado difere do empacotado (v${report.qg.packagedVersion || "?"}). Rode \`gstack_vibehard install\` p/ atualizar.`)
+  }
   for (const s of report.steps) {
     const icon = s.status === "passed" ? "✓" : s.status === "failed" ? "✗"
       : s.status === "pending_feature" ? "◷" : s.status === "tool_missing" ? "⚠"
-      : s.status === "advisory" ? "•" : "–"
+      : s.status === "advisory" ? "•" : s.status === "cache_hit" ? "⚡" : "–"
     const note = s.detail ? ` (${s.detail})` : ""
     info(`  ${icon} ${s.id}: ${s.status}${note}`)
   }

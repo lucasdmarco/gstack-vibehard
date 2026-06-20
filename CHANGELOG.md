@@ -1,5 +1,15 @@
 # Changelog - gstack-vibehard
 
+## [3.0.3] - 2026-06-19
+
+### Ajuste Final P0 — QG consistente, verify rápido, audit read-only, E2E (PRD PRDAJUSTEFINAL.MD)
+- **[P0.1] QG versionado + drift-aware + sem npx lento** (`hooks/hooks/qg.py`, `src/project-plan/verify-runner.js`): o `qg.py` ganha `QG_VERSION` e emite `qg_version`/`qg_hash` em **todo** caminho; resolve o Fallow preferindo **binário local** (`node_modules/.bin/fallow` → global → `npx` fallback), evitando o cold-start; modo `--strict`/`GSTACK_QG_STRICT=1` → Fallow ausente vira `tool_missing`/exit≠0 (nunca pass silencioso em CI/release). O `verify` agora reporta `qg={origin,path,version,hash}` e **detecta drift** entre o qg instalado e o **empacotado** → `qgDrift` + `ready_with_warnings` (não "ready" silencioso). `--profile release` roda o qg empacotado (consistência garantida).
+- **[P0.2] `verify --quick` + cache** (`src/project-plan/verify-runner.js`, `src/commands/verify.js`): perfil `quick` (deps via checagem filesystem, lint, diff-hygiene, QG L1 advisory com timeout 15s) roda em **~8s** (era ~163s no full). Cache por fingerprint de arquivos (`.gstack/verify-cache.json`) → 2ª run sem mudanças = `cache_hit`. Perfil `release` torna o publish-guard bloqueante. `--json` puro no final.
+- **[P0.3] `install --audit-only` literalmente READ-ONLY** (`src/installer/install.js`): por padrão **não escreve nada** (só stdout); `--save-report` grava o relatório e avisa o efeito.
+- **[P0.4] E2E em HOME descartável** (`tests/e2e/safe-install.e2e.test.js`, `npm run test:e2e`, gated por `GSTACK_E2E_SAFE_INSTALL=1`): prova as invariantes de segurança — audit-only não escreve nada, `--save-report` grava exatamente 1 arquivo, `delegate --worktree` bloqueia `.env` rastreado, uninstall preserva drift (e só sobrescreve com `--resolve-drift`) — tudo num HOME temporário, sem tocar a máquina real.
+- **[P0.5] Mensagem do `publish-guard`**: quando a tag da versão já existe, o `detail` orienta (nova release → bump; validação local → publish é advisory no verify).
+- +9 testes (Node verify drift/quick/cache + Python qg strict/version + E2E). 245 Node + 58 Python verdes; lint/syntaxcheck limpos.
+
 ## [3.0.2] - 2026-06-19
 
 ### Fechamento de qualidade — auditoria 4 pontos (rumo ao 10/10)
