@@ -14,5 +14,6 @@ if (args[0] === "--version" || args[0] === "-v") {
   process.exit(0)
 }
 
-const command = args[0] || "install"
-runCLI(command, args.slice(1))
+// IMPORTANTE: no-args NÃO instala. `runCLI(undefined, ...)` mostra ajuda segura
+// e sugere `start` (first-run sem medo). Help/instalação são decididos lá.
+runCLI(args[0], args.slice(1))

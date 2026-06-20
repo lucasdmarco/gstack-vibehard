@@ -37,7 +37,12 @@ const COLORS = {
   dim: "\x1b[2m",
 }
 
+let noColor = !!process.env.NO_COLOR
+
+export function setNoColor(v) { noColor = !!v }
+
 function color(text, ...codes) {
+  if (noColor) return text
   return codes.join("") + text + COLORS.reset
 }
 
@@ -97,47 +102,59 @@ export async function multiSelect(question, options) {
   return indices.filter((i) => i >= 0 && i < options.length).map((i) => options[i].value)
 }
 
-export function showHelp() {
-  logo()
-  console.log(color("  Comandos:", COLORS.bold))
-  console.log(color("    gstack_vibehard install        Instalar gstack_vibehard no ambiente", COLORS.cyan))
-  console.log(color("      --audit-only [--save-report] Preflight READ-ONLY: lista o impacto global (--save-report grava o relatorio)", COLORS.dim))
-  console.log(color("      --project-only               Impacto global minimo (sem deps/MCP global/vault)", COLORS.dim))
-  console.log(color("      --harness <claude|opencode|cursor|codex>  Instala so um harness", COLORS.dim))
-  console.log(color("      --global-mcp                 Escrever MCP global (opt-in; por padrao NAO escreve)", COLORS.dim))
-  console.log(color("      --yes/--global               Confirmar impacto global (necessario em modo nao-interativo)", COLORS.dim))
-  console.log(color("      --skip-deps                  Pular instalacao de deps globais (bun, Rust...)", COLORS.dim))
-  console.log(color("    gstack_vibehard start          Assistente guiado (Replit-like): objetivo → plano → execução", COLORS.cyan))
-  console.log(color("    gstack_vibehard plan \"<objetivo>\" Gerar plano guiado (determinístico) — modo leve/completo", COLORS.cyan))
-  console.log(color("      --name <p> --mode lite|full --json --dry-run --recipe <id>", COLORS.dim))
-  console.log(color("      plan run <id> [--yes] · plan status <id> · plan explain <id>", COLORS.dim))
-  console.log(color("    gstack_vibehard task \"<pedido>\"  Loop Engineer: plano de feature (Document Graph + workflow + delegate)", COLORS.cyan))
-  console.log(color("    gstack_vibehard verify         Delivery gates por arquétipo (--quick rápido+cache, --profile full|release, --json)", COLORS.cyan))
-  console.log(color("    gstack_vibehard publish-guard  Check determinístico pré-publish: tree/bump/CHANGELOG/tag/CI (--json, --no-ci)", COLORS.cyan))
-  console.log(color("    gstack_vibehard dream          Auto-melhoria: audit (promessas vs evidência) · status (matriz de confiança)", COLORS.cyan))
-  console.log(color("    gstack_vibehard proxy          Proxy de redaction pré-output (opt-in) — interceptação real em trânsito", COLORS.cyan))
-  console.log(color("    gstack_vibehard enable         Ativar o gstack NESTE projeto (projeto novo já vem ativo)", COLORS.cyan))
-  console.log(color("    gstack_vibehard disable        Desativar neste projeto (preserva dados em .gstack-disabled/)", COLORS.cyan))
-  console.log(color("    gstack_vibehard status         Ver se o gstack está ativo neste projeto", COLORS.cyan))
-  console.log(color("    gstack_vibehard create <nome>  Criar workspace runtime omniharness", COLORS.cyan))
-  console.log(color("    gstack_vibehard init <nome>    Criar novo projeto com estrutura completa", COLORS.cyan))
-  console.log(color("    gstack_vibehard doctor         Diagnosticar ambiente", COLORS.cyan))
-  console.log(color("      --install-integrity          Validar manifest/backups/hashes (uninstall seguro?)", COLORS.dim))
-  console.log(color("      --impact                     Mostrar componentes GLOBAIS ativos (o que afeta qualquer projeto)", COLORS.dim))
-  console.log(color("      --fix [--dry-run]            Corrigir conflito OpenCode json/jsonc (merge assistido, backup)", COLORS.dim))
-  console.log(color("    gstack_vibehard sprint --save   Salvar decisoes e atualizar memorias", COLORS.cyan))
-  console.log(color("    gstack_vibehard monitor        TUI: agentes, tokens, QG, ROI", COLORS.cyan))
-  console.log(color("    gstack_vibehard tools          Integracoes: Composio (nuvem) + Printing Press (local)", COLORS.cyan))
-  console.log(color("    gstack_vibehard context        Context docs (ADR/PRD/plans/research) — init/status", COLORS.cyan))
-  console.log(color("    gstack_vibehard delegate       Delegar tarefa ao OpenCode (opt-in, confirmação)", COLORS.cyan))
-  console.log(color("    gstack_vibehard workflow       Graph runner determinístico — run/runs/inspect", COLORS.cyan))
-  console.log(color("    gstack_vibehard a2a            Agent Card A2A (offline, sem servidor)", COLORS.cyan))
-  console.log(color("    gstack_vibehard uninstall      Remover gstack_vibehard do ambiente", COLORS.cyan))
-  console.log(color("      --dry-run --restore-only --remove-vault --remove-deps --legacy-name-cleanup  (rollback via manifest)", COLORS.dim))
-  console.log(color("      --resolve-drift              Forçar restore mesmo se o arquivo mudou após a instalação (por padrão preserva)", COLORS.dim))
-  console.log(color("    gstack_vibehard list           Listar componentes instalados", COLORS.cyan))
-  console.log(color("    gstack_vibehard help           Mostrar esta ajuda\n", COLORS.cyan))
+// Registro de comandos — fonte única para help curto, avançado e por-comando.
+const COMMANDS = [
+  { name: "start", group: "common", desc: "Assistente guiado: objetivo → plano → execução", usage: "gstack_vibehard start" },
+  { name: "create", group: "common", desc: "Criar um app (LITE por padrão, escreve só ./<nome>)", usage: "gstack_vibehard create <nome> [--full] [--dry-run --json]" },
+  { name: "init", group: "common", desc: "Criar projeto com estrutura completa", usage: "gstack_vibehard init <nome>" },
+  { name: "status", group: "common", desc: "Ver se o gstack está ativo neste projeto", usage: "gstack_vibehard status" },
+  { name: "enable", group: "common", desc: "Ativar o gstack neste projeto (novo já vem ativo)", usage: "gstack_vibehard enable" },
+  { name: "disable", group: "common", desc: "Desativar neste projeto (preserva dados)", usage: "gstack_vibehard disable" },
+  { name: "doctor", group: "common", desc: "Diagnosticar ambiente", usage: "gstack_vibehard doctor [--json] [--impact] [--install-integrity]" },
+  { name: "verify", group: "common", desc: "Delivery gates por arquétipo", usage: "gstack_vibehard verify [--quick] [--profile full|release] [--json]" },
+  { name: "install", group: "common", desc: "Instalar no ambiente (preflight-first; pede confirmação)", usage: "gstack_vibehard install [--audit-only [--save-report]] [--project-only] [--harness <id>] [--global-mcp] [--yes]" },
+  { name: "uninstall", group: "common", desc: "Remover (rollback via manifest)", usage: "gstack_vibehard uninstall [--dry-run] [--restore-only] [--resolve-drift]" },
+  { name: "help", group: "common", desc: "Mostrar ajuda (`help advanced` p/ avançados; `help <cmd>` p/ um comando)", usage: "gstack_vibehard help [comando|advanced]" },
+  { name: "plan", group: "advanced", desc: "Gerar plano guiado determinístico", usage: "gstack_vibehard plan \"<objetivo>\" [--json --dry-run --recipe <id>] · plan run|status|explain <id>" },
+  { name: "task", group: "advanced", desc: "Loop Engineer: plano de feature", usage: "gstack_vibehard task \"<pedido>\"" },
+  { name: "publish-guard", group: "advanced", desc: "Check determinístico pré-publish (tree/bump/CHANGELOG/tag/CI)", usage: "gstack_vibehard publish-guard [--json] [--no-ci]" },
+  { name: "dream", group: "advanced", desc: "Auditoria promessas-vs-evidência (audit/status)", usage: "gstack_vibehard dream audit|status [--json]" },
+  { name: "proxy", group: "advanced", desc: "Proxy de redaction pré-output (opt-in)", usage: "gstack_vibehard proxy [--port N] [--upstream URL]" },
+  { name: "tools", group: "advanced", desc: "Integrações: Composio (nuvem) + Printing Press (local)", usage: "gstack_vibehard tools <suggested|list|install|mcp>" },
+  { name: "context", group: "advanced", desc: "Context docs (ADR/PRD/plans/research)", usage: "gstack_vibehard context <init|index|status>" },
+  { name: "delegate", group: "advanced", desc: "Delegar tarefa ao OpenCode (opt-in, confirmação)", usage: "gstack_vibehard delegate opencode --task \"...\" [--worktree] [--yes]" },
+  { name: "workflow", group: "advanced", desc: "Graph runner determinístico", usage: "gstack_vibehard workflow <run|runs|inspect>" },
+  { name: "a2a", group: "advanced", desc: "Agent Card A2A (offline, sem servidor)", usage: "gstack_vibehard a2a" },
+  { name: "monitor", group: "advanced", desc: "TUI: agentes, tokens, QG, ROI", usage: "gstack_vibehard monitor" },
+  { name: "sprint", group: "advanced", desc: "Salvar decisões e atualizar memórias", usage: "gstack_vibehard sprint --save" },
+  { name: "list", group: "advanced", desc: "Listar componentes instalados", usage: "gstack_vibehard list" },
+]
+
+export function showHelp(mode = "short") {
+  console.log(color("  Uso: gstack_vibehard <comando> [opções]   ·   `<comando> --help` p/ detalhes", COLORS.bold))
+  console.log("")
+  const groups = mode === "advanced" ? ["advanced"] : mode === "full" ? ["common", "advanced"] : ["common"]
+  for (const g of groups) {
+    console.log(color(g === "common" ? "  Comandos:" : "  Avançados:", COLORS.bold))
+    for (const c of COMMANDS.filter((x) => x.group === g)) {
+      console.log(color(`    ${c.name.padEnd(14)} ${c.desc}`, COLORS.cyan))
+    }
+    console.log("")
+  }
+  if (mode === "short") {
+    console.log(color("  Primeira vez? → `gstack_vibehard start`   ·   Avançados → `gstack_vibehard help advanced`", COLORS.dim))
+  }
 }
+
+export function helpFor(name) {
+  const c = COMMANDS.find((x) => x.name === name)
+  if (!c) { showHelp("short"); return }
+  console.log(color(`  ${c.name} — ${c.desc}`, COLORS.bold))
+  console.log("")
+  console.log(color(`    ${c.usage}`, COLORS.cyan))
+}
+
+export function isKnownCommand(name) { return COMMANDS.some((c) => c.name === name) }
 
 export function success(msg) {
   console.log(color(`  ✓ ${msg}`, COLORS.green))
@@ -160,11 +177,33 @@ export function section(title) {
 }
 
 export async function runCLI(command, args) {
+  if (args.includes("--no-color")) noColor = true
   // Saída-máquina (JSON) precisa de stdout limpo: suprime o banner quando há
   // --json ou em comandos que emitem JSON puro (a2a).
   const quiet = args.includes("--json") || command === "a2a"
-  if (!quiet) logo()
+  const wantsHelp = args.includes("--help") || args.includes("-h")
 
+  // FIRST-RUN SEGURO + HELP UNIVERSAL: nada que pareça ajuda pode instalar/escrever.
+  // no-args, --help/-h, ou `help [topico]` → só ajuda, exit 0, zero escrita.
+  if (command === undefined || command === "--help" || command === "-h" || command === "help") {
+    if (!quiet) logo()
+    const topic = command === "help" ? args[0] : null
+    if (topic === "advanced") showHelp("advanced")
+    else if (topic && isKnownCommand(topic)) helpFor(topic)
+    else {
+      showHelp("short")
+      if (command === undefined) { console.log(""); info("Dica: comece por `gstack_vibehard start` (seguro, guiado). Nada é instalado por este comando.") }
+    }
+    return
+  }
+  // `<comando> --help` → mostra a ajuda do subcomando e NÃO executa.
+  if (wantsHelp) {
+    if (!quiet) logo()
+    helpFor(command)
+    return
+  }
+
+  if (!quiet) logo()
   try {
     await dispatch(command, args)
   } catch (e) {

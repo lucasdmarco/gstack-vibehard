@@ -1,5 +1,16 @@
 # Changelog - gstack-vibehard
 
+## [3.0.4] - 2026-06-19
+
+### First-run seguro + help universal (PR1 do finalprd10.md)
+Corrige as falhas de **primeiro contato** que faziam o CLI parecer arriscado:
+- **`gstack_vibehard` sem argumentos NÃO instala mais** (`src/index.js`): mostra ajuda curta e sugere `gstack_vibehard start` (exit 0, zero escrita). Antes caía em `install` por padrão.
+- **Help universal** (`src/cli/index.js`): `--help`/`-h`/`help`/`help <comando>`/`help advanced` e **`<comando> --help`** mostram ajuda e **nunca executam** o comando (ex.: `install --help` não instala mais). `--help` deixa de virar "Comando desconhecido".
+- **Banner único**: o `help` não duplica mais o banner (removido o `logo()` redundante do `showHelp`).
+- **`--no-color`** (e `NO_COLOR`): suprime as sequências ANSI — saída limpa p/ logs/pipes.
+- **Ajuda em 2 níveis**: curta (start/create/init/status/enable/disable/doctor/verify/install/uninstall/help) + `help advanced` (tools/context/delegate/workflow/a2a/dream/proxy/monitor/publish-guard/...), com `<cmd> --help` por comando — tudo a partir de um **registro único** de comandos.
+- +7 testes Node (no-args não instala/não escreve, help exit 0, banner único, install --help não instala, --no-color). 252 Node + 58 Python verdes; lint/syntaxcheck limpos.
+
 ## [3.0.3] - 2026-06-19
 
 ### Ajuste Final P0 — QG consistente, verify rápido, audit read-only, E2E (PRD PRDAJUSTEFINAL.MD)
