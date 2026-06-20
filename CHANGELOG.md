@@ -1,5 +1,13 @@
 # Changelog - gstack-vibehard
 
+## [3.0.5] - 2026-06-19
+
+### Doctor JSON + resiliência (PR2 do finalprd10.md)
+- **`doctor --json` agora é JSON PURO** (`src/installer/doctor.js`): novo coletor `collectDoctorJson()` (determinístico, sem banner/prosa/ANSI) com versões, harnesses, componentes, MCP global, OpenCode, Playwright, deps, integridade e impacto. `--impact --json` e `--install-integrity --json` também retornam estruturado.
+- **`doctor --strict --json`** → exit≠0 se um check obrigatório falha (Node/Python ausente ou manifest com problema).
+- **EPERM/EACCES-safe**: todo scan de filesystem (incl. a pasta de browsers do Playwright) usa `safeReaddir` → vira **warning, nunca crash**.
+- +4 testes Node (JSON puro, estrutura, EPERM-safe, strict exit≠0 com manifest problemático). 256 Node + 58 Python verdes; lint/syntaxcheck limpos.
+
 ## [3.0.4] - 2026-06-19
 
 ### First-run seguro + help universal (PR1 do finalprd10.md)

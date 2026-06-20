@@ -1,4 +1,4 @@
-import { existsSync } from "fs"
+import { existsSync, readdirSync } from "fs"
 import { homedir } from "os"
 import { join } from "path"
 import { execFileSync, execFile } from "child_process"
@@ -14,7 +14,68 @@ import { section, success, warn, error, info, confirm } from "../cli/index.js"
 
 const HOME = homedir()
 
+// readdir EPERM/EACCES-safe: null = não deu p/ ler (permissão/ausente), nunca crash.
+function safeReaddir(dir) { try { return readdirSync(dir) } catch { return null } }
+function toolVer(cmd, args = ["--version"]) {
+  try { return String(execFileSync(cmd, args, { encoding: "utf-8", stdio: "pipe", timeout: 4000 })).trim() } catch { return null }
+}
+
+/**
+ * Coletor estruturado do `doctor` (P0.7) — DETERMINÍSTICO e EPERM-safe. Não imprime
+ * nada; retorna o objeto que o `--json` serializa puro. `ok=false` se um check
+ * obrigatório falhar (Node/Python ausente, ou manifest com problema).
+ */
+export async function collectDoctorJson(home = HOME) {
+  const warnings = []
+  const node = toolVer("node")
+  const python = toolVer("python") || toolVer("python3")
+  const detected = detectHarnesses().map((h) => ({ id: h.id, label: h.label }))
+  const gstackInstalled = checkAlreadyInstalled(detected.map((h) => h.id))
+  const hooks = safeReaddir(join(home, ".codex", "hooks"))
+  const skills = safeReaddir(join(home, ".agents", "skills"))
+  const pwBrowsers = process.env.PLAYWRIGHT_BROWSERS_PATH
+    || (isWindows() ? join(home, "AppData", "Local", "ms-playwright") : join(home, ".cache", "ms-playwright"))
+  let chromium = false
+  if (existsSync(pwBrowsers)) {
+    const b = safeReaddir(pwBrowsers)
+    if (b === null) warnings.push(`Playwright: sem permissão p/ ler ${pwBrowsers} (EPERM/EACCES)`)
+    else chromium = b.some((f) => f.startsWith("chromium"))
+  }
+  const integrity = checkInstallIntegrity(home)
+  const impact = buildInstallImpact({ home })
+  const oc = inspectOpenCodeConfig(home)
+  const okRequired = !!node && !!python && (integrity.manifestExists ? integrity.safeToUninstall : true)
+  return {
+    ok: okRequired,
+    os: getOSLabel(),
+    versions: { node, python },
+    harnesses: { detected, gstackInstalled },
+    components: {
+      hooks: hooks ? hooks.filter((f) => f.endsWith(".py")).length : 0,
+      skills: skills ? skills.length : 0,
+    },
+    mcpGlobal: existsSync(join(home, ".mcp.json")),
+    opencode: { hasJson: oc.hasJson, hasJsonc: oc.hasJsonc, hasConflict: oc.hasConflict },
+    playwright: { browsersPath: pwBrowsers, chromium },
+    deps: { bun: !!toolVer("bun"), rust: !!toolVer("rustc"), gbrain: !!toolVer("gbrain"), graphify: !!toolVer("graphify"), headroom: !!toolVer("headroom") },
+    integrity: { manifestExists: integrity.manifestExists, items: integrity.items, drift: integrity.drift, safeToUninstall: integrity.safeToUninstall, issues: integrity.issues },
+    impactCategories: impact.map((c) => ({ category: c.category, items: c.items.length })),
+    warnings,
+  }
+}
+
 export async function doctor(args = []) {
+  const json = args.includes("--json")
+  const strict = args.includes("--strict")
+  // `doctor --json` (diagnóstico completo) → JSON PURO. --strict → exit≠0 se check
+  // obrigatório falhar. Não roteia aqui os modos --impact/--install-integrity (têm
+  // seu próprio JSON abaixo) nem --fix (interativo).
+  if (json && !args.includes("--impact") && !args.includes("--install-integrity") && !args.includes("--fix")) {
+    const report = await collectDoctorJson(HOME)
+    process.stdout.write(JSON.stringify(report) + "\n")
+    if (strict && !report.ok) process.exitCode = 1
+    return
+  }
   // Correção assistida do drift OpenCode (json + jsonc).
   if (args.includes("--fix")) {
     const dryRun = args.includes("--dry-run")
@@ -41,6 +102,7 @@ export async function doctor(args = []) {
   // Modo impacto: mostra quais componentes GLOBAIS estão ativos nesta máquina
   // (o que afeta QUALQUER projeto dos harnesses), por categoria.
   if (args.includes("--impact")) {
+    if (json) { process.stdout.write(JSON.stringify(buildInstallImpact({ home: HOME })) + "\n"); return }
     section("doctor --impact — componentes globais ativos")
     const impact = buildInstallImpact({ home: HOME })
     for (const c of impact) {
@@ -62,8 +124,9 @@ export async function doctor(args = []) {
   }
   // Modo integridade: valida manifest/backups/hashes/configs e se uninstall é seguro.
   if (args.includes("--install-integrity")) {
-    section("Integridade da Instalacao (manifest/backups/hashes)")
     const r = checkInstallIntegrity(HOME)
+    if (json) { process.stdout.write(JSON.stringify(r) + "\n"); if (strict && r.manifestExists && !r.safeToUninstall) process.exitCode = 1; return }
+    section("Integridade da Instalacao (manifest/backups/hashes)")
     if (!r.manifestExists) { warn("Manifest ausente — nada a verificar (instale com `gstack_vibehard install`)."); return }
     success(`Manifest presente — ${r.items} item(ns) registrados`)
     info(`Backups OK: ${r.backupsOk}`)
@@ -251,12 +314,13 @@ export async function doctor(args = []) {
     warn("Playwright CLI: nao disponivel (rode: npx playwright install chromium)")
   }
   if (existsSync(pwBrowsers)) {
-    const fs = await import("fs")
-    const browsers = fs.readdirSync(pwBrowsers).filter((f) => f.startsWith("chromium"))
-    if (browsers.length > 0) {
-      success(`Playwright: chromium instalado (${browsers.join(", ")})`)
+    const entries = safeReaddir(pwBrowsers)
+    if (entries === null) {
+      warn(`Playwright: sem permissao p/ ler ${pwBrowsers} (EPERM) — ignorado, sem crash`)
     } else {
-      warn("Playwright: chromium nao encontrado. Rode: npx playwright install chromium")
+      const browsers = entries.filter((f) => f.startsWith("chromium"))
+      if (browsers.length > 0) success(`Playwright: chromium instalado (${browsers.join(", ")})`)
+      else warn("Playwright: chromium nao encontrado. Rode: npx playwright install chromium")
     }
   } else {
     warn("Playwright: browsers nao instalados. Rode: npx playwright install chromium")
