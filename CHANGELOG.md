@@ -1,5 +1,13 @@
 # Changelog - gstack-vibehard
 
+## [3.0.12] - 2026-06-20
+
+### README acessível e coerente com o código (docs)
+- Reescrita do `README.md` adotando o tom acessível ("português de gente", tabela problema→solução, "para quem é", analogia, "como funciona na prática") **com claims 100% verificados no código**.
+- **Correções de coerência:** todos os comandos usam **`gstack_vibehard`** (underscore — o sugerido usava hífen, que falharia); `create` descrito como **lite por padrão** (`--full` opt-in); test gate marcado como **opt-in** (`GSTACK_TEST_GATE`); RBAC **qualificado** com precisão (`GSTACK_USER_ROLE` viewer/developer/admin no Output Guard pós-resposta, não um RBAC corporativo); sem hipérbole ("não alucina").
+- **Bug de manutenção corrigido:** a versão **deixa de ser hardcoded no título** (vinha dessincronizando a cada release) — fonte de verdade agora é o badge npm + CHANGELOG. Removido o bloco de changelog antigo (v2.1.x/v2.2.0) do README.
+- Mantido o enquadramento "seguro no primeiro contato" (no-args = ajuda, `install --audit-only`, opt-in global, como desfazer) e toda a referência técnica de comandos com os flags reais. Sem mudança de runtime.
+
 ## [3.0.11] - 2026-06-19
 
 ### Template smoke + README 5-minutos (PR8 e PR9 do finalprd10.md — fecham o programa)
