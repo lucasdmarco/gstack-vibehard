@@ -1,5 +1,14 @@
 # Changelog - gstack-vibehard
 
+## [3.0.11] - 2026-06-19
+
+### Template smoke + README 5-minutos (PR8 e PR9 do finalprd10.md — fecham o programa)
+- **[PR8] `npm run test:templates`** (`scripts/test-templates.mjs`): valida os metadados de cada template (README, `.env.example`, scripts `dev/build/test` coerentes) e cria o **fullstack-monorepo em LITE end-to-end** (scaffold + `.gstack/app.json` mode=lite + `.env.example`). O `install+build` pesado é opt-in (`GSTACK_TEMPLATE_INSTALL=1`). Adicionado `README.md` ao template fullstack (documenta env e o caminho de 5 minutos; `.env.example` já existia).
+- **[PR9] README orientado ao primeiro contato**: o topo agora ensina **"começar sem medo em 5 minutos"** (1º comando seguro, criar+rodar app lite, ativar em projeto existente, o que escreve global, como desfazer) — e corrige a **versão dessincronizada** (estava travada em 3.0.4). Histórico vai para o CHANGELOG; arquitetura fica abaixo.
+- 267 Node + 58 Python verdes; lint/syntaxcheck limpos; pack smoke e template smoke OK.
+
+> Com isto, os **9 PRs do finalprd10** estão entregues (v3.0.4 → v3.0.11): first-run seguro, help universal, doctor JSON, MCP opt-in, OpenCode plugins manifest-owned, create lite por padrão, política de download remoto, pack smoke, template smoke e README de adoção.
+
 ## [3.0.10] - 2026-06-19
 
 ### Pack smoke — prova o tarball npm, não a árvore-fonte (PR7 do finalprd10.md)

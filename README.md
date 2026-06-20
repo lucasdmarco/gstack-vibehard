@@ -1,11 +1,29 @@
-# 🚀 gstack-vibehard 3.0.4
-**A Máquina de Desenvolvimento Zero-Config Definitiva para Agentes de IA.**
+# 🚀 gstack-vibehard 3.0.10
 
 [![Test](https://github.com/lucasdmarco/gstack-vibehard/actions/workflows/test.yml/badge.svg)](https://github.com/lucasdmarco/gstack-vibehard/actions/workflows/test.yml)
 
-O `gstack-vibehard` é um **Control Plane e Instalador Cross-Harness**. Ele envelopa o seu terminal com ferramentas de elite, transformando Claude Code, Cursor, OpenCode e Codex em um ecossistema corporativo seguro, unificado e autônomo, rodando 100% na sua máquina.
+**O que é:** um **control plane e instalador cross-harness** que roda 100% na sua máquina e dá aos seus agentes (Claude Code, Cursor, OpenCode, Codex) gates de qualidade/segurança, memória entre sessões e criação de projetos — **sem escrita global escondida e com rollback**.
 
-Chega de alucinações, vazamentos de dados ou perda de contexto. O `gstack-vibehard` implementa a mesma infraestrutura de workspaces do Replit Agent 4, mas operando no seu CLI favorito.
+## ⚡ Começar sem medo (5 minutos)
+
+```bash
+# 1) Veja o que faz (NÃO instala nada):
+npx @gstack-vibehard/installer --help
+
+# 2) Crie e rode um app (LITE por padrão: escreve só ./meu-app, nada global):
+npx @gstack-vibehard/installer create meu-app
+cd meu-app && npm install && npm run dev
+
+# 3) (opcional) Integre aos seus harnesses — veja o impacto ANTES, sem escrever:
+npx @gstack-vibehard/installer install --audit-only
+```
+
+- **Primeiro comando seguro:** `gstack_vibehard` sem argumentos (ou `--help`) **só mostra ajuda** — nunca instala nem escreve.
+- **Ativar num projeto existente (opt-in):** entre na pasta e rode `gstack_vibehard enable` (desativar: `disable`; ver estado: `status`).
+- **O que pode escrever globalmente:** só o `install` toca o ambiente — e é **preflight-first** (mostra o impacto por categoria e pede confirmação). **MCP global** e **downloads remotos** são **opt-in** (`--global-mcp`, `--allow-remote-downloads`). Veja tudo com `gstack_vibehard install --audit-only` (read-only) e `doctor --impact`.
+- **Como desfazer:** `gstack_vibehard uninstall --dry-run` (plano) e `uninstall` (rollback via manifest; preserva o que você editou — `--resolve-drift` para forçar).
+
+> Histórico de versões em [CHANGELOG.md](CHANGELOG.md). Arquitetura detalhada e matriz de harness abaixo.
 
 ---
 
