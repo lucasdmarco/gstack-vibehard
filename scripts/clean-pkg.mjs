@@ -24,4 +24,5 @@ function walk(dir) {
 }
 
 walk(process.cwd())
-console.log(`clean-pkg: removidos ${removed} artefato(s) __pycache__/.pyc/.pyo`)
+// stderr (não stdout): não contaminar `npm pack --json`.
+console.error(`clean-pkg: removidos ${removed} artefato(s) __pycache__/.pyc/.pyo`)

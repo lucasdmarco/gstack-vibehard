@@ -1,5 +1,12 @@
 # Changelog - gstack-vibehard
 
+## [3.0.10] - 2026-06-19
+
+### Pack smoke — prova o tarball npm, não a árvore-fonte (PR7 do finalprd10.md)
+- **`npm run test:pack`** (`scripts/test-pack.mjs`): empacota (`npm pack --json`), **inspeciona o conteúdo** (falha se houver `node_modules`/`__pycache__`/`.pyc`/`.tgz`), **instala o `.tgz`** num projeto temp e chama o **bin instalado** (não a fonte): `--version`, `--help` (exit 0, sem "Comando desconhecido"), `doctor --json` (JSON puro) e `install --audit-only` (read-only). Cross-platform (npm via `cmd.exe` no Windows; bin via `node <pacote>/src/index.js`).
+- **`clean-pkg` agora loga em stderr** (`scripts/clean-pkg.mjs`): não contamina mais `npm pack --json`.
+- 267 Node + 58 Python verdes; **pack smoke OK** (698 arquivos, tarball limpo, bin instalado responde).
+
 ## [3.0.9] - 2026-06-19
 
 ### Política de download remoto — opt-in (PR6 do finalprd10.md)
