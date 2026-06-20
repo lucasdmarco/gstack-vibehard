@@ -1,5 +1,14 @@
 # Changelog - gstack-vibehard
 
+## [3.0.8] - 2026-06-19
+
+### `create` LITE e project-scoped por padrão (PR5 do finalprd10.md)
+- **`gstack_vibehard create <nome>` agora é LITE por padrão** (`src/cli/create.js`): escreve **só `./<nome>`** — **sem** Casdoor (Docker), Atomic VCS, ECC2 daemon, AgentMemory federation **nem escrita global** (ex.: `~/.atomic`). Antes provisionava tudo por padrão.
+- **`--full`** habilita o stack completo (Casdoor/Atomic/ECC2/...). `--lite` continua válido; em conflito `--lite` vence (mais seguro).
+- **`create --dry-run [--json]`**: mostra o plano (modo, diretório, escritas project-scoped vs global, provisionamentos) e **não escreve nada**; `--json` puro.
+- **`.gstack/app.json` reflete as capacidades reais**: `mode: lite|full`, e em lite `vcs:"git"`, `mcpGateway:null`, `controlPlane:null`, `iam:"none"` (não mais afirma Casdoor/Atomic/ECC2 que não existem).
+- +2 testes Node (default lite só `./app`+mode lite; dry-run não cria diretório); teste do boot completo passa com `--full`. 263 Node + 58 Python verdes; lint/syntaxcheck limpos.
+
 ## [3.0.7] - 2026-06-19
 
 ### OpenCode plugins manifest-owned + kill switch (PR4 do finalprd10.md)

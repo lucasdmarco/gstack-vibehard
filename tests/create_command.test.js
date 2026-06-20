@@ -22,7 +22,7 @@ test("create scaffolds with 5-phase DAG boot (Casdoor, Atomic, Daemons, Omniharn
     process.env.GSTACK_SKIP_SIDE_EFFECTS = "1"
     const { createProject } = await import(`${pathToFileURL(modulePath)}?t=${Date.now()}`)
     const result = await createProject({
-      args: ["teste-app"],
+      args: ["teste-app", "--full"],
       cwd,
       projectRoot: repoRoot,
       now: () => "2026-06-08T00:00:00.000Z",
@@ -111,6 +111,44 @@ test("create scaffolds with 5-phase DAG boot (Casdoor, Atomic, Daemons, Omniharn
     delete process.env.GSTACK_SKIP_PREFLIGHT
     delete process.env.GSTACK_SKIP_SIDE_EFFECTS
     // maxRetries/retryDelay: defesa extra contra EBUSY/EPERM transitório no Windows.
+    await rm(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
+  }
+})
+
+test("create DEFAULT é LITE: só ./app, sem Casdoor/Atomic, app.json mode=lite", async () => {
+  const tmp = await mkdtemp(path.join(tmpdir(), "gstack-lite-"))
+  try {
+    const cwd = path.join(tmp, "ws"); await mkdir(cwd, { recursive: true })
+    process.env.GSTACK_SKIP_PREFLIGHT = "1"; process.env.GSTACK_SKIP_SIDE_EFFECTS = "1"
+    const { createProject } = await import(`${pathToFileURL(modulePath)}?t=${Date.now()}`)
+    await createProject({ args: ["app-lite"], cwd, projectRoot: repoRoot, now: () => "2026-06-08T00:00:00.000Z",
+      logger: { info: () => {}, success: () => {}, warn: () => {}, error: () => {} }, execSync: () => Buffer.from("ok") })
+    const appDir = path.join(cwd, "app-lite")
+    assert.ok(existsSync(appDir), "criou ./app-lite")
+    assert.equal(existsSync(path.join(appDir, ".gstack", "casdoor.json")), false, "lite não escreve casdoor.json")
+    assert.equal(existsSync(path.join(appDir, ".atomic")), false, "lite não escreve .atomic")
+    const app = JSON.parse(await readFile(path.join(appDir, ".gstack", "app.json"), "utf8"))
+    assert.equal(app.mode, "lite")
+    assert.equal(app.mcpGateway, null)
+    assert.equal(app.iam, "none")
+  } finally {
+    delete process.env.GSTACK_SKIP_PREFLIGHT; delete process.env.GSTACK_SKIP_SIDE_EFFECTS
+    await rm(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
+  }
+})
+
+test("create --dry-run --json: retorna plano e NÃO cria diretório", async () => {
+  const tmp = await mkdtemp(path.join(tmpdir(), "gstack-dry-"))
+  try {
+    const cwd = path.join(tmp, "ws"); await mkdir(cwd, { recursive: true })
+    const { createProject } = await import(`${pathToFileURL(modulePath)}?t=${Date.now()}`)
+    const r = await createProject({ args: ["app-dry", "--dry-run", "--json"], cwd, projectRoot: repoRoot,
+      logger: { info: () => {}, success: () => {}, warn: () => {}, error: () => {} }, execSync: () => Buffer.from("ok") })
+    assert.equal(r.mode, "lite")
+    assert.match(r.note, /dry-run/)
+    assert.deepEqual(r.writes.global, [], "lite dry-run: nenhuma escrita global")
+    assert.equal(existsSync(path.join(cwd, "app-dry")), false, "dry-run não cria o diretório")
+  } finally {
     await rm(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
   }
 })

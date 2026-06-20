@@ -593,7 +593,7 @@ const TEMPLATE_MANIFEST = {
   },
 }
 
-export function writeRuntimeFiles({ projectDir, projectName, now, projectRoot, templateName }) {
+export function writeRuntimeFiles({ projectDir, projectName, now, projectRoot, templateName, isLite = false }) {
   const gstackDir = join(projectDir, ".gstack")
   const scriptsDir = join(projectDir, "scripts")
   mkdirSync(gstackDir, { recursive: true })
@@ -601,19 +601,21 @@ export function writeRuntimeFiles({ projectDir, projectName, now, projectRoot, t
 
   const tpl = TEMPLATE_MANIFEST[templateName] || TEMPLATE_MANIFEST["fullstack-monorepo"]
 
+  // app.json reflete as CAPACIDADES REAIS (P0.5): em lite não há Atomic/Casdoor/ECC2.
   writeJson(join(gstackDir, "app.json"), {
     name: projectName,
     runtime: "gstack-workspace",
+    mode: isLite ? "lite" : "full",
     createdAt: now(),
     packageManager: "pnpm",
     harnesses: OMNIHARNESS_MAP.map(h => h.id),
-    vcs: "atomic",
+    vcs: isLite ? "git" : "atomic",
     sandbox: "openhands",
-    controlPlane: "ecc2",
-    mcpGateway: "casdoor",
-    meshFederation: true,
+    controlPlane: isLite ? null : "ecc2",
+    mcpGateway: isLite ? null : "casdoor",
+    meshFederation: isLite ? false : true,
     ticketOrchestration: "paperclip",
-    iam: "casdoor-local",
+    iam: isLite ? "none" : "casdoor-local",
     run_command: tpl.run_command,
     build_command: tpl.build_command,
     env: tpl.env,
@@ -1245,7 +1247,10 @@ export async function createProject(options = {}) {
   const projectRoot = options.projectRoot || getProjectRoot()
   const execSync = options.execSync || defaultExecSync
   const now = options.now || (() => new Date().toISOString())
-  const isLite = args.includes("--lite")
+  // DEFAULT = LITE (P0.5): sem `--full`, o create é lite e project-scoped (só ./app,
+  // sem Casdoor/Atomic/ECC2 nem escrita global). `--lite` continua válido; em
+  // conflito (`--lite --full`), lite vence (mais seguro).
+  const isLite = args.includes("--lite") || !args.includes("--full")
 
   // Parse --template flag
   const templateFlagIndex = args.findIndex((a) => a === "--template")
@@ -1276,6 +1281,26 @@ export async function createProject(options = {}) {
   }
 
   const projectDir = join(cwd, projectName)
+
+  // DRY-RUN (P0.5): mostra o impacto e NÃO escreve nada. Com --json, JSON puro.
+  if (args.includes("--dry-run")) {
+    const report = {
+      project: projectName,
+      template: templateName,
+      mode: isLite ? "lite" : "full",
+      dir: projectDir,
+      writes: {
+        projectScoped: [projectDir],
+        global: isLite ? [] : [join(HOME, ".atomic")],
+      },
+      provisions: isLite ? [] : ["Casdoor (Docker)", "Atomic VCS", "ECC2 daemon", "AgentMemory federation"],
+      note: "dry-run: nada foi escrito",
+    }
+    if (args.includes("--json")) process.stdout.write(JSON.stringify(report) + "\n")
+    else console.log(`\n  create --dry-run (${report.mode}): criaria ${projectDir} (escrita global: ${report.writes.global.length ? report.writes.global.join(", ") : "nenhuma"})`)
+    return report
+  }
+
   if (existsSync(projectDir)) {
     throw new Error(`Diretorio '${projectName}' ja existe.`)
   }
@@ -1316,7 +1341,7 @@ export async function createProject(options = {}) {
   } else {
     scaffoldVerticalTemplate(templateName, projectDir, projectName, logger)
   }
-  writeRuntimeFiles({ projectDir, projectName, now, projectRoot, templateName })
+  writeRuntimeFiles({ projectDir, projectName, now, projectRoot, templateName, isLite })
   writeSkillsDir(projectDir)
 
   console.log(`\n  === Fase 5/5: Scaffold & Orquestracao Macro ===`)
