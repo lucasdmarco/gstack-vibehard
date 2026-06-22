@@ -22,6 +22,7 @@ import { dreamCommand } from "../commands/dream.js"
 import { proxyCommand } from "../commands/proxy.js"
 import { activateCommand } from "../commands/activate.js"
 import { publishGuardCommand } from "../commands/publish-guard.js"
+import { updateCommand } from "../commands/update.js"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const pkg = JSON.parse(readFileSync(resolve(__dirname, "../../package.json"), "utf-8"))
@@ -113,7 +114,8 @@ const COMMANDS = [
   { name: "doctor", group: "common", desc: "Diagnosticar ambiente", usage: "gstack_vibehard doctor [--json [--strict]] [--impact] [--install-integrity]" },
   { name: "verify", group: "common", desc: "Delivery gates por arquétipo", usage: "gstack_vibehard verify [--quick] [--profile full|release] [--json]" },
   { name: "install", group: "common", desc: "Instalar no ambiente (preflight-first; pede confirmação)", usage: "gstack_vibehard install [--audit-only [--save-report]] [--project-only] [--harness <id>] [--global-mcp [--mcp-server <name>]] [--yes]" },
-  { name: "uninstall", group: "common", desc: "Remover (rollback via manifest)", usage: "gstack_vibehard uninstall [--dry-run] [--restore-only] [--resolve-drift]" },
+  { name: "uninstall", group: "common", desc: "Remover (rollback via manifest)", usage: "gstack_vibehard uninstall [--dry-run] [--restore-only] [--resolve-drift] [--legacy-name-cleanup]" },
+  { name: "update", group: "common", desc: "Checar/atualizar para a última versão (npm)", usage: "gstack_vibehard update [--run] [--json]" },
   { name: "help", group: "common", desc: "Mostrar ajuda (`help advanced` p/ avançados; `help <cmd>` p/ um comando)", usage: "gstack_vibehard help [comando|advanced]" },
   { name: "plan", group: "advanced", desc: "Gerar plano guiado determinístico", usage: "gstack_vibehard plan \"<objetivo>\" [--json --dry-run --recipe <id>] · plan run|status|explain <id>" },
   { name: "task", group: "advanced", desc: "Loop Engineer: plano de feature", usage: "gstack_vibehard task \"<pedido>\"" },
@@ -269,6 +271,9 @@ async function dispatch(command, args) {
       break
     case "publish-guard":
       await publishGuardCommand(args)
+      break
+    case "update":
+      await updateCommand(args)
       break
     case "dream":
       await dreamCommand(args)

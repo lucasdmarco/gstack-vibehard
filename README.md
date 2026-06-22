@@ -282,6 +282,26 @@ O gstack integra ao OpenCode **por diretórios auto-carregados** (`~/.config/ope
 
 ---
 
+## 🔁 Atualizar e reinstalar (na mesma máquina)
+
+```bash
+gstack_vibehard update                 # checa a última versão no npm e mostra como atualizar
+gstack_vibehard update --run           # já atualiza o pacote (depois rode `install`)
+# atualização manual (1 comando, idempotente — refresca hooks/skills obsoletos):
+npm install -g @gstack-vibehard/installer@latest && gstack_vibehard install
+
+gstack_vibehard install --reinstall    # reaplica hooks/config (backup + manifest) — conserta install antigo
+gstack_vibehard uninstall --yes --legacy-name-cleanup   # remoção COMPLETA (até install legado sem manifest)
+```
+Tudo o que o `install` registra fica no **manifest** (incluindo os hooks Python, via Safe Write) — então `uninstall` reverte de verdade, e você pode **reinstalar/re-testar do zero** quantas vezes quiser. Para re-testar a instalação após cada update, use o script de aceitação:
+```bash
+# Windows (PowerShell):
+powershell -ExecutionPolicy Bypass -File scripts\clean-install-acceptance.ps1
+# bash / git-bash / macOS / Linux:
+sh scripts/clean-install-acceptance.sh      # (ou `npm run test:accept`)
+```
+Ele imprime **PASS/FAIL** por item: versão, `--help` seguro, `doctor`, `install --audit-only` sem escrita, e `create` lite sem escrita global.
+
 ## 📦 Verificação & qualidade
 
 `npm test` (Node) · `npm run test:py` (Python) · `npm run lint` · `npm run syntaxcheck` · `npm run test:pack` (smoke do tarball npm) · `npm run test:templates` (smoke dos templates) · `GSTACK_E2E_SAFE_INSTALL=1 npm run test:e2e` (E2E em HOME descartável).
