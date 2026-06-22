@@ -1,5 +1,14 @@
 # Changelog - gstack-vibehard
 
+## [3.0.14] - 2026-06-20
+
+### Reinstalação e atualização limpas na mesma máquina
+- **`install` agora grava os hooks no MANIFEST** (`refreshHooks` usa `safeCopyFile` em vez de `copyFile`): todo hook instalado/refrescado é **rastreável** → o `uninstall` sempre os reverte. Fecha o gap que deixava a máquina com hooks instalados mas manifest ausente (uninstall incompleto).
+- **Novo comando `gstack_vibehard update`** (`src/commands/update.js`): checa a versão instalada vs a última no npm e mostra o comando de atualização (1 linha, idempotente). `--run` atualiza de fato; `--json` para automação; degrada gracioso sem rede.
+- **`install --reinstall`/`--force`**: reaplica hooks/config completos (via Safe Write + manifest) mesmo se "já instalado" — conserta install antigo sem desinstalar.
+- **Script de aceitação versionado** (`scripts/clean-install-acceptance.ps1` + `.sh`, `npm run test:accept`): roda o veredito de instalação limpa (versão, `--help` seguro, `doctor`, `audit-only` sem escrita, `create` lite sem escrita global) e imprime **PASS/FAIL** por item — repetível a cada update. README documenta o ciclo de reinstalação/atualização.
+- +3 testes Node (update: disponível/atualizado/offline). 271 Node + 58 Python verdes; lint/syntaxcheck limpos.
+
 ## [3.0.13] - 2026-06-20
 
 ### Correções do teste de instalação real (máquina Windows do dono)

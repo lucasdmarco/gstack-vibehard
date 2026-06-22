@@ -381,14 +381,13 @@ async function refreshHooks(harnessIds, report) {
   const hooks = readdirSync(hooksSource).filter((f) => f.endsWith(".py"))
   for (const target of hookTargets) {
     ensureDir(target.dir)
-    await Promise.all(hooks.map(async (hook) => {
-      const src = join(hooksSource, hook)
-      const dst = join(target.dir, hook)
-      if (existsSync(dst)) backupFile(dst)
-      await copyFile(src, dst)
+    for (const hook of hooks) {
+      // safeCopyFile: backup versionado + registro no MANIFEST → todo hook
+      // instalado/refrescado é rastreável e o `uninstall` sempre o reverte.
+      safeCopyFile(join(hooksSource, hook), join(target.dir, hook), { home: HOME, component: "hooks" })
       report.updated.push(`hook (${target.id}): ${hook}`)
-    }))
-    success(`${hooks.length} hooks atualizados em ${target.dir}`)
+    }
+    success(`${hooks.length} hooks atualizados em ${target.dir} (manifest-owned)`)
   }
 }
 
@@ -510,9 +509,13 @@ export async function install(args = []) {
     await installDeps(warn, success, info, report, allHarnessIds, allowRemote)
   }
 
-  // Check which harnesses already have gstack_vibehard
-  const alreadyInstalled = checkAlreadyInstalled(allHarnessIds)
+  // Check which harnesses already have gstack_vibehard. Com --reinstall/--force,
+  // tratamos TODOS como disponíveis → reaplica config completa via Safe Write
+  // (conserta install antigo sem manifest).
+  const reinstall = args.includes("--reinstall") || args.includes("--force")
+  const alreadyInstalled = reinstall ? [] : checkAlreadyInstalled(allHarnessIds)
   const availableHarnessIds = allHarnessIds.filter((h) => !alreadyInstalled.includes(h))
+  if (reinstall) info("Modo --reinstall: reaplicando tudo (hooks/config) com backup + manifest.")
 
   // Show diagnosis
   info("")
