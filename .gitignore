@@ -30,3 +30,11 @@ coverage/
 /docs/plans/
 /docs/prd/
 /docs/research/
+
+# Templates são CONTEÚDO do produto — versionar seus .vscode/.docs
+# (as regras .vscode/ e .docs/ acima miram o ambiente do DEV; estas reincluem
+#  os arquivos que fazem parte dos templates publicados, p/ o pacote ser reproduzível)
+!templates/**/.vscode/
+!templates/**/.vscode/**
+!templates/**/.docs/
+!templates/**/.docs/**
