@@ -1,5 +1,13 @@
 # Changelog - gstack-vibehard
 
+## [3.0.15] - 2026-06-22
+
+### `create` lite nasce versionado (git) → graphify se instala sozinho
+- **[melhoria] `create` (lite) agora roda `git init`** (`src/cli/create.js`, novo `bootGit`): o projeto lite nasce **versionado** — o VCS do lite já é o git (`app.json` `vcs: "git"`). O `git init` roda **antes** do `bootGraphify`, então o graphify instala os hooks de commit **sem precisar de `git init` manual**. Some a mensagem "`hook install` nao retornou — opcional". Padrão de scaffolders (create-react-app, Vite). Em **full** o VCS continua sendo o Atomic (sem `git init`).
+- **Causa-raiz corrigida:** em lite o `projectDir` só era criado no scaffold (Fase 4), **depois** do `bootGraphify` — o graphify rodava sem repo/diretório e não retornava. Agora o diretório é garantido (`mkdirSync`) + `git init` antes do graphify.
+- **Honesto e não-bloqueante:** se o git não estiver instalado, mensagem clara e o `create` segue sem versionamento (idempotente — pula se já houver `.git`).
+- +1 teste Node (lite roda `git init` → `.git` existe + `app.json vcs:"git"`). 272 Node + 58 Python verdes; lint/syntaxcheck limpos.
+
 ## [3.0.14] - 2026-06-20
 
 ### Reinstalação e atualização limpas na mesma máquina

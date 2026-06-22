@@ -160,6 +160,28 @@ test("create LITE NÃO escreve no ~/gstack-vault global; --vault escreve", async
   }
 })
 
+test("create LITE inicializa git (vcs do lite) → projeto nasce versionado p/ graphify", async () => {
+  const tmp = await mkdtemp(path.join(tmpdir(), "gstack-git-"))
+  try {
+    const cwd = path.join(tmp, "ws"); await mkdir(cwd, { recursive: true })
+    process.env.GSTACK_SKIP_PREFLIGHT = "1"
+    // Side-effects ON SÓ neste teste de lite: o único processo externo é `git init`
+    // (graphify/headroom não instalados → skip; Casdoor/Atomic são full-only).
+    delete process.env.GSTACK_SKIP_SIDE_EFFECTS
+    const { createProject } = await import(`${pathToFileURL(modulePath)}?t=${Date.now()}`)
+    await createProject({ args: ["app-git"], cwd, projectRoot: repoRoot, now: () => "2026-06-08T00:00:00.000Z",
+      logger: { info: () => {}, success: () => {}, warn: () => {}, error: () => {} }, execSync: () => Buffer.from("ok") })
+    const appDir = path.join(cwd, "app-git")
+    assert.ok(existsSync(appDir), "criou ./app-git")
+    assert.equal(existsSync(path.join(appDir, ".git")), true, "lite roda `git init` → repo versionado (graphify pode instalar hooks)")
+    const app = JSON.parse(await readFile(path.join(appDir, ".gstack", "app.json"), "utf8"))
+    assert.equal(app.vcs, "git", "lite declara git como VCS")
+  } finally {
+    delete process.env.GSTACK_SKIP_PREFLIGHT
+    await rm(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
+  }
+})
+
 test("create --dry-run --json: retorna plano e NÃO cria diretório", async () => {
   const tmp = await mkdtemp(path.join(tmpdir(), "gstack-dry-"))
   try {
