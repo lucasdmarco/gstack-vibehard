@@ -1,5 +1,13 @@
 # Changelog - gstack-vibehard
 
+## [3.0.16] - 2026-06-22
+
+### 🔒 Correção de segurança: `.gitignore` gerado em runtime (`.env` fora do git)
+- **[SEGURANÇA] `create` gera um `.gitignore` próprio** (`src/cli/create.js`, em `writeRuntimeFiles`): como o v3.0.15 passou a rodar `git init` automaticamente, o projeto nascia como repo git **sem `.gitignore`** → um `git add -A` estagiava `node_modules` e, pior, o **`.env` com secrets**. Causa-raiz: o **npm faz strip de qualquer arquivo `.gitignore`** do tarball publicado, então o `.gitignore` do template **nunca chegava ao usuário** (verificado: ausente nos 4 templates no pacote instalado). Agora o `.gitignore` é **gerado em runtime** (independe do strip), cobrindo **todos os templates e modos** (lite e full): ignora `node_modules`, `dist`/`build`/`.next`/`coverage`, `.turbo`/`.vercel`, **`.env` / `.env.*`** (mantendo `!.env.example`), `.gstack/*.local`. Validado fim-a-fim com `git add -A` real → `.env` **não** rastreado.
+- **Removido o `.gitignore` morto do template** `fullstack-monorepo` (nunca era publicado — o npm o removia; causava divergência repo≠tarball). Fonte única agora é a geração em runtime.
+- **[teste] `bootGit` com exec injetável (DI)**: o teste de `git init` voltou a ser **hermético** (`GSTACK_SKIP_SIDE_EFFECTS=1` + `gitExec` mockado) — não spawna mais git/graphify/headroom reais (corrige o teste não-determinístico do v3.0.15, que dependia de quais binários estavam no PATH).
+- **+2 testes** (git init via DI; `.gitignore` protege `.env` em default **e** vertical). 273 Node + 58 Python verdes; lint/syntaxcheck limpos; pack/template smoke OK.
+
 ## [3.0.15] - 2026-06-22
 
 ### `create` lite nasce versionado (git) → graphify se instala sozinho

@@ -160,24 +160,44 @@ test("create LITE NÃO escreve no ~/gstack-vault global; --vault escreve", async
   }
 })
 
-test("create LITE inicializa git (vcs do lite) → projeto nasce versionado p/ graphify", async () => {
+test("create lite roda `git init` via exec injetado (hermético, sem spawnar) e marca vcs=git", async () => {
   const tmp = await mkdtemp(path.join(tmpdir(), "gstack-git-"))
   try {
     const cwd = path.join(tmp, "ws"); await mkdir(cwd, { recursive: true })
-    process.env.GSTACK_SKIP_PREFLIGHT = "1"
-    // Side-effects ON SÓ neste teste de lite: o único processo externo é `git init`
-    // (graphify/headroom não instalados → skip; Casdoor/Atomic são full-only).
-    delete process.env.GSTACK_SKIP_SIDE_EFFECTS
+    process.env.GSTACK_SKIP_PREFLIGHT = "1"; process.env.GSTACK_SKIP_SIDE_EFFECTS = "1"
+    const calls = []
+    const gitExec = (file, args) => { calls.push({ file, args }); return Buffer.from("Initialized empty Git repository") }
     const { createProject } = await import(`${pathToFileURL(modulePath)}?t=${Date.now()}`)
-    await createProject({ args: ["app-git"], cwd, projectRoot: repoRoot, now: () => "2026-06-08T00:00:00.000Z",
-      logger: { info: () => {}, success: () => {}, warn: () => {}, error: () => {} }, execSync: () => Buffer.from("ok") })
-    const appDir = path.join(cwd, "app-git")
-    assert.ok(existsSync(appDir), "criou ./app-git")
-    assert.equal(existsSync(path.join(appDir, ".git")), true, "lite roda `git init` → repo versionado (graphify pode instalar hooks)")
-    const app = JSON.parse(await readFile(path.join(appDir, ".gstack", "app.json"), "utf8"))
+    await createProject({ args: ["app-git"], cwd, projectRoot: repoRoot, now: () => "x",
+      logger: { info: () => {}, success: () => {}, warn: () => {}, error: () => {} }, execSync: () => Buffer.from("ok"), gitExec })
+    assert.ok(calls.some((c) => c.file === "git" && c.args[0] === "init"), "bootGit chamou `git init` (via exec injetado)")
+    const app = JSON.parse(await readFile(path.join(cwd, "app-git", ".gstack", "app.json"), "utf8"))
     assert.equal(app.vcs, "git", "lite declara git como VCS")
   } finally {
-    delete process.env.GSTACK_SKIP_PREFLIGHT
+    delete process.env.GSTACK_SKIP_PREFLIGHT; delete process.env.GSTACK_SKIP_SIDE_EFFECTS
+    await rm(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
+  }
+})
+
+test("create gera .gitignore protegendo .env (default E vertical — npm faz strip do template)", async () => {
+  const tmp = await mkdtemp(path.join(tmpdir(), "gstack-gi-"))
+  try {
+    const cwd = path.join(tmp, "ws"); await mkdir(cwd, { recursive: true })
+    process.env.GSTACK_SKIP_PREFLIGHT = "1"; process.env.GSTACK_SKIP_SIDE_EFFECTS = "1"
+    const { createProject } = await import(`${pathToFileURL(modulePath)}?t=${Date.now()}`)
+    const log = { info: () => {}, success: () => {}, warn: () => {}, error: () => {} }
+    for (const [name, extra] of [["gi-default", []], ["gi-vertical", ["--template", "saas-auth-stripe"]]]) {
+      await createProject({ args: [name, ...extra], cwd, projectRoot: repoRoot, now: () => "x", logger: log, execSync: () => Buffer.from("ok") })
+      const gi = path.join(cwd, name, ".gitignore")
+      assert.ok(existsSync(gi), `${name}: .gitignore gerado em runtime (independe do strip do npm)`)
+      const body = await readFile(gi, "utf8")
+      assert.match(body, /^\.env$/m, `${name}: ignora .env (secrets fora do git)`)
+      assert.match(body, /^\.env\.\*$/m, `${name}: ignora .env.*`)
+      assert.match(body, /^!\.env\.example$/m, `${name}: mantém .env.example versionado`)
+      assert.match(body, /^node_modules\/?$/m, `${name}: ignora node_modules`)
+    }
+  } finally {
+    delete process.env.GSTACK_SKIP_PREFLIGHT; delete process.env.GSTACK_SKIP_SIDE_EFFECTS
     await rm(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
   }
 })

@@ -374,16 +374,17 @@ index = "hnsw"
 `)
 }
 
-function bootGit(logger, projectDir) {
+function bootGit(logger, projectDir, exec = safeExec) {
   // Lite usa git como VCS (app.json `vcs: "git"`): inicializa o repo para o projeto
   // nascer versionado e permitir que o graphify instale os hooks de commit.
   // Idempotente (pula se já houver `.git`); não-bloqueante; honesto se git faltar.
+  // `exec` é injetável (DI): testes verificam o `git init` sem spawnar processo real.
   if (existsSync(join(projectDir, ".git"))) return true
   if (!findBinary("git")) {
     logger.info("Git nao encontrado — projeto criado sem versionamento (instale git para versionar e ativar o graphify).")
     return false
   }
-  const out = safeExec("git", ["init"], { cwd: projectDir })
+  const out = exec("git", ["init"], { cwd: projectDir })
   if (out !== null) {
     logger.success("Git inicializado — projeto versionado")
     return true
@@ -735,6 +736,43 @@ coverage
 graphify-out
 .gstack/casdoor.json
 `)
+
+  // .gitignore SEMPRE gerado em runtime (não empacotado): o npm faz strip de
+  // qualquer arquivo `.gitignore` do tarball, então o do template nunca chega ao
+  // usuário. Como o create agora roda `git init`, sem isto um `git add -A` estagia
+  // node_modules e — pior — o `.env` com secrets. Só escreve se não houver um.
+  const gitignorePath = join(projectDir, ".gitignore")
+  if (!existsSync(gitignorePath)) {
+    writeFileSync(gitignorePath,
+`# Dependências
+node_modules/
+
+# Build / saída
+dist/
+build/
+.next/
+coverage/
+graphify-out/
+
+# Monorepo / ferramentas
+.turbo/
+.vercel/
+*.local
+
+# Secrets — NUNCA commitar (mantém apenas o exemplo)
+.env
+.env.*
+!.env.example
+
+# Estado local do gstack
+.gstack/*.local
+.gstack/casdoor.json
+
+# SO / logs
+.DS_Store
+*.log
+`)
+  }
 
   // Comando de dev por stack: AI = uvicorn; mobile = dev:api + dev:mobile
   // (nao ha root `dev`); demais = pnpm dev.
@@ -1368,7 +1406,7 @@ export async function createProject(options = {}) {
   // hooks de commit sem precisar de `git init` manual. Em full, o VCS é o Atomic.
   if (isLite) {
     mkdirSync(projectDir, { recursive: true })
-    bootGit(logger, projectDir)
+    bootGit(logger, projectDir, options.gitExec)
   }
   bootGraphify(logger, projectDir)
 
