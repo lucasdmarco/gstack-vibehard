@@ -65,7 +65,7 @@ npx @gstack-vibehard/installer install --audit-only
 ```
 
 - **Primeiro comando seguro:** `gstack_vibehard` sem argumentos (ou `--help`) **só mostra ajuda** — nunca instala nem escreve.
-- **Criar é leve e versionado:** `create meu-app` é **lite** por padrão (só `./meu-app`) e já roda `git init` — o projeto nasce versionado (o graphify se instala sozinho). Use `--full` para o stack completo (Casdoor/Atomic/ECC2). Veja o plano antes com `create meu-app --dry-run --json`.
+- **Criar é leve, versionado e seguro:** `create meu-app` é **lite** por padrão (só `./meu-app`), já roda `git init` (o projeto nasce versionado, o graphify se instala sozinho) e gera um **`.gitignore` que mantém o `.env` fora do git** — secrets não vão pro commit por acidente. Use `--full` para o stack completo (Casdoor/Atomic/ECC2). Veja o plano antes com `create meu-app --dry-run --json`.
 - **Ativar num projeto existente (opt-in):** entre na pasta e rode `gstack_vibehard enable` (`disable` desativa preservando dados; `status` mostra o estado).
 - **O que pode escrever globalmente:** só o `install` toca o ambiente — e é **preflight-first** (mostra o impacto por categoria e pede confirmação). **MCP global** (`--global-mcp`) e **downloads remotos** (`--allow-remote-downloads`) são **opt-in**. Audite com `install --audit-only` e `doctor --impact`.
 - **Como desfazer:** `gstack_vibehard uninstall --dry-run` (plano) e `uninstall` (rollback via manifest; preserva o que você editou — `--resolve-drift` para forçar).
