@@ -374,6 +374,24 @@ index = "hnsw"
 `)
 }
 
+function bootGit(logger, projectDir) {
+  // Lite usa git como VCS (app.json `vcs: "git"`): inicializa o repo para o projeto
+  // nascer versionado e permitir que o graphify instale os hooks de commit.
+  // Idempotente (pula se já houver `.git`); não-bloqueante; honesto se git faltar.
+  if (existsSync(join(projectDir, ".git"))) return true
+  if (!findBinary("git")) {
+    logger.info("Git nao encontrado — projeto criado sem versionamento (instale git para versionar e ativar o graphify).")
+    return false
+  }
+  const out = safeExec("git", ["init"], { cwd: projectDir })
+  if (out !== null) {
+    logger.success("Git inicializado — projeto versionado")
+    return true
+  }
+  logger.info("Git presente, mas `init` nao retornou — projeto sem versionamento (opcional).")
+  return false
+}
+
 function bootGraphify(logger, projectDir) {
   // Opcional: só roda se o binário `graphify` JÁ estiver instalado (não baixa via
   // npx — evita lentidão/ruído num PC sem graphify). Mensagens honestas.
@@ -1345,6 +1363,13 @@ export async function createProject(options = {}) {
     phases.daemons = { status: "configured" }
   }
 
+  // Em lite, o VCS é o git (app.json `vcs: "git"`): garante o diretório (ainda não
+  // criado em lite) e inicializa o repo ANTES do graphify, para ele instalar os
+  // hooks de commit sem precisar de `git init` manual. Em full, o VCS é o Atomic.
+  if (isLite) {
+    mkdirSync(projectDir, { recursive: true })
+    bootGit(logger, projectDir)
+  }
   bootGraphify(logger, projectDir)
 
   console.log(`\n  === Fase 4/5: Scaffold ${templateName} (${OMNIHARNESS_MAP.length} IDEs) ===`)
