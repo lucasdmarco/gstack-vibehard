@@ -137,6 +137,29 @@ test("create DEFAULT é LITE: só ./app, sem Casdoor/Atomic, app.json mode=lite"
   }
 })
 
+test("create LITE NÃO escreve no ~/gstack-vault global; --vault escreve", async () => {
+  const tmp = await mkdtemp(path.join(tmpdir(), "gstack-vault-"))
+  const prevH = process.env.HOME, prevU = process.env.USERPROFILE
+  process.env.HOME = tmp; process.env.USERPROFILE = tmp // homedir() do vault aponta p/ o temp
+  process.env.GSTACK_SKIP_PREFLIGHT = "1"; process.env.GSTACK_SKIP_SIDE_EFFECTS = "1"
+  try {
+    const cwd = path.join(tmp, "ws"); await mkdir(cwd, { recursive: true })
+    const { createProject } = await import(`${pathToFileURL(modulePath)}?t=${Date.now()}`)
+    const log = { info: () => {}, success: () => {}, warn: () => {}, error: () => {} }
+    // LITE (padrão): nenhuma escrita global
+    await createProject({ args: ["app-lite"], cwd, projectRoot: repoRoot, now: () => "x", logger: log, execSync: () => Buffer.from("ok") })
+    assert.equal(existsSync(path.join(tmp, "gstack-vault")), false, "LITE não pode criar ~/gstack-vault")
+    // --vault: escreve o vault
+    await createProject({ args: ["app-vault", "--vault"], cwd, projectRoot: repoRoot, now: () => "x", logger: log, execSync: () => Buffer.from("ok") })
+    assert.ok(existsSync(path.join(tmp, "gstack-vault", "projects", "app-vault")), "--vault cria o projeto no vault")
+  } finally {
+    if (prevH === undefined) delete process.env.HOME; else process.env.HOME = prevH
+    if (prevU === undefined) delete process.env.USERPROFILE; else process.env.USERPROFILE = prevU
+    delete process.env.GSTACK_SKIP_PREFLIGHT; delete process.env.GSTACK_SKIP_SIDE_EFFECTS
+    await rm(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
+  }
+})
+
 test("create --dry-run --json: retorna plano e NÃO cria diretório", async () => {
   const tmp = await mkdtemp(path.join(tmpdir(), "gstack-dry-"))
   try {

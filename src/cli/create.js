@@ -375,28 +375,32 @@ index = "hnsw"
 }
 
 function bootGraphify(logger, projectDir) {
+  // Opcional: só roda se o binário `graphify` JÁ estiver instalado (não baixa via
+  // npx — evita lentidão/ruído num PC sem graphify). Mensagens honestas.
+  if (!findBinary("graphify")) {
+    logger.info("Graphify nao instalado — indexacao AST por commit e opcional (instale `graphify` para ativar).")
+    return
+  }
   try {
-    const { file, argv } = npxArgv(["--yes", "graphify", "hook", "install"])
-    const out = safeExec(file, argv, { cwd: projectDir })
-    if (out) {
-      logger.success("Graphify hooks instalados — AST gerada a cada commit")
-    } else {
-      logger.warn("Graphify falhou (sem erro) — AST indexacao desativada")
-    }
+    const out = safeExec("graphify", ["hook", "install"], { cwd: projectDir })
+    if (out) logger.success("Graphify hooks instalados — AST gerada a cada commit")
+    else logger.info("Graphify presente, mas `hook install` nao retornou — indexacao AST por commit desativada (opcional).")
   } catch (e) {
-    logger.warn(`Otimizacao de contexto desativada temporariamente: Graphify — ${e.message}`)
+    logger.info(`Graphify (opcional) nao configurado: ${e.message}`)
   }
 }
 
 function bootHeadroom(logger, projectDir) {
+  // Opcional: idem — só se o binário existir; sem fetch remoto.
+  if (!findBinary("headroom")) {
+    logger.info("Headroom nao instalado — compressao de contexto e opcional.")
+    return
+  }
   try {
-    const { file, argv } = npxArgv(["--yes", "@gstack/headroom-proxy", "--check"])
-    const out = safeExec(file, argv, { cwd: projectDir })
-    if (out) {
-      logger.success("Headroom proxy operacional — compressao de contexto ativa")
-    }
+    const out = safeExec("headroom", ["--check"], { cwd: projectDir })
+    if (out) logger.success("Headroom proxy operacional — compressao de contexto ativa")
   } catch (e) {
-    logger.warn(`Otimizacao de contexto desativada temporariamente: Headroom — ${e.message}`)
+    logger.info(`Headroom (opcional) nao configurado: ${e.message}`)
   }
 }
 
@@ -1372,11 +1376,15 @@ export async function createProject(options = {}) {
   // ── Boot Headroom (non-critical, wrapped in try/catch) ──
   bootHeadroom(logger, projectDir)
 
-  // ── Obsidian Vault Global: project subfolder + graph.json symlink ──
-  const vaultDir = join(homedir(), "gstack-vault")
-  const vaultProjectDir = join(vaultDir, "projects", projectName)
-  mkdirSync(vaultProjectDir, { recursive: true })
-  logger.info(`Vault project: ${vaultProjectDir}`)
+  // ── Obsidian Vault Global (P0.5): só em --full ou --vault. Em LITE (padrão) o
+  //    gstack NÃO escreve nada global — nada em ~/gstack-vault.
+  const writeVault = !isLite || args.includes("--vault")
+  let vaultProjectDir = null
+  if (writeVault) {
+    const vaultDir = join(homedir(), "gstack-vault")
+    vaultProjectDir = join(vaultDir, "projects", projectName)
+    mkdirSync(vaultProjectDir, { recursive: true })
+    logger.info(`Vault project: ${vaultProjectDir}`)
 
   // Symlink graphify-out/graph.json into vault (if graphify has run)
   const graphSource = join(projectDir, "graphify-out", "graph.json")
@@ -1426,15 +1434,17 @@ export async function createProject(options = {}) {
         "}",
       ].join("\n") + "\n")
     }
-  } catch (e) {
-    logger.warn(`Vault graph symlink: ${e.message} (non-blocking)`)
+    } catch (e) {
+      logger.warn(`Vault graph symlink: ${e.message} (non-blocking)`)
+    }
   }
 
   logger.success(`Projeto '${projectName}' criado (template: ${templateName})`)
   logger.info(`  Diretorio: ${projectDir}`)
   logger.info(`  Template: ${templateName}`)
   if (!isLite) logger.info(`  IAM: http://localhost:8000 (admin/123)`)
-  logger.info(`  Vault: ${vaultProjectDir}`)
+  if (vaultProjectDir) logger.info(`  Vault: ${vaultProjectDir}`)
+  else logger.info(`  Modo lite: projeto isolado em ./${projectName} (sem escrita global). Use --full ou --vault para o vault Obsidian.`)
   logger.info(`  Quality gate: npx fallow audit --format json`)
   logger.info(`  Dev: cd ${projectName} && pnpm dev`)
 
