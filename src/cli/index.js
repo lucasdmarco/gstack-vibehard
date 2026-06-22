@@ -105,7 +105,7 @@ export async function multiSelect(question, options) {
 // Registro de comandos — fonte única para help curto, avançado e por-comando.
 const COMMANDS = [
   { name: "start", group: "common", desc: "Assistente guiado: objetivo → plano → execução", usage: "gstack_vibehard start" },
-  { name: "create", group: "common", desc: "Criar um app (LITE por padrão, escreve só ./<nome>)", usage: "gstack_vibehard create <nome> [--full] [--dry-run --json]" },
+  { name: "create", group: "common", desc: "Criar um app (LITE por padrão, escreve só ./<nome>)", usage: "gstack_vibehard create <nome> [--full] [--vault] [--dry-run --json]" },
   { name: "init", group: "common", desc: "Criar projeto com estrutura completa", usage: "gstack_vibehard init <nome>" },
   { name: "status", group: "common", desc: "Ver se o gstack está ativo neste projeto", usage: "gstack_vibehard status" },
   { name: "enable", group: "common", desc: "Ativar o gstack neste projeto (novo já vem ativo)", usage: "gstack_vibehard enable" },

@@ -1,5 +1,13 @@
 # Changelog - gstack-vibehard
 
+## [3.0.13] - 2026-06-20
+
+### Correções do teste de instalação real (máquina Windows do dono)
+- **[BUG] `create` LITE escrevia no global `~/gstack-vault`** (`src/cli/create.js`): o bloco do vault Obsidian rodava sem gate de lite. Agora é **opt-in** (`--full` ou `--vault`); em **lite (padrão) o `create` não escreve NADA global** — só `./<nome>`. Cumpre a promessa do README/PR5. +teste com HOME temp (lite → 0 escrita em `~/gstack-vault`; `--vault` → criado).
+- **[ruído] graphify/headroom**: `bootGraphify`/`bootHeadroom` deixam de tentar **baixar via `npx --yes`** e de logar o confuso "Graphify falhou (sem erro)". Agora **só rodam se o binário já estiver instalado**; ausente → mensagem honesta ("opcional, instale `graphify` para ativar"), sem fetch remoto, não-bloqueante.
+- **[clareza] conflito OpenCode no `doctor`**: a mensagem deixa explícito que é **config pré-existente do usuário** (o gstack NÃO toca) e aponta o remédio de 1 comando: **`gstack_vibehard doctor --fix`** (merge assistido com backup; `--dry-run` mostra o plano).
+- 268 Node + 58 Python verdes; lint/syntaxcheck limpos.
+
 ## [3.0.12] - 2026-06-20
 
 ### README acessível e coerente com o código (docs)

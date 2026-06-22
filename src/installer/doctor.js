@@ -188,9 +188,10 @@ export async function doctor(args = []) {
     if (oc.hasJson) info(`  Config JSON:  ${oc.jsonPath}`)
     if (oc.hasJsonc) info(`  Config JSONC: ${oc.jsoncPath}`)
     if (oc.hasConflict) {
-      warn("  Conflito: opencode.json E opencode.jsonc coexistem.")
+      warn("  Conflito: opencode.json E opencode.jsonc coexistem (config SUA, pre-existente).")
       warn("  Pode sombrear plugins/OAuth do Desktop. O gstack NAO altera esses arquivos.")
-      info("  Remediacao (OpenCode fechado): renomeie opencode.json -> opencode.json.gstack-bak")
+      info("  Remedio em 1 comando (com o OpenCode fechado): `gstack_vibehard doctor --fix`")
+      info("    → merge assistido preservando OAuth/provider/plugins, com backup de ambos. `--dry-run` mostra o plano.")
     }
     const ocPlugins = join(HOME, ".config", "opencode", "plugins")
     const gstackPlugins = ["gstack-security.js", "gstack-session.js", "gstack-prompt.js"]
