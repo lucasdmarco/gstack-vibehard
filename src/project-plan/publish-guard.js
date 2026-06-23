@@ -61,6 +61,13 @@ export function publishGuard(opts = {}) {
   else if (changelog.includes(version)) add("changelog-entry", "passed", `entrada para ${version} encontrada`)
   else add("changelog-entry", "failed", `CHANGELOG.md sem entrada para ${version}`)
 
+  // 3.5. QG_VERSION sincronizado com o package (HARD) — impede release com qg.py
+  // stale. Se qg.py não existe no pacote (ex.: outro repo), é not_applicable.
+  const qgVersion = opts.readQgVersion ? opts.readQgVersion(cwd) : readQgVersion(cwd)
+  if (qgVersion === null) add("qg-version", "not_applicable", "hooks/hooks/qg.py não encontrado")
+  else if (qgVersion === version) add("qg-version", "passed", `qg.py em ${qgVersion}`)
+  else add("qg-version", "failed", `qg.py em ${qgVersion} ≠ package ${version} — rode \`node scripts/sync-qg-version.mjs\``)
+
   // 4. tag da versão (soft — o fluxo cria a tag após publicar)
   const tagV = `v${version}`
   if (tags.includes(tagV) || tags.includes(version)) add("tag-exists", "warning", `tag ${tagV} já existe (re-publicação?)`)
@@ -83,7 +90,15 @@ export function publishGuard(opts = {}) {
   return finalize(checks, version)
 }
 
-const HARD = new Set(["package-version", "tree-clean", "version-bump", "changelog-entry"])
+const HARD = new Set(["package-version", "tree-clean", "version-bump", "changelog-entry", "qg-version"])
+
+/** Lê QG_VERSION de hooks/hooks/qg.py (label do Quality Gate). null se ausente. */
+function readQgVersion(cwd) {
+  const src = readFile(join(cwd, "hooks", "hooks", "qg.py"))
+  if (src === null) return null
+  const m = src.match(/^QG_VERSION = "(.*)"$/m)
+  return m ? m[1] : null
+}
 
 function finalize(checks, version) {
   const failed = checks.filter((c) => c.status === "failed" && HARD.has(c.id)).map((c) => c.id)

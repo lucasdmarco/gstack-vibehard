@@ -9,6 +9,9 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 QG = REPO_ROOT / "hooks" / "hooks" / "qg.py"
+# QG_VERSION espelha o package.json (sincronizado por scripts/sync-qg-version.mjs);
+# o teste lê a fonte de verdade em vez de hardcodar (senão quebra a cada release).
+EXPECTED_QG_VERSION = json.loads((REPO_ROOT / "package.json").read_text(encoding="utf-8"))["version"]
 
 
 class FallowWrapperTest(unittest.TestCase):
@@ -186,7 +189,7 @@ class FallowWrapperTest(unittest.TestCase):
             {"rule": "x", "title": "y", "severity": "HIGH", "auto_fixable": True}]}
         result = self._run_with_fallow_payload(payload, 1)
         data = json.loads(result.stdout)
-        self.assertEqual(data.get("qg_version"), "3.0.3")
+        self.assertEqual(data.get("qg_version"), EXPECTED_QG_VERSION)
 
 
 if __name__ == "__main__":

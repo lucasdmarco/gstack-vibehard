@@ -1,5 +1,13 @@
 # Changelog - gstack-vibehard
 
+## [3.0.17] - 2026-06-22
+
+### QG_VERSION sincronizado + gate de release (não publica QG stale)
+- **[fix] `QG_VERSION` estava congelado em `"3.0.3"`** (`hooks/hooks/qg.py`) enquanto o package já estava em 3.0.16 → o `verify` reportava uma versão de Quality Gate **falsa**. Agora o `QG_VERSION` **espelha o `package.json`** e é sincronizado automaticamente.
+- **Novo `scripts/sync-qg-version.mjs`** + hook de lifecycle `npm version`: todo bump reescreve a linha `QG_VERSION` (replace **ancorado de uma linha**, idempotente) e faz `git add` do qg.py. O humano nunca mais edita à mão. (O drift de **conteúdo** continua coberto pelo `qg_hash` do próprio qg.py.)
+- **Gate HARD no `publish-guard`** (`src/project-plan/publish-guard.js`): novo check `qg-version` **bloqueia o release** se `qg.py` divergir do `package.json` (rede de segurança contra edição manual / falha do sync / merge torto). `not_applicable` se o qg.py não existir (outro repo).
+- **+6 testes** (sync: reescreve/idempotente/erro-loud; gate: match/mismatch-HARD/not_applicable). Suítes Node+Python verdes; lint/syntaxcheck limpos.
+
 ## [3.0.16] - 2026-06-22
 
 ### 🔒 Correção de segurança: `.gitignore` gerado em runtime (`.env` fora do git)

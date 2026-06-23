@@ -97,3 +97,33 @@ test("publish-guard: gh presente e CI success → ci-green passed", async () => 
     assert.equal(ci.status, "passed")
   } finally { await rm(cwd, { recursive: true, force: true }) }
 })
+
+test("publish-guard: qg.py sincronizado com a versão → qg-version passed", async () => {
+  const cwd = await repo("3.0.17", "## [3.0.17]")
+  try {
+    const { publishGuard } = await imp()
+    const r = publishGuard({ cwd, exec: gitExec({ tags: ["v3.0.16"] }), readQgVersion: () => "3.0.17" })
+    assert.equal(r.status, "pass")
+    assert.equal(r.checks.find((c) => c.id === "qg-version").status, "passed")
+  } finally { await rm(cwd, { recursive: true, force: true }) }
+})
+
+test("publish-guard: qg.py divergente do package → fail HARD (bloqueia release)", async () => {
+  const cwd = await repo("3.0.17", "## [3.0.17]")
+  try {
+    const { publishGuard } = await imp()
+    const r = publishGuard({ cwd, exec: gitExec({ tags: ["v3.0.16"] }), readQgVersion: () => "3.0.3" })
+    assert.equal(r.status, "fail")
+    assert.ok(r.failed.includes("qg-version"))
+  } finally { await rm(cwd, { recursive: true, force: true }) }
+})
+
+test("publish-guard: sem qg.py → qg-version not_applicable (não bloqueia)", async () => {
+  const cwd = await repo("3.0.17", "## [3.0.17]")
+  try {
+    const { publishGuard } = await imp()
+    const r = publishGuard({ cwd, exec: gitExec({ tags: ["v3.0.16"] }), readQgVersion: () => null })
+    assert.equal(r.status, "pass")
+    assert.equal(r.checks.find((c) => c.id === "qg-version").status, "not_applicable")
+  } finally { await rm(cwd, { recursive: true, force: true }) }
+})
