@@ -1,6 +1,7 @@
 {
   "name": "my-project",
   "private": true,
+  "packageManager": "pnpm@10.33.0",
   "scripts": {
     "dev": "turbo dev",
     "dev:web": "cd apps/web && npm run dev",

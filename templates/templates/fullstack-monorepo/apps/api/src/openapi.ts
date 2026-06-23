@@ -1,36 +1,7 @@
-import 'dotenv/config'
-import { serve } from '@hono/node-server'
-import { Hono } from 'hono'
-import { cors } from 'hono/cors'
-import { healthRoutes } from './routes/health.js'
-import { userRoutes } from './routes/users.js'
-
-const app = new Hono()
-const port = parseInt(process.env.API_PORT || '3001', 10)
-
-app.use('/*', cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173' }))
-app.get('/api/openapi.json', (c) => c.json(openapiSpec))
-
-app.route('/api', healthRoutes)
-app.route('/api/users', userRoutes)
-
-app.onError((err, c) => {
-  console.error(err)
-  return c.json({
-    success: false,
-    error: { code: 'INTERNAL_ERROR', message: err.message },
-  }, 500)
-})
-
-serve({ fetch: app.fetch, port }, (info) => {
-  console.log(`Hono API running on http://localhost:${info.port}`)
-  console.log(`OpenAPI: http://localhost:${info.port}/api/openapi.json`)
-})
-
-const openapiSpec = {
+export const openapiSpec = {
   openapi: '3.1.0',
-  info: { title: 'API (Hono)', version: '1.0.0' },
-  servers: [{ url: `http://localhost:${port}` }],
+  info: { title: 'API (Express)', version: '1.0.0' },
+  servers: [{ url: `http://localhost:${process.env.API_PORT || 3001}` }],
   paths: {
     '/api/health': {
       get: { tags: ['Health'], summary: 'Health check', responses: { '200': { description: 'OK' } } },

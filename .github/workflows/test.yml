@@ -71,8 +71,7 @@ jobs:
 
   # Smoke de empacotamento + scaffold. O test:pack prova o TARBALL real (pegaria,
   # p.ex., o strip do .gitignore pelo npm); o test:templates valida o scaffold lite.
-  # O build PESADO (turbo) é opt-in local (GSTACK_TEMPLATE_INSTALL=1) — ainda fora
-  # do CI até o template fullstack compilar limpo (deps/imports/tipos pendentes).
+  # O build PESADO (turbo via pnpm) garante que o projeto fullstack gerado COMPILA.
   templates:
     runs-on: ubuntu-latest
     steps:
@@ -80,9 +79,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - run: corepack enable
+        name: "Enable corepack (pnpm)"
       - run: npm ci
         name: "Install dependencies"
       - run: npm run test:pack
         name: "Pack smoke (tarball real)"
       - run: npm run test:templates
         name: "Template smoke (scaffold lite)"
+      - run: GSTACK_TEMPLATE_INSTALL=1 npm run test:templates
+        name: "Template build PESADO (fullstack lite: pnpm install + turbo build)"
+        timeout-minutes: 15

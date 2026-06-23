@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import Fastify from 'fastify'
+import Fastify, { type FastifyError } from 'fastify'
 import cors from '@fastify/cors'
 import swagger from '@fastify/swagger'
 import swaggerUi from '@fastify/swagger-ui'
@@ -23,7 +23,7 @@ await app.register(swaggerUi, { routePrefix: '/api/docs' })
 await app.register(healthRoutes, { prefix: '/api' })
 await app.register(userRoutes, { prefix: '/api/users' })
 
-app.setErrorHandler((err, _req, reply) => {
+app.setErrorHandler((err: FastifyError, _req, reply) => {
   if (err.validation) {
     return reply.status(422).send({
       success: false,

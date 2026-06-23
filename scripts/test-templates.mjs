@@ -43,12 +43,14 @@ try {
   existsSync(join(appDir, ".env.example")) ? ok("lite fullstack: .env.example presente no projeto") : bad("projeto sem .env.example")
 
   if (process.env.GSTACK_TEMPLATE_INSTALL === "1") {
+    // O template fullstack é um monorepo PNPM (turbo + pnpm-workspace.yaml) — usa
+    // pnpm (via corepack), não npm, que não linka os workspaces.
     const { execFileSync } = await import("node:child_process")
     const isWin = process.platform === "win32"
-    const npm = (a) => isWin ? execFileSync("cmd.exe", ["/c", "npm", ...a], { cwd: appDir, stdio: "inherit", timeout: 600000 })
-      : execFileSync("npm", a, { cwd: appDir, stdio: "inherit", timeout: 600000 })
-    try { npm(["install", "--no-audit", "--no-fund"]); npm(["run", "build"]); ok("lite fullstack: install + build OK") }
-    catch (e) { bad(`install/build falhou: ${(e.message || "").slice(0, 80)}`) }
+    const pnpm = (a) => isWin ? execFileSync("cmd.exe", ["/c", "pnpm", ...a], { cwd: appDir, stdio: "inherit", timeout: 600000 })
+      : execFileSync("pnpm", a, { cwd: appDir, stdio: "inherit", timeout: 600000 })
+    try { pnpm(["install", "--no-frozen-lockfile"]); pnpm(["build"]); ok("lite fullstack: pnpm install + build OK") }
+    catch (e) { bad(`pnpm install/build falhou: ${(e.message || "").slice(0, 80)}`) }
   } else {
     ok("install+build pesado: pulado (GSTACK_TEMPLATE_INSTALL=1 para rodar)")
   }

@@ -25,7 +25,7 @@ const querySchema = z.object({
 
 router.get('/', validate({ query: querySchema }), async (req, res, next) => {
   try {
-    const { page, limit: limitVal, search } = req.query as z.infer<typeof querySchema>
+    const { page, limit: limitVal, search } = req.query as unknown as z.infer<typeof querySchema>
     const offset = (page - 1) * limitVal
 
     const where = search ? like(users.email, `%${search}%`) : undefined
@@ -40,7 +40,7 @@ router.get('/', validate({ query: querySchema }), async (req, res, next) => {
 
 router.get('/:id', async (req, res, next) => {
   try {
-    const user = await db.select().from(users).where(eq(users.id, req.params.id)).limit(1)
+    const user = await db.select().from(users).where(eq(users.id, req.params.id as string)).limit(1)
     if (!user.length) throw AppError.notFound('User not found')
     success(res, user[0])
   } catch (err) {
@@ -65,7 +65,7 @@ router.put('/:id', validate({ body: updateUserSchema }), async (req, res, next) 
   try {
     const [user] = await db.update(users)
       .set(req.body as any)
-      .where(eq(users.id, req.params.id))
+      .where(eq(users.id, req.params.id as string))
       .returning()
     if (!user) throw AppError.notFound('User not found')
     success(res, user)
@@ -76,7 +76,7 @@ router.put('/:id', validate({ body: updateUserSchema }), async (req, res, next) 
 
 router.delete('/:id', async (req, res, next) => {
   try {
-    const [user] = await db.delete(users).where(eq(users.id, req.params.id)).returning()
+    const [user] = await db.delete(users).where(eq(users.id, req.params.id as string)).returning()
     if (!user) throw AppError.notFound('User not found')
     success(res, { deleted: true })
   } catch (err) {
