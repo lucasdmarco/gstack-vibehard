@@ -1,5 +1,12 @@
 # Changelog - gstack-vibehard
 
+## [3.1.2] - 2026-06-22
+
+### 🪟 Robustez do `install` no Windows (3 falhas reais que o install do dono expôs)
+- **[fix] `graphify` parava de dar erro espúrio** (`install.js`): o passo fazia `uv tool install graphify`, mas **graphify não é pacote PyPI** → falhava SEMPRE com `No solution found... no versions of graphify`. Agora **pula se o binário já existe** (`findWorkingBinary`) e, se não, dá mensagem honesta (opcional) — sem o erro de resolução confuso.
+- **[fix] `npm`/`npx` no Windows davam `spawnSync ENOENT`** — `execFileSync("npm"/"npx", …)` sem `.cmd` não acha o binário no Windows. Novo helper `npmArgv` (espelha o `npxArgv`) e uso cross-platform (`cmd.exe /c npm`/`npx`) em: `cli-anything-hub` (`install.js`), `connectAgentMemory` e `installGraphifyGitHooks` (`agent-distribution.js`). Agora a skill `cli-anything-hub` e a distribuição AgentMemory **instalam no Windows**.
+- **+1 teste** (`npmArgv` win/unix) e assertions de comando agora cross-platform via `npxArgv`. 283 Node + 58 Python verdes; lint/syntaxcheck limpos.
+
 ## [3.1.1] - 2026-06-22
 
 ### 🏗️ O template fullstack agora COMPILA (turbo build verde) + CI o garante

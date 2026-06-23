@@ -16,7 +16,7 @@ import { ensureDir, copyWithBackup, copyDirSync, backupFile } from "./merge.js"
 import { buildInstallImpact, renderImpactMarkdown } from "./impact.js"
 import { checkRemoteDownload } from "./remote-policy.js"
 import { safeCopyDir, safeCopyFile, safeWriteFile, safeAppendBlock } from "./safe-write.js"
-import { findWorkingBinary, getUvCandidates, getBunCandidates, npxArgv } from "./deps.js"
+import { findWorkingBinary, getUvCandidates, getBunCandidates, npxArgv, npmArgv } from "./deps.js"
 import { checkAlreadyInstalled } from "./check.js"
 import { installGeneratedAgentLayer, installGraphifyGitHooks } from "./agent-distribution.js"
 import { multiSelect, select, prompt, success, warn, error, info, section } from "../cli/index.js"
@@ -143,15 +143,13 @@ async function installDeps(warn, success, info, report, harnessIds, allowRemote 
     }
   }
 
-  if (uvBin) {
-    try {
-      execFileSync(uvBin, ["tool", "install", "graphify"], { stdio: "pipe", timeout: 120000 })
-      success("graphify (uv tool)")
-    } catch (e) {
-      warn(`graphify (uv tool): ${e.message}`)
-    }
+  // graphify NÃO é pacote PyPI — `uv tool install graphify` sempre falha ("no
+  // versions of graphify"). Se o binário já existe (instalado via setup-graphify),
+  // pula; senão, mensagem honesta (opcional) — sem o erro de resolução confuso.
+  if (findWorkingBinary(["graphify"])) {
+    success("graphify: já instalado")
   } else {
-    info("graphify: pulado (uv nao disponivel)")
+    info("graphify: não instalado — opcional (indexação AST por commit). Instale separadamente se quiser ativar.")
   }
 
   // ========================================
@@ -269,7 +267,9 @@ async function installDeps(warn, success, info, report, harnessIds, allowRemote 
   // CLI-Anything Hub (dynamic CLI download for agents)
   // ========================================
   try {
-    execFileSync("npm", ["install", "-g", "cli-anything-hub"], { stdio: "pipe", timeout: 120000 })
+    // npm cross-platform: no Windows `npm` sem `.cmd` dá ENOENT no execFileSync.
+    const { file, argv } = npmArgv(["install", "-g", "cli-anything-hub"])
+    execFileSync(file, argv, { stdio: "pipe", timeout: 120000 })
     success("cli-anything-hub (npm global)")
   } catch (e) {
     warn(`cli-anything-hub (npm global): ${e.message}`)

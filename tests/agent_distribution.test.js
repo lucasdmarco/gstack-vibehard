@@ -8,6 +8,9 @@ import { pathToFileURL } from "node:url"
 
 const repoRoot = path.resolve(import.meta.dirname, "..")
 const modulePath = path.join(repoRoot, "src", "installer", "agent-distribution.js")
+const { npxArgv } = await import(`${pathToFileURL(path.join(repoRoot, "src", "installer", "deps.js"))}`)
+// comando npx resolvido p/ a plataforma atual (Windows → `cmd.exe /c npx ...`)
+const connectCmd = (h) => { const { file, argv } = npxArgv(["@agentmemory/agentmemory", "connect", h]); return [file, ...argv].join(" ") }
 
 test("installs generated agents into detected harnesses and writes manifest", async () => {
   const tmp = await mkdtemp(path.join(tmpdir(), "gstack-agent-distribution-"))
@@ -53,12 +56,7 @@ test("installs generated agents into detected harnesses and writes manifest", as
     assert.equal(existsSync(path.join(home, ".codex", "agents", "gstack-vibehard", "deployer.toml")), true)
     assert.equal(existsSync(path.join(cwd, ".cursor", "agents", "gstack-vibehard", "AGENTS.md")), true)
     assert.equal(existsSync(path.join(home, ".opencode", "agents", "gstack-vibehard", "rules", "deployer.mdc")), true)
-    assert.deepEqual(commands, [
-      "npx @agentmemory/agentmemory connect claude",
-      "npx @agentmemory/agentmemory connect codex",
-      "npx @agentmemory/agentmemory connect cursor",
-      "npx @agentmemory/agentmemory connect opencode",
-    ])
+    assert.deepEqual(commands, ["claude", "codex", "cursor", "opencode"].map(connectCmd))
 
     const manifestPath = path.join(home, ".gstack_vibehard", "install-manifest.json")
     const manifest = JSON.parse(await readFile(manifestPath, "utf8"))
@@ -108,10 +106,7 @@ test("respects selected harness ids", async () => {
     assert.deepEqual(result.detectedHarnesses.map((h) => h.id), ["claude", "cursor"])
     assert.equal(existsSync(path.join(home, ".claude", "agents", "gstack-vibehard", "deployer", "SKILL.md")), true)
     assert.equal(existsSync(path.join(home, ".codex", "agents", "gstack-vibehard", "deployer.toml")), false)
-    assert.deepEqual(commands, [
-      "npx @agentmemory/agentmemory connect claude",
-      "npx @agentmemory/agentmemory connect cursor",
-    ])
+    assert.deepEqual(commands, ["claude", "cursor"].map(connectCmd))
   } finally {
     await rm(tmp, { recursive: true, force: true })
   }
@@ -152,7 +147,7 @@ test("keeps generated agent copy failures non-blocking", async () => {
 
     assert.equal(result.agentDirectories.claude.endsWith(path.join(".claude", "agents", "gstack-vibehard")), true)
     assert.equal(result.agentDirectories.codex, undefined)
-    assert.deepEqual(commands, ["npx @agentmemory/agentmemory connect claude"])
+    assert.deepEqual(commands, [connectCmd("claude")])
     assert.equal(report.errors.some((item) => item.includes("generated agents: codex: permission denied")), true)
   } finally {
     await rm(tmp, { recursive: true, force: true })
@@ -228,7 +223,8 @@ test("installs Graphify git hooks only inside git projects", async () => {
 
     assert.equal(installed.status, "success")
     assert.equal(skipped.status, "skipped")
-    assert.deepEqual(commands, [{ cmd: "npx graphify hook install", cwd: repo }])
+    const gfx = npxArgv(["graphify", "hook", "install"])
+    assert.deepEqual(commands, [{ cmd: [gfx.file, ...gfx.argv].join(" "), cwd: repo }])
     assert.equal(report.updated.includes("Graphify git hooks"), true)
     assert.equal(report.skipped.includes("Graphify git hooks: sem .git"), true)
   } finally {
