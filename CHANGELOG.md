@@ -1,5 +1,12 @@
 # Changelog - gstack-vibehard
 
+## [3.1.3] - 2026-06-23
+
+### 🪟 `refreshPath` quebrava o `cmd.exe` no meio do install (root cause do ENOENT)
+- **[fix] causa-raiz:** `refreshPath()` (`install.js`) **substituía** o `process.env.Path` pelos valores crus do registro — que guardam `%SystemRoot%\system32` **não-expandido** (REG_EXPAND_SZ). Resultado: depois dele, o PATH perdia o **System32**, e qualquer spawn de `cmd.exe` dava `spawnSync cmd.exe ENOENT` (foi o que sobrou no `cli-anything-hub`, que roda **depois** do `refreshPath`; o playwright passou porque roda antes). Agora `refreshPath` **expande `%VAR%` e MESCLA** com o PATH atual (novo `mergeWindowsPath`, dedup case-insensitive) — nunca perde o System32.
+- **Blindagem extra:** `npmArgv`/`npxArgv` passam a usar o caminho **absoluto** do cmd.exe (`process.env.ComSpec`), robusto mesmo se algo mexer no PATH.
+- **+1 teste** (`mergeWindowsPath` expande/mescla/dedup) e `npm/npxArgv`/printing-press atualizados p/ ComSpec. 284 Node + 58 Python verdes; lint/syntaxcheck limpos.
+
 ## [3.1.2] - 2026-06-22
 
 ### 🪟 Robustez do `install` no Windows (3 falhas reais que o install do dono expôs)

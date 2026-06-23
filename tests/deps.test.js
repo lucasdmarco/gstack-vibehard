@@ -52,22 +52,37 @@ test("isBinaryAvailable reflete sucesso/falha do exec", async () => {
   assert.equal(isBinaryAvailable("nope", { exec: () => { throw new Error("x") } }), false)
 })
 
-test("npxArgv: Windows usa cmd.exe /c npx; unix usa npx direto", async () => {
+test("npxArgv: Windows usa o cmd.exe ABSOLUTO (ComSpec); unix usa npx direto", async () => {
   const { npxArgv } = await import(`${pathToFileURL(depsModule)}?t=${Date.now()}`)
+  const cmd = process.env.ComSpec || "cmd.exe" // caminho absoluto, robusto a PATH mexido
   assert.deepEqual(npxArgv(["playwright", "--version"], "win32"), {
-    file: "cmd.exe", argv: ["/c", "npx", "playwright", "--version"],
+    file: cmd, argv: ["/c", "npx", "playwright", "--version"],
   })
   assert.deepEqual(npxArgv(["playwright", "--version"], "linux"), {
     file: "npx", argv: ["playwright", "--version"],
   })
 })
 
-test("npmArgv: Windows usa cmd.exe /c npm (evita ENOENT); unix usa npm direto", async () => {
+test("npmArgv: Windows usa o cmd.exe ABSOLUTO (ComSpec, evita ENOENT); unix usa npm direto", async () => {
   const { npmArgv } = await import(`${pathToFileURL(depsModule)}?t=${Date.now()}`)
+  const cmd = process.env.ComSpec || "cmd.exe"
   assert.deepEqual(npmArgv(["install", "-g", "cli-anything-hub"], "win32"), {
-    file: "cmd.exe", argv: ["/c", "npm", "install", "-g", "cli-anything-hub"],
+    file: cmd, argv: ["/c", "npm", "install", "-g", "cli-anything-hub"],
   })
   assert.deepEqual(npmArgv(["install", "-g", "x"], "linux"), {
     file: "npm", argv: ["install", "-g", "x"],
   })
+})
+
+test("mergeWindowsPath: expande %VAR%, mescla com o PATH atual e dedup (não perde System32)", async () => {
+  const { mergeWindowsPath } = await import(`${pathToFileURL(depsModule)}?t=${Date.now()}`)
+  const env = { SystemRoot: "C:\\Windows" }
+  const current = "C:\\Windows\\System32;C:\\Tools"
+  const reg = "%SystemRoot%\\System32;C:\\NovoTool"
+  const parts = mergeWindowsPath(current, reg, env).split(";")
+  assert.ok(parts.includes("C:\\Windows\\System32"), "preserva System32 (cmd.exe)")
+  assert.ok(parts.includes("C:\\Tools"), "preserva entrada já presente")
+  assert.ok(parts.includes("C:\\NovoTool"), "adiciona a nova do registro")
+  // %SystemRoot% expandido + dedup → System32 aparece UMA vez
+  assert.equal(parts.filter((p) => p.toLowerCase() === "c:\\windows\\system32").length, 1, "dedup case-insensitive")
 })

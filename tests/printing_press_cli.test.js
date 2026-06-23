@@ -26,7 +26,7 @@ test("runPrintingPress no Windows usa cmd.exe /c npx (evita ENOENT, sem shell:tr
   let captured
   const exec = (file, args, opts) => { captured = { file, args, opts }; return "[]" }
   runPrintingPress(["list", "--json"], { exec, platform: "win32" })
-  assert.equal(captured.file, "cmd.exe")
+  assert.equal(captured.file, process.env.ComSpec || "cmd.exe") // cmd.exe absoluto (ComSpec)
   assert.deepEqual(captured.args, ["/c", "npx", "-y", PP_PKG, "list", "--json"])
   assert.equal(captured.opts.shell, false, "nunca shell:true (sem deprecation/injecao)")
 })

@@ -53,16 +53,41 @@ export function isBinaryAvailable(bin, opts = {}) {
  * @returns {{ file: string, argv: string[] }}
  */
 export function npxArgv(args, platform = process.platform) {
-  if (platform === "win32") return { file: "cmd.exe", argv: ["/c", "npx", ...args] }
+  // ComSpec = caminho ABSOLUTO do cmd.exe; não depende do PATH (que o refreshPath
+  // pode ter mexido). Fallback "cmd.exe" se ComSpec não estiver setado.
+  if (platform === "win32") return { file: process.env.ComSpec || "cmd.exe", argv: ["/c", "npx", ...args] }
   return { file: "npx", argv: args }
 }
 
 /**
  * Invocacao cross-platform de `npm`. Mesmo motivo do npxArgv: no Windows o binario
- * e `npm.cmd` e `execFileSync("npm", ...)` da ENOENT — rodamos via `cmd.exe /c npm`.
+ * e `npm.cmd` e `execFileSync("npm", ...)` da ENOENT — rodamos via `cmd.exe /c npm`
+ * usando o caminho ABSOLUTO do cmd.exe (ComSpec).
  * @returns {{ file: string, argv: string[] }}
  */
 export function npmArgv(args, platform = process.platform) {
-  if (platform === "win32") return { file: "cmd.exe", argv: ["/c", "npm", ...args] }
+  if (platform === "win32") return { file: process.env.ComSpec || "cmd.exe", argv: ["/c", "npm", ...args] }
   return { file: "npm", argv: args }
+}
+
+/**
+ * Constrói o PATH do Windows: expande `%VAR%` (o registro guarda REG_EXPAND_SZ com
+ * `%SystemRoot%` etc.) e MESCLA com o PATH atual — nunca substitui, senão perde o
+ * System32 (onde mora o cmd.exe) e quebra spawns subsequentes. Dedup case-insensitive.
+ * Puro/testável.
+ */
+export function mergeWindowsPath(current, regPath, env = process.env) {
+  const expand = (s) => String(s || "").replace(/%([^%]+)%/g, (m, name) => env[name] ?? env[name.toUpperCase()] ?? m)
+  const parts = [...String(current || "").split(";"), ...expand(regPath).split(";")]
+  const seen = new Set()
+  const out = []
+  for (const raw of parts) {
+    const p = raw.trim()
+    if (!p) continue
+    const key = p.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(p)
+  }
+  return out.join(";")
 }
