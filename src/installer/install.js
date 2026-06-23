@@ -16,7 +16,7 @@ import { ensureDir, copyWithBackup, copyDirSync, backupFile } from "./merge.js"
 import { buildInstallImpact, renderImpactMarkdown } from "./impact.js"
 import { checkRemoteDownload } from "./remote-policy.js"
 import { safeCopyDir, safeCopyFile, safeWriteFile, safeAppendBlock } from "./safe-write.js"
-import { findWorkingBinary, getUvCandidates, getBunCandidates, npxArgv, npmArgv } from "./deps.js"
+import { findWorkingBinary, getUvCandidates, getBunCandidates, npxArgv, npmArgv, mergeWindowsPath } from "./deps.js"
 import { checkAlreadyInstalled } from "./check.js"
 import { installGeneratedAgentLayer, installGraphifyGitHooks } from "./agent-distribution.js"
 import { multiSelect, select, prompt, success, warn, error, info, section } from "../cli/index.js"
@@ -74,8 +74,10 @@ function refreshPath() {
     const userResult = execFileSync("reg", ["query", "HKCU\\Environment", "/v", "Path"], { stdio: "pipe", timeout: 5000, encoding: "utf-8" })
     const sysMatch = (sysResult || "").match(/REG_\w+\s+(\S.+)/)
     const userMatch = (userResult || "").match(/REG_\w+\s+(\S.+)/)
-    const merged = [sysMatch?.[1], userMatch?.[1]].filter(Boolean).join(";")
-    if (merged) process.env.Path = merged
+    const fromReg = [sysMatch?.[1], userMatch?.[1]].filter(Boolean).join(";")
+    // MESCLA com o PATH atual e expande %VAR% — substituir cru perdia o System32
+    // (cmd.exe) porque o registro guarda `%SystemRoot%\system32` não-expandido.
+    if (fromReg) process.env.Path = mergeWindowsPath(process.env.Path || process.env.PATH || "", fromReg)
   } catch (e) { console.error("refreshPath (non-critical):", e.message) }
 }
 
