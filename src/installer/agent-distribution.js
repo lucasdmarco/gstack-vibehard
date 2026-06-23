@@ -3,6 +3,7 @@ import { execFileSync as defaultExecFileSync } from "child_process"
 import { homedir } from "os"
 import { dirname, join } from "path"
 import { loadManifest, recordItem, saveManifest } from "./manifest.js"
+import { npxArgv } from "./deps.js"
 
 const AGENT_NAMESPACE = "gstack-vibehard"
 
@@ -88,7 +89,9 @@ function connectAgentMemory(harnessId, exec = defaultExecFileSync) {
     return { status: "warning", error: `harnessId invalido: ${harnessId}` }
   }
   try {
-    exec("npx", ["@agentmemory/agentmemory", "connect", harnessId], { stdio: "pipe", timeout: 120000 })
+    // npx cross-platform: no Windows `npx` sem `.cmd` dá ENOENT no execFileSync.
+    const { file, argv } = npxArgv(["@agentmemory/agentmemory", "connect", harnessId])
+    exec(file, argv, { stdio: "pipe", timeout: 120000 })
     return { status: "success" }
   } catch (e) {
     return { status: "warning", error: e.message }
@@ -112,7 +115,9 @@ export function installGraphifyGitHooks(options = {}) {
   }
 
   try {
-    exec("npx", ["graphify", "hook", "install"], { cwd, stdio: "pipe", timeout: 120000 })
+    // npx cross-platform (Windows: `npx` sem `.cmd` dá ENOENT no execFileSync).
+    const { file, argv } = npxArgv(["graphify", "hook", "install"])
+    exec(file, argv, { cwd, stdio: "pipe", timeout: 120000 })
     success("Graphify git hooks instalados")
     report.updated.push("Graphify git hooks")
     return { status: "success" }

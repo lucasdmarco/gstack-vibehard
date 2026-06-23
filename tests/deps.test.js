@@ -61,3 +61,13 @@ test("npxArgv: Windows usa cmd.exe /c npx; unix usa npx direto", async () => {
     file: "npx", argv: ["playwright", "--version"],
   })
 })
+
+test("npmArgv: Windows usa cmd.exe /c npm (evita ENOENT); unix usa npm direto", async () => {
+  const { npmArgv } = await import(`${pathToFileURL(depsModule)}?t=${Date.now()}`)
+  assert.deepEqual(npmArgv(["install", "-g", "cli-anything-hub"], "win32"), {
+    file: "cmd.exe", argv: ["/c", "npm", "install", "-g", "cli-anything-hub"],
+  })
+  assert.deepEqual(npmArgv(["install", "-g", "x"], "linux"), {
+    file: "npm", argv: ["install", "-g", "x"],
+  })
+})

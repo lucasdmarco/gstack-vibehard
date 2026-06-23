@@ -56,3 +56,13 @@ export function npxArgv(args, platform = process.platform) {
   if (platform === "win32") return { file: "cmd.exe", argv: ["/c", "npx", ...args] }
   return { file: "npx", argv: args }
 }
+
+/**
+ * Invocacao cross-platform de `npm`. Mesmo motivo do npxArgv: no Windows o binario
+ * e `npm.cmd` e `execFileSync("npm", ...)` da ENOENT — rodamos via `cmd.exe /c npm`.
+ * @returns {{ file: string, argv: string[] }}
+ */
+export function npmArgv(args, platform = process.platform) {
+  if (platform === "win32") return { file: "cmd.exe", argv: ["/c", "npm", ...args] }
+  return { file: "npm", argv: args }
+}
