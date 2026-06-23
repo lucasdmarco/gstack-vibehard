@@ -1,5 +1,17 @@
 # Changelog - gstack-vibehard
 
+## [3.1.1] - 2026-06-22
+
+### 🏗️ O template fullstack agora COMPILA (turbo build verde) + CI o garante
+- **[fix] o template `fullstack-monorepo` não compilava** com `turbo build` — um usuário que rodava `create` + build levava erro na cara. Endurecido até **`Tasks: 4 successful, 4 total`** (web + api + api-fastify + api-hono), verificado num scaffold limpo do zero. Correções:
+  - **`packageManager: pnpm@10.33.0`** no root (turbo 2.x exige p/ resolver os workspaces).
+  - **deps faltando declaradas:** `@radix-ui/react-slot`, `class-variance-authority`, `tailwindcss-animate` (web); `drizzle-orm` (api-hono).
+  - **arquivos faltando:** `apps/web/src/vite-env.d.ts` (tipos de `import.meta.env`), `apps/api/src/openapi.ts` (era importado mas inexistente).
+  - **imports errados:** `patterns/index.ts` (`../components/patterns/…` → `./…`), pattern→lib (`../../lib` → `../../../lib`), `index.css` (`./themes/…` → `./styles/themes/…`).
+  - **tipos:** CORS do Hono (`|| false` → default localhost string), `eq(users.id, req.params.id as string)` (Express), `req.query as unknown as …` (ParsedQs), `FastifyError` no error handler, imports não usados em `schema.ts`.
+- **CI agora roda o build PESADO** (`.github/workflows/test.yml` job `templates`): `corepack enable` + `GSTACK_TEMPLATE_INSTALL=1` → `pnpm install` + `turbo build` do fullstack lite, **bloqueante**. `scripts/test-templates.mjs` passou a usar **pnpm** (o PM real do monorepo), não npm.
+- Sem mudança no runtime do instalador. 282 Node + 58 Python verdes; lint/syntaxcheck limpos; pack/template smoke OK.
+
 ## [3.1.0] - 2026-06-22
 
 ### `doctor --repair-manifest` — conserta manifest inseguro sem destruir backups

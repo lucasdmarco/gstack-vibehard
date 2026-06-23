@@ -1,4 +1,4 @@
-import { getConfig, engineLabel } from "../../lib/design-system/config"
+import { getConfig, engineLabel } from "../../../lib/design-system/config"
 
 export function HeroSection() {
   const config = getConfig()

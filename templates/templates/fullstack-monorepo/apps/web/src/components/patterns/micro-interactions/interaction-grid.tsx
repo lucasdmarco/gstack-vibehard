@@ -1,4 +1,4 @@
-import { getConfig } from "../../lib/design-system/config"
+import { getConfig } from "../../../lib/design-system/config"
 
 const microInteractions = [
   {

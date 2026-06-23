@@ -1,4 +1,4 @@
-import { engineLabel, TasteEngine } from "../../lib/design-system/config"
+import { TasteEngine } from "../../../lib/design-system/config"
 
 interface BentoCard {
   title: string

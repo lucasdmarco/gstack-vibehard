@@ -1,4 +1,4 @@
-export { HeroSection } from "../components/patterns/heroes/hero-section"
-export { BentoGrid } from "../components/patterns/grids/bento-grid"
-export { NavigationBar } from "../components/patterns/navigation/navbar"
-export { MicroInteractionGrid } from "../components/patterns/micro-interactions/interaction-grid"
+export { HeroSection } from "./heroes/hero-section"
+export { BentoGrid } from "./grids/bento-grid"
+export { NavigationBar } from "./navigation/navbar"
+export { MicroInteractionGrid } from "./micro-interactions/interaction-grid"

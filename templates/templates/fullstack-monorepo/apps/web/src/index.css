@@ -5,10 +5,10 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ── Engine themes ── */
-@import "./themes/brutalist.css";
-@import "./themes/soft.css";
-@import "./themes/minimalist.css";
-@import "./themes/stitch.css";
+@import "./styles/themes/brutalist.css";
+@import "./styles/themes/soft.css";
+@import "./styles/themes/minimalist.css";
+@import "./styles/themes/stitch.css";
 
 /* ── Default theme (minimalist) ── */
 :root {
