@@ -1,5 +1,13 @@
 # Changelog - gstack-vibehard
 
+## [3.1.0] - 2026-06-22
+
+### `doctor --repair-manifest` — conserta manifest inseguro sem destruir backups
+- **Novo `doctor --repair-manifest`** (`src/installer/repair-manifest.js`): repara/migra um manifest de instalação inseguro (o que deixava `safeToUninstall=false`) **sem precisar de uninstall/reinstall total**. Ações: **poda** entradas cujo arquivo rastreado sumiu (nada a desinstalar); **marca não-restaurável** a entrada cujo backup não existe mais (mantém a entrada — **NUNCA apaga backups do usuário**); **reporta** (sem tocar) config JSON inválido e drift; **normaliza** schema legado.
+- **Seguro por padrão:** `--dry-run` (default) só mostra o **plano**, não escreve nada. `--yes` aplica — e antes faz **backup versionado do próprio manifest**. `--json` para automação; `--strict` sai ≠0 se há mutação pendente não aplicada.
+- Reusa `checkInstallIntegrity`/`sha256` (`integrity.js`), `versionedBackup` (`safe-write.js`) e o manifest como fonte de verdade. Rodado na máquina real, já achou entradas mortas de runs antigas.
+- **+3 testes** (dry-run não toca nada; apply poda/marca/preserva backups e melhora `safeToUninstall`; manifest ausente). 282 Node + 58 Python verdes; lint/syntaxcheck limpos.
+
 ## [3.0.17] - 2026-06-22
 
 ### QG_VERSION sincronizado + gate de release (não publica QG stale)

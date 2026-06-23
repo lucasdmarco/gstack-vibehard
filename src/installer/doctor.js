@@ -8,6 +8,7 @@ import { npxArgv } from "./deps.js"
 import { detectHarnesses } from "../harness/detector.js"
 import { inspectOpenCodeConfig } from "../harness/opencode-config.js"
 import { checkInstallIntegrity } from "./integrity.js"
+import { repairManifest } from "./repair-manifest.js"
 import { buildInstallImpact } from "./impact.js"
 import { planOpenCodeFix, applyOpenCodeFix } from "./opencode-jsonc.js"
 import { section, success, warn, error, info, confirm } from "../cli/index.js"
@@ -70,7 +71,7 @@ export async function doctor(args = []) {
   // `doctor --json` (diagnóstico completo) → JSON PURO. --strict → exit≠0 se check
   // obrigatório falhar. Não roteia aqui os modos --impact/--install-integrity (têm
   // seu próprio JSON abaixo) nem --fix (interativo).
-  if (json && !args.includes("--impact") && !args.includes("--install-integrity") && !args.includes("--fix")) {
+  if (json && !args.includes("--impact") && !args.includes("--install-integrity") && !args.includes("--fix") && !args.includes("--repair-manifest")) {
     const report = await collectDoctorJson(HOME)
     process.stdout.write(JSON.stringify(report) + "\n")
     if (strict && !report.ok) process.exitCode = 1
@@ -122,6 +123,35 @@ export async function doctor(args = []) {
     info("Rollback: `gstack_vibehard uninstall --dry-run` · Integridade: `--install-integrity`.")
     return
   }
+  // Modo reparo: limpa/migra um manifest inseguro SEM destruir backups do usuário.
+  // Default = --dry-run (só mostra o plano); --yes aplica (faz backup do manifest).
+  if (args.includes("--repair-manifest")) {
+    const apply = args.includes("--yes") && !args.includes("--dry-run")
+    const r = repairManifest(HOME, { dryRun: !apply })
+    if (json) {
+      process.stdout.write(JSON.stringify(r) + "\n")
+      if (strict && r.manifestExists && r.mutating > 0 && !r.applied) process.exitCode = 1
+      return
+    }
+    section("doctor --repair-manifest — limpeza/migração segura do manifest")
+    if (!r.manifestExists) { warn(r.note); return }
+    if (r.plan.length === 0) { success("Manifest íntegro — nada a reparar."); return }
+    info(`${r.plan.length} item(ns) no plano (${r.mutating} mutação(ões); restante é só relato):`)
+    for (const a of r.plan) {
+      const tag = a.action === "prune" ? "PODAR" : a.action === "mark-unrestorable" ? "MARCAR não-restaurável"
+        : a.action === "migrate" ? "MIGRAR schema" : "RELATAR"
+      info(`  • [${tag}] ${a.path} — ${a.reason}`)
+    }
+    info("Backups do usuário são SEMPRE preservados (nunca apagados).")
+    if (!apply) {
+      info("(--dry-run: nada foi alterado) — para aplicar: `gstack_vibehard doctor --repair-manifest --yes`")
+      return
+    }
+    if (r.applied) success(`Manifest reparado (${r.before.items} → ${r.after.items} itens). Backup do manifest: ${r.backup || "—"}`)
+    else info("Nada a aplicar (apenas relatos).")
+    return
+  }
+
   // Modo integridade: valida manifest/backups/hashes/configs e se uninstall é seguro.
   if (args.includes("--install-integrity")) {
     const r = checkInstallIntegrity(HOME)

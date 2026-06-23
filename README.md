@@ -158,6 +158,7 @@ gstack_vibehard doctor                      # humano
 gstack_vibehard doctor --json [--strict]    # JSON puro (strict → exit≠0 se check obrigatório falha)
 gstack_vibehard doctor --impact             # componentes globais ativos (o que afeta qualquer projeto)
 gstack_vibehard doctor --install-integrity  # manifest/backups/hashes — uninstall seguro?
+gstack_vibehard doctor --repair-manifest    # plano de limpeza/migração do manifest (--dry-run); --yes aplica (preserva backups)
 ```
 Mostra Node/Python, harnesses e nível de integração, hooks/skills instalados, deps globais, integrações e Playwright. Scans de filesystem são **EPERM-safe** (viram warning, nunca crash). **Rode primeiro.**
 
