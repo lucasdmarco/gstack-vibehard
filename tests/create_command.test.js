@@ -115,6 +115,25 @@ test("create scaffolds with 5-phase DAG boot (Casdoor, Atomic, Daemons, Omniharn
   }
 })
 
+test("create --full reporta STATUS honesto por componente (phases: casdoor/atomic/ecc/agentmemory; sem 'daemons configured' falso)", async () => {
+  const tmp = await mkdtemp(path.join(tmpdir(), "gstack-status-"))
+  try {
+    const cwd = path.join(tmp, "ws"); await mkdir(cwd, { recursive: true })
+    process.env.GSTACK_SKIP_PREFLIGHT = "1"; process.env.GSTACK_SKIP_SIDE_EFFECTS = "1"
+    const { createProject } = await import(`${pathToFileURL(modulePath)}?t=${Date.now()}`)
+    const r = await createProject({ args: ["full-status", "--full"], cwd, projectRoot: repoRoot, now: () => "x",
+      logger: { info: () => {}, success: () => {}, warn: () => {}, error: () => {} }, execSync: () => Buffer.from("ok") })
+    const ok = (s) => ["online", "installed", "degraded", "skipped"].includes(s)
+    assert.ok(ok(r.phases.casdoor.status), "casdoor com status real")
+    assert.ok(r.phases.ecc && ok(r.phases.ecc.status), "ECC com status real (não 'configured' falso)")
+    assert.ok(r.phases.agentmemory && ok(r.phases.agentmemory.status), "AgentMemory com status real")
+    assert.equal(r.phases.daemons, undefined, "removido o phantom 'daemons: configured'")
+  } finally {
+    delete process.env.GSTACK_SKIP_PREFLIGHT; delete process.env.GSTACK_SKIP_SIDE_EFFECTS
+    await rm(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
+  }
+})
+
 test("create DEFAULT é LITE: só ./app, sem Casdoor/Atomic, app.json mode=lite", async () => {
   const tmp = await mkdtemp(path.join(tmpdir(), "gstack-lite-"))
   try {

@@ -208,10 +208,11 @@ function writeCasdoorProjectConfig(projectDir) {
 //  PHASE 2: Parallelism (Atomic VCS)
 // ─────────────────────────────────────────────────────────────
 
+// Retorna o STATUS honesto do componente: "installed" | "degraded" | "skipped".
 function initAtomic(logger, projectDir, opts = {}) {
   if (process.env.GSTACK_SKIP_PREFLIGHT) {
     logger.info("GSTACK_SKIP_PREFLIGHT set — skipping Atomic init")
-    return
+    return "skipped"
   }
   if (!findBinary("atomic")) {
     // Atomic VCS real = github.com/atomicdotdev/atomic (Rust), instalado via cargo
@@ -219,7 +220,7 @@ function initAtomic(logger, projectDir, opts = {}) {
     // antigo estava MORTO (não resolvia) — era download fantasma.
     if (!findBinary("cargo")) {
       logger.warn("Atomic VCS nao instalado — requer Rust/cargo (instale o stack completo ou rustup).")
-      return
+      return "degraded"
     }
     logger.info("Atomic VCS nao encontrado — instalando via cargo de github.com/atomicdotdev/atomic (compila Rust, pode levar minutos)...")
     const cloneDir = join(tmpdir(), `atomic-build-${Date.now()}`)
@@ -231,16 +232,17 @@ function initAtomic(logger, projectDir, opts = {}) {
     if (!findBinary("atomic")) {
       logger.warn("Atomic VCS nao pode ser instalado/compilado — continuando sem VCS atomico (Git permanece).")
       logger.warn("  Manual: git clone https://github.com/atomicdotdev/atomic && cargo install --path atomic/atomic-cli")
-      return
+      return "degraded"
     }
     logger.success("Atomic VCS instalado (cargo: atomicdotdev/atomic)")
   }
   const out = safeExec("atomic", ["init"], { cwd: projectDir })
   if (out) {
     logger.success("Atomic VCS inicializado — views paralelas disponiveis")
-  } else {
-    logger.warn("atomic init falhou — continuando sem VCS atomico")
+    return "installed"
   }
+  logger.warn("atomic init falhou — continuando sem VCS atomico")
+  return "degraded"
 }
 
 function writeAtomicConfig(projectDir) {
@@ -295,10 +297,11 @@ default_expose = [".env", ".claude/", ".gstack/", ".agent/"]
 //  PHASE 3: Daemons & Memory (ECC 2.0 + AgentMemory + Graphify)
 // ─────────────────────────────────────────────────────────────
 
+// Retorna o STATUS honesto: "installed" | "degraded" | "skipped".
 function bootEcc2(logger, projectDir) {
   if (process.env.GSTACK_SKIP_PREFLIGHT) {
     logger.info("GSTACK_SKIP_PREFLIGHT set — skipping ECC")
-    return
+    return "skipped"
   }
   // ECC real = pacote npm `ecc-universal` (otimizador de performance de harness:
   // agents/skills/hooks/AgentShield; binário `ecc`). NÃO é o daemon Rust `ecc2`
@@ -306,7 +309,7 @@ function bootEcc2(logger, projectDir) {
   // ecc2 (404) e compilava via cargo — dependência fantasma que travava o create.
   if (findBinary("ecc")) {
     logger.success("ECC: já instalado (ecc-universal)")
-    return
+    return "installed"
   }
   const { file, argv } = npmArgv(["install", "-g", "ecc-universal"])
   const out = safeExec(file, argv, { timeout: 180000 })
@@ -316,11 +319,13 @@ function bootEcc2(logger, projectDir) {
   // `npx ecc-agentshield scan` (prompt-injection), `npx ecc-install --profile <p>`.
   if (out !== null && findBinary("ecc")) {
     logger.success("ECC instalado (ecc-universal) — biblioteca on-demand (`ecc`, `npx ecc-agentshield scan`)")
+    return "installed"
   } else if (out !== null) {
     logger.success("ECC instalado (ecc-universal)")
-  } else {
-    logger.warn("ECC (ecc-universal) nao instalado — opcional. `npm i -g ecc-universal` p/ ativar.")
+    return "installed"
   }
+  logger.warn("ECC (ecc-universal) nao instalado — opcional. `npm i -g ecc-universal` p/ ativar.")
+  return "degraded"
 }
 
 function writeControlPlaneConfig(projectDir, projectName) {
@@ -347,11 +352,16 @@ observability:
 `)
 }
 
+// Retorna o STATUS honesto: "installed" | "degraded".
 function bootAgentMemory(logger, projectDir) {
   const { file, argv } = npxArgv(["--yes", "@agentmemory/agentmemory", "federate", "--enable"])
   const out = safeExec(file, argv, { cwd: projectDir })
-  if (out) logger.success("AgentMemory Mesh Federation ativa (BM25 + Vetor + Grafo)")
-  else logger.warn("AgentMemory Federation nao pode ser ativada — continuando sem P2P mesh")
+  if (out) {
+    logger.success("AgentMemory Mesh Federation ativa (BM25 + Vetor + Grafo)")
+    return "installed"
+  }
+  logger.warn("AgentMemory Federation nao pode ser ativada — continuando sem P2P mesh")
+  return "degraded"
 }
 
 function writeMemoryFederationConfig(projectDir) {
@@ -1385,21 +1395,20 @@ export async function createProject(options = {}) {
     console.log(`\n  === Fase 1/5: IAM Local (Casdoor) ===`)
     mkdirSync(projectDir, { recursive: true })
     const casdoorUrl = startCasdoor(logger, projectDir)
-    phases.casdoor = { status: casdoorUrl ? "online" : "offline", url: casdoorUrl }
+    // STATUS honesto: online se subiu; degraded se Docker/Casdoor não disponíveis.
+    phases.casdoor = { status: casdoorUrl ? "online" : "degraded", url: casdoorUrl }
 
     console.log(`\n  === Fase 2/5: Atomic VCS ===`)
     writeAtomicConfig(projectDir)
-    initAtomic(logger, projectDir, { allowRemote: args.includes("--allow-remote-downloads") })
-    phases.atomic = { status: "configured" }
+    phases.atomic = { status: initAtomic(logger, projectDir, { allowRemote: args.includes("--allow-remote-downloads") }) }
   }
 
   if (!isLite) {
     console.log(`\n  === Fase 3/5: Daemons & Memoria ===`)
-    bootEcc2(logger, projectDir)
+    phases.ecc = { status: bootEcc2(logger, projectDir) }
     writeControlPlaneConfig(projectDir, projectName)
-    bootAgentMemory(logger, projectDir)
+    phases.agentmemory = { status: bootAgentMemory(logger, projectDir) }
     writeMemoryFederationConfig(projectDir)
-    phases.daemons = { status: "configured" }
   }
 
   // Em lite, o VCS é o git (app.json `vcs: "git"`): garante o diretório (ainda não
@@ -1506,6 +1515,24 @@ export async function createProject(options = {}) {
   logger.success(`Projeto '${projectName}' criado (template: ${templateName})`)
   logger.info(`  Diretorio: ${projectDir}`)
   logger.info(`  Template: ${templateName}`)
+  // STATUS HONESTO por componente do Full (installed/online vs degraded). Nada de
+  // "✓ configurado" falso: se a máquina não tinha Docker/Rust, aparece degraded.
+  if (!isLite) {
+    logger.info("  Componentes do Full (status real nesta maquina):")
+    const comps = [
+      ["Casdoor IAM", phases.casdoor?.status],
+      ["Atomic VCS", phases.atomic?.status],
+      ["ECC (otimizador)", phases.ecc?.status],
+      ["AgentMemory mesh", phases.agentmemory?.status],
+    ]
+    for (const [name, st] of comps) {
+      const icon = (st === "online" || st === "installed") ? "✓" : st === "degraded" ? "⚠" : "–"
+      logger.info(`    ${icon} ${name}: ${st || "n/a"}`)
+    }
+    if (comps.some(([, s]) => s === "degraded")) {
+      logger.info("    (⚠ degraded = nao instalado nesta maquina; veja os avisos acima p/ o reparo — Git/projeto seguem funcionais)")
+    }
+  }
   if (!isLite) logger.info(`  IAM: http://localhost:8000 (admin/123)`)
   if (vaultProjectDir) logger.info(`  Vault: ${vaultProjectDir}`)
   else logger.info(`  Modo lite: projeto isolado em ./${projectName} (sem escrita global). Use --full ou --vault para o vault Obsidian.`)
