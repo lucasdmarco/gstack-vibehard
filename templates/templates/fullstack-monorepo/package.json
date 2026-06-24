@@ -25,7 +25,7 @@
     "coverage:gaps": "fallow coverage setup --yes --json",
     "setup:repo": "powershell -File scripts/setup-repo.ps1",
     "format": "prettier --write .",
-    "postinstall": "fallow coverage setup --yes --json || true"
+    "postinstall": "node scripts/postinstall-fallow.mjs"
   },
   "devDependencies": {
     "turbo": "^2.4.0",
