@@ -1,5 +1,15 @@
 # Changelog - gstack-vibehard
 
+## [3.2.0] - 2026-06-23
+
+### 🧭 Alinhamento do ECC e do Atomic VCS à realidade (fim do "ecosystem drift")
+A auditoria das fontes provou que dois componentes do modo completo estavam apontando para **vaporware** (repos/domínios que não existem). Fontes reais (passadas pelo dono) integradas:
+- **[fix] ECC** — o `bootEcc2` (`create.js`) clonava `github.com/gstack-dev/ecc2` (**404**) e compilava um daemon Rust via cargo — dependência fantasma que travava o `create --full`. O ECC real é o pacote npm **`ecc-universal@2.0.0`** (otimizador de performance de harness: agents/skills/hooks/AgentShield; binário `ecc`); o daemon `ecc2` é só protótipo alfa in-tree. Agora instala via `npm i -g ecc-universal` (pula se `ecc` já existe); perfil completo opcional via `npx ecc-install --profile full`.
+- **[fix] Atomic VCS** — o `initAtomic` baixava de `atomic-vcs.dev` (**domínio morto, não resolve**). Fonte real: **`github.com/atomicdotdev/atomic`** (Rust) → `git clone` + `cargo install --path atomic-cli` (usa o Rust que o gstack já instala). Removido `atomic-vcs.dev` da allowlist de downloads.
+- **[fix] `monitor`** não depende mais de `ecc2 daemon status` (binário fantasma) p/ o orçamento de tokens — usa `GSTACK_TOKEN_BUDGET`/default, sem chamar daemon inexistente.
+- **Coerência:** `app.json` `controlPlane` vira `ecc-universal`; AGENTS.md e o script de dev deixam de prometer "ECC 2.0 Daemon (dashboard/sessions)" → "Harness Optimizer: ECC". **Lite intocado.**
+- **+2 testes de guarda** (ECC=ecc-universal sem gstack-dev/ecc2; Atomic=atomicdotdev/atomic sem atomic-vcs.dev). 290 Node + 58 Python verdes; lint/syntaxcheck limpos.
+
 ## [3.1.5] - 2026-06-23
 
 ### graphify instala global (token-saver) + fim do pacote fantasma cli-anything-hub

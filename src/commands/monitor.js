@@ -78,14 +78,11 @@ function getQGBlockedCount() {
 }
 
 function getTokenBudget() {
-  try {
-    const result = execFileSync("ecc2", ["daemon", "status"], { stdio: "pipe", timeout: 3000, encoding: "utf-8" })
-    const match = result.match(/tokens[:\s]+(\d+)/i)
-    if (match) return parseInt(match[1], 10)
-    return 128000
-  } catch {
-    return 128000
-  }
+  // Orçamento de contexto. NÃO depende mais de `ecc2 daemon status` (o daemon `ecc2`
+  // é só protótipo alfa; o ECC real é o pacote `ecc-universal`). Lê do env se
+  // configurado, senão usa o default — sem chamar binário fantasma.
+  const fromEnv = parseInt(process.env.GSTACK_TOKEN_BUDGET || "", 10)
+  return Number.isFinite(fromEnv) && fromEnv > 0 ? fromEnv : 128000
 }
 
 function getHarnessStatus() {
@@ -156,7 +153,7 @@ function render() {
   // Token Budget
   console.log(color("\n── Token Budget ──", C.bold))
   const budgetColor = tokenBudget > 100000 ? C.green : tokenBudget > 50000 ? C.yellow : C.red
-  console.log(`  ${color(tokenBudget.toLocaleString(), budgetColor)} tokens restantes (ECC 2.0)`)
+  console.log(`  ${color(tokenBudget.toLocaleString(), budgetColor)} tokens (orçamento de contexto)`)
 
   // Quality Gate
   console.log(color("\n── Quality Gate ──", C.bold))

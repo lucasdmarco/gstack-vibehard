@@ -86,7 +86,7 @@ test("create scaffolds with 5-phase DAG boot (Casdoor, Atomic, Daemons, Omniharn
 
     // app.json metadata
     const app = JSON.parse(await readFile(path.join(appDir, ".gstack", "app.json"), "utf8"))
-    assert.equal(app.controlPlane, "ecc2")
+    assert.equal(app.controlPlane, "ecc-universal")
     assert.equal(app.mcpGateway, "casdoor")
     assert.equal(app.meshFederation, true)
     assert.equal(app.ticketOrchestration, "paperclip")
@@ -95,7 +95,7 @@ test("create scaffolds with 5-phase DAG boot (Casdoor, Atomic, Daemons, Omniharn
     // AGENTS.md documents the stack
     const agents = await readFile(path.join(appDir, "AGENTS.md"), "utf8")
     assert.match(agents, /Casdoor/)
-    assert.match(agents, /Control Plane/)
+    assert.match(agents, /Harness Optimizer: ECC/)
     assert.match(agents, /Mesh Federation/)
     assert.match(agents, /Omniharness/)
     assert.match(agents, /auto_fixable/)

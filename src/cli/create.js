@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url"
 import { homedir, tmpdir } from "node:os"
 import { deepMerge } from "../installer/merge.js"
 import { checkRemoteDownload } from "../installer/remote-policy.js"
-import { npxArgv } from "../installer/deps.js"
+import { npxArgv, npmArgv } from "../installer/deps.js"
 import { buildIntegrationsRegistry } from "../printing-press/registry.js"
 import { buildContextRegistry, DOC_SOURCES as CONTEXT_DOC_SOURCES } from "../context-docs/registry.js"
 import { DEFAULT_LOOP_BUDGET } from "../loop-budget/policy.js"
@@ -214,20 +214,26 @@ function initAtomic(logger, projectDir, opts = {}) {
     return
   }
   if (!findBinary("atomic")) {
-    logger.warn("Atomic CLI nao encontrado.")
-    const url = process.platform === "win32"
-      ? "https://atomic-vcs.dev/install.ps1"
-      : "https://atomic-vcs.dev/install.sh"
-    const ok = safeDownloadAndRun(url, logger, "Atomic CLI", { allowRemote: opts.allowRemote })
-    if (!ok) {
-      logger.warn("Atomic CLI nao pode ser instalado — continuando sem VCS atomico")
-      logger.warn("  Instale manualmente: curl -fsSL https://atomic-vcs.dev/install.sh | sh")
+    // Atomic VCS real = github.com/atomicdotdev/atomic (Rust), instalado via cargo
+    // do código-fonte (não há pacote npm/PyPI/Homebrew). O domínio de download
+    // antigo estava MORTO (não resolvia) — era download fantasma.
+    if (!findBinary("cargo")) {
+      logger.warn("Atomic VCS nao instalado — requer Rust/cargo (instale o stack completo ou rustup).")
       return
     }
+    logger.info("Atomic VCS nao encontrado — instalando via cargo de github.com/atomicdotdev/atomic (compila Rust, pode levar minutos)...")
+    const cloneDir = join(tmpdir(), `atomic-build-${Date.now()}`)
+    const cloned = safeExec("git", ["clone", "--depth", "1", "https://github.com/atomicdotdev/atomic.git", cloneDir], { timeout: 120000 })
+    if (cloned !== null && existsSync(join(cloneDir, "atomic-cli"))) {
+      safeExec("cargo", ["install", "--path", join(cloneDir, "atomic-cli")], { timeout: 600000 })
+    }
+    try { rmSync(cloneDir, { recursive: true, force: true }) } catch { /* cleanup */ }
     if (!findBinary("atomic")) {
-      logger.warn("Atomic CLI instalado mas nao no PATH — continuando")
+      logger.warn("Atomic VCS nao pode ser instalado/compilado — continuando sem VCS atomico (Git permanece).")
+      logger.warn("  Manual: git clone https://github.com/atomicdotdev/atomic && cargo install --path atomic/atomic-cli")
       return
     }
+    logger.success("Atomic VCS instalado (cargo: atomicdotdev/atomic)")
   }
   const out = safeExec("atomic", ["init"], { cwd: projectDir })
   if (out) {
@@ -291,32 +297,27 @@ default_expose = [".env", ".claude/", ".gstack/", ".agent/"]
 
 function bootEcc2(logger, projectDir) {
   if (process.env.GSTACK_SKIP_PREFLIGHT) {
-    logger.info("GSTACK_SKIP_PREFLIGHT set — skipping ECC 2.0")
+    logger.info("GSTACK_SKIP_PREFLIGHT set — skipping ECC")
     return
   }
-  if (!findBinary("ecc2")) {
-    logger.warn("ECC 2.0 Daemon nao encontrado — tentando compilar do repositorio oficial...")
-    const cloneDir = join(tmpdir(), "ecc2-build")
-    safeExec("git", ["clone", "--depth", "1", "https://github.com/gstack-dev/ecc2.git", cloneDir], { timeout: 120000 })
-    if (existsSync(join(cloneDir, "Cargo.toml"))) {
-      logger.info("Compilando ECC 2.0 via cargo (pode levar alguns minutos)...")
-      const buildOk = safeExec("cargo", ["install", "--path", cloneDir], { timeout: 600000 })
-      try { rmSync(cloneDir, { recursive: true, force: true }) } catch {}
-      if (buildOk && findBinary("ecc2")) {
-        logger.success("ECC 2.0 Daemon compilado e instalado")
-      } else {
-        logger.warn("ECC 2.0 Daemon nao pode ser compilado — control plane desativado")
-        logger.warn("  Instale manualmente: git clone https://github.com/gstack-dev/ecc2.git && cargo install --path ecc2")
-        return
-      }
-    } else {
-      try { rmSync(cloneDir, { recursive: true, force: true }) } catch {}
-      logger.warn("Repo ECC 2.0 nao encontrado — control plane desativado")
-      return
-    }
+  // ECC real = pacote npm `ecc-universal` (otimizador de performance de harness:
+  // agents/skills/hooks/AgentShield; binário `ecc`). NÃO é o daemon Rust `ecc2`
+  // (apenas protótipo alfa in-tree). Antes o código clonava github.com/gstack-dev/
+  // ecc2 (404) e compilava via cargo — dependência fantasma que travava o create.
+  if (findBinary("ecc")) {
+    logger.success("ECC: já instalado (ecc-universal)")
+    return
   }
-  safeExec("ecc2", ["daemon", "start"], { timeout: 15000 })
-  logger.success("ECC 2.0 Daemon iniciado em background")
+  const { file, argv } = npmArgv(["install", "-g", "ecc-universal"])
+  const out = safeExec(file, argv, { timeout: 180000 })
+  if (out !== null && findBinary("ecc")) {
+    logger.success("ECC instalado (ecc-universal) — otimização cross-harness disponível (`ecc`)")
+    logger.info("  Perfil completo (skills/hooks/agents): `npx ecc-install --profile full` (opcional).")
+  } else if (out !== null) {
+    logger.success("ECC instalado (ecc-universal)")
+  } else {
+    logger.warn("ECC (ecc-universal) nao instalado — opcional. `npm i -g ecc-universal` p/ ativar.")
+  }
 }
 
 function writeControlPlaneConfig(projectDir, projectName) {
@@ -643,7 +644,7 @@ export function writeRuntimeFiles({ projectDir, projectName, now, projectRoot, t
     harnesses: OMNIHARNESS_MAP.map(h => h.id),
     vcs: isLite ? "git" : "atomic",
     sandbox: "openhands",
-    controlPlane: isLite ? null : "ecc2",
+    controlPlane: isLite ? null : "ecc-universal",
     mcpGateway: isLite ? null : "casdoor",
     meshFederation: isLite ? false : true,
     ticketOrchestration: "paperclip",
@@ -792,9 +793,6 @@ export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
 # Casdoor IAM (if running)
 docker start casdoor 2>/dev/null || true
 
-# Control Plane Daemon
-ecc2 daemon start 2>/dev/null || true
-
 echo "gstack dev: web=$WEB_PORT api=$API_PORT teams=1"
 ${devCommand}
 `
@@ -932,7 +930,7 @@ For complex multi-step tasks, use /effort ultracode to activate dynamic JS workf
 
 ## Runtime
 - Sandbox: OpenHands (headless SDK isolation)
-${isLite ? "" : "- VCS: Atomic (token-level isolation)\n- IAM: Casdoor local (Docker SQLite, localhost:8000)\n- Control Plane: ECC 2.0 Daemon (dashboard, sessions, status)\n- MCP Gateway: Casdoor (IAM local) + Headroom (compact proxy)\n- Mesh Federation: AgentMemory P2P (BM25 + Vector + Graph sync)\n"}- Ticket Orchestration: Paperclip / Symphony (Jira/Linear integration)
+${isLite ? "" : "- VCS: Atomic (token-level isolation, github.com/atomicdotdev/atomic)\n- IAM: Casdoor local (Docker SQLite, localhost:8000)\n- Harness Optimizer: ECC (ecc-universal — agents/skills/hooks/AgentShield)\n- MCP Gateway: Casdoor (IAM local) + Headroom (compact proxy)\n- Mesh Federation: AgentMemory P2P (BM25 + Vector + Graph sync)\n"}- Ticket Orchestration: Paperclip / Symphony (Jira/Linear integration)
 - Omniharness: Claude, Cursor, Codex, Windsurf, OpenCode, Gemini, Kiro, Antigravity, Zed, Hermes, Trae
 - Coverage Gaps: fallow coverage setup (hot/cold path analysis)
 - Workflows: .claude/workflows/ (ativar com /effort ultracode)
