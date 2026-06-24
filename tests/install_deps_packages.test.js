@@ -30,3 +30,12 @@ test("create instala Atomic da fonte real atomicdotdev/atomic (não do domínio 
   assert.match(createSrc, /atomicdotdev\/atomic/, "usa o repo real do Atomic")
   assert.doesNotMatch(createSrc, /atomic-vcs\.dev/, "sem o domínio morto atomic-vcs.dev")
 })
+
+test("install: MCP global é OPT-OUT no completo (--no-global-mcp), não mais opt-in", () => {
+  assert.match(installSrc, /globalMcp\s*=\s*!projectOnly\s*&&\s*!args\.includes\("--no-global-mcp"\)/, "Full escreve MCP global por padrão; opt-out --no-global-mcp")
+})
+
+test("install: Full tenta instalar o app Obsidian (winget/brew) com opt-out --no-obsidian", () => {
+  assert.match(installSrc, /Obsidian\.Obsidian/, "winget instala o app Obsidian no completo")
+  assert.match(installSrc, /--no-obsidian/, "opt-out --no-obsidian")
+})

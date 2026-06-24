@@ -306,6 +306,25 @@ async function installDeps(warn, success, info, report, harnessIds, allowRemote 
   }, report)
 }
 
+// Full = tudo: tenta instalar o app Obsidian (winget no Windows / brew no mac).
+// Retorna true se o comando rodou sem erro; false (degraded) se não houver
+// gerenciador/permissão. NÃO bloqueia — o vault markdown funciona sem o app.
+function tryInstallObsidianApp(report) {
+  try {
+    if (isWindows()) {
+      execFileSync("winget", ["install", "-e", "--id", "Obsidian.Obsidian", "--silent", "--accept-source-agreements", "--accept-package-agreements"], { stdio: "pipe", timeout: 240000 })
+    } else if (isMacOS()) {
+      execFileSync("brew", ["install", "--cask", "obsidian"], { stdio: "pipe", timeout: 240000 })
+    } else {
+      return false
+    }
+    report.added.push("Obsidian app (instalado)")
+    return true
+  } catch {
+    return false
+  }
+}
+
 function setupObsidianVault(report) {
   const vaultDir = join(HOME, "gstack-vault")
   for (const sub of ["", "projects", "chats", "agents", "graph", ".obsidian"]) {
@@ -421,8 +440,10 @@ export async function install(args = []) {
   // Política remota (P0.6): instaladores remotos (Bun/uv/Rust) só rodam com opt-in.
   const allowRemote = args.includes("--allow-remote-downloads")
   const globalConfirmed = args.includes("--global") || yes
-  // MCP global é OPT-IN (AC8): só escreve com --global-mcp (ou --global). project-only nunca.
-  const globalMcp = !projectOnly && (args.includes("--global-mcp") || args.includes("--global"))
+  // MCP global no MODO COMPLETO (PRD 11: "Full = tudo"): escreve por padrão; opt-out
+  // com `--no-global-mcp`. project-only/lite NUNCA escreve. (Antes era opt-in via
+  // --global-mcp; mantido como sinônimo explícito.)
+  const globalMcp = !projectOnly && !args.includes("--no-global-mcp")
   // --mcp-server <name> (repetível ou CSV): com --global-mcp, escreve só os escolhidos.
   const mcpServers = (() => {
     const out = []
@@ -509,8 +530,8 @@ export async function install(args = []) {
     } else {
       if (!skipDeps) info("  • MCP global: Headroom configura `~/.mcp.json` (parte do completo)")
       info(globalMcp
-        ? "  • MCP servers do gstack (gateway): SERÃO escritos (--global-mcp)"
-        : "  • MCP servers do gstack (gateway): só com --global-mcp")
+        ? "  • MCP servers do gstack (gateway): SERÃO escritos em `~/.mcp.json` (modo completo; `--no-global-mcp` p/ pular)"
+        : "  • MCP servers do gstack (gateway): NÃO serão escritos (project-only)")
     }
     info("")
     info("Detalhe completo sem instalar: `gstack_vibehard install --audit-only`.")
@@ -759,7 +780,14 @@ export async function install(args = []) {
   // indexar no Document Graph. Detecção lê só obsidian.json; NUNCA indexa aqui.
   section("obsidian/ — Document Graph (escolha do vault)")
   if (!obsidianDetected()) {
-    info("Obsidian nao detectado — pulado (configure depois com `context obsidian set`).")
+    // Full = tudo (PRD 11): tenta instalar o APP Obsidian (winget/brew). Honesto:
+    // degraded se não der (sem winget/admin/cask). O VAULT já existe (markdown) e
+    // abre em qualquer editor — o app é só o visualizador. Opt-out: --no-obsidian.
+    if (!projectOnly && !args.includes("--no-obsidian") && tryInstallObsidianApp(report)) {
+      success("Obsidian app instalado (vault em ~/gstack-vault).")
+    } else {
+      info("Obsidian app: nao instalado nesta maquina (degraded/opcional — o vault e markdown). Manual: `winget install Obsidian.Obsidian` / `brew install --cask obsidian`.")
+    }
   } else if (getGlobalObsidianDefault()) {
     info(`Obsidian ja configurado (default global): ${getGlobalObsidianDefault()}`)
   } else if (!process.stdin.isTTY) {
