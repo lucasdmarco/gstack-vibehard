@@ -1,5 +1,13 @@
 # Changelog - gstack-vibehard
 
+## [3.3.0] - 2026-06-23
+
+### Status honesto por componente no `create --full` (sem ✓ falso)
+PRD 11 Fase 3 (parte 1): o Full deixa de dizer "✓ configurado" para componentes que **não instalaram** na máquina.
+- **`bootEcc2`/`initAtomic`/`bootAgentMemory` retornam status real** (`installed | degraded | skipped`) em vez de void; `startCasdoor` vira `online | degraded`. O `create --full` imprime um resumo **"Componentes do Full (status real nesta máquina)"** com ✓/⚠ por item — se faltou Docker (Casdoor) ou Rust (Atomic), aparece **`degraded`** com o reparo, não um check falso. Removido o phantom `phases.daemons: "configured"`.
+- **Honestidade:** Git e o projeto seguem funcionais mesmo com componentes degraded; o Full não mente que subiu tudo.
+- **+1 teste** (phases com status real; sem "daemons configured" falso). 294 Node + 58 Python verdes; lint/syntaxcheck limpos.
+
 ## [3.2.1] - 2026-06-23
 
 ### ECC como biblioteca on-demand (decisão b+c) + AgentShield no `verify`
