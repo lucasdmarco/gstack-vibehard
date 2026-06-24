@@ -1,5 +1,12 @@
 # Changelog - gstack-vibehard
 
+## [3.1.5] - 2026-06-23
+
+### graphify instala global (token-saver) + fim do pacote fantasma cli-anything-hub
+- **[fix] graphify agora INSTALA de verdade, global** (`install.js`): o pacote PyPI é **`graphifyy`** (dois "y"; o CLI continua `graphify`) — por isso `uv tool install graphify` dava **E404**. Agora `uv tool install graphifyy` instala o indexador AST por commit pra **qualquer projeto** (economiza muito token: a IA lê a topologia do código sem gastar contexto). Pula se já presente; honesto se uv faltar. Fonte: `github.com/safishamsi/graphify`.
+- **[fix] removido o pacote fantasma `cli-anything-hub`** — `npm install -g cli-anything-hub` dava **E404** porque o pacote **nunca existiu**. O recurso real é o **Printing Press** (gerador de CLIs em Go), que o gstack já integra via `gstack_vibehard tools` (catálogo `@mvanhorn/printing-press-library` → compila `cli-printing-press` sob demanda). Sem mais 404 no install; o install aponta o caminho real.
+- **+2 testes** (guarda de regressão dos nomes: `graphifyy` ✓, sem `cli-anything-hub`). 288 Node + 58 Python verdes; lint/syntaxcheck limpos.
+
 ## [3.1.4] - 2026-06-23
 
 ### Robustez/honestidade do install no Windows (PRD 11 — Fase 1)

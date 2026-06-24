@@ -38,3 +38,6 @@ coverage/
 !templates/**/.vscode/**
 !templates/**/.docs/
 !templates/**/.docs/**
+
+# pnpm não é usado neste repo (npm-based) — evita cruft de testes
+pnpm-lock.yaml
