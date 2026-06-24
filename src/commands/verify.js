@@ -1,8 +1,28 @@
-import { mkdirSync, writeFileSync } from "fs"
+import { mkdirSync, writeFileSync, existsSync } from "fs"
 import { join } from "path"
 import { randomUUID } from "crypto"
+import { execFileSync } from "child_process"
 import { runVerify } from "../project-plan/verify-runner.js"
+import { npxArgv } from "../installer/deps.js"
 import { success, warn, error, info, section } from "../cli/index.js"
+
+/**
+ * ECC AgentShield (opt-in via `--agentshield` ou GSTACK_AGENTSHIELD=1): consome o
+ * ECC como BIBLIOTECA — roda `npx ecc-agentshield scan` nos arquivos de regra do
+ * projeto (CLAUDE.md/AGENTS.md). ADVISORY e não-bloqueante; pula gracioso se
+ * indisponível (não vira dependência dura do gate). `exec` injetável p/ teste.
+ */
+function runAgentShield(cwd, exec) {
+  const target = ["CLAUDE.md", "AGENTS.md"].find((f) => existsSync(join(cwd, f)))
+  if (!target) return { status: "skipped", detail: "sem CLAUDE.md/AGENTS.md p/ escanear" }
+  try {
+    const { file, argv } = npxArgv(["-y", "ecc-agentshield", "scan", target])
+    const out = String((exec || execFileSync)(file, argv, { cwd, stdio: "pipe", encoding: "utf-8", timeout: 120000 }) || "")
+    return { status: "advisory", detail: `scan em ${target}`, output: out.slice(0, 400) }
+  } catch (e) {
+    return { status: "unavailable", detail: `indisponível (${String(e.message || "").slice(0, 50)}) — opcional` }
+  }
+}
 
 /**
  * `verify` — roda os delivery gates do projeto e salva o relatório.
@@ -20,6 +40,11 @@ export async function verifyCommand(args = [], opts = {}) {
   const harness = hi !== -1 && args[hi + 1] ? args[hi + 1] : opts.harness
 
   const report = runVerify({ cwd, profile, harness, exec: opts.exec, home: opts.home })
+
+  // ECC AgentShield (opt-in): camada de segurança de prompt-injection, advisory.
+  if (args.includes("--agentshield") || process.env.GSTACK_AGENTSHIELD === "1") {
+    report.agentShield = runAgentShield(cwd, opts.exec)
+  }
 
   // Persiste em .gstack/runs/<runId>/verify.json
   const runId = opts.runId || randomUUID().slice(0, 8)
@@ -42,6 +67,11 @@ export async function verifyCommand(args = [], opts = {}) {
       : s.status === "advisory" ? "•" : s.status === "cache_hit" ? "⚡" : "–"
     const note = s.detail ? ` (${s.detail})` : ""
     info(`  ${icon} ${s.id}: ${s.status}${note}`)
+  }
+  if (report.agentShield) {
+    const a = report.agentShield
+    const icon = a.status === "advisory" ? "•" : a.status === "unavailable" ? "⚠" : "–"
+    info(`  ${icon} agentshield (ECC): ${a.status}${a.detail ? ` — ${a.detail}` : ""}`)
   }
   if (report.reducedTrust) warn(`Confiança REDUZIDA: harness '${report.harness}' não tem controle real (best-effort).`)
   info(`  Relatório: .gstack/runs/${runId}/verify.json`)

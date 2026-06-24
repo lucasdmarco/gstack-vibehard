@@ -1,5 +1,13 @@
 # Changelog - gstack-vibehard
 
+## [3.2.1] - 2026-06-23
+
+### ECC como biblioteca on-demand (decisão b+c) + AgentShield no `verify`
+Decisão de produto: o gstack é **dono** do seu namespace (skills/hooks/agentes em `gstack-vibehard/`) e consome o ECC como **biblioteca on-demand** — **sem** injetar o perfil do ECC (evita clobber das 261 skills do ECC sobre as do gstack).
+- **`create --full`** reenquadra a mensagem do ECC: instala o pacote `ecc-universal` (binário `ecc`) e **não** roda `ecc-install --profile full` automático; surfaça as capacidades on-demand (`ecc`, `npx ecc-agentshield scan`). Confirmado que `ecc-universal@2.0.0` expõe os bins `ecc`/`ecc-install`/`ecc-control-pane` e que `ecc-agentshield@1.4.0` é pacote npm real.
+- **Novo `verify --agentshield`** (ou `GSTACK_AGENTSHIELD=1`): roda o **ECC AgentShield** (scan de prompt-injection) no `CLAUDE.md`/`AGENTS.md` como camada **advisory e não-bloqueante** — gstack consumindo o ECC como biblioteca, com skip gracioso se indisponível (não vira dependência dura do gate).
+- **+3 testes** (AgentShield advisory / falha-não-bloqueia / opt-in). 293 Node + 58 Python verdes; lint/syntaxcheck limpos.
+
 ## [3.2.0] - 2026-06-23
 
 ### 🧭 Alinhamento do ECC e do Atomic VCS à realidade (fim do "ecosystem drift")
