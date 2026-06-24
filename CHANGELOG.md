@@ -1,5 +1,12 @@
 # Changelog - gstack-vibehard
 
+## [3.3.1] - 2026-06-23
+
+### MCP global + app Obsidian no modo completo (PRD 11 Fase 3 parte 2 — "Full = tudo")
+- **[P0] MCP global agora é escrito no completo** (`install.js`): antes era opt-in (`--global-mcp`); agora o `install --yes` escreve os MCP servers do gstack em `~/.mcp.json` por padrão (alinha o preflight, que já declarava o Headroom escrevendo lá). **Opt-out: `--no-global-mcp`.** `project-only`/lite **nunca** escrevem.
+- **App Obsidian no completo:** quando não detectado, o Full **tenta instalar o app** (`winget install Obsidian.Obsidian` no Windows / `brew install --cask obsidian` no mac) — reportado honesto, **degraded** se não houver winget/admin/cask (o vault em `~/gstack-vault` é markdown e abre em qualquer editor). **Opt-out: `--no-obsidian`.**
+- **+2 testes de guarda** (MCP opt-out; Obsidian winget + opt-out). 296 Node + 58 Python verdes; lint/syntaxcheck limpos.
+
 ## [3.3.0] - 2026-06-23
 
 ### Status honesto por componente no `create --full` (sem ✓ falso)
