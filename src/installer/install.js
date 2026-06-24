@@ -145,13 +145,28 @@ async function installDeps(warn, success, info, report, harnessIds, allowRemote 
     }
   }
 
-  // graphify NÃO é pacote PyPI — `uv tool install graphify` sempre falha ("no
-  // versions of graphify"). Se o binário já existe (instalado via setup-graphify),
-  // pula; senão, mensagem honesta (opcional) — sem o erro de resolução confuso.
+  // graphify — indexação AST por commit (economiza MUITO token: a IA lê a topologia
+  // do código sem gastar contexto). O pacote PyPI é `graphifyy` (DOIS "y"; o CLI
+  // continua `graphify`) — por isso `uv tool install graphify` dava E404. Instala
+  // GLOBAL via uv tool (ambiente isolado) p/ qualquer projeto. Pula se já existe.
   if (findWorkingBinary(["graphify"])) {
     success("graphify: já instalado")
+  } else if (uvBin) {
+    try {
+      execFileSync(uvBin, ["tool", "install", "graphifyy"], { stdio: "pipe", timeout: 180000 })
+      refreshPath()
+      if (findWorkingBinary(["graphify"])) {
+        success("graphify instalado (uv tool: graphifyy) — AST global p/ qualquer projeto")
+      } else {
+        success("graphify instalado (graphifyy)")
+        info("  Se `graphify` não aparecer, reinicie o terminal (bin do uv tool no PATH).")
+      }
+      report.added.push("graphify (graphifyy — indexação AST)")
+    } catch (e) {
+      warn(`graphify (uv tool graphifyy): ${e.message}`)
+    }
   } else {
-    info("graphify: não instalado — opcional (indexação AST por commit). Instale separadamente se quiser ativar.")
+    info("graphify: pulado (uv não disponível) — `uv tool install graphifyy` ativa a indexação AST global.")
   }
 
   // ========================================
@@ -266,15 +281,17 @@ async function installDeps(warn, success, info, report, harnessIds, allowRemote 
   }
 
   // ========================================
-  // CLI-Anything Hub (dynamic CLI download for agents)
+  // Printing Press — gerador de CLIs para agentes
   // ========================================
-  try {
-    // npm cross-platform: no Windows `npm` sem `.cmd` dá ENOENT no execFileSync.
-    const { file, argv } = npmArgv(["install", "-g", "cli-anything-hub"])
-    execFileSync(file, argv, { stdio: "pipe", timeout: 120000 })
-    success("cli-anything-hub (npm global)")
-  } catch (e) {
-    warn(`cli-anything-hub (npm global): ${e.message}`)
+  // NÃO existe pacote `cli-anything-hub` no npm (era nome fantasma → E404). O
+  // recurso real é o Printing Press: catálogo via `@mvanhorn/printing-press-library`
+  // (npm) que compila o gerador Go (`cli-printing-press`) SOB DEMANDA. Integrado no
+  // comando `gstack_vibehard tools` (instala só quando o usuário pede — evita
+  // forçar ~150MB de Go em todo install). Aqui só sinalizamos, sem 404.
+  if (findWorkingBinary(["cli-printing-press"]) || findWorkingBinary(["printing-press"])) {
+    success("Printing Press (gerador de CLIs): já instalado")
+  } else {
+    info("Printing Press (gerador de CLIs): disponível via `gstack_vibehard tools` (instala sob demanda, compila via Go).")
   }
 
   // ========================================
