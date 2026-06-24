@@ -485,7 +485,16 @@ export async function install(args = []) {
     const impact = buildInstallImpact({ home: HOME, harnessIds: allHarnessIds, withDeps: !skipDeps, withMcp: globalMcp, projectOnly })
     section("Impacto desta instalação (preflight)")
     for (const c of impact) info(`  • ${c.label}${c.optional ? " (opcional)" : ""}: ${c.items.length} item(ns)`)
-    if (!globalMcp && !projectOnly) info("  • MCP global: NÃO será escrito (opt-in: use --global-mcp)")
+    // MCP global — preflight HONESTO (corrige a contradição: o preflight dizia "NÃO
+    // será escrito" enquanto o Headroom configura ~/.mcp.json no modo completo).
+    if (projectOnly) {
+      info("  • MCP global: NÃO será escrito (project-only)")
+    } else {
+      if (!skipDeps) info("  • MCP global: Headroom configura `~/.mcp.json` (parte do completo)")
+      info(globalMcp
+        ? "  • MCP servers do gstack (gateway): SERÃO escritos (--global-mcp)"
+        : "  • MCP servers do gstack (gateway): só com --global-mcp")
+    }
     info("")
     info("Detalhe completo sem instalar: `gstack_vibehard install --audit-only`.")
     if (!globalConfirmed) {
@@ -547,8 +556,10 @@ export async function install(args = []) {
 
   // Single prompt or non-interactive fallback
   let selectedHarnessIds
-  if (!process.stdin.isTTY) {
-    info("Modo nao-interativo: instalando em todos os harnesses detectados")
+  if (yes || !process.stdin.isTTY) {
+    // --yes (modo completo) NÃO pergunta: instala em todos os detectados.
+    // Para um subconjunto, use --harness <id>. (Antes o prompt aparecia mesmo com --yes.)
+    info(yes ? "Modo --yes: instalando em todos os harnesses detectados (use --harness <id> p/ subconjunto)" : "Modo nao-interativo: instalando em todos os harnesses detectados")
     selectedHarnessIds = availableHarnessIds
   } else {
     const harnessOptions = [

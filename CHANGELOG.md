@@ -1,5 +1,13 @@
 # Changelog - gstack-vibehard
 
+## [3.1.4] - 2026-06-23
+
+### Robustez/honestidade do install no Windows (PRD 11 — Fase 1)
+- **[P0] template `postinstall` quebrava o `pnpm install` no Windows** — era `fallow coverage setup … || true`, mas `|| true` é shell Unix (o `true` não existe no `cmd.exe`) → `ELIFECYCLE exit 1`. Agora é `node scripts/postinstall-fallow.mjs` (cross-platform): roda o fallow **se existir** e **sempre sai com exit 0** (opcional, nunca falha o install do projeto).
+- **[P1] `install --yes` não pergunta mais o harness** — antes, num PowerShell interativo o prompt "Instalar em quais harnesses?" aparecia mesmo com `--yes`. Agora `--yes` (modo completo) seleciona **todos os detectados** sem prompt; para subconjunto, `--harness <id>`.
+- **[P0] preflight de MCP coerente** — o preflight dizia "MCP global: NÃO será escrito" enquanto o Headroom configura `~/.mcp.json`. Agora é honesto: no completo declara **"Headroom configura `~/.mcp.json`"** + estado dos MCP servers do gateway (`--global-mcp`); em `project-only`, nada.
+- **+2 testes** (postinstall: referenciado sem `|| true` e sempre exit 0). 286 Node + 58 Python verdes; lint/syntaxcheck limpos; heavy smoke (pnpm install + turbo build) OK.
+
 ## [3.1.3] - 2026-06-23
 
 ### 🪟 `refreshPath` quebrava o `cmd.exe` no meio do install (root cause do ENOENT)
