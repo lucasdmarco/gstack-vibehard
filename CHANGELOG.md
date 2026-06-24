@@ -1,5 +1,12 @@
 # Changelog - gstack-vibehard
 
+## [3.3.2] - 2026-06-23
+
+### Output legível no PowerShell legado (fim do mojibake) — PRD 11 Fase 4 (P2)
+- **No Windows TTY, o gstack troca a codepage do console para UTF-8 (`chcp 65001`) no startup** — conserta de uma vez TODO o output (banner `╔══╗`, `✓`, `—`, …) que aparecia como mojibake (`ÔòöÔòÉ`, `Ô£ô`) no Windows PowerShell 5.1. Só em TTY, ignora erros, pula terminais que já são UTF-8 (Windows Terminal/VSCode).
+- **Fallback ASCII:** se a codepage não puder ser trocada (ou via `--ascii`/`GSTACK_ASCII=1`), o banner usa moldura ASCII (`+---+`/`|`/`-`) em vez de box-drawing — sem depender de UTF-8.
+- **+1 teste** (banner ASCII sem box-drawing). 297 Node + 58 Python verdes; lint/syntaxcheck limpos.
+
 ## [3.3.1] - 2026-06-23
 
 ### MCP global + app Obsidian no modo completo (PRD 11 Fase 3 parte 2 — "Full = tudo")
