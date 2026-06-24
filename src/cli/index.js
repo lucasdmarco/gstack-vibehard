@@ -112,7 +112,7 @@ const COMMANDS = [
   { name: "enable", group: "common", desc: "Ativar o gstack neste projeto (novo já vem ativo)", usage: "gstack_vibehard enable" },
   { name: "disable", group: "common", desc: "Desativar neste projeto (preserva dados)", usage: "gstack_vibehard disable" },
   { name: "doctor", group: "common", desc: "Diagnosticar ambiente", usage: "gstack_vibehard doctor [--json [--strict]] [--impact] [--install-integrity] [--repair-manifest [--yes]]" },
-  { name: "verify", group: "common", desc: "Delivery gates por arquétipo", usage: "gstack_vibehard verify [--quick] [--profile full|release] [--json]" },
+  { name: "verify", group: "common", desc: "Delivery gates por arquétipo", usage: "gstack_vibehard verify [--quick] [--profile full|release] [--agentshield] [--json]" },
   { name: "install", group: "common", desc: "Instalar no ambiente (preflight-first; pede confirmação)", usage: "gstack_vibehard install [--audit-only [--save-report]] [--project-only] [--harness <id>] [--global-mcp [--mcp-server <name>]] [--yes]" },
   { name: "uninstall", group: "common", desc: "Remover (rollback via manifest)", usage: "gstack_vibehard uninstall [--dry-run] [--restore-only] [--resolve-drift] [--legacy-name-cleanup]" },
   { name: "update", group: "common", desc: "Checar/atualizar para a última versão (npm)", usage: "gstack_vibehard update [--run] [--json]" },

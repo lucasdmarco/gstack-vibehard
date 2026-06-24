@@ -310,9 +310,12 @@ function bootEcc2(logger, projectDir) {
   }
   const { file, argv } = npmArgv(["install", "-g", "ecc-universal"])
   const out = safeExec(file, argv, { timeout: 180000 })
+  // gstack consome o ECC como BIBLIOTECA on-demand (decisão b+c): mantém seu
+  // próprio namespace de skills/hooks/agentes e NÃO injeta o perfil do ECC (evita
+  // clobber). As capacidades do ECC ficam disponíveis quando VOCÊ quiser: `ecc`,
+  // `npx ecc-agentshield scan` (prompt-injection), `npx ecc-install --profile <p>`.
   if (out !== null && findBinary("ecc")) {
-    logger.success("ECC instalado (ecc-universal) — otimização cross-harness disponível (`ecc`)")
-    logger.info("  Perfil completo (skills/hooks/agents): `npx ecc-install --profile full` (opcional).")
+    logger.success("ECC instalado (ecc-universal) — biblioteca on-demand (`ecc`, `npx ecc-agentshield scan`)")
   } else if (out !== null) {
     logger.success("ECC instalado (ecc-universal)")
   } else {
