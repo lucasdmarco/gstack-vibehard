@@ -9,7 +9,8 @@
 
 // Allowlist de ORIGENS HTTPS confiáveis (instaladores oficiais conhecidos).
 export const ALLOWED_REMOTE_ORIGINS = Object.freeze([
-  "https://atomic-vcs.dev",
+  // (atomic-vcs.dev removido: domínio morto. Atomic VCS agora vem de
+  //  github.com/atomicdotdev/atomic via git clone + cargo, sem download de script.)
   "https://sh.rustup.rs",
   "https://bun.sh",
   "https://astral.sh",      // uv

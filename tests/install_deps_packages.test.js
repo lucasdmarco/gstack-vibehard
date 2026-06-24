@@ -17,3 +17,16 @@ test("install instala graphify pelo pacote correto `graphifyy` (não `graphify`)
 test("install NÃO tenta mais o pacote fantasma `cli-anything-hub` (E404)", () => {
   assert.doesNotMatch(installSrc, /install",\s*"-g",\s*"cli-anything-hub"/, "removido o npm install -g cli-anything-hub")
 })
+
+const createSrc = readFileSync(path.join(import.meta.dirname, "..", "src", "cli", "create.js"), "utf-8")
+
+test("create instala ECC pelo pacote real `ecc-universal` (não o daemon fantasma ecc2)", () => {
+  assert.match(createSrc, /"ecc-universal"/, "instala ecc-universal via npm")
+  assert.doesNotMatch(createSrc, /gstack-dev\/ecc2/, "sem o repo fantasma gstack-dev/ecc2 (404)")
+  assert.doesNotMatch(createSrc, /"ecc2",\s*\["daemon",\s*"start"\]/, "sem `ecc2 daemon start` fantasma")
+})
+
+test("create instala Atomic da fonte real atomicdotdev/atomic (não do domínio morto)", () => {
+  assert.match(createSrc, /atomicdotdev\/atomic/, "usa o repo real do Atomic")
+  assert.doesNotMatch(createSrc, /atomic-vcs\.dev/, "sem o domínio morto atomic-vcs.dev")
+})
