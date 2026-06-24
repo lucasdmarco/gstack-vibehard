@@ -18,6 +18,13 @@ function run(args, env = {}) {
   }
 }
 
+test("GSTACK_ASCII=1: banner usa moldura ASCII (sem box-drawing unicode) — terminal legado", () => {
+  const r = run(["--help"], { GSTACK_ASCII: "1" })
+  assert.equal(r.code, 0)
+  assert.match(r.out, /\+-{4,}\+/, "moldura ASCII (+---+) em vez de box-drawing")
+  assert.doesNotMatch(r.out, /[╔╗╚╝═║]/, "modo ASCII não emite box-drawing unicode (que mojibaka no PowerShell legado)")
+})
+
 test("no-args: exit 0, sugere `start`, NÃO instala nem escreve no HOME", () => {
   const home = mkdtempSync(path.join(tmpdir(), "gstack-cli-"))
   try {

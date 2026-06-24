@@ -2,6 +2,7 @@ import { readFileSync } from "fs"
 import { resolve, dirname } from "path"
 import { fileURLToPath } from "url"
 import { createInterface } from "readline"
+import { execSync } from "child_process"
 import { install } from "../installer/install.js"
 import { doctor } from "../installer/doctor.js"
 import { uninstall, list } from "../installer/uninstall.js"
@@ -39,8 +40,26 @@ const COLORS = {
 }
 
 let noColor = !!process.env.NO_COLOR
+// ASCII fallback p/ terminais que mojibakean box-drawing/unicode (PowerShell legado).
+let asciiMode = process.env.GSTACK_ASCII === "1"
 
 export function setNoColor(v) { noColor = !!v }
+
+let _consoleFixed = false
+/**
+ * Windows legado (PowerShell 5.1 / conhost) renderiza UTF-8 como mojibake (ex.:
+ * `╔`→`ÔòÉ`, `✓`→`Ô£ô`) quando a codepage do console não é 65001. Trocar p/ UTF-8
+ * conserta TODO o output (banner + símbolos) sem refatorar cada caractere. Só em
+ * TTY; ignora erros; pula terminais que já são UTF-8 (Windows Terminal/VSCode).
+ */
+function ensureReadableConsole() {
+  if (_consoleFixed) return
+  _consoleFixed = true
+  if (process.platform !== "win32" || !process.stdout.isTTY) return
+  if (process.env.WT_SESSION || process.env.TERM_PROGRAM || process.env.WT_PROFILE_ID) return
+  try { execSync("chcp 65001", { stdio: "ignore", windowsHide: true }) }
+  catch { asciiMode = true } // não deu p/ trocar a codepage → cai no banner ASCII
+}
 
 function color(text, ...codes) {
   if (noColor) return text
@@ -49,18 +68,21 @@ function color(text, ...codes) {
 
 function logo() {
   const width = 40
+  // ASCII quando o terminal não aguenta box-drawing (legado): evita o mojibake.
+  const B = asciiMode ? { tl: "+", tr: "+", bl: "+", br: "+", h: "-", v: "|", dash: "-" }
+    : { tl: "╔", tr: "╗", bl: "╚", br: "╝", h: "═", v: "║", dash: "—" }
   const line1 = "GStack VibeHard Installer"
-  const line2 = `@gstack-vibehard/installer — v${VERSION}`
+  const line2 = `@gstack-vibehard/installer ${B.dash} v${VERSION}`
   const pad = (text) => {
     const total = width - 2 - text.length
     const left = Math.max(0, Math.floor(total / 2))
     const right = Math.max(0, total - left)
-    return "║" + " ".repeat(left) + text + " ".repeat(right) + "║"
+    return B.v + " ".repeat(left) + text + " ".repeat(right) + B.v
   }
-  console.log(color(`\n  ╔${"═".repeat(width - 2)}╗`, COLORS.cyan))
+  console.log(color(`\n  ${B.tl}${B.h.repeat(width - 2)}${B.tr}`, COLORS.cyan))
   console.log(color(`  ${pad(line1)}`, COLORS.cyan))
   console.log(color(`  ${pad(line2)}`, COLORS.cyan))
-  console.log(color(`  ╚${"═".repeat(width - 2)}╝\n`, COLORS.cyan))
+  console.log(color(`  ${B.bl}${B.h.repeat(width - 2)}${B.br}\n`, COLORS.cyan))
 }
 
 export function prompt(question) {
@@ -179,7 +201,9 @@ export function section(title) {
 }
 
 export async function runCLI(command, args) {
+  if (args.includes("--ascii")) asciiMode = true
   if (args.includes("--no-color")) noColor = true
+  ensureReadableConsole() // Windows legado → console UTF-8 (ou ASCII fallback)
   // Saída-máquina (JSON) precisa de stdout limpo: suprime o banner quando há
   // --json ou em comandos que emitem JSON puro (a2a).
   const quiet = args.includes("--json") || command === "a2a"
