@@ -50,6 +50,17 @@ test("validateRuntimeManifest: válido passa; inválidos pegam (command string, 
   assert.equal(validateRuntimeManifest({ schemaVersion: 1, services: [] }).valid, false)
 })
 
+test("validateRuntimeManifest: nome com path-traversal é REJEITADO (anti-escape)", async () => {
+  const { validateRuntimeManifest } = await imp()
+  const evil = { schemaVersion: 2, services: [{ name: "../../../PWNED", command: ["node", "x"] }] }
+  const r = validateRuntimeManifest(evil)
+  assert.equal(r.valid, false)
+  assert.match(r.errors.join(" "), /name inválido/)
+
+  const evil2 = { schemaVersion: 2, services: [{ name: "a/b", command: ["node", "x"] }] }
+  assert.equal(validateRuntimeManifest(evil2).valid, false)
+})
+
 test("loadRuntimeManifest: prefere runtime.json; deriva de services.json se ausente", async () => {
   const { loadRuntimeManifest } = await imp()
   const norm = (p) => p.replace(/\\/g, "/")
