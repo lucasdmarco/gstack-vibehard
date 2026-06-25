@@ -1,5 +1,16 @@
 # Changelog - gstack-vibehard
 
+## [3.7.0] - 2026-06-24
+
+### Runtime Supervisor — `dev`/`stop`/`logs`/`open` (PRD 12 PR4 — o motor)
+Sobe e derruba os serviços do projeto a partir do Runtime Manifest V2 (PR3). Sem shell, sem race de porta, mata a **árvore** de processos.
+- **Novo `src/runtime/ports.js`:** `isPortFree`/`allocatePort` por **bind real** em `127.0.0.1` (sem race — quem aloca já segurou a porta); injetável para teste.
+- **Novo `src/runtime/supervisor.js`:** lógica **pura/injetável** — `planStart` (manifest → plano de spawn com **argv** e env de porta, **sem shell**), `killTreeCommand` (Windows `taskkill /T /F`; POSIX `kill -TERM -<grupo>`), `stopAll` idempotente, `pollReadiness` HTTP, state por serviço em `.gstack/runtime/`.
+- **`gstack_vibehard dev [--open] [--json]`:** sobe cada serviço **detached** (sobrevive ao launcher), redireciona stdout/stderr para `.gstack/runtime/logs/<svc>.log` (fd numérico — não WriteStream), aloca porta, aguarda readiness e marca `ready`/`unhealthy` honestamente.
+- **`stop`** encerra a árvore e limpa o state (idempotente); **`logs [svc]`** mostra o log; **`open`** abre o preview web.
+- **`.gstack/runtime/`** entra no `.gitignore` do template (state local, não versionado).
+- **+9 testes** (8 unit de ports/plan/kill/stop/readiness/state + **1 e2e real**: sobe um http server de verdade, prova que sobrevive ao `dev` e que o `stop` mata). 320 Node + 58 Python verdes; lint/syntaxcheck limpos; pack smoke OK.
+
 ## [3.6.0] - 2026-06-24
 
 ### Runtime Manifest V2 + `runtime status` (PRD 12 PR3 — fundação do supervisor)
