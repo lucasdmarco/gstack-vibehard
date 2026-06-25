@@ -1,5 +1,14 @@
 # Changelog - gstack-vibehard
 
+## [3.6.0] - 2026-06-24
+
+### Runtime Manifest V2 + `runtime status` (PRD 12 PR3 — fundação do supervisor)
+Evolui os manifests que o `create` já gera (não cria formato concorrente) para o contrato que o supervisor (`dev`, PR4) vai consumir.
+- **Novo `src/runtime/manifest.js`:** `buildRuntimeManifest`/`migrateServiceToV2`/`validateRuntimeManifest`/`loadRuntimeManifest`. Schema **v2**: `command` sempre em **array** (sem shell string), `port.autoAllocate`, `health.readiness`+`liveness`, `restart` com circuit breaker, `dependsOn`, `secretRefs`. Migra o v1 (`services.json`) automaticamente.
+- **`create` grava `.gstack/runtime.json`** (v2) junto dos manifests existentes.
+- **Novo `gstack_vibehard runtime status [--json]`:** lê e **valida** o manifest declarado (o que o `dev` vai subir), com checagem honesta (`válido`/`INVÁLIDO`). `dev/stop/logs/open` respondem `pending_feature` até o PR4 (supervisor).
+- **Sem motor ainda** (supervisão de processo é o PR4). **+5 testes** (tokenize/migração/build/validação/load). 311 Node + 58 Python verdes; lint/syntaxcheck limpos.
+
 ## [3.5.0] - 2026-06-24
 
 ### `doctor --package-manager` — resolver único de npm/pnpm (PRD 12, sprint 1)
