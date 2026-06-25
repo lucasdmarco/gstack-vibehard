@@ -1,5 +1,17 @@
 # Changelog - gstack-vibehard
 
+## [3.7.2] - 2026-06-25
+
+### Endurecimento do Runtime Supervisor — 2 P0 de segurança + 4 P1 (PRD 12 PR4)
+Auditoria externa pegou abusos que o smoke/CI de *funcionalidade* não cobriam. Reproduzi os 6, corrigi e blindei com testes de **abuso** (não só de feature).
+- **[P0] Vazamento de `process.env`** — `dev` passava `{...process.env}` ao serviço e gravava `{...s}` (com env) no state. Agora o serviço só recebe **base OS-essencial + porta + segredos DECLARADOS em `secretRefs`** (allowlist), e o state file é gravado por **whitelist de campos** (`pickState`) — **env/segredo nunca vão a disco**. Reproduzido vazando `GSTACK_FAKE_SECRET` antes; sumiu depois.
+- **[P0] Path traversal pelo nome do serviço** — nome `../../../x` escrevia fora de `.gstack/runtime`. Agora `validateRuntimeManifest` **rejeita** nome fora de `[A-Za-z0-9._-]`/com `..` (1ª defesa: `dev` para antes do disco) e `writeServiceState` valida nome + **contém o caminho** no runtime dir (`assertWithin`, defesa em profundidade).
+- **[P1] Spawn de binário inexistente derrubava o CLI** — `Unhandled 'error' event` + exit 1. Agora o `dev` aguarda o desfecho do spawn (`'spawn'` vs `'error'`) de forma determinística → serviço vira `status: failed` honesto, **sem crash**.
+- **[P1] `dev` duplicado orfanava processos** — `clearState()` rodava antes de checar execução viva. Agora o `dev` **recusa** se já há runtime vivo (`isAlive` via signal 0); `--force` reinicia parando o antigo primeiro.
+- **[P1] `stop` não validava dono do PID** — pid reusado/state adulterado podia matar processo alheio. Agora valida a **idade real do processo** (tz-free: `Get-Process`/`ps -o etimes=`) vs a registrada → foreign é **pulado** (`skipped-foreign`), não morto. Fallback honesto quando não dá pra ler.
+- **[P1] readiness aceitava 4xx como saudável** — `pollReadiness` agora só **2xx/3xx** = pronto; 4xx/5xx = `unhealthy`.
+- **+15 testes de abuso** (env-allowlist, state-whitelist, traversal rejeitado, dono-do-PID, isAlive, readiness 4xx, spawn-no-crash e2e, dev-idempotente e2e). 330 Node + 58 Python verdes; lint/syntaxcheck; pack smoke OK.
+
 ## [3.7.1] - 2026-06-25
 
 ### Correção: `stop` vazava processo no Linux (PRD 12 PR4 — pego pelo CI)

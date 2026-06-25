@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "fs"
 import { join } from "path"
+import { isValidServiceName } from "./supervisor.js"
 
 /**
  * Runtime Manifest V2 (PRD 12 PR3). EVOLUI os manifests já gerados pelo create
@@ -62,6 +63,7 @@ export function validateRuntimeManifest(m) {
   for (const [i, s] of (m.services || []).entries()) {
     const at = `services[${i}]${s && s.name ? ` (${s.name})` : ""}`
     if (!s || !s.name) errors.push(`${at}: sem name`)
+    else if (!isValidServiceName(s.name)) errors.push(`${at}: name inválido — use [A-Za-z0-9._-] sem '/', '\\' ou '..' (anti path-traversal)`)
     if (!Array.isArray(s?.command) || s.command.length === 0) errors.push(`${at}: command deve ser array não-vazio (sem shell string)`)
     else if (s.command.some((c) => typeof c !== "string")) errors.push(`${at}: command só pode conter strings`)
     if (s?.port != null && (typeof s.port !== "object" || typeof s.port.preferred !== "number")) errors.push(`${at}: port.preferred deve ser número`)

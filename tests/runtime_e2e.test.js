@@ -71,3 +71,54 @@ test("e2e: dev sobe um serviço real (sobrevive ao launcher) e stop o mata", asy
     await rm(dir, { recursive: true, force: true, maxRetries: 5 })
   }
 })
+
+async function mkProject(services) {
+  const dir = await mkdtemp(path.join(tmpdir(), "gstack-e2e-"))
+  await writeFile(path.join(dir, "server.mjs"), SERVER)
+  await mkdir(path.join(dir, ".gstack"), { recursive: true })
+  await writeFile(path.join(dir, ".gstack", "runtime.json"), JSON.stringify({ schemaVersion: 2, services }, null, 2))
+  return dir
+}
+
+// ── ABUSO fix3: spawn de binário inexistente NÃO derruba o CLI; marca failed ──
+test("e2e: spawn de binário inexistente não derruba o CLI (status failed)", async () => {
+  const { devCommand, stopCommand } = await import(`${pathToFileURL(cmdMod)}?t=${Date.now()}`)
+  const dir = await mkProject([{
+    name: "web", command: ["binario-que-nao-existe-zzz"], cwd: ".",
+    port: { preferred: 7301, env: "E2E_PORT", autoAllocate: true },
+    health: { readiness: { type: "http", path: "/", timeoutSeconds: 3 } },
+  }])
+  try {
+    // se derrubasse o CLI, isto lançaria (Unhandled 'error') e o teste falharia
+    await devCommand(["--json"], { cwd: dir })
+    const state = JSON.parse(await readFile(path.join(dir, ".gstack", "runtime", "web.json"), "utf-8"))
+    assert.equal(state.status, "failed", "spawn falho vira status failed (sem crash)")
+    assert.ok(!state.pid, "serviço falho não tem pid running")
+  } finally {
+    try { stopCommand([], { cwd: dir }) } catch { /* ok */ }
+    await rm(dir, { recursive: true, force: true, maxRetries: 5 })
+  }
+})
+
+// ── ABUSO fix4: dev duas vezes — a 2ª RECUSA (idempotente), não duplica/orfana ──
+test("e2e: dev duplicado recusa e mantém o mesmo pid (não orfana processos)", async () => {
+  const { devCommand, stopCommand } = await import(`${pathToFileURL(cmdMod)}?t=${Date.now()}`)
+  const port = 7400 + Math.floor(Math.random() * 300)
+  const dir = await mkProject([{
+    name: "web", command: ["node", "server.mjs"], cwd: ".",
+    port: { preferred: port, env: "E2E_PORT", autoAllocate: true },
+    health: { readiness: { type: "http", path: "/", timeoutSeconds: 15 } },
+  }])
+  try {
+    await devCommand(["--json"], { cwd: dir })
+    const pid1 = JSON.parse(await readFile(path.join(dir, ".gstack", "runtime", "web.json"), "utf-8")).pid
+    assert.ok(pid1, "primeiro dev subiu")
+
+    await devCommand(["--json"], { cwd: dir }) // 2ª chamada SEM --force → deve recusar
+    const pid2 = JSON.parse(await readFile(path.join(dir, ".gstack", "runtime", "web.json"), "utf-8")).pid
+    assert.equal(pid2, pid1, "2ª chamada não relançou — mesmo pid, sem órfão")
+  } finally {
+    try { stopCommand([], { cwd: dir }) } catch { /* ok */ }
+    await rm(dir, { recursive: true, force: true, maxRetries: 5 })
+  }
+})
