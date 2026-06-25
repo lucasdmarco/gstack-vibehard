@@ -1,5 +1,12 @@
 # Changelog - gstack-vibehard
 
+## [3.4.2] - 2026-06-24
+
+### Correção honesta do encoding no pipe (o fix do v3.4.1 não funcionava)
+- **[honestidade] o `chcp` no pipe do v3.4.1 NÃO consertava o mojibake** e foi revertido para só-TTY. Motivo real (validado na máquina): o PowerShell **cacheia `[Console]::OutputEncoding` no startup** (codepage OEM) e um `chcp` rodado por **subprocesso** não muda esse cache — então `gstack ... | Select-String` continua distorcendo. O **render DIRETO** (uso normal) está **perfeito** (confirmado: banner e `✓` legíveis). Para pipe, o usuário roda uma vez na sessão: `[Console]::OutputEncoding=[System.Text.Encoding]::UTF8`.
+- **[confirmado] `install --yes` instala o ECC com segurança** — o `postinstall` do `ecc-universal` é apenas um `echo` (não auto-injeta skills no `~/.claude`); o `ecc` é um CLI **instalador** (sem `--version`), consumido on-demand. Alinha com o contrato b+c (gstack dono do namespace, ECC como biblioteca).
+- Sem mudança de teste (revert + doc honesta). 300 Node + 58 Python verdes; lint/syntaxcheck limpos.
+
 ## [3.4.1] - 2026-06-24
 
 ### Polimento pós-validação na máquina real (encoding no pipe + ECC no install)
