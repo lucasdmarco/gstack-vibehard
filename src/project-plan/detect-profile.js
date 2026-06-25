@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "fs"
 import { join } from "path"
+import { stripBom } from "../util/json.js"
 
 /**
  * Detecção de ARQUÉTIPO de projeto (determinística, sem LLM, sem rede).
@@ -73,5 +74,5 @@ export function detectProfile(cwd = process.cwd()) {
 }
 
 function readJson(p) {
-  try { return JSON.parse(readFileSync(p, "utf-8")) } catch { return null }
+  try { return JSON.parse(stripBom(readFileSync(p, "utf-8"))) } catch { return null }
 }

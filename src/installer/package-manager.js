@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "fs"
 import { join } from "path"
 import { isBinaryAvailable } from "./deps.js"
+import { stripBom } from "../util/json.js"
 
 /**
  * Resolver ÚNICO de package manager (PRD 12 PR2). Detecta o PM correto do projeto
@@ -21,7 +22,7 @@ const LOCKFILES = Object.freeze({
 
 export function resolvePackageManager(projectDir, io = {}) {
   const exists = io.exists || ((p) => existsSync(p))
-  const readJson = io.readJson || ((p) => { try { return JSON.parse(readFileSync(p, "utf-8")) } catch { return null } })
+  const readJson = io.readJson || ((p) => { try { return JSON.parse(stripBom(readFileSync(p, "utf-8"))) } catch { return null } })
   const hasBinary = io.hasBinary || ((b) => isBinaryAvailable(b))
 
   const pkg = readJson(join(projectDir, "package.json")) || {}

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync, readdirSync } from "fs"
 import { join, dirname } from "path"
 import { homedir } from "os"
+import { stripBom } from "../util/json.js"
 import { fileURLToPath } from "url"
 import { createHash } from "crypto"
 import { execFileSync } from "child_process"
@@ -43,7 +44,7 @@ function projectFingerprint(cwd) {
   return "sha256:" + h.digest("hex")
 }
 function cachePath(cwd) { return join(cwd, ".gstack", "verify-cache.json") }
-function readVerifyCache(cwd) { try { return JSON.parse(readFileSync(cachePath(cwd), "utf-8")) } catch { return null } }
+function readVerifyCache(cwd) { try { return JSON.parse(stripBom(readFileSync(cachePath(cwd), "utf-8"))) } catch { return null } }
 function writeVerifyCache(cwd, data) { try { mkdirSync(join(cwd, ".gstack"), { recursive: true }); writeFileSync(cachePath(cwd), JSON.stringify(data, null, 2) + "\n") } catch { /* cache best-effort */ } }
 
 /**
@@ -59,7 +60,7 @@ function writeVerifyCache(cwd, data) { try { mkdirSync(join(cwd, ".gstack"), { r
  * `reducedTrust` = harness ativo não tem controle real (best_effort/partial).
  */
 
-function readJson(p) { try { return JSON.parse(readFileSync(p, "utf-8")) } catch { return {} } }
+function readJson(p) { try { return JSON.parse(stripBom(readFileSync(p, "utf-8"))) } catch { return {} } }
 
 function defaultExec(file, args, opts) {
   if (process.platform === "win32" && file === "npm") {

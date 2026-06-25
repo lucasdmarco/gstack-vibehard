@@ -1,5 +1,13 @@
 # Changelog - gstack-vibehard
 
+## [3.7.3] - 2026-06-25
+
+### Correção: manifest/config com BOM era ignorado em silêncio no Windows (PRD 12 PR4)
+Reconfirmação numa máquina Windows limpa expôs: `gstack_vibehard dev` dizia "Sem manifest de runtime" mesmo com o `.gstack/runtime.json` presente.
+- **Causa real:** o PowerShell 5.1 (`Set-Content -Encoding utf8`) e vários editores no Windows gravam UTF-8 **com BOM** (EF BB BF). Os leitores faziam `JSON.parse(readFileSync(...))` sem remover o BOM → `JSON.parse` lançava no `﻿` inicial → o `catch` engolia → o arquivo era tratado como **ausente/ilegível** em silêncio.
+- **Fix de raiz:** novo `src/util/json.js` com `stripBom`/`readJsonFile` (no-op em arquivo limpo — seguro). Aplicado nos leitores dos arquivos que o usuário edita à mão: **runtime manifest** (`runtime.json`/`services.json`), state do supervisor, **resolver de package manager** (`package.json`/`app.json`) e **project-plan** (`state`, `detect-profile`, `verify-runner`).
+- **+2 testes** (stripBom no-op/início; `loadRuntimeManifest` lê manifest COM BOM). 332 Node + 58 Python verdes; lint/syntaxcheck; pack smoke OK.
+
 ## [3.7.2] - 2026-06-25
 
 ### Endurecimento do Runtime Supervisor — 2 P0 de segurança + 4 P1 (PRD 12 PR4)
