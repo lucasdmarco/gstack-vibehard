@@ -1,5 +1,14 @@
 # Changelog - gstack-vibehard
 
+## [3.7.1] - 2026-06-25
+
+### Correção: `stop` vazava processo no Linux (PRD 12 PR4 — pego pelo CI)
+O CI (ubuntu) pegou o que o smoke no Windows não podia: o `stop` da v3.7.0 **não matava** os serviços no Linux.
+- **Causa real:** no POSIX o `stop` rodava `kill -TERM -<pid>` via **binário**; o `kill` do **util-linux** (Linux) **sai 0 sem matar** quando recebe `-<pid>` como grupo (só o `kill` BSD do macOS aceitava). Resultado: `stop` reportava "stopped" mas o processo seguia de pé.
+- **Fix:** no POSIX o `stop` agora usa o primitivo **nativo** `process.kill(-pid, "SIGTERM")` (syscall direta no **grupo** de processos — o `dev` sobe `detached`, então o pid é líder do grupo). Sem dependência do binário `kill`. Windows segue com `taskkill /T /F` (árvore). **O `exec` só é injetado no Windows.**
+- **Teste e2e robusto:** lê a porta/status **reais** do state (`.gstack/runtime/web.json`) em vez de assumir a `preferred` (que colide no CI). **+1 unit** do caminho POSIX nativo (mata o grupo via `-pid`, nunca o binário).
+- Sem mudança no shipado fora do `stop`/teste. 321 Node + 58 Python verdes; lint/syntaxcheck; pack smoke OK.
+
 ## [3.7.0] - 2026-06-24
 
 ### Runtime Supervisor — `dev`/`stop`/`logs`/`open` (PRD 12 PR4 — o motor)

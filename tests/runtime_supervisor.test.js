@@ -57,6 +57,17 @@ test("stopAll: mata cada pid; lida com no-pid e processo já encerrado", async (
   assert.deepEqual(calls, ["taskkill /PID 123 /T /F"])
 })
 
+// ── stopAll POSIX: caminho NATIVO mata o GRUPO via process.kill(-pid) ──
+test("stopAll: POSIX sem exec usa process.kill(-pid) (grupo), não o binário", async () => {
+  const { stopAll } = await imp(supMod)
+  const calls = []
+  const kill = (pid, sig) => { if (pid === -999) throw new Error("ESRCH"); calls.push(`${pid}/${sig}`) }
+  const r = stopAll([{ name: "web", pid: 5760 }, { name: "gone", pid: 999 }], { kill, platform: "linux" })
+  assert.equal(r[0].status, "stopped")
+  assert.equal(r[1].status, "already-gone", "grupo inexistente vira already-gone")
+  assert.deepEqual(calls, ["-5760/SIGTERM"], "mata o GRUPO (-pid), nunca o binário kill")
+})
+
 // ── pollReadiness: ok / retry / timeout (sem esperar de verdade) ──
 test("pollReadiness: 200 → ok; sempre falha → timeout (now/sleep injetados)", async () => {
   const { pollReadiness } = await imp(supMod)

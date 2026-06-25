@@ -87,7 +87,12 @@ export function stopCommand(args = [], opts = {}) {
   const json = args.includes("--json")
   const state = readAllState(cwd)
   if (state.length === 0) { if (!json) info("Nada rodando (sem state de runtime)."); else process.stdout.write('{"stopped":[]}\n'); return }
-  const results = stopAll(state, { exec: (file, a) => execFileSync(file, a, { stdio: "ignore" }) })
+  // Windows: taskkill /T /F (árvore) via exec. POSIX: caminho nativo do stopAll
+  // (process.kill(-pid) mata o grupo) — sem exec, pois o binário `kill` do Linux
+  // não mata via `-<pid>`.
+  const results = process.platform === "win32"
+    ? stopAll(state, { exec: (file, a) => execFileSync(file, a, { stdio: "ignore" }) })
+    : stopAll(state)
   clearState(cwd)
   if (json) { process.stdout.write(JSON.stringify({ stopped: results }) + "\n"); return }
   section("stop — encerrando o runtime")

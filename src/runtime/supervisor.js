@@ -45,17 +45,23 @@ export function killTreeCommand(pid, platform = process.platform) {
   return { file: "kill", args: ["-TERM", `-${pid}`] }
 }
 
-/** Encerra todos os PIDs do state. Idempotente. `exec`/`platform` injetáveis. */
+/**
+ * Encerra todos os PIDs do state. Idempotente. `exec`/`kill`/`platform` injetáveis.
+ * POSIX: caminho NATIVO `process.kill(-pid, SIGTERM)` (mata o GRUPO via syscall) —
+ * NÃO usa o binário `kill`, porque o `kill` do util-linux (Linux) sai 0 sem matar
+ * quando recebe `-<pid>` como grupo (só o BSD `kill` do macOS aceitava). Windows:
+ * `taskkill /T /F` (árvore) via `exec`. `exec` só é injetado no Windows real.
+ */
 export function stopAll(state, opts = {}) {
   const exec = opts.exec
+  const kill = opts.kill || ((pid, sig) => process.kill(pid, sig))
   const platform = opts.platform || process.platform
   const results = []
   for (const svc of state || []) {
     if (!svc || !svc.pid) { results.push({ name: svc && svc.name, status: "no-pid" }); continue }
-    const { file, args } = killTreeCommand(svc.pid, platform)
     try {
-      if (exec) exec(file, args)
-      else process.kill(platform === "win32" ? svc.pid : -svc.pid, "SIGTERM")
+      if (exec) { const { file, args } = killTreeCommand(svc.pid, platform); exec(file, args) }
+      else kill(platform === "win32" ? svc.pid : -svc.pid, "SIGTERM")
       results.push({ name: svc.name, status: "stopped", pid: svc.pid })
     } catch (e) {
       results.push({ name: svc.name, status: "already-gone", pid: svc.pid, detail: e.message })
