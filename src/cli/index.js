@@ -16,6 +16,7 @@ import { initCommand } from "../commands/init.js"
 import { sprintCommand } from "../commands/sprint.js"
 import { monitorCommand } from "../commands/monitor.js"
 import { runtimeCommand } from "../commands/runtime.js"
+import { devCommand, stopCommand, logsCommand, openCommand } from "../commands/runtime-supervisor.js"
 import { planCommand } from "../commands/plan.js"
 import { startCommand } from "../commands/start.js"
 import { taskCommand } from "../commands/task.js"
@@ -156,7 +157,11 @@ const COMMANDS = [
   { name: "workflow", group: "advanced", desc: "Graph runner determinístico", usage: "gstack_vibehard workflow <run|runs|inspect>" },
   { name: "a2a", group: "advanced", desc: "Agent Card A2A (offline, sem servidor)", usage: "gstack_vibehard a2a" },
   { name: "monitor", group: "advanced", desc: "TUI: agentes, tokens, QG, ROI", usage: "gstack_vibehard monitor" },
-  { name: "runtime", group: "common", desc: "Runtime do projeto (status do manifest; dev/stop chegam no PR4)", usage: "gstack_vibehard runtime status [--json]" },
+  { name: "runtime", group: "common", desc: "Runtime do projeto (status do manifest)", usage: "gstack_vibehard runtime status [--json]" },
+  { name: "dev", group: "common", desc: "Sobe os serviços do projeto (port alloc + health)", usage: "gstack_vibehard dev [--open] [--json]" },
+  { name: "stop", group: "common", desc: "Encerra o runtime (árvore de processos)", usage: "gstack_vibehard stop [--json]" },
+  { name: "logs", group: "common", desc: "Logs de um serviço do runtime", usage: "gstack_vibehard logs [serviço] [--follow]" },
+  { name: "open", group: "common", desc: "Abre o preview do serviço web", usage: "gstack_vibehard open" },
   { name: "sprint", group: "advanced", desc: "Salvar decisões e atualizar memórias", usage: "gstack_vibehard sprint --save" },
   { name: "list", group: "advanced", desc: "Listar componentes instalados", usage: "gstack_vibehard list" },
 ]
@@ -283,6 +288,18 @@ async function dispatch(command, args) {
       break
     case "runtime":
       await runtimeCommand(args, { strict: args.includes("--strict") })
+      break
+    case "dev":
+      await devCommand(args)
+      break
+    case "stop":
+      stopCommand(args)
+      break
+    case "logs":
+      logsCommand(args)
+      break
+    case "open":
+      openCommand(args)
       break
     case "tools":
     case "pp":

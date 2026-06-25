@@ -786,6 +786,7 @@ graphify-out/
 # Estado local do gstack
 .gstack/*.local
 .gstack/casdoor.json
+.gstack/runtime/
 
 # SO / logs
 .DS_Store
