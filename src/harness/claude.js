@@ -54,6 +54,7 @@ O padrao e world-class. Inegociavel.
 - Zero secrets hardcoded
 
 ## Skills disponiveis
+- start — ativado por /start: PONTO DE ENTRADA guiado (objetivo → plano → execução). Use PRIMEIRO.
 - frontend-design — interfaces premium com taste-skill (4 engines + 3 dials) + design system detection
 - chronicle — memoria de sessoes indexada
 - project-init — setup de projeto com variante backend

@@ -58,6 +58,7 @@ export async function installOpenCode(config, report, deps = {}) {
       skills: { paths: [skillsDir] },
       instructions: [
         "Comandos disponiveis:",
+        "  /start      — PONTO DE ENTRADA guiado (objetivo -> plano -> execucao). Use primeiro.",
         "  /newproject — Guided Architecture Walkthrough (9 passos de arquitetura)",
         "  /g_update   — Atualizar gstack_vibehard para versao mais recente",
         "",

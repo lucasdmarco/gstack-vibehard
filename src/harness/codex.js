@@ -67,6 +67,7 @@ function buildGstackConfig() {
       skills_dir: skillsDir,
       instructions: [
         "Comandos disponiveis:",
+        "  /start      — PONTO DE ENTRADA guiado (objetivo -> plano -> execucao). Use primeiro.",
         "  /newproject — Guided Architecture Walkthrough (10 passos com design system)",
         "  /g_update   — Atualizar gstack_vibehard para versao mais recente",
         "",
