@@ -170,6 +170,24 @@ async function installDeps(warn, success, info, report, harnessIds, allowRemote 
   }
 
   // ========================================
+  // ECC (ecc-universal) — otimizador de harness (binário `ecc`). Instala GLOBAL no
+  // install completo (consistência "Full = tudo", como gbrain/graphify/headroom).
+  // gstack consome como BIBLIOTECA (não injeta o perfil do ECC — ver create.js).
+  // ========================================
+  if (findWorkingBinary(["ecc"])) {
+    success("ECC: já instalado (ecc-universal)")
+  } else {
+    try {
+      const { file, argv } = npmArgv(["install", "-g", "ecc-universal"])
+      execFileSync(file, argv, { stdio: "pipe", timeout: 180000 })
+      success("ECC instalado (ecc-universal) — `ecc` / `npx ecc-agentshield scan` on-demand")
+      report.added.push("ECC (ecc-universal)")
+    } catch (e) {
+      warn(`ECC (ecc-universal): ${e.message}`)
+    }
+  }
+
+  // ========================================
   // pytest — hooks Python, QG e Test Gate dependem dele
   // ========================================
   let pytestOk = false

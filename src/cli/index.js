@@ -49,13 +49,16 @@ let _consoleFixed = false
 /**
  * Windows legado (PowerShell 5.1 / conhost) renderiza UTF-8 como mojibake (ex.:
  * `╔`→`ÔòÉ`, `✓`→`Ô£ô`) quando a codepage do console não é 65001. Trocar p/ UTF-8
- * conserta TODO o output (banner + símbolos) sem refatorar cada caractere. Só em
- * TTY; ignora erros; pula terminais que já são UTF-8 (Windows Terminal/VSCode).
+ * conserta TODO o output (banner + símbolos) sem refatorar cada caractere. Roda
+ * MESMO quando a saída é canalizada (`gstack ... | Select-String`): a codepage é
+ * do console (compartilhado), e o PowerShell também relê a saída nativa por ela —
+ * sem isto, o pipe distorce. Ignora erros (sem console → cai no banner ASCII);
+ * pula terminais que já são UTF-8 (Windows Terminal/VSCode).
  */
 function ensureReadableConsole() {
   if (_consoleFixed) return
   _consoleFixed = true
-  if (process.platform !== "win32" || !process.stdout.isTTY) return
+  if (process.platform !== "win32") return
   if (process.env.WT_SESSION || process.env.TERM_PROGRAM || process.env.WT_PROFILE_ID) return
   try { execSync("chcp 65001", { stdio: "ignore", windowsHide: true }) }
   catch { asciiMode = true } // não deu p/ trocar a codepage → cai no banner ASCII
