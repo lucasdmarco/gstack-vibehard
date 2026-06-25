@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises"
+import { mkdtemp, rm, writeFile, mkdir, readFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
@@ -41,10 +41,17 @@ test("e2e: dev sobe um serviço real (sobrevive ao launcher) e stop o mata", asy
 
     await devCommand(["--json"], { cwd: dir })
 
+    // a porta é ALOCADA pelo supervisor (preferred pode estar ocupada no CI) — leio
+    // a porta/status REAIS do state file, nunca assumo a preferred.
+    const state = JSON.parse(await readFile(path.join(dir, ".gstack", "runtime", "web.json"), "utf-8"))
+    assert.equal(state.status, "ready", `dev marcou o serviço ready (status=${state.status})`)
+    const realPort = state.port
+    assert.ok(realPort >= port, "porta alocada a partir da preferred")
+
     // o serviço deve continuar de pé DEPOIS do dev retornar (prova do detached)
     let status = null
     for (let i = 0; i < 20 && status === null; i++) {
-      status = await tryFetch(`http://127.0.0.1:${port}/`)
+      status = await tryFetch(`http://127.0.0.1:${realPort}/`)
       if (status === null) await new Promise((r) => setTimeout(r, 250))
     }
     assert.equal(status, 200, "serviço respondendo após o dev sair (sobreviveu ao launcher)")
@@ -54,7 +61,7 @@ test("e2e: dev sobe um serviço real (sobrevive ao launcher) e stop o mata", asy
     // após o stop a porta deve cair
     let down = false
     for (let i = 0; i < 20 && !down; i++) {
-      const s = await tryFetch(`http://127.0.0.1:${port}/`, 800)
+      const s = await tryFetch(`http://127.0.0.1:${realPort}/`, 800)
       if (s === null) down = true
       else await new Promise((r) => setTimeout(r, 250))
     }
