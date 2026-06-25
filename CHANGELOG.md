@@ -1,5 +1,14 @@
 # Changelog - gstack-vibehard
 
+## [3.5.0] - 2026-06-24
+
+### `doctor --package-manager` — resolver único de npm/pnpm (PRD 12, sprint 1)
+Primeiro PR do PRD 12 (PR2). Resolve a dor real que vivemos nesta jornada (corepack `EPERM`, pnpm ausente, `node_modules` pnpm com `package-lock` npm).
+- **Novo resolver** (`src/installer/package-manager.js`): detecta o PM por prioridade — `packageManager` do package.json → lockfile versionado → `.gstack/app.json` → layout de `node_modules` → fallback npm. Retorna **estado honesto**: `ok | missing_binary | lockfile_conflict | node_modules_mismatch`, com reparo seguro por estado.
+- **`gstack_vibehard doctor --package-manager` (`--pm`)**: reporta o estado; `--json`/`--strict` p/ automação. **`--fix`** instala o **pnpm ausente** via `npm install -g pnpm` (com confirmação; `corepack` precisa de admin no Windows). **Nunca apaga lockfile/node_modules automaticamente** — conflito/mismatch exigem confirmação manual.
+- Já flagra o mismatch do próprio repo (`package-lock.json` + `node_modules/.pnpm`).
+- **+6 testes** (todos os estados do resolver, io injetado). 306 Node + 58 Python verdes; lint/syntaxcheck limpos.
+
 ## [3.4.2] - 2026-06-24
 
 ### Correção honesta do encoding no pipe (o fix do v3.4.1 não funcionava)

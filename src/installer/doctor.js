@@ -9,6 +9,8 @@ import { detectHarnesses } from "../harness/detector.js"
 import { inspectOpenCodeConfig } from "../harness/opencode-config.js"
 import { checkInstallIntegrity } from "./integrity.js"
 import { repairManifest } from "./repair-manifest.js"
+import { resolvePackageManager } from "./package-manager.js"
+import { npmArgv } from "./deps.js"
 import { buildInstallImpact } from "./impact.js"
 import { planOpenCodeFix, applyOpenCodeFix } from "./opencode-jsonc.js"
 import { section, success, warn, error, info, confirm } from "../cli/index.js"
@@ -71,7 +73,7 @@ export async function doctor(args = []) {
   // `doctor --json` (diagnóstico completo) → JSON PURO. --strict → exit≠0 se check
   // obrigatório falhar. Não roteia aqui os modos --impact/--install-integrity (têm
   // seu próprio JSON abaixo) nem --fix (interativo).
-  if (json && !args.includes("--impact") && !args.includes("--install-integrity") && !args.includes("--fix") && !args.includes("--repair-manifest")) {
+  if (json && !args.includes("--impact") && !args.includes("--install-integrity") && !args.includes("--fix") && !args.includes("--repair-manifest") && !args.includes("--package-manager") && !args.includes("--pm")) {
     const report = await collectDoctorJson(HOME)
     process.stdout.write(JSON.stringify(report) + "\n")
     if (strict && !report.ok) process.exitCode = 1
@@ -123,6 +125,36 @@ export async function doctor(args = []) {
     info("Rollback: `gstack_vibehard uninstall --dry-run` · Integridade: `--install-integrity`.")
     return
   }
+  // Modo package-manager (PRD 12 PR2): resolve o PM do projeto e reporta estado +
+  // reparo seguro. `--fix` instala o pnpm ausente (sem apagar lock/node_modules).
+  if (args.includes("--package-manager") || args.includes("--pm")) {
+    const cwd = process.cwd()
+    const r = resolvePackageManager(cwd)
+    if (json) {
+      process.stdout.write(JSON.stringify(r) + "\n")
+      if (strict && r.state !== "ok") process.exitCode = 1
+      return
+    }
+    section("doctor --package-manager — resolver do gerenciador do projeto")
+    const icon = r.state === "ok" ? "✓" : "⚠"
+    info(`  ${icon} PM: ${r.pm} · estado: ${r.state}`)
+    info(`    ${r.detail}`)
+    if (r.state === "ok") { success("Package manager OK."); return }
+    warn(`  Reparo: ${r.repair}`)
+    if (args.includes("--fix") && r.state === "missing_binary" && r.pm === "pnpm") {
+      const ok = args.includes("--yes") || (process.stdin.isTTY && await confirm("Instalar o pnpm agora (`npm install -g pnpm`)?", false))
+      if (!ok) { info("Cancelado (use --yes em modo não-interativo)."); return }
+      try {
+        const { file, argv } = npmArgv(["install", "-g", "pnpm"])
+        execFileSync(file, argv, { stdio: "inherit", timeout: 120000 })
+        success("pnpm instalado. Rode `doctor --package-manager` de novo p/ confirmar.")
+      } catch (e) { warn(`Falha ao instalar pnpm: ${e.message}. Manual: npm install -g pnpm`) }
+    } else if (args.includes("--fix")) {
+      info("  (--fix não aplica reparo destrutivo automaticamente: lockfile/node_modules exigem sua confirmação manual — siga o passo acima.)")
+    }
+    return
+  }
+
   // Modo reparo: limpa/migra um manifest inseguro SEM destruir backups do usuário.
   // Default = --dry-run (só mostra o plano); --yes aplica (faz backup do manifest).
   if (args.includes("--repair-manifest")) {
