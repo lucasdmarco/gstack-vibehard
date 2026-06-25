@@ -1,5 +1,12 @@
 # Changelog - gstack-vibehard
 
+## [3.4.0] - 2026-06-23
+
+### `/start` como ponto de entrada guiado (PRD 11 Fase 4 — fecha o roadmap)
+- **Nova skill `/start`** (`skills/skills/start/SKILL.md`, `trigger: /start`): a porta de entrada do gstack — objetivo → plano → execução, mapeando para `gstack_vibehard start`. O usuário comum não precisa decorar a CLI.
+- **`/start` surfaçado PRIMEIRO** no guidance de cada harness (Claude, Codex, OpenCode) — antes de `/newproject`, com o rótulo "PONTO DE ENTRADA — use primeiro". No completo, `/start` oferece a instalação completa; no lite, explica o caminho enxuto.
+- **+2 testes** (skill /start com trigger; ordenado antes de /newproject nos 3 harnesses). 299 Node + 58 Python verdes; lint/syntaxcheck limpos.
+
 ## [3.3.2] - 2026-06-23
 
 ### Output legível no PowerShell legado (fim do mojibake) — PRD 11 Fase 4 (P2)
