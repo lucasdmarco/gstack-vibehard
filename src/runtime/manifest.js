@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "fs"
 import { join } from "path"
 import { isValidServiceName } from "./supervisor.js"
+import { stripBom } from "../util/json.js"
 
 /**
  * Runtime Manifest V2 (PRD 12 PR3). EVOLUI os manifests já gerados pelo create
@@ -78,7 +79,7 @@ export function validateRuntimeManifest(m) {
  */
 export function loadRuntimeManifest(projectDir, io = {}) {
   const exists = io.exists || ((p) => existsSync(p))
-  const readJson = io.readJson || ((p) => { try { return JSON.parse(readFileSync(p, "utf-8")) } catch { return null } })
+  const readJson = io.readJson || ((p) => { try { return JSON.parse(stripBom(readFileSync(p, "utf-8"))) } catch { return null } })
   const rt = join(projectDir, ".gstack", "runtime.json")
   if (exists(rt)) {
     const m = readJson(rt)

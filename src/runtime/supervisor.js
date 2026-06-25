@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, rmSync } from "fs"
 import { join, resolve, relative, isAbsolute } from "path"
 import { allocatePort } from "./ports.js"
+import { stripBom } from "../util/json.js"
 
 /**
  * Supervisor de runtime (PRD 12 PR4): consome o Runtime Manifest V2 e sobe/derruba
@@ -182,7 +183,7 @@ export function readAllState(projectDir) {
   if (!existsSync(dir)) return []
   return readdirSync(dir)
     .filter((f) => f.endsWith(".json"))
-    .map((f) => { try { return JSON.parse(readFileSync(join(dir, f), "utf-8")) } catch { return null } })
+    .map((f) => { try { return JSON.parse(stripBom(readFileSync(join(dir, f), "utf-8"))) } catch { return null } })
     .filter(Boolean)
 }
 export function clearState(projectDir) {

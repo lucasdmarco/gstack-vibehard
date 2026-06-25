@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs"
 import { join } from "path"
+import { stripBom } from "../util/json.js"
 
 /**
  * Estado do plano em .gstack/plans/<planId>/status.json:
@@ -14,7 +15,7 @@ export function statePath(planDir) {
 export function readState(planDir) {
   const p = statePath(planDir)
   if (!existsSync(p)) return null
-  try { return JSON.parse(readFileSync(p, "utf-8")) } catch { return null }
+  try { return JSON.parse(stripBom(readFileSync(p, "utf-8"))) } catch { return null }
 }
 
 export function writeState(planDir, state) {
