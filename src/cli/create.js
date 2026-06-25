@@ -18,6 +18,7 @@ import { homedir, tmpdir } from "node:os"
 import { deepMerge } from "../installer/merge.js"
 import { checkRemoteDownload } from "../installer/remote-policy.js"
 import { npxArgv, npmArgv } from "../installer/deps.js"
+import { buildRuntimeManifest } from "../runtime/manifest.js"
 import { buildIntegrationsRegistry } from "../printing-press/registry.js"
 import { buildContextRegistry, DOC_SOURCES as CONTEXT_DOC_SOURCES } from "../context-docs/registry.js"
 import { DEFAULT_LOOP_BUDGET } from "../loop-budget/policy.js"
@@ -676,6 +677,10 @@ export function writeRuntimeFiles({ projectDir, projectName, now, projectRoot, t
     version: 1,
     ports: tpl.ports,
   })
+
+  // Runtime Manifest V2 (PRD 12 PR3): contrato que o supervisor (`dev`) consome —
+  // comandos em array, port autoAllocate, health readiness/liveness, restart.
+  writeJson(join(gstackDir, "runtime.json"), buildRuntimeManifest({ services: tpl.services }))
 
   writeJson(join(gstackDir, "secrets.schema.json"), {
     required: ["DATABASE_URL"],
