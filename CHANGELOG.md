@@ -1,5 +1,12 @@
 # Changelog - gstack-vibehard
 
+## [3.4.1] - 2026-06-24
+
+### Polimento pós-validação na máquina real (encoding no pipe + ECC no install)
+- **[encoding] `chcp 65001` agora roda MESMO quando a saída é canalizada** (`gstack ... | Select-String`): antes pulava se não-TTY, e o PowerShell relia a saída nativa como OEM → mojibake no pipe. A codepage é do console (compartilhado), então trocá-la conserta também o pipe. Render direto já estava legível (confirmado na máquina); agora o pipe também.
+- **[Full = tudo] `install --yes` instala o ECC global** (`ecc-universal`, binário `ecc`) — antes só o `create --full` o instalava, deixando `ecc` ausente após um `install` puro. Consistente com gbrain/graphify/headroom; pula se já presente.
+- **+1 teste de guarda** (install instala ecc-universal). 300 Node + 58 Python verdes; lint/syntaxcheck limpos.
+
 ## [3.4.0] - 2026-06-23
 
 ### `/start` como ponto de entrada guiado (PRD 11 Fase 4 — fecha o roadmap)

@@ -18,6 +18,10 @@ test("install NÃO tenta mais o pacote fantasma `cli-anything-hub` (E404)", () =
   assert.doesNotMatch(installSrc, /install",\s*"-g",\s*"cli-anything-hub"/, "removido o npm install -g cli-anything-hub")
 })
 
+test("install --yes instala o ECC global (ecc-universal) — consistência Full = tudo", () => {
+  assert.match(installSrc, /"ecc-universal"/, "install instala ecc-universal (binário `ecc`)")
+})
+
 const createSrc = readFileSync(path.join(import.meta.dirname, "..", "src", "cli", "create.js"), "utf-8")
 
 test("create instala ECC pelo pacote real `ecc-universal` (não o daemon fantasma ecc2)", () => {
