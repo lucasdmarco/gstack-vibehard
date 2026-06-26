@@ -1,5 +1,13 @@
 # Changelog - gstack-vibehard
 
+## [3.10.0] - 2026-06-26
+
+### Truth-sync: o `dream audit` agora conhece o sprint entregue (PRD 12 PR1)
+Reconcilia as promessas com a realidade — o auditor anti-placebo passou a listar o que o sprint PRD 12 entregou.
+- **`dream audit` ganha 5 claims REAIS** com evidência verificada no código: **runtime-supervisor** (`dev`/`stop`), **secrets-broker** (keychain, sem `.env`), **runtime-manifest** (V2), **package-manager** (`doctor --package-manager`) e **full-contract** (`--allow-degraded`). Resultado: **8 REAL / 3 PARTIAL / 0 PLACEBO / 0 ROADMAP / 1 RISK** (Output Guard segue RISK honesto — auditoria pós-resposta, sem intercept pré-render).
+- **README:** corrige a claim **factualmente errada** "ECC2" → **ECC** (`ecc-universal`; ECC2 era vaporware/404 que auditamos) e aponta segredos para o **broker** (keychain), não `.env` em claro.
+- **+5 asserts** no teste do audit travam os novos claims como REAL. 342 Node + 58 Python verdes; lint/syntaxcheck; pack smoke OK.
+
 ## [3.9.0] - 2026-06-26
 
 ### Contrato Full sem degradação silenciosa (PRD 12 §11, P1-#7)
