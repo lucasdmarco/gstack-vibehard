@@ -1,5 +1,14 @@
 # Changelog - gstack-vibehard
 
+## [3.9.0] - 2026-06-26
+
+### Contrato Full sem degradação silenciosa (PRD 12 §11, P1-#7)
+"Full = tudo" não termina mais como **concluído** se um componente do completo falhou em silêncio.
+- **Novo `src/installer/full-contract.js`** (puro/testável): `trackDegraded(report, comp, reason)` (dedup por componente) + `evaluateFullContract({degraded, projectOnly, auditOnly, skipDeps, allowDegraded})` → `{block, isFull, message}`. Regra: no modo **Full**, qualquer componente degradado **BLOQUEIA** (exit 1); Lite/project-only/audit-only **toleram** (só avisam).
+- **`install` rastreia o degradado** em vez de só `warn`-and-continue: **gbrain, graphify, ECC, headroom** (binário ausente após instalar) e **Obsidian app**. No fim, imprime "Contrato Full — componentes degradados" e **bloqueia** sem `--allow-degraded`.
+- **Novo flag `--allow-degraded`**: aceita explicitamente o estado parcial (Full prossegue, marcado como DEGRADADO). Sem ele, o install sai com erro e remediação clara.
+- Não afeta `--audit-only`/`--project-only` (retornam antes do gate / são tolerados). **+5 testes** (bloqueia/allow/ok/Lite tolera/dedup). 342 Node + 58 Python verdes; lint/syntaxcheck; pack smoke OK.
+
 ## [3.8.0] - 2026-06-26
 
 ### Secrets Broker real — keychain do SO, sem `.env` (PRD 12 §10, P0-B)
