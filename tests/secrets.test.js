@@ -90,6 +90,15 @@ test("redact: troca valores de segredo por *** (defesa p/ logs)", async () => {
   assert.equal(redact("nada", ["x"]), "nada", "valor curto (<4) não redige")
 })
 
+// ── secrets run: aceita comando COM e SEM `--` (shim do Windows engole o `--`) ──
+test("parseRunArgs: com `--` e SEM `--` (Windows .cmd) pegam o comando verbatim", async () => {
+  const { parseRunArgs } = await imp("src/commands/secrets.js")
+  assert.deepEqual(parseRunArgs(["run", "--", "node", "-e", "x"]), ["node", "-e", "x"], "com --")
+  assert.deepEqual(parseRunArgs(["run", "node", "-e", "x"]), ["node", "-e", "x"], "sem -- (shim engoliu)")
+  assert.deepEqual(parseRunArgs(["run"]), [], "sem comando → vazio")
+  assert.deepEqual(parseRunArgs(["run", "--", "pnpm", "--filter", "api", "dev"]), ["pnpm", "--filter", "api", "dev"], "flags do comando preservadas")
+})
+
 // ── brokerStatus sem provider ──
 test("brokerStatus: sem keychain → available false (honesto)", async () => {
   const { brokerStatus } = await imp("src/secrets/broker.js")

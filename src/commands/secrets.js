@@ -108,10 +108,21 @@ async function importCmd(cwd, args, status, opts) {
   } else info("  Mantido. Lembre: `.env` rastreado bloqueia delegação.")
 }
 
+/**
+ * Comando de `secrets run`. O `--` é OPCIONAL: o shim `.cmd` do npm no Windows
+ * ENGOLE o `--`, então não dá pra depender dele — `secrets run node x.js` vale igual
+ * a `secrets run -- node x.js`. Pega tudo após `run` (ou após o `--`, se houver).
+ */
+export function parseRunArgs(args) {
+  const runIdx = args.indexOf("run")
+  const rest = runIdx >= 0 ? args.slice(runIdx + 1) : args.slice()
+  const dd = rest.indexOf("--")
+  return dd >= 0 ? rest.slice(dd + 1) : rest // verbatim (não filtra args do comando)
+}
+
 function runCmd(cwd, args, status, opts) {
-  const sep = args.indexOf("--")
-  const cmd = sep >= 0 ? args.slice(sep + 1) : []
-  if (cmd.length === 0) { error("Uso: secrets run -- <comando> [args]"); return }
+  const cmd = parseRunArgs(args)
+  if (cmd.length === 0) { error("Uso: secrets run [--] <comando> [args]"); return }
   const schema = loadSecretsSchema(cwd)
   const names = allRequiredNames(schema)
   const secrets = resolveSecrets(cwd, names, opts) // só os requeridos, EM MEMÓRIA
