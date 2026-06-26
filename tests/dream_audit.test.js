@@ -36,6 +36,10 @@ test("audit: classifica claims, é determinístico e read-only (todas têm statu
   // verify e rollback são REAL (já entregues)
   assert.equal(r.claims.find((c) => c.id === "verify").status, "REAL")
   assert.equal(r.claims.find((c) => c.id === "rollback").status, "REAL")
+  // truth-sync (PRD 12 PR1): o sprint entregue aparece como REAL no audit
+  for (const id of ["runtime-supervisor", "secrets-broker", "runtime-manifest", "package-manager", "full-contract"]) {
+    assert.equal(r.claims.find((c) => c.id === id).status, "REAL", `${id} deve ser REAL`)
+  }
   // soma do summary == nº de claims
   assert.equal(Object.values(r.summary).reduce((a, b) => a + b, 0), r.claims.length)
 })

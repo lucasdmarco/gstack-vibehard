@@ -96,6 +96,49 @@ export function audit(opts = {}) {
     missing: ["execução do loop (worktree/diff/accept) — hoje só planeja"],
   })
 
+  // 8. Runtime Supervisor (PRD 12 PR4) — REAL: dev/stop sobem/derrubam serviços.
+  {
+    const ok = cliHasCommand(read, "dev") && cliHasCommand(read, "stop") && has("src/runtime/supervisor.js") && has("tests/runtime_supervisor.test.js")
+    add({
+      id: "runtime-supervisor", claim: "Runtime: dev/stop sobem e derrubam serviços",
+      status: ok ? "REAL" : "PARTIAL", severity: "P1",
+      evidence: ["src/runtime/supervisor.js", "src/runtime/ports.js", "src/commands/runtime-supervisor.js"].filter(has),
+      missing: ok ? [] : ["supervisor contínuo (restart/backoff/dependsOn) — hoje launch+readiness"],
+    })
+  }
+
+  // 9. Secrets Broker (PRD 12 §10) — REAL: keychain do SO, sem .env.
+  {
+    const ok = cliHasCommand(read, "secrets") && has("src/secrets/broker.js") && has("src/secrets/providers.js") && has("tests/secrets.test.js")
+    add({
+      id: "secrets-broker", claim: "Secrets Broker (keychain do SO, sem .env)",
+      status: ok ? "REAL" : "PARTIAL", severity: "P1",
+      evidence: ["src/secrets/broker.js", "src/secrets/providers.js", "src/secrets/schema.js", "src/commands/secrets.js"].filter(has),
+      missing: ok ? [] : ["providers por SO + comandos doctor/set/list/run"],
+    })
+  }
+
+  // 10. Runtime Manifest V2 (PRD 12 PR3) — REAL: schema/migração/validação.
+  add({
+    id: "runtime-manifest", claim: "Runtime Manifest V2 (contrato do supervisor)",
+    status: (has("src/runtime/manifest.js") && has("tests/runtime_manifest.test.js")) ? "REAL" : "PARTIAL",
+    severity: "P2", evidence: ["src/runtime/manifest.js"].filter(has), missing: [],
+  })
+
+  // 11. Package Manager Doctor (PRD 12 PR2) — REAL: resolver + doctor --package-manager.
+  add({
+    id: "package-manager", claim: "Resolver de package manager (doctor --package-manager)",
+    status: (has("src/installer/package-manager.js") && read("src/installer/doctor.js").includes("--package-manager")) ? "REAL" : "PARTIAL",
+    severity: "P2", evidence: ["src/installer/package-manager.js"].filter(has), missing: [],
+  })
+
+  // 12. Contrato Full sem degradação (PRD 12 §11) — REAL: gate + --allow-degraded.
+  add({
+    id: "full-contract", claim: "Full = tudo (bloqueia degradação silenciosa)",
+    status: (has("src/installer/full-contract.js") && read("src/installer/install.js").includes("allow-degraded")) ? "REAL" : "PARTIAL",
+    severity: "P1", evidence: ["src/installer/full-contract.js"].filter(has), missing: [],
+  })
+
   const summary = { REAL: 0, PARTIAL: 0, PLACEBO: 0, ROADMAP: 0, RISK: 0 }
   for (const c of claims) summary[c.status] = (summary[c.status] || 0) + 1
   return { generatedAt: new Date().toISOString(), root: ".", claims, summary }
