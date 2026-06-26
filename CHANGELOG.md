@@ -1,5 +1,11 @@
 # Changelog - gstack-vibehard
 
+## [3.10.1] - 2026-06-26
+
+### Correções pós-reconfirmação na máquina Windows limpa
+- **`secrets run` falhava no bin global do Windows** ("Uso: secrets run --"): o shim `.cmd` do npm **engole o `--`**, então o separador não chegava ao comando. Agora o `--` é **opcional** — `secrets run node x.js` vale igual a `secrets run -- node x.js` (pega tudo após `run`, ou após o `--` se houver; comando preservado verbatim). **+1 teste** (`parseRunArgs` com e sem `--`).
+- **`install --help` não listava `--allow-degraded`**: o flag funcionava mas não era descobrível. Adicionado ao usage. 343 Node + 58 Python verdes; lint/syntaxcheck; pack smoke OK.
+
 ## [3.10.0] - 2026-06-26
 
 ### Truth-sync: o `dream audit` agora conhece o sprint entregue (PRD 12 PR1)
