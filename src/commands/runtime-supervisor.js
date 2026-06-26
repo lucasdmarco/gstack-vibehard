@@ -6,6 +6,7 @@ import {
   planStart, stopAll, pollReadiness, killTreeCommand, isAlive,
   writeServiceState, readAllState, clearState, logsDir,
 } from "../runtime/supervisor.js"
+import { resolveSecrets } from "../secrets/broker.js"
 import { section, success, warn, error, info } from "../cli/index.js"
 
 /** GET HTTP simples com timeout (readiness). Usa o fetch global (Node >= 18). */
@@ -54,9 +55,13 @@ export async function devCommand(args = [], opts = {}) {
 
   mkdirSync(logsDir(cwd), { recursive: true })
   if (!json) section("dev — subindo o runtime")
-  // envSource = process.env, mas o plano só repassa ao serviço a base OS-essencial,
-  // a porta alocada e os segredos DECLARADOS (secretRefs) — nunca o env inteiro.
-  const plans = await planStart(m, { envSource: process.env, allocatePort: opts.allocatePort })
+  // Resolve os segredos DECLARADOS (secretRefs) do BROKER (keychain) — em memória,
+  // nunca a disco. Têm precedência sobre o env do shell. Sem broker → cai no env.
+  const refNames = [...new Set((m.services || []).flatMap((s) => s.secretRefs || []))]
+  const brokerSecrets = refNames.length ? resolveSecrets(cwd, refNames, opts) : {}
+  // envSource = env do shell + segredos do broker (precedência). O plano só repassa
+  // ao serviço a base OS-essencial, a porta e os secretRefs declarados — nunca tudo.
+  const plans = await planStart(m, { envSource: { ...process.env, ...brokerSecrets }, allocatePort: opts.allocatePort })
   const started = []
   for (const p of plans) {
     const logPath = join(logsDir(cwd), `${p.name}.log`)

@@ -1,5 +1,17 @@
 # Changelog - gstack-vibehard
 
+## [3.8.0] - 2026-06-26
+
+### Secrets Broker real — keychain do SO, sem `.env` (PRD 12 §10, P0-B)
+Sai do "lista de nomes" para um broker de verdade: o **valor** vive no keychain do SO e é injetado **só em memória** no serviço; o repo nunca vê segredo em claro.
+- **Providers por SO** (`src/secrets/providers.js`): **Windows DPAPI** (cifra com a chave do usuário, externa ao arquivo — via PowerShell `ConvertFrom/ConvertTo-SecureString`), **macOS Keychain** (`security`), **Linux libsecret** (`secret-tool`). Valor sempre por **STDIN**, nunca em argv (não vaza na lista de processos). Detecção por sonda benigna (não `--version`).
+- **Schema v2** (`src/secrets/schema.js`): `{schemaVersion:2, provider, required:[{name,scope,services,sensitive}], optional}`. Migra o v1 (lista de nomes) automaticamente. `create` agora gera o v2; `required[].services` = allowlist de quem recebe cada segredo.
+- **Broker** (`src/secrets/broker.js`): namespace por projeto (hash do path), índice de **nomes/metadados** (`names.json`, **nunca valores**), resolução em memória, `redact()` p/ logs, `parseDotEnv` p/ import.
+- **`gstack_vibehard secrets <doctor|list|set|delete|import|run>`**: `set` sem echo (ou `--stdin`); `list` **nunca** mostra valor; `import .env` guarda no keychain e oferece renomear o `.env`; `run -- <cmd>` injeta só os requeridos em memória.
+- **`dev` consome o broker**: resolve os `secretRefs` declarados do keychain (precedência sobre o shell; fallback honesto sem broker) e injeta só ao serviço dono.
+- **`.env` NÃO é mais exposto ao Atomic** (`workspace.toml`) e o template/README passa a orientar `secrets`, não `cp .env.example .env`.
+- **+5 testes** (migração v1→v2, parseDotEnv, broker com provider fake, índice sem valor, resolve só declarados, redação). 337 Node + 58 Python verdes; lint/syntaxcheck; pack smoke OK.
+
 ## [3.7.3] - 2026-06-25
 
 ### Correção: manifest/config com BOM era ignorado em silêncio no Windows (PRD 12 PR4)
