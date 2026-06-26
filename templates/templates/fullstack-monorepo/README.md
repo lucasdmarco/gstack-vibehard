@@ -5,10 +5,12 @@ Monorepo fullstack: **React (Vite)** no front + **Express/Fastify/Hono** na API,
 ## Começar em 5 minutos
 
 ```bash
-cp .env.example .env      # preencha as variáveis (ver abaixo)
-npm install               # ou pnpm install
-npm run dev               # sobe web + api
+gstack_vibehard secrets import .env.example   # segredos → keychain do SO (sem .env)
+npm install                                   # ou pnpm install
+gstack_vibehard dev                           # sobe web + api (injeta os segredos)
 ```
+
+> **Segredos via broker, não `.env`.** O `gstack_vibehard secrets` guarda os valores no keychain do SO (Windows Credential/DPAPI, macOS Keychain, Linux libsecret) e injeta só os declarados em cada serviço, **em memória** — nada em claro no repo. `gstack_vibehard secrets doctor` mostra o que falta. (`.env.example` segue só como referência de quais variáveis existem.)
 
 ## Variáveis de ambiente (`.env.example`)
 
@@ -20,7 +22,7 @@ npm run dev               # sobe web + api
 | `DB_ENV` | `local` (SQLite/Turso) ou `prod` (PostgreSQL) |
 | `API_PORT` / `CORS_ORIGIN` | porta da API e origem CORS |
 
-> Sem as variáveis preenchidas, comandos que dependem de Supabase/DB falham com erro claro de **env ausente** — não com stack trace opaco. Copie `.env.example` para `.env` antes de rodar.
+> Sem as variáveis preenchidas, comandos que dependem de Supabase/DB falham com erro claro de **env ausente** — não com stack trace opaco. Guarde os valores com `gstack_vibehard secrets set <NOME>` (ou `secrets import .env.example`); o `dev` os injeta em memória.
 
 ## Scripts
 

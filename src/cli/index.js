@@ -17,6 +17,7 @@ import { sprintCommand } from "../commands/sprint.js"
 import { monitorCommand } from "../commands/monitor.js"
 import { runtimeCommand } from "../commands/runtime.js"
 import { devCommand, stopCommand, logsCommand, openCommand } from "../commands/runtime-supervisor.js"
+import { secretsCommand } from "../commands/secrets.js"
 import { planCommand } from "../commands/plan.js"
 import { startCommand } from "../commands/start.js"
 import { taskCommand } from "../commands/task.js"
@@ -162,6 +163,7 @@ const COMMANDS = [
   { name: "stop", group: "common", desc: "Encerra o runtime (árvore de processos)", usage: "gstack_vibehard stop [--json]" },
   { name: "logs", group: "common", desc: "Logs de um serviço do runtime", usage: "gstack_vibehard logs [serviço] [--follow]" },
   { name: "open", group: "common", desc: "Abre o preview do serviço web", usage: "gstack_vibehard open" },
+  { name: "secrets", group: "common", desc: "Broker de segredos (keychain do SO; sem .env)", usage: "gstack_vibehard secrets <doctor|list|set|delete|import|run>" },
   { name: "sprint", group: "advanced", desc: "Salvar decisões e atualizar memórias", usage: "gstack_vibehard sprint --save" },
   { name: "list", group: "advanced", desc: "Listar componentes instalados", usage: "gstack_vibehard list" },
 ]
@@ -300,6 +302,9 @@ async function dispatch(command, args) {
       break
     case "open":
       openCommand(args)
+      break
+    case "secrets":
+      await secretsCommand(args)
       break
     case "tools":
     case "pp":

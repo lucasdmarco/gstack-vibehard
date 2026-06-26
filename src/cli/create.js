@@ -263,11 +263,11 @@ __pycache__/
 
   const atomicDir = join(projectDir, ".atomic")
   mkdirSync(atomicDir, { recursive: true })
+  // Secrets Broker (PRD 12 §10): `.env`/`.env.local` NÃO são expostos às views do
+  // Atomic — segredo vive no keychain (`gstack_vibehard secrets`), não em arquivo.
   writeFileSync(join(atomicDir, "workspace.toml"),
 `[workspace]
 expose = [
-  ".env",
-  ".env.local",
   ".claude/",
   ".cursor/",
   ".windsurf/",
@@ -682,8 +682,15 @@ export function writeRuntimeFiles({ projectDir, projectName, now, projectRoot, t
   // comandos em array, port autoAllocate, health readiness/liveness, restart.
   writeJson(join(gstackDir, "runtime.json"), buildRuntimeManifest({ services: tpl.services }))
 
+  // Secrets schema v2 (PRD 12 §10): nomes + metadados, NUNCA valores. O valor vive
+  // no keychain do SO via `gstack_vibehard secrets`. `required[].services` declara
+  // quem recebe cada segredo no `dev` (allowlist por serviço).
   writeJson(join(gstackDir, "secrets.schema.json"), {
-    required: ["DATABASE_URL"],
+    schemaVersion: 2,
+    provider: "os-keychain",
+    required: [
+      { name: "DATABASE_URL", scope: "runtime", services: ["api"], sensitive: true },
+    ],
     optional: [
       "CASDOOR_CLIENT_SECRET",
       "GH_TOKEN",
