@@ -12,6 +12,7 @@ import { installCursor } from "../harness/cursor.js"
 import { installHermes } from "../harness/hermes.js"
 import { writeInstructionalGuidance } from "../harness/instructional.js"
 import { installHeadroom } from "../harness/headroom.js"
+import { trackDegraded, evaluateFullContract } from "./full-contract.js"
 import { ensureDir, copyWithBackup, copyDirSync, backupFile } from "./merge.js"
 import { buildInstallImpact, renderImpactMarkdown } from "./impact.js"
 import { checkRemoteDownload } from "./remote-policy.js"
@@ -117,9 +118,11 @@ async function installDeps(warn, success, info, report, harnessIds, allowRemote 
       success("gbrain (bun global)")
     } catch (e) {
       warn(`gbrain (bun global): ${e.message}`)
+      trackDegraded(report, "gbrain", e.message)
     }
   } else {
     info("gbrain: pulado (bun nao disponivel)")
+    trackDegraded(report, "gbrain", "bun não disponível")
   }
 
   // ========================================
@@ -164,9 +167,11 @@ async function installDeps(warn, success, info, report, harnessIds, allowRemote 
       report.added.push("graphify (graphifyy — indexação AST)")
     } catch (e) {
       warn(`graphify (uv tool graphifyy): ${e.message}`)
+      trackDegraded(report, "graphify", e.message)
     }
   } else {
     info("graphify: pulado (uv não disponível) — `uv tool install graphifyy` ativa a indexação AST global.")
+    trackDegraded(report, "graphify", "uv não disponível")
   }
 
   // ========================================
@@ -184,6 +189,7 @@ async function installDeps(warn, success, info, report, harnessIds, allowRemote 
       report.added.push("ECC (ecc-universal)")
     } catch (e) {
       warn(`ECC (ecc-universal): ${e.message}`)
+      trackDegraded(report, "ECC", e.message)
     }
   }
 
@@ -322,6 +328,8 @@ async function installDeps(warn, success, info, report, harnessIds, allowRemote 
     uvBin,
     selectedHarnessIds: harnessIds,
   }, report)
+  // Full = tudo: se o headroom não ficou disponível, é degradação (não silêncio).
+  if (!findWorkingBinary(["headroom"])) trackDegraded(report, "headroom", "binário ausente após instalar (sem uv/permissão?)")
 }
 
 // Full = tudo: tenta instalar o app Obsidian (winget no Windows / brew no mac).
@@ -472,7 +480,10 @@ export async function install(args = []) {
     }
     return out.length ? out : null
   })()
-  const report = { added: [], updated: [], skipped: [], errors: [] }
+  // Contrato Full (PRD 12 §11): `degraded` rastreia componentes do completo que
+  // falharam. No fim, no modo Full, isso BLOQUEIA — a menos de `--allow-degraded`.
+  const allowDegraded = args.includes("--allow-degraded")
+  const report = { added: [], updated: [], skipped: [], errors: [], degraded: [] }
 
   section("gstack_vibehard Installer")
 
@@ -805,6 +816,8 @@ export async function install(args = []) {
       success("Obsidian app instalado (vault em ~/gstack-vault).")
     } else {
       info("Obsidian app: nao instalado nesta maquina (degraded/opcional — o vault e markdown). Manual: `winget install Obsidian.Obsidian` / `brew install --cask obsidian`.")
+      // Full = tudo: app ausente conta como degradação (opt-out explícito: --no-obsidian).
+      if (!projectOnly && !args.includes("--no-obsidian")) trackDegraded(report, "obsidian-app", "winget/brew indisponível ou falhou (vault markdown segue funcional)")
     }
   } else if (getGlobalObsidianDefault()) {
     info(`Obsidian ja configurado (default global): ${getGlobalObsidianDefault()}`)
@@ -823,6 +836,22 @@ export async function install(args = []) {
 
   // Report
   printInstallReport(report)
+
+  // Contrato Full (PRD 12 §11): "Full = tudo" não pode terminar como concluído com
+  // componentes degradados em silêncio. Bloqueia (exit 1) a menos de --allow-degraded.
+  const contract = evaluateFullContract({ degraded: report.degraded, projectOnly, auditOnly, skipDeps, allowDegraded })
+  if (report.degraded.length) {
+    section("Contrato Full — componentes degradados")
+    for (const d of report.degraded) warn(`  ✗ ${d.component}: ${d.reason}`)
+  }
+  if (contract.block) {
+    error(contract.message)
+    info("  Conserte os componentes acima, ou rode novamente com `--allow-degraded` para aceitar o estado parcial.")
+    report.blocked = true
+    process.exitCode = 1
+    return report
+  }
+  if (contract.isFull && report.degraded.length && allowDegraded) warn(contract.message)
 
   section("Instalacao Concluida!")
   section("Ativacao POR PROJETO (importante)")
