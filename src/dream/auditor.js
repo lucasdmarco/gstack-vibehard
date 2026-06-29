@@ -151,6 +151,18 @@ export function audit(opts = {}) {
     })
   }
 
+  // 14. AgentShield Blocking Build (PRD 13 PR13.2) — REAL: scan determinístico bloqueia injeção em build E --check.
+  {
+    const ok = has("src/agents/scanner.js") && has("tests/agents_scanner.test.js") &&
+      read("scripts/scripts/build_agents.js").includes("evaluateScan")
+    add({
+      id: "agentshield", claim: "AgentShield: scan determinístico bloqueia prompt-injection (build + --check)",
+      status: ok ? "REAL" : "PARTIAL", severity: "P1",
+      evidence: ["src/agents/scanner.js", "scripts/scripts/build_agents.js"].filter(has),
+      missing: ok ? [] : ["scanner determinístico no build e no --check"],
+    })
+  }
+
   const summary = { REAL: 0, PARTIAL: 0, PLACEBO: 0, ROADMAP: 0, RISK: 0 }
   for (const c of claims) summary[c.status] = (summary[c.status] || 0) + 1
   return { generatedAt: new Date().toISOString(), root: ".", claims, summary }
