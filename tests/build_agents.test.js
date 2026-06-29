@@ -102,12 +102,30 @@ Use clear API design boundaries.
 
     const generatedManifest = JSON.parse(await readFile(path.join(root, "agents", "generated", "manifest.json"), "utf8"))
     assert.equal(generatedManifest.agents, 3)
+    // Manifest V2 (PRD 13 PR13.1): hashes da fonte + adapter versions + security verdict
+    assert.equal(generatedManifest.schemaVersion, 2)
+    assert.match(generatedManifest.source.coreHash, /^sha256:[0-9a-f]{64}$/)
+    assert.match(generatedManifest.source.agentsHash, /^sha256:/)
+    assert.ok(generatedManifest.compilerVersion)
+    assert.ok(generatedManifest.adapters.claude && generatedManifest.security.verdict)
+    // Execution Contract presente em TODO adapter gerado
+    assert.match(claudeText, /## GStack Execution Contract/)
+    assert.match(claudeText, /LLM cross-review is advisory only/)
+    assert.match(codexText, /advisory only/)
+    const cursorRuleText = await readFile(cursorRule, "utf8")
+    assert.match(cursorRuleText, /treat the gate as blocked, not passed/)
 
     const checkResult = spawnSync(process.execPath, [buildScript, "--root", root, "--check"], {
       cwd: repoRoot,
       encoding: "utf8",
     })
     assert.equal(checkResult.status, 0, checkResult.stderr || checkResult.stdout)
+
+    // ABUSO: editar um adapter à mão → --check FALHA (drift guard)
+    await writeFile(claudeSkill, claudeText + "\nEDITADO A MAO\n")
+    const driftResult = spawnSync(process.execPath, [buildScript, "--root", root, "--check"], { cwd: repoRoot, encoding: "utf8" })
+    assert.equal(driftResult.status, 1, "edição manual em generated deve falhar o --check")
+    assert.match((driftResult.stderr || "") + (driftResult.stdout || ""), /desatualiz/i)
   } finally {
     await rm(root, { recursive: true, force: true })
   }

@@ -68,6 +68,8 @@ jobs:
         run: grep -rn '/Users/\|/home/' src/ --include='*.js' && exit 1 || exit 0
       - name: Check shebang
         run: head -1 src/index.js | grep -q '#!/usr/bin/env node'
+      - name: Agent Factory drift guard (PRD 13 PR13.1)
+        run: npm run build:agents -- --check
 
   # Smoke de empacotamento + scaffold. O test:pack prova o TARBALL real (pegaria,
   # p.ex., o strip do .gitignore pelo npm); o test:templates valida o scaffold lite.

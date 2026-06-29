@@ -1,5 +1,16 @@
 # Changelog - gstack-vibehard
 
+## [3.11.0] - 2026-06-29
+
+### Agent Factory Contract — fonte única, drift guard, Execution Contract (PRD 13 PR13.1)
+A fábrica de agentes (`core/` + `knowledge/` + `agents/agents/` → adapters por harness) vira **contrato do produto**: o que é gerado é comprovável e não pode apodrecer em silêncio.
+- **Manifest V2** (`agents/generated/manifest.json`): `schemaVersion 2` + `compilerVersion` + **hashes da fonte** (`coreHash`/`knowledgeHash`/`agentsHash`) + adapter versions/status + security verdict. **Determinístico** (sem `generatedAt`) — o `--check` compara por igualdade sem ruído/churn.
+- **Execution Contract** (`src/agents/factory.js`, §8.6): bloco imutável injetado no **fim de TODO adapter gerado** (claude/codex/cursor) — mesmo DNA operacional: "LLM cross-review é advisory only", "Fallow/QG indisponível bloqueia, não passa", respeitar hooks, nunca vazar segredo. Não substitui hooks reais (instrucional segue instrucional).
+- **Drift Guard**: `build:agents --check` falha se generated está stale (core/knowledge/agents mudou), foi editado à mão, ou um adapter perdeu o contrato.
+- **Novo comando `gstack_vibehard agents <build|check|diff|doctor|list|explain>`** — `doctor` mostra manifest v2, drift, contrato N/N, security e a **matriz de adapters × confiança real** (capabilities.js); nenhum harness instrucional rotulado enforcement.
+- **dream audit** ganha `agent-factory` = **REAL** → **9 REAL / 3 PARTIAL / 0 PLACEBO / 0 ROADMAP / 1 RISK**.
+- **+4 testes** de factory (contrato idempotente, hashFiles determinístico, manifest v2, `evaluateDrift` de abuso) + asserts de manifest v2/contrato/**drift on edit** no build e2e. Adapters regenerados (21 agentes). **347 Node** + 58 Python verdes; lint/syntaxcheck; pack smoke OK.
+
 ## [3.10.1] - 2026-06-26
 
 ### Correções pós-reconfirmação na máquina Windows limpa

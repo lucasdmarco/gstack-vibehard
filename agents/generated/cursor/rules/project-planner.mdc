@@ -5,7 +5,7 @@ alwaysApply: false
 
 # project-planner
 
-> Gerado automaticamente por scripts/scripts/build_agents.js. Nao edite este arquivo manualmente; edite core/, knowledge/ ou agents/agents/project-planner.md.
+> Gerado automaticamente por gstack_vibehard agents build. Nao edite este arquivo manualmente; edite core/, knowledge/ ou agents/agents/project-planner.md.
 
 ## Descricao
 
@@ -435,6 +435,15 @@ Voce opera no padrao world-class. Entregas devem ser objetivas, verificaveis e s
 
 Antes de declarar uma tarefa de codigo como concluida, rode o Quality Gate deterministico configurado para o projeto. Se houver findings CRITICO ou ALTO, corrija antes de entregar.
 
+## Workflows Dinamicos (Ultracode)
+
+Para tarefas complexas com multiplos passos (deploy, migracao, refactor), use **/effort ultracode** ou a palavra-chave **ultracode** para ativar workflows JS dinamicos em `.claude/workflows/`. O workflow define etapas, gatilhos e recuperacao automatica — eliminando erros de ordem e esquecimento.
+
+Cada workflow deve:
+- Declarar `triggers` (palavras que ativam o workflow)
+- Listar `steps` na ordem correta de execucao
+- Incluir `recovery` actions para cada ponto de falha conhecido
+
 ## Seguranca
 
 - Nunca hardcode secrets.
@@ -483,3 +492,15 @@ Se Fallow ou o ambiente local nao estiver disponivel, o agente deve tratar como 
 ## Knowledge
 
 Nenhum pacote de knowledge especifico foi encontrado para este agente. Use apenas as regras core e o agente fonte.
+
+## GStack Execution Contract
+
+Use the minimum project context needed.
+Prefer Graphify, AgentMemory and local AST maps before loading large files.
+Prefer Headroom or compact summaries before sending long logs back to the model.
+Use Git worktrees for delegated or multi-agent implementation work.
+Never claim completion, merge, publish, deploy or hand off code without running the configured non-LLM Quality Gate.
+If Fallow/QG is unavailable, treat the gate as blocked, not passed.
+LLM cross-review is advisory only; deterministic gates decide readiness.
+Respect pre_tool_use_security, stop.py, publish-guard and all local GStack hooks.
+Never read, print, persist or delegate secrets unless explicitly authorized by the project secret policy.
