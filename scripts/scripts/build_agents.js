@@ -4,6 +4,7 @@ import fs from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { execSync, execFileSync } from "node:child_process"
+import { withExecutionContract, buildManifestV2 } from "../../src/agents/factory.js"
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url))
 const DEFAULT_ROOT = path.resolve(SCRIPT_DIR, "..", "..")
@@ -248,7 +249,9 @@ function renderInstruction(agent, coreBlocks, knowledgeBlocks, root) {
     ? knowledgeBlocks.map((block) => `## Knowledge: ${block.title}\n\n${block.body}`).join("\n\n")
     : "## Knowledge\n\nNenhum pacote de knowledge especifico foi encontrado para este agente. Use apenas as regras core e o agente fonte."
 
-  return `# ${agent.id}\n\n> Gerado automaticamente por scripts/scripts/build_agents.js. Nao edite este arquivo manualmente; edite core/, knowledge/ ou ${relativeAgent}.\n\n## Descricao\n\n${agent.description}\n\n## Agente Fonte\n\n${agent.body}\n\n${coreText}\n\n${knowledgeText}\n`.trim() + "\n"
+  const instruction = `# ${agent.id}\n\n> Gerado automaticamente por gstack_vibehard agents build. Nao edite este arquivo manualmente; edite core/, knowledge/ ou ${relativeAgent}.\n\n## Descricao\n\n${agent.description}\n\n## Agente Fonte\n\n${agent.body}\n\n${coreText}\n\n${knowledgeText}\n`.trim() + "\n"
+  // Execution Contract GStack (PRD 13 §8.6): bloco imutável no FIM de todo adapter.
+  return withExecutionContract(instruction)
 }
 
 function yamlScalar(value) {
@@ -316,6 +319,45 @@ function renderCursorAgents(agents) {
   return lines.join("\n")
 }
 
+function rel(root, p) {
+  return path.relative(root, p).replaceAll("\\", "/")
+}
+
+async function readCompilerVersion(root) {
+  try {
+    const pkg = JSON.parse(await fs.readFile(path.join(root, "package.json"), "utf8"))
+    return pkg.version || "0.0.0"
+  } catch { return "0.0.0" }
+}
+
+async function collectSourceFiles(root, absDir) {
+  const out = []
+  for (const file of await listMarkdownFiles(absDir)) {
+    out.push({ rel: rel(root, file), content: await readText(file) })
+  }
+  return out
+}
+
+/** Sumário de segurança DETERMINÍSTICO sobre a FONTE (igual em build e --check). */
+async function builtinSecuritySummary(root) {
+  let critical = 0
+  let high = 0
+  for (const sub of [["core"], ["knowledge"], ["agents", "agents"]]) {
+    const dir = path.join(root, ...sub)
+    if (!existsSync(dir)) continue
+    for (const file of await listMarkdownFiles(dir)) {
+      const content = await readText(file)
+      for (const rule of PROMPT_INJECTION_PATTERNS) {
+        if (rule.pattern.test(content)) {
+          if (rule.severity === "CRITICO") critical += 1
+          else if (rule.severity === "ALTO") high += 1
+        }
+      }
+    }
+  }
+  return { scanner: "agentshield+builtin", verdict: critical > 0 ? "fail" : "pass", critical, high }
+}
+
 async function generate(options) {
   const root = options.root
   const generatedRoot = path.join(root, GENERATED_DIR)
@@ -335,6 +377,7 @@ async function generate(options) {
   }
 
   const cursorIndex = []
+  const adapterFiles = { claude: [], codex: [], cursor: [] }
   let changed = 0
 
   for (const agent of agents) {
@@ -350,31 +393,31 @@ async function generate(options) {
     if (await writeText(codexPath, renderCodexToml(agent, instruction), options)) changed += 1
     if (await writeText(cursorRulePath, renderCursorRule(agent, instruction), options)) changed += 1
 
+    adapterFiles.claude.push(rel(root, claudePath))
+    adapterFiles.codex.push(rel(root, codexPath))
+    adapterFiles.cursor.push(rel(root, cursorRulePath))
     cursorIndex.push({ ...agent, source })
     log(`${agent.id}: ${matchedKnowledge.length} knowledge pack(s)`)
   }
 
   const cursorAgentsPath = path.join(generatedRoot, "cursor", "AGENTS.md")
   if (await writeText(cursorAgentsPath, renderCursorAgents(cursorIndex), options)) changed += 1
+  adapterFiles.cursor.push(rel(root, cursorAgentsPath))
 
-  const manifest = {
-    schemaVersion: 1,
-    generatedBy: "scripts/scripts/build_agents.js",
-    agents: agents.length,
-    core: coreBlocks.map((block) => path.relative(root, block.file).replaceAll("\\", "/")),
-    knowledge: knowledgeBlocks.map((block) => path.relative(root, block.file).replaceAll("\\", "/")),
-    outputs: [
-      "agents/generated/claude/<agent>/SKILL.md",
-      "agents/generated/codex/<agent>.toml",
-      "agents/generated/cursor/AGENTS.md",
-      "agents/generated/cursor/rules/<agent>.mdc",
-    ],
-  }
+  // AgentShield/scan determinístico (gera report + BLOQUEIA crítico) ANTES do manifest.
+  await securityScanGenerated(root, generatedRoot, options)
+
+  // Manifest V2 (PRD 13 §8.3): hashes da fonte + adapter versions + security verdict.
+  // DETERMINÍSTICO (sem generatedAt) → `--check` compara por igualdade sem ruído.
+  const compilerVersion = await readCompilerVersion(root)
+  const coreFiles = await collectSourceFiles(root, path.join(root, "core"))
+  const knowledgeFiles = await collectSourceFiles(root, path.join(root, "knowledge"))
+  const agentFiles = await collectSourceFiles(root, path.join(root, "agents", "agents"))
+  const security = await builtinSecuritySummary(root)
+  const manifest = buildManifestV2({ compilerVersion, coreFiles, knowledgeFiles, agentFiles, agentsCount: agents.length, adapters: adapterFiles, security })
   if (await writeText(path.join(generatedRoot, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`, options)) changed += 1
 
   log(`concluido: ${agents.length} agente(s), ${changed} arquivo(s) alterado(s)`)
-
-  await securityScanGenerated(root, generatedRoot, options)
 }
 
 async function securityScanGenerated(root, generatedRoot, options) {

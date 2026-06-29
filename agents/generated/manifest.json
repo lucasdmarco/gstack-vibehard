@@ -1,19 +1,106 @@
 {
-  "schemaVersion": 1,
-  "generatedBy": "scripts/scripts/build_agents.js",
+  "schemaVersion": 2,
+  "generatedBy": "gstack_vibehard agents build",
+  "compilerVersion": "3.10.1",
   "agents": 21,
-  "core": [
-    "core/01-regras-base.md",
-    "core/02-quality-gates.md"
-  ],
-  "knowledge": [
-    "knowledge/deployer.md",
-    "knowledge/frontend.md"
-  ],
-  "outputs": [
-    "agents/generated/claude/<agent>/SKILL.md",
-    "agents/generated/codex/<agent>.toml",
-    "agents/generated/cursor/AGENTS.md",
-    "agents/generated/cursor/rules/<agent>.mdc"
-  ]
+  "source": {
+    "coreHash": "sha256:8c97845ab37a81d191671c8d90f4831442261de077dc01fd946d4948fc11aeb9",
+    "knowledgeHash": "sha256:965344454b2b59df6d31ed62302b457ec41b8997ded2d49e4f1dada8eac63d44",
+    "agentsHash": "sha256:a7aa55bf9047f040ffa0400142b7cfc8767e9507f5fe98385f24c52b83f57860"
+  },
+  "adapters": {
+    "claude": {
+      "version": 1,
+      "status": "generated",
+      "files": [
+        "agents/generated/claude/backend-specialist/SKILL.md",
+        "agents/generated/claude/code-archaeologist/SKILL.md",
+        "agents/generated/claude/database-architect/SKILL.md",
+        "agents/generated/claude/debugger/SKILL.md",
+        "agents/generated/claude/devops-engineer/SKILL.md",
+        "agents/generated/claude/documentation-writer/SKILL.md",
+        "agents/generated/claude/explorer-agent/SKILL.md",
+        "agents/generated/claude/frontend-specialist/SKILL.md",
+        "agents/generated/claude/game-developer/SKILL.md",
+        "agents/generated/claude/mobile-developer/SKILL.md",
+        "agents/generated/claude/orchestrator/SKILL.md",
+        "agents/generated/claude/penetration-tester/SKILL.md",
+        "agents/generated/claude/performance-optimizer/SKILL.md",
+        "agents/generated/claude/product-manager/SKILL.md",
+        "agents/generated/claude/product-owner/SKILL.md",
+        "agents/generated/claude/project-planner/SKILL.md",
+        "agents/generated/claude/qa-automation-engineer/SKILL.md",
+        "agents/generated/claude/security-auditor/SKILL.md",
+        "agents/generated/claude/seo-specialist/SKILL.md",
+        "agents/generated/claude/test-engineer/SKILL.md",
+        "agents/generated/claude/deployer/SKILL.md"
+      ]
+    },
+    "codex": {
+      "version": 1,
+      "status": "generated",
+      "files": [
+        "agents/generated/codex/backend-specialist.toml",
+        "agents/generated/codex/code-archaeologist.toml",
+        "agents/generated/codex/database-architect.toml",
+        "agents/generated/codex/debugger.toml",
+        "agents/generated/codex/devops-engineer.toml",
+        "agents/generated/codex/documentation-writer.toml",
+        "agents/generated/codex/explorer-agent.toml",
+        "agents/generated/codex/frontend-specialist.toml",
+        "agents/generated/codex/game-developer.toml",
+        "agents/generated/codex/mobile-developer.toml",
+        "agents/generated/codex/orchestrator.toml",
+        "agents/generated/codex/penetration-tester.toml",
+        "agents/generated/codex/performance-optimizer.toml",
+        "agents/generated/codex/product-manager.toml",
+        "agents/generated/codex/product-owner.toml",
+        "agents/generated/codex/project-planner.toml",
+        "agents/generated/codex/qa-automation-engineer.toml",
+        "agents/generated/codex/security-auditor.toml",
+        "agents/generated/codex/seo-specialist.toml",
+        "agents/generated/codex/test-engineer.toml",
+        "agents/generated/codex/deployer.toml"
+      ]
+    },
+    "cursor": {
+      "version": 1,
+      "status": "generated",
+      "files": [
+        "agents/generated/cursor/rules/backend-specialist.mdc",
+        "agents/generated/cursor/rules/code-archaeologist.mdc",
+        "agents/generated/cursor/rules/database-architect.mdc",
+        "agents/generated/cursor/rules/debugger.mdc",
+        "agents/generated/cursor/rules/devops-engineer.mdc",
+        "agents/generated/cursor/rules/documentation-writer.mdc",
+        "agents/generated/cursor/rules/explorer-agent.mdc",
+        "agents/generated/cursor/rules/frontend-specialist.mdc",
+        "agents/generated/cursor/rules/game-developer.mdc",
+        "agents/generated/cursor/rules/mobile-developer.mdc",
+        "agents/generated/cursor/rules/orchestrator.mdc",
+        "agents/generated/cursor/rules/penetration-tester.mdc",
+        "agents/generated/cursor/rules/performance-optimizer.mdc",
+        "agents/generated/cursor/rules/product-manager.mdc",
+        "agents/generated/cursor/rules/product-owner.mdc",
+        "agents/generated/cursor/rules/project-planner.mdc",
+        "agents/generated/cursor/rules/qa-automation-engineer.mdc",
+        "agents/generated/cursor/rules/security-auditor.mdc",
+        "agents/generated/cursor/rules/seo-specialist.mdc",
+        "agents/generated/cursor/rules/test-engineer.mdc",
+        "agents/generated/cursor/rules/deployer.mdc",
+        "agents/generated/cursor/AGENTS.md"
+      ]
+    },
+    "opencode": {
+      "version": 1,
+      "status": "compat_cursor",
+      "files": []
+    }
+  },
+  "security": {
+    "scanner": "agentshield+builtin",
+    "verdict": "pass",
+    "critical": 0,
+    "high": 0
+  }
 }

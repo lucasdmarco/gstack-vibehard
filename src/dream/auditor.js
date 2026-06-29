@@ -139,6 +139,18 @@ export function audit(opts = {}) {
     severity: "P1", evidence: ["src/installer/full-contract.js"].filter(has), missing: [],
   })
 
+  // 13. Agent Factory Contract (PRD 13 PR13.1) — REAL: fonte única → adapters, drift guard, Execution Contract.
+  {
+    const ok = cliHasCommand(read, "agents") && has("src/agents/factory.js") && has("tests/agents_factory.test.js") &&
+      read("agents/generated/manifest.json").includes('"schemaVersion": 2')
+    add({
+      id: "agent-factory", claim: "Agent Factory (fonte única → adapters; drift guard + Execution Contract)",
+      status: ok ? "REAL" : "PARTIAL", severity: "P1",
+      evidence: ["src/agents/factory.js", "scripts/scripts/build_agents.js", "src/commands/agents.js"].filter(has),
+      missing: ok ? [] : ["manifest v2 + drift guard + comando agents"],
+    })
+  }
+
   const summary = { REAL: 0, PARTIAL: 0, PLACEBO: 0, ROADMAP: 0, RISK: 0 }
   for (const c of claims) summary[c.status] = (summary[c.status] || 0) + 1
   return { generatedAt: new Date().toISOString(), root: ".", claims, summary }
