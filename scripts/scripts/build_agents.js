@@ -415,7 +415,20 @@ async function generate(options) {
   const agentFiles = await collectSourceFiles(root, path.join(root, "agents", "agents"))
   const security = await builtinSecuritySummary(root)
   const manifest = buildManifestV2({ compilerVersion, coreFiles, knowledgeFiles, agentFiles, agentsCount: agents.length, adapters: adapterFiles, security })
-  if (await writeText(path.join(generatedRoot, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`, options)) changed += 1
+  // Manifest com tratamento especial no --check: `compilerVersion` é INFORMATIVO
+  // (versão do package) e NÃO conta como drift — senão todo bump de versão quebraria
+  // o --check sem mudar a fonte. Compara o resto por igualdade.
+  const manifestPath = path.join(generatedRoot, "manifest.json")
+  const stableManifest = (m) => { if (!m) return null; const c = { ...m }; delete c.compilerVersion; return c }
+  if (options.check) {
+    const onDisk = existsSync(manifestPath) ? JSON.parse(await fs.readFile(manifestPath, "utf8")) : null
+    if (!onDisk || JSON.stringify(stableManifest(onDisk)) !== JSON.stringify(stableManifest(manifest))) {
+      throw new Error(`Saida gerada desatualizada: ${rel(root, manifestPath)} (manifest)`)
+    }
+  } else if (!options.dryRun) {
+    await fs.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8")
+    changed += 1
+  }
 
   log(`concluido: ${agents.length} agente(s), ${changed} arquivo(s) alterado(s)`)
 }

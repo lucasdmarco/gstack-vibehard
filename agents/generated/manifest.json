@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "generatedBy": "gstack_vibehard agents build",
-  "compilerVersion": "3.10.1",
+  "compilerVersion": "3.11.0",
   "agents": 21,
   "source": {
     "coreHash": "sha256:8c97845ab37a81d191671c8d90f4831442261de077dc01fd946d4948fc11aeb9",
