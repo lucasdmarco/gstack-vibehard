@@ -1,5 +1,16 @@
 # Changelog - gstack-vibehard
 
+## [3.12.0] - 2026-06-29
+
+### AgentShield Blocking Build — scan determinístico bloqueia injeção (PRD 13 PR13.2)
+O scan de prompt-injection vira gate **determinístico e bloqueante**, em build **e** no `--check` (o gap que importava: uma injeção commitada não passava pelo `--check` do CI).
+- **Novo `src/agents/scanner.js`** (puro/testável): `INJECTION_PATTERNS` (override de instrução, exfiltração, leitura de `.env`, desabilitar QG/hooks, vazamento de system prompt, comando destrutivo…), `scanFiles`, `evaluateScan`. **CRÍTICO bloqueia sempre; ALTO bloqueia em `--strict`** (CI release/Full).
+- **Roda em build E `--check`** sobre o escopo §9.1 (`core/`, `knowledge/`, `agents/agents/`, `generated/`, `skills/skills/`). Antes o scan só rodava em build → o gate do CI (`--check`) era cego a injeção.
+- **Cobertura honesta**: ECC AgentShield é cobertura **adicional**; sem ele o builtin determinístico segue ativo e o verdict é `APROVADO_COBERTURA_REDUZIDA`, nunca `pass` pleno (`reduced_coverage`).
+- **Sem falso-positivo**: `process.env` e `.env.example` são BAIXO (não bloqueiam); word-boundary evita casar "send"/"open" em "resend"/"openai".
+- **dream audit**: agentshield = REAL → **10 REAL / 3 PARTIAL / 0 PLACEBO / 0 ROADMAP / 1 RISK**.
+- **+3 testes scanner** (injeção detectada, anti-falso-positivo, gate strict/non-strict) + **e2e de abuso** (injeção em knowledge bloqueia build E `--check`). 351 Node + 58 Python verdes; lint/syntaxcheck; pack smoke OK.
+
 ## [3.11.0] - 2026-06-29
 
 ### Agent Factory Contract — fonte única, drift guard, Execution Contract (PRD 13 PR13.1)
