@@ -6,7 +6,7 @@
   "source": {
     "coreHash": "sha256:8c97845ab37a81d191671c8d90f4831442261de077dc01fd946d4948fc11aeb9",
     "knowledgeHash": "sha256:965344454b2b59df6d31ed62302b457ec41b8997ded2d49e4f1dada8eac63d44",
-    "agentsHash": "sha256:a7aa55bf9047f040ffa0400142b7cfc8767e9507f5fe98385f24c52b83f57860"
+    "agentsHash": "sha256:6ae6b271c37874dc653d486100c64e9b47fb0e3ec44c30cc978e09961587b1cf"
   },
   "adapters": {
     "claude": {
