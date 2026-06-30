@@ -22,6 +22,7 @@ import { agentsCommand } from "../commands/agents.js"
 import { qaCommand } from "../commands/qa.js"
 import { auditCommand } from "../commands/audit.js"
 import { challengeCommand } from "../commands/challenge.js"
+import { orchestrateCommand } from "../commands/orchestrate.js"
 import { planCommand } from "../commands/plan.js"
 import { startCommand } from "../commands/start.js"
 import { taskCommand } from "../commands/task.js"
@@ -172,6 +173,7 @@ const COMMANDS = [
   { name: "qa", group: "advanced", desc: "QA Multi-Lens: lentes determinísticas sobre o diff (eval/any/secret/...)", usage: "gstack_vibehard qa [--strict] [--json]" },
   { name: "audit", group: "advanced", desc: "Provenance/VFA: recibos com hash-chain (verifica ações críticas)", usage: "gstack_vibehard audit <status|inspect|verify|export|doctor> [runId]" },
   { name: "challenge", group: "advanced", desc: "Challenge-Response: exige justificativa antes de ação de alto risco", usage: "gstack_vibehard challenge <classify|evaluate> --intent <i> --target <t> [--scope global]" },
+  { name: "orchestrate", group: "advanced", desc: "Meta-Harness: executor em worktree + verifier independente + dupla verificação", usage: "gstack_vibehard orchestrate <planId> [--verify-with <harness>] --yes" },
   { name: "sprint", group: "advanced", desc: "Salvar decisões e atualizar memórias", usage: "gstack_vibehard sprint --save" },
   { name: "list", group: "advanced", desc: "Listar componentes instalados", usage: "gstack_vibehard list" },
 ]
@@ -325,6 +327,9 @@ async function dispatch(command, args) {
       break
     case "challenge":
       challengeCommand(args)
+      break
+    case "orchestrate":
+      orchestrateCommand(args)
       break
     case "tools":
     case "pp":
