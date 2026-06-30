@@ -1,5 +1,16 @@
 # Changelog - gstack-vibehard
 
+## [3.13.0] - 2026-06-30
+
+### Adapter Expansion + Capability Matrix honesta (PRD 13 PR13.3)
+A matriz de adapters passa a declarar o **enforcement REAL** de cada harness — e nenhum harness instrucional é rotulado como enforcement/Zero-Trust.
+- **Novo `src/agents/adapter-matrix.js`** (§8.4): `enforcement` por harness — `real_hooks` (claude) / `partial` (codex, hermes) / `rules_only` (cursor, **opencode** compat) / `instructional` (copilot, gemini, windsurf) / `detection_only` (kiro). `isInstructional`, `generatedHarnesses`.
+- **`agents doctor` honesto**: a matriz mostra `enforcement=` real, não o `trust` de runtime. **opencode** vira `rules_only` (era `trust=strong`, enganoso — é compat Cursor sem hook próprio). Header explícito: "instrucional não é enforcement".
+- **Copilot + Gemini gerados**: `agents/generated/copilot/copilot-instructions.md` e `gemini/GEMINI.md` (índices combinados, **com o Execution Contract**). Contrato agora em **65/65** adapters.
+- **Label de proveniência**: o doctor mostra "compilado por X" (a versão que compilou os adapters), não a versão do package — honesto quando o release não regenera os adapters.
+- **dream audit**: adapter-matrix = REAL → **11 REAL / 3 PARTIAL / 0 PLACEBO / 0 ROADMAP / 1 RISK**.
+- **+3 testes de matriz** (enforcement honesto, isInstructional sem Zero-Trust, generatedHarnesses) + asserts de copilot/gemini gerados com contrato no e2e. 354 Node + 58 Python verdes; lint/syntaxcheck; pack smoke OK.
+
 ## [3.12.0] - 2026-06-29
 
 ### AgentShield Blocking Build — scan determinístico bloqueia injeção (PRD 13 PR13.2)

@@ -312,6 +312,22 @@ function renderCursorAgents(agents) {
   return lines.join("\n")
 }
 
+/** Arquivo combinado (copilot/gemini): índice de agentes + Execution Contract. */
+function renderCombinedInstructions(title, agents) {
+  const lines = [
+    `# ${title}`,
+    "",
+    "Gerado automaticamente por gstack_vibehard agents build. Nao edite manualmente; edite core/, knowledge/ ou agents/agents/.",
+    "",
+    "## Agentes",
+    "",
+  ]
+  for (const agent of agents) {
+    lines.push(`### ${agent.id}`, "", agent.description, "", `- Source: ${agent.source}`, "")
+  }
+  return withExecutionContract(lines.join("\n"))
+}
+
 function rel(root, p) {
   return path.relative(root, p).replaceAll("\\", "/")
 }
@@ -394,6 +410,15 @@ async function generate(options) {
   const cursorAgentsPath = path.join(generatedRoot, "cursor", "AGENTS.md")
   if (await writeText(cursorAgentsPath, renderCursorAgents(cursorIndex), options)) changed += 1
   adapterFiles.cursor.push(rel(root, cursorAgentsPath))
+
+  // Adapters combinados (PRD 13 §8.4): Copilot e Gemini — instrucionais, com o
+  // Execution Contract. Honesto: instruem, não bloqueiam (matriz em adapter-matrix.js).
+  const copilotPath = path.join(generatedRoot, "copilot", "copilot-instructions.md")
+  if (await writeText(copilotPath, renderCombinedInstructions("GStack VibeHard — Copilot Instructions", cursorIndex), options)) changed += 1
+  const geminiPath = path.join(generatedRoot, "gemini", "GEMINI.md")
+  if (await writeText(geminiPath, renderCombinedInstructions("GStack VibeHard — Gemini Agents", cursorIndex), options)) changed += 1
+  adapterFiles.copilot = [rel(root, copilotPath)]
+  adapterFiles.gemini = [rel(root, geminiPath)]
 
   // AgentShield/scan determinístico (gera report + BLOQUEIA crítico) ANTES do manifest.
   await securityScanGenerated(root, generatedRoot, options)
