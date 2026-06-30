@@ -1,5 +1,16 @@
 # Changelog - gstack-vibehard
 
+## [3.21.0] - 2026-06-30
+
+### Security & Governance Pack (PRD 12 PR9)
+Governança e supply-chain como artefatos versionados — não promessa.
+- **`SECURITY.md`** (publicado no pacote): política de report privado + **postura de defesas** mapeando as proteções reais (Secrets Broker, AgentShield, Challenge-Response, VFA Provenance, diff-hygiene/QA, capability matrix honesta, deps mínimas).
+- **`THREAT_MODEL.md`**: modelo de ameaças REAL (T1–T10: prompt injection, exfiltração, manifest adulterado, config global, ação não-provável, harness fingindo enforcement, loop descontrolado, revisão otimista, supply chain, drift) → cada um mapeado à mitigação determinística já implementada.
+- **`CONTRIBUTING.md`** (ritual de release + disciplina de testes de abuso + zero-dep), **`.github/CODEOWNERS`** (revisão obrigatória; áreas sensíveis secrets/vfa/runtime/agents).
+- **CodeQL** (`.github/workflows/codeql.yml`, `security-extended`, semanal) + **SBOM CycloneDX** (`npm run sbom`).
+- **dream audit**: governance = REAL → **18 REAL / 2 PARTIAL / 0 PLACEBO / 0 ROADMAP / 1 RISK**.
+- **+4 testes** (SECURITY/threat-model/CODEOWNERS/CodeQL/SBOM presentes e com conteúdo real). 395 Node + 58 Python verdes; coverage gate; lint/syntaxcheck; pack smoke OK.
+
 ## [3.20.0] - 2026-06-30
 
 ### `verify` conhece o runtime + usa o package manager real (PRD 12 PR5)

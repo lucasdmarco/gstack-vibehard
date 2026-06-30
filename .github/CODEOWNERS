@@ -1,0 +1,13 @@
+# Donos do código (revisão obrigatória). Veja governança em CONTRIBUTING.md.
+*                       @lucasdmarco
+
+# Áreas sensíveis — segurança/runtime/agentes exigem atenção extra
+/src/secrets/           @lucasdmarco
+/src/vfa/               @lucasdmarco
+/src/runtime/           @lucasdmarco
+/src/agents/            @lucasdmarco
+/src/meta/              @lucasdmarco
+/hooks/                 @lucasdmarco
+/.github/workflows/     @lucasdmarco
+SECURITY.md             @lucasdmarco
+THREAT_MODEL.md         @lucasdmarco
