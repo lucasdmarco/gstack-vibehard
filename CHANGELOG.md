@@ -1,5 +1,15 @@
 # Changelog - gstack-vibehard
 
+## [3.17.0] - 2026-06-30
+
+### Challenge-Response para ações de alto risco (PRD 13 PR13.5)
+Antes de uma ação perigosa, a policy exige **justificativa estruturada** — sem a evidência, a ação é **negada** (em harness com hook real).
+- **Novo `src/vfa/challenge.js`** (puro): `classifyRisk` (escrita em config GLOBAL de harness, leitura de segredo, MCP global, comando destrutivo `rm -rf`/`drop database`/`push --force`, exfiltração) + `evaluateChallenge` (alto risco exige TODAS as evidências: `install-manifest-owner`/`backup-path`/`rollback-plan`; faltou → **deny**) + `buildChallenge`.
+- **Honestidade do enforcement**: harness **instrucional** (copilot/gemini) → `posthoc_audit_only` (não bloqueia antes — só audita depois; **não** é Zero-Trust). Hook real → bloqueio.
+- **Novo `gstack_vibehard challenge <classify|evaluate> --intent <i> --target <t> [--scope global] [--harness <id>] [--evidence …]`**: registra a decisão no **provenance** (recibo encadeado, C1).
+- **dream audit**: challenge-response = REAL → **15 REAL / 2 PARTIAL / 0 PLACEBO / 0 ROADMAP / 1 RISK**. (Resta D1 — Meta-Harness — agora totalmente desbloqueado.)
+- **+4 testes** (classifyRisk; DoD deny sem evidência/allow com evidência; instrucional=posthoc; buildChallenge). 376 Node + 58 Python verdes; lint/syntaxcheck; pack smoke OK.
+
 ## [3.16.0] - 2026-06-30
 
 ### VFA Provenance Alpha — recibos com hash-chain (PRD 13 PR13.4)

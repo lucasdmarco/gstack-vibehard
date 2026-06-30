@@ -21,6 +21,7 @@ import { secretsCommand } from "../commands/secrets.js"
 import { agentsCommand } from "../commands/agents.js"
 import { qaCommand } from "../commands/qa.js"
 import { auditCommand } from "../commands/audit.js"
+import { challengeCommand } from "../commands/challenge.js"
 import { planCommand } from "../commands/plan.js"
 import { startCommand } from "../commands/start.js"
 import { taskCommand } from "../commands/task.js"
@@ -170,6 +171,7 @@ const COMMANDS = [
   { name: "agents", group: "advanced", desc: "Agent Factory: compila core/knowledge/agents → adapters por harness", usage: "gstack_vibehard agents <build|check|diff|doctor|list|explain>" },
   { name: "qa", group: "advanced", desc: "QA Multi-Lens: lentes determinísticas sobre o diff (eval/any/secret/...)", usage: "gstack_vibehard qa [--strict] [--json]" },
   { name: "audit", group: "advanced", desc: "Provenance/VFA: recibos com hash-chain (verifica ações críticas)", usage: "gstack_vibehard audit <status|inspect|verify|export|doctor> [runId]" },
+  { name: "challenge", group: "advanced", desc: "Challenge-Response: exige justificativa antes de ação de alto risco", usage: "gstack_vibehard challenge <classify|evaluate> --intent <i> --target <t> [--scope global]" },
   { name: "sprint", group: "advanced", desc: "Salvar decisões e atualizar memórias", usage: "gstack_vibehard sprint --save" },
   { name: "list", group: "advanced", desc: "Listar componentes instalados", usage: "gstack_vibehard list" },
 ]
@@ -320,6 +322,9 @@ async function dispatch(command, args) {
       break
     case "audit":
       auditCommand(args)
+      break
+    case "challenge":
+      challengeCommand(args)
       break
     case "tools":
     case "pp":
