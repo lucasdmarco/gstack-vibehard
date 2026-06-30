@@ -115,6 +115,16 @@ Use clear API design boundaries.
     const cursorRuleText = await readFile(cursorRule, "utf8")
     assert.match(cursorRuleText, /treat the gate as blocked, not passed/)
 
+    // Adapters combinados (PR13.3): Copilot + Gemini gerados, COM o Execution Contract
+    const copilotFile = path.join(root, "agents", "generated", "copilot", "copilot-instructions.md")
+    const geminiFile = path.join(root, "agents", "generated", "gemini", "GEMINI.md")
+    assert.equal(existsSync(copilotFile), true)
+    assert.equal(existsSync(geminiFile), true)
+    assert.match(await readFile(copilotFile, "utf8"), /## GStack Execution Contract/)
+    assert.match(await readFile(geminiFile, "utf8"), /advisory only/)
+    assert.equal(generatedManifest.adapters.copilot.status, "generated")
+    assert.equal(generatedManifest.adapters.gemini.status, "generated")
+
     const checkResult = spawnSync(process.execPath, [buildScript, "--root", root, "--check"], {
       cwd: repoRoot,
       encoding: "utf8",

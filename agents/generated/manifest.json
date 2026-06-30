@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "generatedBy": "gstack_vibehard agents build",
-  "compilerVersion": "3.11.0",
+  "compilerVersion": "3.12.0",
   "agents": 21,
   "source": {
     "coreHash": "sha256:8c97845ab37a81d191671c8d90f4831442261de077dc01fd946d4948fc11aeb9",
@@ -95,6 +95,20 @@
       "version": 1,
       "status": "compat_cursor",
       "files": []
+    },
+    "copilot": {
+      "version": 1,
+      "status": "generated",
+      "files": [
+        "agents/generated/copilot/copilot-instructions.md"
+      ]
+    },
+    "gemini": {
+      "version": 1,
+      "status": "generated",
+      "files": [
+        "agents/generated/gemini/GEMINI.md"
+      ]
     }
   },
   "security": {

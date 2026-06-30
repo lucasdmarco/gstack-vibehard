@@ -163,6 +163,17 @@ export function audit(opts = {}) {
     })
   }
 
+  // 15. Adapter Capability Matrix honesta (PRD 13 PR13.3) — REAL: enforcement real por harness, sem Zero-Trust p/ instrucional.
+  {
+    const ok = has("src/agents/adapter-matrix.js") && has("tests/agents_adapter_matrix.test.js") && cliHasCommand(read, "agents")
+    add({
+      id: "adapter-matrix", claim: "Adapter matrix honesta (enforcement real; instrucional ≠ Zero-Trust)",
+      status: ok ? "REAL" : "PARTIAL", severity: "P2",
+      evidence: ["src/agents/adapter-matrix.js", "src/commands/agents.js"].filter(has),
+      missing: ok ? [] : ["matriz de enforcement + copilot/gemini gerados"],
+    })
+  }
+
   const summary = { REAL: 0, PARTIAL: 0, PLACEBO: 0, ROADMAP: 0, RISK: 0 }
   for (const c of claims) summary[c.status] = (summary[c.status] || 0) + 1
   return { generatedAt: new Date().toISOString(), root: ".", claims, summary }

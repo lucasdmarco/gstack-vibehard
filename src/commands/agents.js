@@ -3,7 +3,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "fs"
 import { join, resolve, dirname, basename } from "path"
 import { fileURLToPath } from "url"
 import { hasExecutionContract } from "../agents/factory.js"
-import { getCapability } from "../dream/capabilities.js"
+import { getAdapterInfo, isInstructional } from "../agents/adapter-matrix.js"
 import { stripBom } from "../util/json.js"
 import { section, success, warn, error, info } from "../cli/index.js"
 
@@ -106,11 +106,12 @@ function doctorCmd(json) {
   const manifest = readManifest()
   const drift = checkDrift()
   const adapters = manifest && manifest.adapters ? manifest.adapters : {}
-  // matriz honesta: status do manifest + trustLevel real do harness (capabilities.js)
+  // MATRIZ HONESTA (PRD 13 §8.4): enforcement real do adapter, não o trust de runtime.
+  // Nenhum instrucional é rotulado enforcement/Zero-Trust.
   const matrix = Object.entries(adapters).map(([id, a]) => ({
-    harness: id, status: a.status, files: (a.files || []).length, trustLevel: getCapability(id).trustLevel,
+    harness: id, status: a.status, files: (a.files || []).length, enforcement: getAdapterInfo(id).enforcement,
   }))
-  // contrato presente em todos os adapters POR-AGENTE gerados? (AGENTS.md é índice, não conta)
+  // contrato presente em todos os adapters gerados? (per-agente + combinados copilot/gemini; AGENTS.md/índice não conta)
   const adapterFilesToCheck = []
   const claudeDir = join(GEN, "claude")
   if (existsSync(claudeDir)) for (const d of readdirSync(claudeDir)) { const f = join(claudeDir, d, "SKILL.md"); if (existsSync(f)) adapterFilesToCheck.push(f) }
@@ -118,6 +119,7 @@ function doctorCmd(json) {
   if (existsSync(codexDir)) for (const f of readdirSync(codexDir)) if (f.endsWith(".toml")) adapterFilesToCheck.push(join(codexDir, f))
   const cursorRules = join(GEN, "cursor", "rules")
   if (existsSync(cursorRules)) for (const f of readdirSync(cursorRules)) if (f.endsWith(".mdc")) adapterFilesToCheck.push(join(cursorRules, f))
+  for (const combined of [join(GEN, "copilot", "copilot-instructions.md"), join(GEN, "gemini", "GEMINI.md")]) if (existsSync(combined)) adapterFilesToCheck.push(combined)
   let missingContract = 0
   const checked = adapterFilesToCheck.length
   for (const f of adapterFilesToCheck) { try { if (!hasExecutionContract(readFileSync(f, "utf-8"))) missingContract += 1 } catch { missingContract += 1 } }
@@ -134,12 +136,12 @@ function doctorCmd(json) {
   if (json) { process.stdout.write(JSON.stringify(report) + "\n"); if (!report.ok) process.exitCode = 1; return }
   section("agents doctor")
   if (!manifest) { error("manifest.json ausente — rode `agents build`."); process.exitCode = 1; return }
-  info(`  Manifest: schemaVersion ${manifest.schemaVersion} · compiler ${manifest.compilerVersion} · ${manifest.agents} agentes`)
+  info(`  Manifest: schemaVersion ${manifest.schemaVersion} · compilado por ${manifest.compilerVersion} · ${manifest.agents} agentes`)
   ;(drift.ok ? success : error)(`  Drift: ${drift.ok ? "nenhum (generated em dia)" : drift.detail}`)
   ;(missingContract === 0 ? success : error)(`  Execution Contract: ${checked - missingContract}/${checked} adapters`)
   if (manifest.security) (manifest.security.verdict === "pass" ? success : error)(`  Security: ${manifest.security.verdict} (crit ${manifest.security.critical}, alto ${manifest.security.high})`)
-  section("Adapter matrix (status × confiança real)")
-  for (const r of matrix) info(`  • ${r.harness}: ${r.status} · ${r.files} arquivo(s) · trust=${r.trustLevel}`)
+  section("Adapter matrix (enforcement REAL — instrucional não é enforcement)")
+  for (const r of matrix) info(`  • ${r.harness}: ${r.status} · ${r.files} arquivo(s) · enforcement=${r.enforcement}`)
   if (!report.ok) { process.exitCode = 1; warn("Há pendências acima — rode `agents build`.") }
   else success("Agent Factory saudável.")
 }
