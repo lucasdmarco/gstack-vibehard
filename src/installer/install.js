@@ -20,7 +20,7 @@ import { safeCopyDir, safeCopyFile, safeWriteFile, safeAppendBlock } from "./saf
 import { findWorkingBinary, getUvCandidates, getBunCandidates, npxArgv, npmArgv, mergeWindowsPath } from "./deps.js"
 import { checkAlreadyInstalled } from "./check.js"
 import { installGeneratedAgentLayer, installGraphifyGitHooks } from "./agent-distribution.js"
-import { multiSelect, select, prompt, success, warn, error, info, section } from "../cli/index.js"
+import { multiSelect, select, prompt, confirm, success, warn, error, info, section } from "../cli/index.js"
 import { obsidianDetected, getGlobalObsidianDefault, setGlobalObsidianDefault, chooseObsidian } from "../context-docs/obsidian.js"
 
 const HOME = homedir()

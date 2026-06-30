@@ -23,7 +23,8 @@ export const QA_LENSES = Object.freeze([
   { id: "bare-except", lens: "errors", severity: "MEDIO", langs: ["py"], match: reLine(/^\s*except\s*:\s*$/), msg: "bare `except:` — capture exceções específicas" },
   // ── Performance (ultracode: zero query sem limit) ──
   { id: "unbounded-query", lens: "perf", severity: "MEDIO", langs: ["js", "ts"], match: reLine(/\.findMany\s*\(\s*\)/), msg: "findMany() sem filtro/limite — query potencialmente ilimitada" },
-  { id: "select-no-limit", lens: "perf", severity: "BAIXO", langs: ["js", "ts", "py"], match: reLine(/\bSELECT\b[\s\S]*\bFROM\b(?![\s\S]*\bLIMIT\b)/i), msg: "SELECT sem LIMIT (revisar)" },
+  // SQL cru por regex de linha dá falso-positivo (ex.: `import { select } from`) — a
+  // lente unbounded-query (ORM) cobre o caso real sem o ruído. Mantido fora do gate.
 ])
 
 const LANG_BY_EXT = { js: "js", jsx: "js", mjs: "js", cjs: "js", ts: "ts", tsx: "ts", py: "py" }

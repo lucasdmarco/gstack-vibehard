@@ -4,8 +4,9 @@
 // type-checker (o projeto é ESM puro, sem TypeScript). Falha (exit 1) se algum
 // arquivo não parsear.
 import { readdirSync } from "fs"
+import { cpus } from "os"
 import { join, extname, dirname } from "path"
-import { execFileSync } from "child_process"
+import { spawn } from "child_process"
 import { fileURLToPath } from "url"
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)))
@@ -25,14 +26,24 @@ function walk(d) {
 
 for (const d of DIRS) walk(join(root, d))
 
+// `node --check` por arquivo, em PARALELO (limite = nº de CPUs). Spawn de processo
+// é caro no Windows; serial levava >120s — paralelo derruba pra poucos segundos.
+function checkFile(f) {
+  return new Promise((resolve) => {
+    const p = spawn(process.execPath, ["--check", f], { stdio: ["ignore", "ignore", "pipe"] })
+    let err = ""
+    p.stderr.on("data", (d) => { err += d })
+    p.on("close", (code) => resolve({ f, ok: code === 0, err }))
+    p.on("error", (e) => resolve({ f, ok: false, err: e.message }))
+  })
+}
+
 let errors = 0
-for (const f of files) {
-  try {
-    execFileSync(process.execPath, ["--check", f], { stdio: "pipe" })
-  } catch (e) {
-    errors++
-    const msg = (e.stderr || e.message || "").toString().split("\n").slice(0, 3).join("\n")
-    console.error(`✗ ${f}\n${msg}`)
+const concurrency = Math.max(4, (cpus() || []).length || 4)
+for (let i = 0; i < files.length; i += concurrency) {
+  const results = await Promise.all(files.slice(i, i + concurrency).map(checkFile))
+  for (const r of results) {
+    if (!r.ok) { errors++; console.error(`✗ ${r.f}\n${r.err.split("\n").slice(0, 3).join("\n")}`) }
   }
 }
 

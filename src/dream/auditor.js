@@ -223,6 +223,17 @@ export function audit(opts = {}) {
     })
   }
 
+  // 20. Type safety + coverage + bench (PRD 12 B3 / PR10) — REAL: .d.ts dos contratos + gate c8 ≥70% + bench.
+  {
+    const ok = has("types/contracts.d.ts") && has("jsconfig.json") && has("scripts/bench.mjs") && read("package.json").includes("coverage:ci")
+    add({
+      id: "type-coverage", claim: "Tipos dos contratos (.d.ts) + coverage gate c8 (≥70%) + benchmarks",
+      status: ok ? "REAL" : "PARTIAL", severity: "P2",
+      evidence: ["types/contracts.d.ts", "jsconfig.json", "scripts/bench.mjs"].filter(has),
+      missing: ["gate `checkJs` full (adoção incremental de JSDoc nos options-bags)"],
+    })
+  }
+
   const summary = { REAL: 0, PARTIAL: 0, PLACEBO: 0, ROADMAP: 0, RISK: 0 }
   for (const c of claims) summary[c.status] = (summary[c.status] || 0) + 1
   return { generatedAt: new Date().toISOString(), root: ".", claims, summary }
