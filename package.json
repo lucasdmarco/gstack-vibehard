@@ -1,6 +1,6 @@
 {
   "name": "@gstack-vibehard/installer",
-  "version": "3.21.0",
+  "version": "3.21.1",
   "description": "gstack_vibehard — Cross-harness installer & fullstack template kit with deep agent integration (Codex, Claude Code, OpenCode)",
   "license": "MIT",
   "type": "module",
@@ -50,8 +50,10 @@
     "launchers/windows/install.bat",
     "launchers/windows/gstack_vibehard.cmd",
     "src/plugins/",
+    "types/",
     "README.md",
     "SECURITY.md",
+    "THREAT_MODEL.md",
     "CHANGELOG.md",
     "LICENSE",
     "NOTICE"

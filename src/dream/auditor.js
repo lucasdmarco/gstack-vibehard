@@ -5,9 +5,15 @@ import { HARNESS_CAPABILITIES } from "./capabilities.js"
 
 /**
  * Auditor anti-placebo (PRD Fase 3 §1). DETERMINÍSTICO, sem LLM, somente-leitura:
- * compara PROMESSAS (docs/CLAUDE.md/README) contra EVIDÊNCIA real no código
- * (comandos registrados, módulos, testes). Classifica cada claim:
- *   REAL | PARTIAL | PLACEBO | ROADMAP | RISK
+ * compara PROMESSAS (docs/CLAUDE.md/README) contra EVIDÊNCIA real no código.
+ *
+ * REGRA DE HONESTIDADE (v3.21.1): a evidência de REAL é SÓ o que o produto
+ * PUBLICA no tarball npm (módulo de implementação + comando registrado + dados
+ * shipados). NUNCA depende de `tests/` ou `.github/` — esses não viajam na
+ * allowlist `files`, então usá-los como evidência faria o audit MENTIR (sub-
+ * declarar capacidade real) em toda cópia instalada. Teste prova correção no CI;
+ * não é evidência verificável pelo usuário final. Resultado: o mesmo placar
+ * REAL/PARTIAL/PLACEBO/RISK no repo E em `npm i -g`.
  */
 const DEFAULT_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..")
 
@@ -52,10 +58,10 @@ export function audit(opts = {}) {
     })
   }
 
-  // 3. verify delivery gates — REAL (comando + status honesto + testes).
+  // 3. verify delivery gates — REAL (comando + runner shipado).
   add({
     id: "verify", claim: "Delivery gates (verify) honestos",
-    status: (cliHasCommand(read, "verify") && has("tests/verify_gates.test.js")) ? "REAL" : "PARTIAL", severity: "P2",
+    status: (cliHasCommand(read, "verify") && has("src/project-plan/verify-runner.js")) ? "REAL" : "PARTIAL", severity: "P2",
     evidence: ["src/commands/verify.js", "src/project-plan/verify-runner.js"].filter(has), missing: [],
   })
 
@@ -91,7 +97,7 @@ export function audit(opts = {}) {
   // 7. Loop Engineer task — REAL: executa o loop em WORKTREE (worktree→diff→hygiene→accept/reject).
   {
     const ok = has("src/project-plan/task-loop.js") && has("src/commands/task-run.js") &&
-      has("tests/task_loop.test.js") && read("src/commands/task.js").includes("taskRunCommand")
+      read("src/commands/task.js").includes("taskRunCommand")
     add({
       id: "task-loop", claim: "Loop Engineer (task) executa em worktree (diff/hygiene/accept/reject)",
       status: ok ? "REAL" : "PARTIAL", severity: "P2",
@@ -102,7 +108,7 @@ export function audit(opts = {}) {
 
   // 8. Runtime Supervisor (PRD 12 PR4) — REAL: dev/stop sobem/derrubam serviços.
   {
-    const ok = cliHasCommand(read, "dev") && cliHasCommand(read, "stop") && has("src/runtime/supervisor.js") && has("tests/runtime_supervisor.test.js")
+    const ok = cliHasCommand(read, "dev") && cliHasCommand(read, "stop") && has("src/runtime/supervisor.js") && has("src/runtime/ports.js")
     add({
       id: "runtime-supervisor", claim: "Runtime: dev/stop sobem e derrubam serviços",
       status: ok ? "REAL" : "PARTIAL", severity: "P1",
@@ -113,7 +119,7 @@ export function audit(opts = {}) {
 
   // 9. Secrets Broker (PRD 12 §10) — REAL: keychain do SO, sem .env.
   {
-    const ok = cliHasCommand(read, "secrets") && has("src/secrets/broker.js") && has("src/secrets/providers.js") && has("tests/secrets.test.js")
+    const ok = cliHasCommand(read, "secrets") && has("src/secrets/broker.js") && has("src/secrets/providers.js") && has("src/secrets/schema.js")
     add({
       id: "secrets-broker", claim: "Secrets Broker (keychain do SO, sem .env)",
       status: ok ? "REAL" : "PARTIAL", severity: "P1",
@@ -125,7 +131,7 @@ export function audit(opts = {}) {
   // 10. Runtime Manifest V2 (PRD 12 PR3) — REAL: schema/migração/validação.
   add({
     id: "runtime-manifest", claim: "Runtime Manifest V2 (contrato do supervisor)",
-    status: (has("src/runtime/manifest.js") && has("tests/runtime_manifest.test.js")) ? "REAL" : "PARTIAL",
+    status: has("src/runtime/manifest.js") ? "REAL" : "PARTIAL",
     severity: "P2", evidence: ["src/runtime/manifest.js"].filter(has), missing: [],
   })
 
@@ -145,7 +151,7 @@ export function audit(opts = {}) {
 
   // 13. Agent Factory Contract (PRD 13 PR13.1) — REAL: fonte única → adapters, drift guard, Execution Contract.
   {
-    const ok = cliHasCommand(read, "agents") && has("src/agents/factory.js") && has("tests/agents_factory.test.js") &&
+    const ok = cliHasCommand(read, "agents") && has("src/agents/factory.js") &&
       read("agents/generated/manifest.json").includes('"schemaVersion": 2')
     add({
       id: "agent-factory", claim: "Agent Factory (fonte única → adapters; drift guard + Execution Contract)",
@@ -157,7 +163,7 @@ export function audit(opts = {}) {
 
   // 14. AgentShield Blocking Build (PRD 13 PR13.2) — REAL: scan determinístico bloqueia injeção em build E --check.
   {
-    const ok = has("src/agents/scanner.js") && has("tests/agents_scanner.test.js") &&
+    const ok = has("src/agents/scanner.js") &&
       read("scripts/scripts/build_agents.js").includes("evaluateScan")
     add({
       id: "agentshield", claim: "AgentShield: scan determinístico bloqueia prompt-injection (build + --check)",
@@ -169,7 +175,7 @@ export function audit(opts = {}) {
 
   // 15. Adapter Capability Matrix honesta (PRD 13 PR13.3) — REAL: enforcement real por harness, sem Zero-Trust p/ instrucional.
   {
-    const ok = has("src/agents/adapter-matrix.js") && has("tests/agents_adapter_matrix.test.js") && cliHasCommand(read, "agents")
+    const ok = has("src/agents/adapter-matrix.js") && cliHasCommand(read, "agents")
     add({
       id: "adapter-matrix", claim: "Adapter matrix honesta (enforcement real; instrucional ≠ Zero-Trust)",
       status: ok ? "REAL" : "PARTIAL", severity: "P2",
@@ -180,7 +186,7 @@ export function audit(opts = {}) {
 
   // 16. QA Multi-Lens (PRD 12 B2) — REAL: lentes determinísticas sobre o diff (veredito sem LLM).
   {
-    const ok = has("src/project-plan/qa-lenses.js") && has("tests/qa_lenses.test.js") && cliHasCommand(read, "qa")
+    const ok = has("src/project-plan/qa-lenses.js") && cliHasCommand(read, "qa")
     add({
       id: "qa-multi-lens", claim: "QA Multi-Lens determinístico (eval/any/secret/query/shell) sobre o diff",
       status: ok ? "REAL" : "PARTIAL", severity: "P1",
@@ -192,7 +198,7 @@ export function audit(opts = {}) {
   // 17. VFA Provenance (PRD 13 PR13.4) — REAL: recibos com hash-chain; audit verify pega adulteração.
   {
     const ok = has("src/vfa/attestation.js") && has("src/vfa/provenance.js") &&
-      has("tests/vfa_attestation.test.js") && cliHasCommand(read, "audit")
+      cliHasCommand(read, "audit")
     add({
       id: "vfa-provenance", claim: "VFA: provenance hash-chain + attestation (audit verify pega adulteração)",
       status: ok ? "REAL" : "PARTIAL", severity: "P1",
@@ -203,7 +209,7 @@ export function audit(opts = {}) {
 
   // 18. Challenge-Response (PRD 13 PR13.5) — REAL: ação de alto risco exige evidência; instrucional=posthoc.
   {
-    const ok = has("src/vfa/challenge.js") && has("tests/vfa_challenge.test.js") && cliHasCommand(read, "challenge")
+    const ok = has("src/vfa/challenge.js") && cliHasCommand(read, "challenge")
     add({
       id: "challenge-response", claim: "Challenge-Response (alto risco exige backup/manifest/rollback; instrucional=posthoc_audit_only)",
       status: ok ? "REAL" : "PARTIAL", severity: "P1",
@@ -214,7 +220,7 @@ export function audit(opts = {}) {
 
   // 19. Meta-Harness MVP (PRD 13 PR13.6) — REAL: executor+verifier independente, dupla verificação (QG decide).
   {
-    const ok = has("src/meta/orchestrator.js") && has("tests/meta_orchestrator.test.js") && cliHasCommand(read, "orchestrate")
+    const ok = has("src/meta/orchestrator.js") && cliHasCommand(read, "orchestrate")
     add({
       id: "meta-harness", claim: "Meta-Harness (executor em worktree + verifier independente; QG decide, LLM advisory)",
       status: ok ? "REAL" : "PARTIAL", severity: "P1",
@@ -225,7 +231,7 @@ export function audit(opts = {}) {
 
   // 20. Type safety + coverage + bench (PRD 12 B3 / PR10) — REAL: .d.ts dos contratos + gate c8 ≥70% + bench.
   {
-    const ok = has("types/contracts.d.ts") && has("jsconfig.json") && has("scripts/bench.mjs") && read("package.json").includes("coverage:ci")
+    const ok = has("types/contracts.d.ts") && has("scripts/bench.mjs") && read("package.json").includes("coverage:ci")
     add({
       id: "type-coverage", claim: "Tipos dos contratos (.d.ts) + coverage gate c8 (≥70%) + benchmarks",
       status: ok ? "REAL" : "PARTIAL", severity: "P2",
@@ -236,8 +242,9 @@ export function audit(opts = {}) {
 
   // 21. Security & Governance Pack (PRD 12 PR9) — REAL: SECURITY/threat model/CODEOWNERS/CodeQL/SBOM.
   {
-    const ok = has("SECURITY.md") && has("THREAT_MODEL.md") && has(".github/CODEOWNERS") &&
-      has(".github/workflows/codeql.yml") && read("package.json").includes("\"sbom\"")
+    // .github/CODEOWNERS e codeql.yml NÃO viajam no tarball (são governança do repo);
+    // evidência shipada = SECURITY.md + THREAT_MODEL.md + script sbom no package.json.
+    const ok = has("SECURITY.md") && has("THREAT_MODEL.md") && read("package.json").includes("\"sbom\"")
     add({
       id: "governance", claim: "Governance pack (SECURITY, threat model, CODEOWNERS, CodeQL, SBOM)",
       status: ok ? "REAL" : "PARTIAL", severity: "P2",
