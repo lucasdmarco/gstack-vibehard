@@ -189,6 +189,18 @@ export function audit(opts = {}) {
     })
   }
 
+  // 17. VFA Provenance (PRD 13 PR13.4) — REAL: recibos com hash-chain; audit verify pega adulteração.
+  {
+    const ok = has("src/vfa/attestation.js") && has("src/vfa/provenance.js") &&
+      has("tests/vfa_attestation.test.js") && cliHasCommand(read, "audit")
+    add({
+      id: "vfa-provenance", claim: "VFA: provenance hash-chain + attestation (audit verify pega adulteração)",
+      status: ok ? "REAL" : "PARTIAL", severity: "P1",
+      evidence: ["src/vfa/attestation.js", "src/vfa/provenance.js", "src/commands/audit.js"].filter(has),
+      missing: ok ? ["challenge-response (C2) + auditores determinísticos sobre o log"] : ["attestation + provenance + audit"],
+    })
+  }
+
   const summary = { REAL: 0, PARTIAL: 0, PLACEBO: 0, ROADMAP: 0, RISK: 0 }
   for (const c of claims) summary[c.status] = (summary[c.status] || 0) + 1
   return { generatedAt: new Date().toISOString(), root: ".", claims, summary }

@@ -1,5 +1,16 @@
 # Changelog - gstack-vibehard
 
+## [3.16.0] - 2026-06-30
+
+### VFA Provenance Alpha — recibos com hash-chain (PRD 13 PR13.4)
+Verifiability-First: toda ação crítica deixa um **recibo encadeado por hash** — o sistema PROVA o que foi tentado/alterado (por hash, sem o conteúdo bruto), qual policy decidiu, e a cadeia não pode ser adulterada sem ser detectada.
+- **Novo `src/vfa/attestation.js`** (puro): `buildReceipt` (inputHash/outputHash + `previousHash` + `receiptHash` que sela o conteúdo via `stableStringify` determinístico), `verifyChain` (pega receiptHash adulterado E previousHash quebrado por remoção/reordenação), `redactReceiptValues`.
+- **Novo `src/vfa/provenance.js`**: `.gstack/provenance/actions.jsonl` **append-only** + `index.json`; hash chain **por run**; **redação ANTES de persistir** (segredo nunca em claro — o hash cobre o conteúdo já redigido, cadeia segue válida); logs por workspace.
+- **Novo `gstack_vibehard audit <status|inspect|verify|export|doctor> [runId]`**: `verify` recomputa a cadeia e **falha (exit 1) se adulterada**.
+- **Integração**: o `task run` (B1) registra um recibo encadeado em cada **accept/reject** (intent/target/policy — hashes, sem diff cru).
+- **dream audit**: vfa-provenance = REAL → **14 REAL / 2 PARTIAL / 0 PLACEBO / 0 ROADMAP / 1 RISK**. Desbloqueia C2 (challenge-response) e os Audit Agents sobre o log.
+- **+4 testes** (recibo/hashes; stableStringify determinístico; cadeia íntegra vs adulteração/remoção; provenance append+redação+jsonl adulterado→falha). 372 Node + 58 Python verdes; lint/syntaxcheck; pack smoke OK.
+
 ## [3.15.0] - 2026-06-30
 
 ### QA Multi-Lens — lentes determinísticas sobre o diff (PRD 12 B2)
