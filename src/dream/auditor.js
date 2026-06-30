@@ -88,13 +88,17 @@ export function audit(opts = {}) {
     })
   }
 
-  // 7. Loop Engineer task — PARTIAL: planeja, não executa o loop completo.
-  add({
-    id: "task-loop", claim: "Loop Engineer (task) executa features",
-    status: cliHasCommand(read, "task") ? "PARTIAL" : "PLACEBO", severity: "P2",
-    evidence: ["src/commands/task.js", "src/project-plan/task-planner.js"].filter(has),
-    missing: ["execução do loop (worktree/diff/accept) — hoje só planeja"],
-  })
+  // 7. Loop Engineer task — REAL: executa o loop em WORKTREE (worktree→diff→hygiene→accept/reject).
+  {
+    const ok = has("src/project-plan/task-loop.js") && has("src/commands/task-run.js") &&
+      has("tests/task_loop.test.js") && read("src/commands/task.js").includes("taskRunCommand")
+    add({
+      id: "task-loop", claim: "Loop Engineer (task) executa em worktree (diff/hygiene/accept/reject)",
+      status: ok ? "REAL" : "PARTIAL", severity: "P2",
+      evidence: ["src/project-plan/task-loop.js", "src/commands/task-run.js", "src/commands/task.js"].filter(has),
+      missing: ok ? [] : ["execução do loop (worktree/diff/accept)"],
+    })
+  }
 
   // 8. Runtime Supervisor (PRD 12 PR4) — REAL: dev/stop sobem/derrubam serviços.
   {
