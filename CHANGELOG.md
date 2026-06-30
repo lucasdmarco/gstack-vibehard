@@ -1,5 +1,13 @@
 # Changelog - gstack-vibehard
 
+## [3.20.0] - 2026-06-30
+
+### `verify` conhece o runtime + usa o package manager real (PRD 12 PR5)
+Fecha o P1 da auditoria: o `verify` deixava `runtime`/`preview` como `pending_feature` incondicional (placebo) e rodava `npm install` mesmo em projeto pnpm.
+- **Package manager REAL**: `deps`/`lint`/`typecheck`/`test`/`build` agora resolvem o PM (campo `packageManager` → lockfile → fallback npm) — **pnpm/yarn/bun**, não mais `npm` fixo. Cross-platform (no Windows o `pm.cmd` roda via `cmd.exe /c`).
+- **Runtime-aware**: para app/web, o `verify` agora **carrega e VALIDA o Runtime Manifest V2** e lê o estado real (`.gstack/runtime/`): manifest **inválido → `failed`** (sinal real, não placebo); válido + serviços `ready` (o `dev` rodou) → **`passed`**; válido + não rodado → **`advisory`** ("rode `dev`"); **sem `runtime.json` → preserva o `pending_product`** (o projeto roda mas o gstack não verifica). `preview:open` reporta a URL real do state quando há.
+- **+3 testes** (runtime válido→advisory sem bloquear; inválido→failed→blocked; projeto pnpm→deps usa pnpm). 391 Node + 58 Python verdes; coverage gate verde; lint/syntaxcheck; pack smoke OK.
+
 ## [3.19.0] - 2026-06-30
 
 ### Type-safety + Coverage + Benchmarks (PRD 12 B3 / PR10)
