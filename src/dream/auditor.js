@@ -212,6 +212,17 @@ export function audit(opts = {}) {
     })
   }
 
+  // 19. Meta-Harness MVP (PRD 13 PR13.6) — REAL: executor+verifier independente, dupla verificação (QG decide).
+  {
+    const ok = has("src/meta/orchestrator.js") && has("tests/meta_orchestrator.test.js") && cliHasCommand(read, "orchestrate")
+    add({
+      id: "meta-harness", claim: "Meta-Harness (executor em worktree + verifier independente; QG decide, LLM advisory)",
+      status: ok ? "REAL" : "PARTIAL", severity: "P1",
+      evidence: ["src/meta/orchestrator.js", "src/commands/orchestrate.js"].filter(has),
+      missing: ok ? ["reviewer LLM real plugável (hoje advisory no-op) + multi-harness paralelo"] : ["orchestrator + dupla verificação"],
+    })
+  }
+
   const summary = { REAL: 0, PARTIAL: 0, PLACEBO: 0, ROADMAP: 0, RISK: 0 }
   for (const c of claims) summary[c.status] = (summary[c.status] || 0) + 1
   return { generatedAt: new Date().toISOString(), root: ".", claims, summary }

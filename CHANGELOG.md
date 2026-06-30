@@ -1,5 +1,14 @@
 # Changelog - gstack-vibehard
 
+## [3.18.0] - 2026-06-30
+
+### Meta-Harness MVP — o fecho do PRD 13 (PR13.6)
+Orquestrador como **máquina de estado** sobre worktree+executor, com **verifier independente** e **dupla verificação** — amarra task-loop (B1), provenance (C1) e o resto.
+- **Novo `src/meta/orchestrator.js`** (puro): `decideStatus` (a REGRA DE OURO §11.4.1 — o gate determinístico DECIDE, o LLM é advisory: **LLM aprova + QG falha = `failed`, NUNCA `passed`**; QG passa + LLM aponta risco = `needs_human_review`; QG ausente = `blocked_gate_missing`), `pickExecutor`/`pickVerifier` (planner por especialidade; verifier sempre **≠ executor**), `runOrchestration` (executor implementa → verifier revisa advisory → gate bloqueante → decisão → provenance; **hard caps**; executor≠verifier obrigatório em **risco alto**).
+- **Novo `gstack_vibehard orchestrate <planId> [--verify-with <harness>] --yes`**: camada sobre worktree real + `diff-hygiene` como gate determinístico + provenance (recibos separando `llm_review_advisory` de `deterministic_gate`). **SEM auto-merge**: passo `passed` vira branch; o resto é descartado. Guarda: repo git + bloqueia `.env` rastreado. Reviewer LLM é um **hook advisory** (sem reviewer real, o gate decide).
+- **dream audit**: meta-harness = REAL → **16 REAL / 2 PARTIAL / 0 PLACEBO / 0 ROADMAP / 1 RISK** — **PRD 13 completo** (factory→shield→adapters→provenance→challenge→meta-harness).
+- **+8 testes**: 6 de motor (regra de ouro; executor≠verifier; risco alto sem verifier→handoff; hard caps) + **2 e2e reais com git** (passo limpo→passed+branch sem tocar main; `debugger`→gate falha→descarta). 385 Node + 58 Python verdes; lint/syntaxcheck; pack smoke OK.
+
 ## [3.17.1] - 2026-06-30
 
 ### Correção: `challenge --evidence` negava no Windows (cmd/PowerShell quebra a vírgula)
