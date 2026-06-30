@@ -1,0 +1,16 @@
+{
+  "//": "Tipos para editores (IntelliSense) — ESM puro + .d.ts dos contratos (types/). checkJs fica como adoção incremental de JSDoc; o gate de sintaxe é `npm run lint` (node --check paralelo).",
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "target": "es2022",
+    "checkJs": false,
+    "allowJs": true,
+    "noEmit": true,
+    "strict": false,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["src/**/*.js", "types/**/*.d.ts"],
+  "exclude": ["node_modules", "templates", "agents/generated"]
+}

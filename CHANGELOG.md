@@ -1,5 +1,18 @@
 # Changelog - gstack-vibehard
 
+## [3.19.0] - 2026-06-30
+
+### Type-safety + Coverage + Benchmarks (PRD 12 B3 / PR10)
+Tipos nos contratos, gate de cobertura e lint 40× mais rápido — e o `tsc --checkJs` **achou 2 bugs reais de ReferenceError** que nenhum teste/CI pegava (só disparam em caminhos específicos).
+- **[bug] `install.js`: `confirm` não estava importado** (não é global no Node — o `tsc` resolveu pro `confirm` do DOM). Um `install` **interativo** (sem `--yes`) **crasharia** no prompt de confirmação. Corrigido (import do `cli/index.js`).
+- **[bug] `sprint.js`: `pyCmd` fora de escopo no `catch`** (declarado `const` dentro do `try`) → crash no ENOENT do python. Corrigido (hoist).
+- **`tsc --checkJs` + `.d.ts` dos contratos** (`types/contracts.d.ts`: Runtime Manifest V2, Secrets Schema V2, Agent Manifest V2, Attestation Receipt) + `jsconfig.json` para IntelliSense. (Gate `checkJs` full fica como adoção incremental de JSDoc nos options-bags — honesto.)
+- **Coverage c8**: `npm run coverage` + **`coverage:ci` no CI** (gate ≥70% linhas / 72% funções / 65% branches; atual **73% / 78% / 73%**).
+- **`npm run bench`** (`scripts/bench.mjs`): micro-bench dos caminhos quentes (hashFiles, buildReceipt, allocatePort) — detecta regressão de performance.
+- **⚡ `lint` paralelizado**: `node --check` por arquivo agora roda concorrente → **~120s → 3s** no Windows (fim do flake recorrente do `lint.test.js`).
+- **dream audit**: type-coverage = REAL → **17 REAL / 2 PARTIAL / 0 PLACEBO / 0 ROADMAP / 1 RISK**.
+- devDeps: `typescript`, `@types/node`, `c8` (dev-only, não shipados). **+3 testes** (guard dos 2 bugs + infra B3). 388 Node + 58 Python verdes; coverage gate verde; pack smoke OK.
+
 ## [3.18.0] - 2026-06-30
 
 ### Meta-Harness MVP — o fecho do PRD 13 (PR13.6)

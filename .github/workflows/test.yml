@@ -54,6 +54,8 @@ jobs:
         name: "Install pytest"
       - run: python -m pytest tests/ -v
         name: "Unit tests (Python)"
+      - run: npm run coverage:ci
+        name: "Coverage gate (c8, baseline ≥70%)"
 
   lint:
     runs-on: ubuntu-latest

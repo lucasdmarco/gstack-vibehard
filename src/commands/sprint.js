@@ -46,8 +46,9 @@ export async function sprintCommand(args) {
     info("  Atualizando gbrain → .gbrain/context.json")
     info("  Enriquecendo chronicle...")
 
+    let pyCmd // fora do try: o catch (ENOENT) referencia pyCmd na mensagem de erro
     try {
-      const pyCmd = resolvePythonCmd()
+      pyCmd = resolvePythonCmd()
       const result = execFileSync(pyCmd, [POST_SPRINT], {
         input,
         encoding: "utf-8",
