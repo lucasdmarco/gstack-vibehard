@@ -6,6 +6,7 @@ import { createWorktree, removeWorktree, commitWorktree, isGitRepo, checkTracked
 import { diffHygiene } from "../project-plan/diff-hygiene.js"
 import { appendPlanEvent, completedSteps } from "../project-plan/journal.js"
 import { setStepStatus, setPlanStatus } from "../project-plan/state.js"
+import { recordAction } from "../vfa/provenance.js"
 import { stripBom } from "../util/json.js"
 import { section, success, warn, error, info } from "../cli/index.js"
 
@@ -82,8 +83,13 @@ export function taskRunCommand(args = [], opts = {}) {
     accept: opts.accept || ((step, wt) => {
       try { commitWorktree(wt.dir, `task ${plan.id}: ${step.id}`, { exec }) } catch { /* nada a commitar */ }
       removeWorktree(cwd, wt.dir, wt.branch, { keepBranch: true, exec }) // mantém o branch p/ merge humano
+      // VFA: recibo encadeado da ação ACEITA (intent/target/policy — hashes, sem diff cru)
+      try { recordAction(cwd, { runId: plan.id, intent: "task_step_accept", actor: { harness: "gstack", agent: "task-loop" }, target: { kind: "branch", pathOrName: wt.branch }, output: step.id, policy: { decision: "allow", rules: ["diff-hygiene"] } }) } catch { /* provenance best-effort */ }
     }),
-    reject: opts.reject || ((step, wt) => { removeWorktree(cwd, wt.dir, wt.branch, { exec }) }),
+    reject: opts.reject || ((step, wt, reason) => {
+      removeWorktree(cwd, wt.dir, wt.branch, { exec })
+      try { recordAction(cwd, { runId: plan.id, intent: "task_step_reject", actor: { harness: "gstack", agent: "task-loop" }, target: { kind: "step", pathOrName: step.id }, policy: { decision: "deny", rules: [String(reason || "rejected")] } }) } catch { /* best-effort */ }
+    }),
   })
 
   setPlanStatus(planDir, plan.id, result.status === "handoff" ? "handoff" : (result.rejected.length ? "partial" : "done"))
