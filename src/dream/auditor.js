@@ -234,6 +234,18 @@ export function audit(opts = {}) {
     })
   }
 
+  // 21. Security & Governance Pack (PRD 12 PR9) — REAL: SECURITY/threat model/CODEOWNERS/CodeQL/SBOM.
+  {
+    const ok = has("SECURITY.md") && has("THREAT_MODEL.md") && has(".github/CODEOWNERS") &&
+      has(".github/workflows/codeql.yml") && read("package.json").includes("\"sbom\"")
+    add({
+      id: "governance", claim: "Governance pack (SECURITY, threat model, CODEOWNERS, CodeQL, SBOM)",
+      status: ok ? "REAL" : "PARTIAL", severity: "P2",
+      evidence: ["SECURITY.md", "THREAT_MODEL.md", ".github/workflows/codeql.yml"].filter(has),
+      missing: [],
+    })
+  }
+
   const summary = { REAL: 0, PARTIAL: 0, PLACEBO: 0, ROADMAP: 0, RISK: 0 }
   for (const c of claims) summary[c.status] = (summary[c.status] || 0) + 1
   return { generatedAt: new Date().toISOString(), root: ".", claims, summary }
