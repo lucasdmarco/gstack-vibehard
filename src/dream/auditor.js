@@ -201,6 +201,17 @@ export function audit(opts = {}) {
     })
   }
 
+  // 18. Challenge-Response (PRD 13 PR13.5) — REAL: ação de alto risco exige evidência; instrucional=posthoc.
+  {
+    const ok = has("src/vfa/challenge.js") && has("tests/vfa_challenge.test.js") && cliHasCommand(read, "challenge")
+    add({
+      id: "challenge-response", claim: "Challenge-Response (alto risco exige backup/manifest/rollback; instrucional=posthoc_audit_only)",
+      status: ok ? "REAL" : "PARTIAL", severity: "P1",
+      evidence: ["src/vfa/challenge.js", "src/commands/challenge.js"].filter(has),
+      missing: ok ? ["enforcement no pre-tool hook Python (refinamento)"] : ["classifier + challenge + deny"],
+    })
+  }
+
   const summary = { REAL: 0, PARTIAL: 0, PLACEBO: 0, ROADMAP: 0, RISK: 0 }
   for (const c of claims) summary[c.status] = (summary[c.status] || 0) + 1
   return { generatedAt: new Date().toISOString(), root: ".", claims, summary }
