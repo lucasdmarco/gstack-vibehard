@@ -1,5 +1,14 @@
 # Changelog - gstack-vibehard
 
+## [3.21.1] - 2026-06-30
+
+### dream audit honesto na instalação publicada (fix)
+A reconfirmação numa máquina Windows LIMPA (`npm i -g`) expôs que `dream audit` mostrava **4 REAL / 16 PARTIAL** — enquanto no repo dá 18 REAL. Causa-raiz: o auditor exigia como **evidência de REAL** arquivos que **não viajam no tarball** (`tests/*.test.js`, `.github/*`). O próprio truth contract mentia em toda cópia instalada — subdeclarando 14 capacidades reais (pior que placebo na filosofia do projeto).
+- **Fix de raiz:** REAL agora se baseia SÓ em artefatos que o produto **publica** (módulo de implementação + comando registrado + dados shipados). Nunca em `tests/`/`.github/` — teste prova correção no CI, não é evidência verificável pelo usuário final.
+- `types/` e `THREAT_MODEL.md` adicionados à allowlist `files` (evidência shipada de type-coverage e governance).
+- **+1 teste de regressão**: monta a árvore EXATA do tarball (só os `files`, sem `tests/`/`.github/`) e exige o mesmo placar do repo (REAL idêntico, 0 PLACEBO). Garante: o mesmo resultado no repo E em `npm i -g`.
+- Resultado: `dream audit` na instalação publicada agora mostra **18 REAL / 2 PARTIAL / 0 PLACEBO / 1 RISK**, igual ao repo.
+
 ## [3.21.0] - 2026-06-30
 
 ### Security & Governance Pack (PRD 12 PR9)

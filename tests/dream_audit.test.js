@@ -1,6 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { mkdtemp, rm } from "node:fs/promises"
+import { cpSync, existsSync, readFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
@@ -42,6 +43,37 @@ test("audit: classifica claims, é determinístico e read-only (todas têm statu
   }
   // soma do summary == nº de claims
   assert.equal(Object.values(r.summary).reduce((a, b) => a + b, 0), r.claims.length)
+})
+
+test("audit: HONESTO no tarball publicado — só os `files` (sem tests/ nem .github/) → mesmo placar REAL", async () => {
+  // Regressão v3.21.1: a máquina limpa expôs que o audit dependia de tests/ e
+  // .github/ como evidência, que NÃO viajam na allowlist `files`. Resultado: toda
+  // cópia instalada sub-declarava 14 capacidades reais. Aqui montamos a árvore EXATA
+  // que o npm publica e exigimos o mesmo placar do repo (REAL idêntico, 0 PLACEBO).
+  const { audit } = await imp(audMod)
+  const full = audit({ root: repoRoot })
+
+  const pkg = JSON.parse(readFileSync(path.join(repoRoot, "package.json"), "utf-8"))
+  const shipped = await mkdtemp(path.join(tmpdir(), "gstack-shipped-"))
+  try {
+    cpSync(path.join(repoRoot, "package.json"), path.join(shipped, "package.json"))
+    for (const entry of pkg.files) {
+      const src = path.join(repoRoot, entry)
+      if (!existsSync(src)) continue
+      cpSync(src, path.join(shipped, entry), { recursive: true })
+    }
+    // garantia explícita: o que NÃO ship não foi copiado
+    assert.ok(!existsSync(path.join(shipped, "tests")), "tests/ não viaja no tarball")
+    assert.ok(!existsSync(path.join(shipped, ".github")), ".github/ não viaja no tarball")
+
+    const onInstall = audit({ root: shipped })
+    assert.equal(onInstall.summary.PLACEBO, 0, "instalação publicada não tem PLACEBO")
+    assert.equal(onInstall.summary.REAL, full.summary.REAL, "REAL idêntico repo vs tarball")
+    // claims gated por teste/CI antes mentiam — agora são REAL no tarball:
+    for (const id of ["verify", "runtime-supervisor", "secrets-broker", "agent-factory", "vfa-provenance", "meta-harness", "governance", "type-coverage"]) {
+      assert.equal(onInstall.claims.find((c) => c.id === id).status, "REAL", `${id} REAL no tarball`)
+    }
+  } finally { await rm(shipped, { recursive: true, force: true }) }
 })
 
 test("audit: roda contra repo vazio sem quebrar (claims viram PLACEBO/RISK)", async () => {
