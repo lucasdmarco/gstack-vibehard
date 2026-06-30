@@ -1,5 +1,15 @@
 # Changelog - gstack-vibehard
 
+## [3.15.0] - 2026-06-30
+
+### QA Multi-Lens — lentes determinísticas sobre o diff (PRD 12 B2)
+Gate de revisão **determinístico** (sem LLM, sem rede) sobre os arquivos mudados, alinhado ao `ultracode.md` (zero eval, zero `any`, zero bare except, zero query sem limit, zero exec shell).
+- **Novo `src/project-plan/qa-lenses.js`** (puro): lentes por linguagem — `eval`/`new Function` (ALTO), `exec` com string interpolada (ALTO, command injection), `shell:true` (MÉDIO), `: any`/`as any` (MÉDIO, TS), bare `except:` (MÉDIO, Py), `findMany()` ilimitado (MÉDIO), `SELECT` sem `LIMIT` (BAIXO). `evaluateQa`: ALTO/CRÍTICO bloqueiam; MÉDIO bloqueia em `--strict`.
+- **Novo `gstack_vibehard qa [--strict] [--json]`**: varre os arquivos mudados (git), combina as lentes com o `diff-hygiene` (segredo/debugger), veredito por severidade. Testes legítimos e arquivos fora de escopo (.md) não disparam.
+- **Sem falso-positivo**: `evaluate`≠`eval(`, `'any'` em string ≠ tipo, `except ValueError:` ≠ bare. Validado: `qa` na própria base do gstack = **0 findings**.
+- **dream audit**: qa-multi-lens = REAL → **13 REAL / 2 PARTIAL / 0 PLACEBO / 0 ROADMAP / 1 RISK**. (Os Audit Agents sobre *provenance* do §10.4 chegam com a VFA — Sprint C1.)
+- **+4 testes** (lentes pegam os anti-padrões; anti-falso-positivo incl. testes/idioma; gate strict; comando bloqueia). 368 Node + 58 Python verdes; lint/syntaxcheck; pack smoke OK.
+
 ## [3.14.0] - 2026-06-30
 
 ### Task Loop Executável — o `task` EXECUTA em worktree (PRD 12 B1 / Sprint B1)

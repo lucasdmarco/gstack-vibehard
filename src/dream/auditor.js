@@ -178,6 +178,17 @@ export function audit(opts = {}) {
     })
   }
 
+  // 16. QA Multi-Lens (PRD 12 B2) — REAL: lentes determinísticas sobre o diff (veredito sem LLM).
+  {
+    const ok = has("src/project-plan/qa-lenses.js") && has("tests/qa_lenses.test.js") && cliHasCommand(read, "qa")
+    add({
+      id: "qa-multi-lens", claim: "QA Multi-Lens determinístico (eval/any/secret/query/shell) sobre o diff",
+      status: ok ? "REAL" : "PARTIAL", severity: "P1",
+      evidence: ["src/project-plan/qa-lenses.js", "src/commands/qa.js"].filter(has),
+      missing: ok ? ["Audit Agents sobre provenance chegam com a VFA (C1)"] : ["lentes determinísticas + comando qa"],
+    })
+  }
+
   const summary = { REAL: 0, PARTIAL: 0, PLACEBO: 0, ROADMAP: 0, RISK: 0 }
   for (const c of claims) summary[c.status] = (summary[c.status] || 0) + 1
   return { generatedAt: new Date().toISOString(), root: ".", claims, summary }

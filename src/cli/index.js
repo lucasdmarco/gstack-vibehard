@@ -19,6 +19,7 @@ import { runtimeCommand } from "../commands/runtime.js"
 import { devCommand, stopCommand, logsCommand, openCommand } from "../commands/runtime-supervisor.js"
 import { secretsCommand } from "../commands/secrets.js"
 import { agentsCommand } from "../commands/agents.js"
+import { qaCommand } from "../commands/qa.js"
 import { planCommand } from "../commands/plan.js"
 import { startCommand } from "../commands/start.js"
 import { taskCommand } from "../commands/task.js"
@@ -166,6 +167,7 @@ const COMMANDS = [
   { name: "open", group: "common", desc: "Abre o preview do serviço web", usage: "gstack_vibehard open" },
   { name: "secrets", group: "common", desc: "Broker de segredos (keychain do SO; sem .env)", usage: "gstack_vibehard secrets <doctor|list|set|delete|import|run>" },
   { name: "agents", group: "advanced", desc: "Agent Factory: compila core/knowledge/agents → adapters por harness", usage: "gstack_vibehard agents <build|check|diff|doctor|list|explain>" },
+  { name: "qa", group: "advanced", desc: "QA Multi-Lens: lentes determinísticas sobre o diff (eval/any/secret/...)", usage: "gstack_vibehard qa [--strict] [--json]" },
   { name: "sprint", group: "advanced", desc: "Salvar decisões e atualizar memórias", usage: "gstack_vibehard sprint --save" },
   { name: "list", group: "advanced", desc: "Listar componentes instalados", usage: "gstack_vibehard list" },
 ]
@@ -310,6 +312,9 @@ async function dispatch(command, args) {
       break
     case "agents":
       await agentsCommand(args)
+      break
+    case "qa":
+      qaCommand(args)
       break
     case "tools":
     case "pp":
