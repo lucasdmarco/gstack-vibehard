@@ -1,5 +1,12 @@
 # Changelog - gstack-vibehard
 
+## [3.17.1] - 2026-06-30
+
+### Correção: `challenge --evidence` negava no Windows (cmd/PowerShell quebra a vírgula)
+Reconfirmação numa máquina Windows limpa: `challenge evaluate … --evidence a,b,c` retornava **DENY** mesmo com a evidência completa.
+- **Causa:** o `cmd.exe`/PowerShell quebra o valor `a,b,c` (sem aspas) em **argumentos separados**, então o parser só via o 1º token (ou nenhum). No bash a vírgula fica num arg só, por isso passava.
+- **Fix:** `--evidence` agora **consome múltiplos tokens** até o próximo `--flag` — `--evidence a b c` (split do cmd/PS) **e** `--evidence a,b,c` (bash) valem igual. **+1 teste** (ambas as formas → allow; sem evidência → deny). 377 Node verdes.
+
 ## [3.17.0] - 2026-06-30
 
 ### Challenge-Response para ações de alto risco (PRD 13 PR13.5)
