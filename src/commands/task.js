@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync } from "fs"
 import { join } from "path"
 import { buildTaskPlan } from "../project-plan/task-planner.js"
+import { taskRunCommand } from "./task-run.js"
 import { warn, error, info, section } from "../cli/index.js"
 
 /**
@@ -18,7 +19,10 @@ export async function taskCommand(args = [], opts = {}) {
   const positional = args.filter((a) => !a.startsWith("--"))
   const sub = positional[0]
 
-  // Subcomandos de execução/inspeção do loop (status/diff/accept/reject): honesto.
+  // `task run [planId]` — EXECUTA o loop em worktree (worktree→diff→hygiene→accept/reject).
+  if (sub === "run") { taskRunCommand(args, opts); return }
+
+  // Subcomandos de inspeção do loop ainda pendentes (status/diff/accept/reject manual).
   if (["status", "diff", "accept", "reject"].includes(sub)) {
     if (json) { process.stdout.write(JSON.stringify({ error: "loop_pending", subcommand: sub }) + "\n"); return }
     section(`task ${sub}`)

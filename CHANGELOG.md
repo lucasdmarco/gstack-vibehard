@@ -1,5 +1,14 @@
 # Changelog - gstack-vibehard
 
+## [3.14.0] - 2026-06-30
+
+### Task Loop Executável — o `task` EXECUTA em worktree (PRD 12 B1 / Sprint B1)
+O Loop Engineer sai de "só planeja" para **executar de verdade**: cada passo roda em **worktree isolado** e passa por **diff → diff-hygiene → accept/reject**, sem auto-merge.
+- **Novo `src/project-plan/task-loop.js`** (motor PURO/injetável): `runTaskLoop` — por passo, cria worktree, aplica, captura diff, roda `diff-hygiene`; **aceita** (registra branch pronto pra merge) ou **rejeita** (`needs_review`, descarta). **Circuit breaker** (N falhas consecutivas → `handoff` humano; reseta no accept), **replay** (passos já aceitos pulam via journal), **hard cap** de iterações. O journal recebe só **resumo** (stepId/evento/branch/ids) — nunca o diff/segredo/comando.
+- **Novo `gstack_vibehard task run [planId] --yes`**: executa o plano salvo. Reusa `worktree.js` (staging por allowlist, exclui `.env`/binário, respeita hooks), `diff-hygiene`, `journal`/`state` canônicos. **Sem auto-merge** — cada passo aceito vira um branch `task/<plano>-<passo>` pra revisão. Guarda: exige repo git e **bloqueia se `.env` está rastreado** (segredo iria pra worktree).
+- **dream audit**: `task-loop` PARTIAL→**REAL** → **12 REAL / 2 PARTIAL / 0 PLACEBO / 0 ROADMAP / 1 RISK**. Desbloqueia o Meta-Harness (D1).
+- **+10 testes**: 7 de motor (abuso — hygiene rejeita, circuit breaker + reset, journal sanitizado, replay, maxIterations) + 3 **e2e reais com git** (passo limpo→branch sem tocar main; `debugger`→rejeitado; `.env` rastreado→bloqueia). 364 Node + 58 Python verdes; lint/syntaxcheck; pack smoke OK.
+
 ## [3.13.1] - 2026-06-30
 
 ### Correção: `agents doctor` acusava drift falso em instalação limpa (Windows)

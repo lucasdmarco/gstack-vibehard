@@ -149,7 +149,7 @@ const COMMANDS = [
   { name: "update", group: "common", desc: "Checar/atualizar para a última versão (npm)", usage: "gstack_vibehard update [--run] [--json]" },
   { name: "help", group: "common", desc: "Mostrar ajuda (`help advanced` p/ avançados; `help <cmd>` p/ um comando)", usage: "gstack_vibehard help [comando|advanced]" },
   { name: "plan", group: "advanced", desc: "Gerar plano guiado determinístico", usage: "gstack_vibehard plan \"<objetivo>\" [--json --dry-run --recipe <id>] · plan run|status|explain <id>" },
-  { name: "task", group: "advanced", desc: "Loop Engineer: plano de feature", usage: "gstack_vibehard task \"<pedido>\"" },
+  { name: "task", group: "advanced", desc: "Loop Engineer: plano + execução em worktree", usage: "gstack_vibehard task \"<pedido>\"  ·  task run [planId] --yes" },
   { name: "publish-guard", group: "advanced", desc: "Check determinístico pré-publish (tree/bump/CHANGELOG/tag/CI)", usage: "gstack_vibehard publish-guard [--json] [--no-ci]" },
   { name: "dream", group: "advanced", desc: "Auditoria promessas-vs-evidência (audit/status)", usage: "gstack_vibehard dream audit|status [--json]" },
   { name: "proxy", group: "advanced", desc: "Proxy de redaction pré-output (opt-in)", usage: "gstack_vibehard proxy [--port N] [--upstream URL]" },
