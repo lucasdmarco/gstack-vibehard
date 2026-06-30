@@ -9,6 +9,8 @@ import { isStrongTrust } from "../dream/capabilities.js"
 import { detectProfile } from "./detect-profile.js"
 import { publishGuard } from "./publish-guard.js"
 import { diffHygiene } from "./diff-hygiene.js"
+import { loadRuntimeManifest, validateRuntimeManifest } from "../runtime/manifest.js"
+import { readAllState } from "../runtime/supervisor.js"
 
 const PKG_QG = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "hooks", "hooks", "qg.py")
 
@@ -113,6 +115,21 @@ export function runVerify(opts = {}) {
   }
   const na = (id, detail, required = false) => steps.push({ id, status: "not_applicable", required, detail })
 
+  // Package manager REAL do projeto (PR2/PR5): packageManager field → lockfile →
+  // fallback npm. Não usa mais `npm` fixo (quebrava deps/build em projeto pnpm).
+  const pm = (() => {
+    try { const p = hasPkg ? readJson(pkgPath) : {}; if (p.packageManager) return String(p.packageManager).split("@")[0] } catch { /* ignore */ }
+    if (existsSync(join(cwd, "pnpm-lock.yaml"))) return "pnpm"
+    if (existsSync(join(cwd, "yarn.lock"))) return "yarn"
+    if (existsSync(join(cwd, "bun.lockb"))) return "bun"
+    return "npm"
+  })()
+  // Exec do PM cross-platform: no Windows o binário é `pm.cmd` → cmd.exe /c (senão ENOENT).
+  const runPm = (id, args, opts) => {
+    if (process.platform === "win32") run(id, process.env.ComSpec || "cmd.exe", ["/c", pm, ...args], opts)
+    else run(id, pm, args, opts)
+  }
+
   // 1. deps — quick: checagem FILESYSTEM (instantânea, sem spawnar npm que é lento
   //    no Windows); full/release: install obrigatório.
   if (isQuick) {
@@ -122,21 +139,21 @@ export function runVerify(opts = {}) {
       const declared = Object.keys({ ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) })
       const missing = declared.filter((d) => !existsSync(join(cwd, "node_modules", d)))
       if (missing.length === 0) steps.push({ id: "deps", status: "passed", detail: "node_modules ok (check rápido)" })
-      else steps.push({ id: "deps", status: "failed", detail: `deps ausentes: ${missing.slice(0, 5).join(", ")} — rode npm install` })
+      else steps.push({ id: "deps", status: "failed", detail: `deps ausentes: ${missing.slice(0, 5).join(", ")} — rode ${pm} install` })
     }
   }
-  else if (isFullish) { hasPkg ? run("deps", "npm", ["install"], { required: true }) : na("deps", "sem package.json") }
+  else if (isFullish) { hasPkg ? runPm("deps", ["install"], { required: true }) : na("deps", "sem package.json") }
   // 2. lint (sempre, se houver)
-  scripts.lint ? run("lint", "npm", ["run", "lint"]) : na("lint", "sem script lint")
+  scripts.lint ? runPm("lint", ["run", "lint"]) : na("lint", "sem script lint")
   // 3. typecheck (full/release)
-  if (isFullish) { scripts.typecheck ? run("typecheck", "npm", ["run", "typecheck"]) : na("typecheck", "sem script typecheck") }
+  if (isFullish) { scripts.typecheck ? runPm("typecheck", ["run", "typecheck"]) : na("typecheck", "sem script typecheck") }
   // 4. testes — pulados no quick (parte lenta); obrigatórios nos demais quando existem.
   if (isQuick) { na("test", "pulado no --quick (use --profile full p/ a suíte)") }
-  else if (scripts.test) run("test", "npm", ["test"], { required: true })
+  else if (scripts.test) runPm("test", ["test"], { required: true })
   else if (hasPyTests) run("test", pyBin, ["-m", "pytest", "-q"], { required: true })
   else na("test", "sem suíte de testes")
   // 5. build (full/release; obrigatório quando existe)
-  if (isFullish) { scripts.build ? run("build", "npm", ["run", "build"], { required: true }) : na("build", "sem script build") }
+  if (isFullish) { scripts.build ? runPm("build", ["run", "build"], { required: true }) : na("build", "sem script build") }
   // 6. Quality Gate — quick: só L1 (rápido, binário local). full/release: L1+L2.
   //    release roda o qg EMPACOTADO (consistência garantida); demais usam o instalado.
   const qgRun = isRelease && existsSync(PKG_QG) ? PKG_QG : qgHook
@@ -170,14 +187,32 @@ export function runVerify(opts = {}) {
     } catch { steps.push({ id: "diff-hygiene", status: "advisory", detail: "hygiene indisponível" }) }
   }
 
-  // 8. runtime/preview — não se aplica a lib/CLI; para app/web fica pending_feature
-  //    (roadmap). productCritical quando o projeto precisa rodar.
+  // 8. runtime/preview — verify CONHECE o runtime entregue (PR5): valida o Runtime
+  //    Manifest V2 e reporta o estado real dos serviços (.gstack/runtime/). Sem
+  //    runtime declarado, preserva o pending_product (o projeto roda mas o gstack não verifica).
   if (isLibCli) {
     na("runtime:start", "não se aplica a lib/CLI")
     na("preview:open", "não se aplica a lib/CLI")
   } else {
-    steps.push({ id: "runtime:start", status: "pending_feature", productCritical: hasRunScript })
-    steps.push({ id: "preview:open", status: "pending_feature", productCritical: hasRunScript })
+    const rm = loadRuntimeManifest(cwd)
+    if (!rm) {
+      steps.push({ id: "runtime:start", status: "pending_feature", productCritical: hasRunScript, detail: "sem .gstack/runtime.json — `gstack_vibehard create` declara o runtime" })
+      steps.push({ id: "preview:open", status: "pending_feature", productCritical: hasRunScript })
+    } else {
+      const v = validateRuntimeManifest(rm)
+      const state = (() => { try { return readAllState(cwd) } catch { return [] } })()
+      const ready = state.filter((s) => s.status === "ready")
+      if (!v.valid) {
+        steps.push({ id: "runtime:start", status: "failed", required: isFullish, detail: `runtime manifest INVÁLIDO: ${v.errors[0]}` })
+      } else if (ready.length) {
+        steps.push({ id: "runtime:start", status: "passed", detail: `${ready.length}/${rm.services.length} serviço(s) ready (dev rodou)` })
+      } else {
+        steps.push({ id: "runtime:start", status: "advisory", productCritical: false, detail: `runtime válido (${rm.services.length} serviço(s)) — rode \`gstack_vibehard dev\`` })
+      }
+      const web = state.find((s) => s.url)
+      if (web) steps.push({ id: "preview:open", status: "passed", detail: web.url })
+      else steps.push({ id: "preview:open", status: "advisory", detail: "preview chega com `gstack_vibehard dev --open`" })
+    }
   }
 
   // Qualquer gate que FALHOU bloqueia "ready" (lint quebrado não é "pronto").

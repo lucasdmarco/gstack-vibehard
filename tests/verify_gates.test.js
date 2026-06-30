@@ -137,3 +137,50 @@ test("verifyCommand --json: persiste verify.json com status", async () => {
     assert.ok(existsSync(path.join(cwd, ".gstack", "runs", "run1", "verify.json")))
   } finally { await rm(cwd, { recursive: true, force: true }) }
 })
+
+// ── PR5: verify CONHECE o runtime entregue (Runtime Manifest V2 + estado) ──
+async function withRuntime(scripts, runtimeJson) {
+  const cwd = await mkdtemp(path.join(tmpdir(), "gstack-verify-rt-"))
+  await writeFile(path.join(cwd, "package.json"), JSON.stringify({ name: "x", scripts }))
+  await mkdir(path.join(cwd, ".gstack", "hooks"), { recursive: true })
+  await copyFile(path.join(repoRoot, "hooks", "hooks", "qg.py"), path.join(cwd, ".gstack", "hooks", "qg.py"))
+  await writeFile(path.join(cwd, ".gstack", "runtime.json"), JSON.stringify(runtimeJson))
+  return cwd
+}
+
+test("verify PR5: runtime.json VÁLIDO → runtime:start advisory (não pending_feature), não bloqueia produto", async () => {
+  const cwd = await withRuntime({ test: "x", start: "node ." }, { schemaVersion: 2, services: [{ name: "web", command: ["node", "server.js"] }] })
+  try {
+    const { runVerify } = await imp(runnerMod)
+    const r = runVerify({ cwd, profile: "full", home: cwd, exec: () => {} })
+    const rt = r.steps.find((s) => s.id === "runtime:start")
+    assert.equal(rt.status, "advisory", "runtime válido vira advisory, não pending_feature placebo")
+    assert.match(rt.detail, /runtime válido/)
+    assert.notEqual(r.status, "pending_product", "runtime conhecido/válido não marca produto pendente")
+  } finally { await rm(cwd, { recursive: true, force: true }) }
+})
+
+test("verify PR5: runtime.json INVÁLIDO (command string) → runtime:start failed → blocked", async () => {
+  const cwd = await withRuntime({ test: "x", start: "node ." }, { schemaVersion: 2, services: [{ name: "web", command: "node server.js" }] })
+  try {
+    const { runVerify } = await imp(runnerMod)
+    const r = runVerify({ cwd, profile: "full", home: cwd, exec: () => {} })
+    const rt = r.steps.find((s) => s.id === "runtime:start")
+    assert.equal(rt.status, "failed", "manifest de runtime quebrado é falha real, não pending")
+    assert.equal(r.status, "blocked")
+  } finally { await rm(cwd, { recursive: true, force: true }) }
+})
+
+test("verify PR5: projeto pnpm → deps usa pnpm (não npm fixo)", async () => {
+  const cwd = await mkdtemp(path.join(tmpdir(), "gstack-verify-pnpm-"))
+  try {
+    await writeFile(path.join(cwd, "package.json"), JSON.stringify({ name: "x", scripts: { lint: "x" } }))
+    await writeFile(path.join(cwd, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n")
+    const { runVerify } = await imp(runnerMod)
+    const calls = []
+    runVerify({ cwd, profile: "full", home: cwd, exec: (f, a) => { calls.push([f, ...a].join(" ")) } })
+    const depsCall = calls.find((c) => c.includes("install"))
+    assert.ok(depsCall && depsCall.includes("pnpm"), `deps deve usar pnpm, foi: ${depsCall}`)
+    assert.ok(!depsCall.match(/\bnpm install\b/), "não pode ser npm install fixo")
+  } finally { await rm(cwd, { recursive: true, force: true }) }
+})
