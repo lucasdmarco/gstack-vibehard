@@ -13,7 +13,13 @@ function parseFlags(args) {
     else if (a === "--harness") out.harness = args[++i]
     else if (a === "--run") out.runId = args[++i]
     else if (a === "--sensitive") out.sensitive = true
-    else if (a === "--evidence") for (const e of String(args[++i] || "").split(",").map((s) => s.trim()).filter(Boolean)) out.evidence[e] = "provided"
+    else if (a === "--evidence") {
+      // consome MÚLTIPLOS tokens (até o próximo --flag): o cmd.exe/PowerShell quebra
+      // `a,b,c` em args separados, então `--evidence a b c` e `--evidence a,b,c` valem.
+      while (i + 1 < args.length && !String(args[i + 1]).startsWith("--")) {
+        for (const e of String(args[++i]).split(",").map((s) => s.trim()).filter(Boolean)) out.evidence[e] = "provided"
+      }
+    }
   }
   return out
 }

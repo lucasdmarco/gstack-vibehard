@@ -40,6 +40,30 @@ test("evaluateChallenge: harness instrucional → posthoc_audit_only (sem bloque
   assert.match(r.note, /não bloqueia|posterior/i)
 })
 
+// ── ABUSO de parsing: cmd.exe/PowerShell quebra `a,b,c` em args separados ──
+test("challengeCommand: --evidence aceita tokens por ESPAÇO (cmd/PS split) e por vírgula", async () => {
+  const { mkdtemp, rm } = await import("node:fs/promises")
+  const { tmpdir } = await import("node:os")
+  const cmd = await import(`${pathToFileURL(path.resolve(import.meta.dirname, "..", "src", "commands", "challenge.js"))}?t=${Date.now()}`)
+  const dir = await mkdtemp(path.join((await import("node:os")).tmpdir(), "gstack-ch-"))
+  const prevCode = process.exitCode
+  const orig = process.stdout.write.bind(process.stdout)
+  process.stdout.write = () => true
+  try {
+    const base = ["evaluate", "--intent", "edit_file", "--target", "~/.config/opencode/x", "--scope", "global", "--harness", "claude"]
+    const spaced = cmd.challengeCommand([...base, "--evidence", "install-manifest-owner", "backup-path", "rollback-plan", "--json"], { cwd: dir })
+    assert.equal(spaced.decision, "allow", "evidência por espaço (cmd/PS) → allow")
+    const comma = cmd.challengeCommand([...base, "--evidence", "install-manifest-owner,backup-path,rollback-plan", "--json"], { cwd: dir })
+    assert.equal(comma.decision, "allow", "evidência por vírgula (bash) → allow")
+    const none = cmd.challengeCommand([...base, "--json"], { cwd: dir })
+    assert.equal(none.decision, "deny", "sem evidência → deny")
+  } finally {
+    process.stdout.write = orig
+    process.exitCode = prevCode
+    await rm(dir, { recursive: true, force: true, maxRetries: 5 })
+  }
+})
+
 test("buildChallenge: monta o desafio com a evidência exigida (só p/ alto risco)", async () => {
   const { buildChallenge } = await imp()
   const ch = buildChallenge({ intent: "edit_file", target: { scope: "global", pathOrName: "~/.claude/settings.json" } })
