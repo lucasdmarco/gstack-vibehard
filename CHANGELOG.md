@@ -1,5 +1,12 @@
 # Changelog - gstack-vibehard
 
+## [3.13.1] - 2026-06-30
+
+### Correção: `agents doctor` acusava drift falso em instalação limpa (Windows)
+Reconfirmação numa máquina Windows limpa: `agents doctor` (3.13.0) reportava `Drift: Saida gerada desatualizada: copilot-instructions.md` numa instalação fresca.
+- **Causa:** o tarball npm levou os adapters gerados com **CRLF** (autocrlf no Windows ao empacotar; a fonte embute CRLF), mas `build:agents --check` regenera em **LF** → a comparação **exata** do `writeText` acusava drift falso. (O manifest não sofria — é comparado via `JSON.parse`, que ignora line-ending.)
+- **Fix:** a comparação de drift do `writeText` agora **normaliza CRLF→LF** — robusta a qualquer line-ending. `--check`/`agents doctor` passam numa instalação limpa independente do empacotamento. **+1 teste** (adapter em CRLF não acusa drift). 354 Node verdes.
+
 ## [3.13.0] - 2026-06-30
 
 ### Adapter Expansion + Capability Matrix honesta (PRD 13 PR13.3)

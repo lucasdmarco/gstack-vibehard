@@ -131,6 +131,12 @@ Use clear API design boundaries.
     })
     assert.equal(checkResult.status, 0, checkResult.stderr || checkResult.stdout)
 
+    // line-ending robusto: adapter em CRLF (tarball npm no Windows) NÃO acusa drift falso
+    const crlf = (await readFile(copilotFile, "utf8")).replace(/\r\n/g, "\n").replace(/\n/g, "\r\n")
+    await writeFile(copilotFile, crlf)
+    const crlfCheck = spawnSync(process.execPath, [buildScript, "--root", root, "--check"], { cwd: repoRoot, encoding: "utf8" })
+    assert.equal(crlfCheck.status, 0, "CRLF nos gerados não pode acusar drift falso (--check normaliza)")
+
     // ABUSO: editar um adapter à mão → --check FALHA (drift guard)
     await writeFile(claudeSkill, claudeText + "\nEDITADO A MAO\n")
     const driftResult = spawnSync(process.execPath, [buildScript, "--root", root, "--check"], { cwd: repoRoot, encoding: "utf8" })

@@ -63,7 +63,11 @@ async function writeText(filePath, content, options) {
   }
 
   const previous = existsSync(filePath) ? await fs.readFile(filePath, "utf8") : null
-  if (previous === content) return false
+  // Compara IGNORANDO line-ending: o tarball npm pode trazer CRLF (autocrlf no
+  // Windows) e o regen escreve LF — sem isso o --check acusaria drift falso numa
+  // instalação limpa (pego na reconfirmação Windows do copilot-instructions.md).
+  const norm = (s) => (s == null ? s : s.replace(/\r\n/g, "\n"))
+  if (norm(previous) === norm(content)) return false
 
   if (options.check) {
     throw new Error(`Saida gerada desatualizada: ${path.relative(options.root, filePath)}`)
