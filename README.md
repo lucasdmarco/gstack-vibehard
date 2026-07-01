@@ -67,7 +67,7 @@ npx @gstack-vibehard/installer install --audit-only
 - **Primeiro comando seguro:** `gstack_vibehard` sem argumentos (ou `--help`) **só mostra ajuda** — nunca instala nem escreve.
 - **Criar é leve, versionado e seguro:** `create meu-app` é **lite** por padrão (só `./meu-app`), já roda `git init` (o projeto nasce versionado, o graphify se instala sozinho) e gera um **`.gitignore` que mantém o `.env` fora do git**. Melhor ainda: segredos vão pro **keychain do SO** via `gstack_vibehard secrets` (broker — nada em claro no repo). Use `--full` para o stack completo (Casdoor/Atomic/ECC). Veja o plano antes com `create meu-app --dry-run --json`.
 - **Ativar num projeto existente (opt-in):** entre na pasta e rode `gstack_vibehard enable` (`disable` desativa preservando dados; `status` mostra o estado).
-- **O que pode escrever globalmente:** só o `install` toca o ambiente — e é **preflight-first** (mostra o impacto por categoria e pede confirmação). **MCP global** (`--global-mcp`) e **downloads remotos** (`--allow-remote-downloads`) são **opt-in**. Audite com `install --audit-only` e `doctor --impact`.
+- **O que pode escrever globalmente:** só o `install` toca o ambiente — e é **preflight-first** (mostra o impacto por categoria e pede confirmação). O install **completo** escreve MCP global por padrão (**opt-out**: `--no-global-mcp`); `--project-only` e o modo lite **nunca** escrevem config global. **Downloads remotos** (`--allow-remote-downloads`) seguem opt-in. Audite com `install --audit-only` e `doctor --impact`.
 - **Como desfazer:** `gstack_vibehard uninstall --dry-run` (plano) e `uninstall` (rollback via manifest; preserva o que você editou — `--resolve-drift` para forçar).
 
 ---
@@ -101,7 +101,7 @@ npx @gstack-vibehard/installer install --audit-only
 
 ```bash
 gstack_vibehard create meu-app                              # fullstack-monorepo (padrão), lite
-gstack_vibehard create meu-app --full                      # stack completo (Casdoor/Atomic/ECC2)
+gstack_vibehard create meu-app --full                      # stack completo (Casdoor/Atomic/ECC)
 gstack_vibehard create meu-app --template saas-auth-stripe # vertical específico
 ```
 
@@ -139,7 +139,13 @@ gstack_vibehard verify --quick    # gates rápidos (~8s, com cache)
 gstack_vibehard publish-guard     # checklist determinístico antes de publicar
 gstack_vibehard install --audit-only   # ver impacto global SEM escrever
 gstack_vibehard uninstall --dry-run    # plano de remoção (rollback via manifest)
+gstack_vibehard dev                    # sobe o runtime do projeto (manifest .gstack/runtime.json)
+gstack_vibehard stop | logs | open     # para serviços · vê logs · abre o preview
 ```
+
+> **Runtime real:** projetos do `create` nascem com Runtime Manifest V2 — `dev` sobe os serviços destacados (sobrevivem ao CLI), `stop` mata a árvore com validação de dono do PID.
+>
+> **MVPs com limites declarados:** `challenge` (verificação challenge-response/VFA com provenance — ainda **sem** enforcement automático em pre-tool hooks) e `orchestrate` (executor em worktree + verificação dupla: reviewer LLM **advisory** + gates determinísticos bloqueantes — ainda sem paralelismo multi-harness). Nenhum LLM aprova entrega sozinho.
 
 ---
 
@@ -169,13 +175,14 @@ gstack_vibehard install --project-only                 # impacto global mínimo 
 gstack_vibehard install --harness claude               # instala só um harness
 gstack_vibehard install                                # completo (mostra impacto e PEDE confirmação)
 gstack_vibehard install --yes                          # confirma (necessário em modo não-interativo)
-gstack_vibehard install --global-mcp [--mcp-server playwright]  # opt-in: MCP global (só os escolhidos)
+gstack_vibehard install --no-global-mcp                # completo SEM escrever MCP global (opt-out)
+gstack_vibehard install --mcp-server playwright        # MCP global só com os servers escolhidos
 gstack_vibehard install --allow-remote-downloads       # opt-in: permite instaladores remotos (Bun/Rust/uv)
 gstack_vibehard install --skip-deps                    # pula bun/Rust/Chromium pesados
 ```
-**Preflight-first:** antes de qualquer escrita global, mostra o impacto por categoria e pede confirmação (não-interativo exige `--yes`/`--global`). **MCP global e downloads remotos são opt-in.** Registra hooks reais (Claude `settings.json`, Cursor `hooks.json`, plugins OpenCode), copia agentes/skills e escreve orientação para harnesses sem hooks API. Idempotente e não-destrutivo (backup `.bak` + manifest). Auditar/reverter: `doctor --impact` · `doctor --install-integrity` · `uninstall --dry-run`/`--resolve-drift`.
+**Preflight-first:** antes de qualquer escrita global, mostra o impacto por categoria e pede confirmação (não-interativo exige `--yes`/`--global`). **O completo é completo de verdade:** escreve MCP global por padrão, com opt-out claro (`--no-global-mcp`); `--project-only`/lite nunca escrevem global. **Downloads remotos seguem opt-in.** Registra hooks reais (Claude `settings.json`, Cursor `hooks.json`, plugins OpenCode), copia agentes/skills e escreve orientação para harnesses sem hooks API. Idempotente e não-destrutivo (backup `.bak` + manifest). Auditar/reverter: `doctor --impact` · `doctor --install-integrity` · `uninstall --dry-run`/`--resolve-drift`.
 
-> **Honestidade de scripts:** `npm run syntaxcheck` (alias `typecheck`) faz checagem de **sintaxe ESM** via `node --check` — não é typecheck TypeScript.
+> **Honestidade de scripts:** `npm run syntaxcheck` (alias `typecheck`) faz checagem de **sintaxe ESM** via `node --check`. O typecheck TypeScript **real** (baseline) é `npm run typecheck:ts` — `tsc --noEmit` sobre `jsconfig.json` + `types/contracts.d.ts`.
 
 ### `enable` / `disable` / `status` — ativar num projeto existente (opcional)
 A infra é instalada **globalmente**, mas as regras gstack só **agem em projetos com `.gstack/`**. Projeto novo (`create`) já nasce ativo; projeto em andamento fica **intocado** até você ativar.
@@ -305,7 +312,7 @@ Ele imprime **PASS/FAIL** por item: versão, `--help` seguro, `doctor`, `install
 
 ## 📦 Verificação & qualidade
 
-`npm test` (Node) · `npm run test:py` (Python) · `npm run lint` · `npm run syntaxcheck` · `npm run test:pack` (smoke do tarball npm) · `npm run test:templates` (smoke dos templates) · `GSTACK_E2E_SAFE_INSTALL=1 npm run test:e2e` (E2E em HOME descartável).
+`npm test` (Node) · `npm run test:py` (Python) · `npm run lint` · `npm run syntaxcheck` · `npm run typecheck:ts` (TS baseline, `tsc --noEmit`) · `npm run test:pack` (smoke do tarball npm) · `npm run test:templates` (smoke dos templates) · `GSTACK_E2E_SAFE_INSTALL=1 npm run test:e2e` (E2E em HOME descartável).
 
 ---
 

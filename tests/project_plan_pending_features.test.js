@@ -8,13 +8,18 @@ import { pathToFileURL } from "node:url"
 const repoRoot = path.resolve(import.meta.dirname, "..")
 const imp = (rel) => import(`${pathToFileURL(path.join(repoRoot, rel))}?t=${Date.now()}`)
 
-test("pending-features: registro tem runtime/dashboard/deploy, todos sem comando", async () => {
-  const { PENDING_FEATURES, isPendingFeature, getPendingFeature } = await imp("src/project-plan/pending-features.js")
-  for (const id of ["runtime:start", "dashboard:open", "deploy:preview", "deploy:production"]) {
+test("pending-features: registro tem dashboard/deploy sem comando; runtime é REAL (PRD14)", async () => {
+  const { isPendingFeature, getPendingFeature } = await imp("src/project-plan/pending-features.js")
+  for (const id of ["dashboard:open", "deploy:preview", "deploy:production"]) {
     assert.ok(isPendingFeature(id), `${id} é pending`)
     const pf = getPendingFeature(id)
     assert.ok(pf.label && pf.explanation, "tem label e explicação")
     assert.ok(!("command" in pf), "nunca carrega comando")
+  }
+  // runtime saiu do registro: o supervisor (`dev`/`logs`/`open`) existe e o planner
+  // expande para comando real — pending aqui seria claim falso de produto incompleto.
+  for (const id of ["runtime:start", "runtime:logs", "runtime:open"]) {
+    assert.equal(isPendingFeature(id), false, `${id} não é mais pending`)
   }
   assert.equal(isPendingFeature("doctor"), false)
 })
@@ -40,8 +45,11 @@ test("executor: nunca executa um pending feature (pula com step_skipped)", async
     const ran = []
     const r = executePlan({ plan, planDir, cwd: tmp, exec: (c) => ran.push(c.join(" ")), includeOptional: true })
     assert.equal(r.status, "done")
-    assert.ok(r.skipped.includes("deploy:preview") && r.skipped.includes("runtime:start"))
-    assert.ok(!ran.some((c) => /deploy|runtime/.test(c)), "nenhum pending feature foi executado")
+    assert.ok(r.skipped.includes("deploy:preview"), "deploy segue pending → pulado")
+    assert.ok(!ran.some((c) => /deploy/.test(c)), "nenhum pending feature foi executado")
+    // runtime:start agora é comando REAL: executa `gstack_vibehard dev` no opt-in
+    assert.ok(r.completed.includes("runtime:start"), "runtime:start executa como passo real")
+    assert.ok(ran.includes("gstack_vibehard dev"), "runtime:start roda o supervisor real")
   } finally {
     await rm(tmp, { recursive: true, force: true })
   }

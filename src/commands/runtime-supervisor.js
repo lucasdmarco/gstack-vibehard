@@ -3,7 +3,7 @@ import { openSync, closeSync, mkdirSync, existsSync, readFileSync } from "fs"
 import { join } from "path"
 import { loadRuntimeManifest, validateRuntimeManifest } from "../runtime/manifest.js"
 import {
-  planStart, stopAll, pollReadiness, killTreeCommand, isAlive,
+  planStart, stopAll, pollReadiness, killTreeCommand, isAlive, waitPidsExit,
   writeServiceState, readAllState, clearState, logsDir,
 } from "../runtime/supervisor.js"
 import { resolveSecrets } from "../secrets/broker.js"
@@ -50,6 +50,9 @@ export async function devCommand(args = [], opts = {}) {
     const onWin = process.platform === "win32"
     const killed = stopAll(alive, onWin ? { exec: (f, a) => execFileSync(f, a, { stdio: "ignore" }) } : {})
     if (!json) killed.forEach((r) => info(`  • reiniciando — parei o antigo ${r.name}: ${r.status}`))
+    // Espera a morte REAL antes de relançar: sem isso o processo antigo ainda
+    // segura a porta/log e o novo serviço nasce unhealthy (race do taskkill).
+    await waitPidsExit(killed.filter((r) => r.status === "stopped").map((r) => r.pid))
   }
   clearState(cwd)
 
@@ -144,7 +147,7 @@ function procAgeSec(pid) {
 }
 
 /** `gstack_vibehard stop` — encerra a árvore de processos. Idempotente. */
-export function stopCommand(args = [], opts = {}) {
+export async function stopCommand(args = [], opts = {}) {
   const cwd = opts.cwd || process.cwd()
   const json = args.includes("--json")
   const state = readAllState(cwd)
@@ -157,11 +160,19 @@ export function stopCommand(args = [], opts = {}) {
     getAgeSec: opts.getAgeSec || procAgeSec,
     ...(onWin ? { exec: (file, a) => execFileSync(file, a, { stdio: "ignore" }) } : {}),
   })
+  // `stop` só reporta "parado" quando os processos MORRERAM de verdade: taskkill/
+  // kill retornam antes de o SO liberar handles — sem esta espera, remover o
+  // diretório do projeto logo após o stop dá EBUSY no Windows (PRD14 §4.14).
+  const stillAlive = await waitPidsExit(
+    results.filter((r) => r.status === "stopped").map((r) => r.pid),
+    { timeoutMs: opts.waitTimeoutMs || 5000 },
+  )
   clearState(cwd)
-  if (json) { process.stdout.write(JSON.stringify({ stopped: results }) + "\n"); return }
+  if (json) { process.stdout.write(JSON.stringify({ stopped: results, stillAlive }) + "\n"); return }
   section("stop — encerrando o runtime")
   for (const r of results) info(`  • ${r.name}: ${r.status}${r.pid ? ` (pid ${r.pid})` : ""}`)
-  success("Runtime parado.")
+  if (stillAlive.length) warn(`  ⚠ pid(s) ainda finalizando após ${opts.waitTimeoutMs || 5000}ms: ${stillAlive.join(", ")}`)
+  else success("Runtime parado.")
 }
 
 /** `gstack_vibehard logs [serviço] [--follow]`. */

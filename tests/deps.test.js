@@ -66,8 +66,8 @@ test("npxArgv: Windows usa o cmd.exe ABSOLUTO (ComSpec); unix usa npx direto", a
 test("npmArgv: Windows usa o cmd.exe ABSOLUTO (ComSpec, evita ENOENT); unix usa npm direto", async () => {
   const { npmArgv } = await import(`${pathToFileURL(depsModule)}?t=${Date.now()}`)
   const cmd = process.env.ComSpec || "cmd.exe"
-  assert.deepEqual(npmArgv(["install", "-g", "cli-anything-hub"], "win32"), {
-    file: cmd, argv: ["/c", "npm", "install", "-g", "cli-anything-hub"],
+  assert.deepEqual(npmArgv(["install", "-g", "algum-pacote"], "win32"), {
+    file: cmd, argv: ["/c", "npm", "install", "-g", "algum-pacote"],
   })
   assert.deepEqual(npmArgv(["install", "-g", "x"], "linux"), {
     file: "npm", argv: ["install", "-g", "x"],

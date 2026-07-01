@@ -1,12 +1,41 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { mkdtemp, rm, writeFile, mkdir, readFile } from "node:fs/promises"
+import { mkdtemp, rm, writeFile, mkdir, readFile, readdir } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
+import { readAllState, isAlive, waitPidsExit } from "../src/runtime/supervisor.js"
 
 const repoRoot = path.resolve(import.meta.dirname, "..")
 const cmdMod = path.join(repoRoot, "src", "commands", "runtime-supervisor.js")
+
+/** rm recursivo com retry/backoff próprio; retorna o último erro (null = sucesso). */
+async function rmWithBackoff(dir, attempts = 8) {
+  let lastErr = null
+  for (let i = 0; i < attempts; i++) {
+    try { await rm(dir, { recursive: true, force: true, maxRetries: 3 }); return null }
+    catch (e) { lastErr = e; await new Promise((r) => setTimeout(r, 200 * (i + 1))) }
+  }
+  return lastErr
+}
+
+/**
+ * Cleanup à prova de EBUSY (Windows): para o runtime, espera os pids morrerem DE
+ * VERDADE (taskkill retorna antes de o SO soltar os handles do filho) e remove o
+ * diretório com retry/backoff próprio. Na última falha, diagnostica o que sobrou.
+ */
+async function cleanupProject(dir, stopCommand) {
+  try { await stopCommand([], { cwd: dir }) } catch { /* idempotente */ }
+  // cinto e suspensório: qualquer pid remanescente no state (stop pode ter pulado)
+  try {
+    await waitPidsExit(readAllState(dir).map((s) => s.pid).filter((p) => p && isAlive(p)), { timeoutMs: 5000 })
+  } catch { /* state ausente/ilegível = nada vivo a esperar */ }
+  const lastErr = await rmWithBackoff(dir)
+  if (!lastErr) return
+  // Diagnóstico do arquivo preso — sem isso o CI só mostra "EBUSY: <dir>".
+  const leftover = await readdir(path.join(dir, ".gstack", "runtime", "logs")).catch(() => [])
+  throw new Error(`cleanup falhou (${lastErr.code}): ${lastErr.path} — logs presos: ${leftover.join(", ") || "(nenhum listável)"}`)
+}
 
 // Servidor http mínimo: prova que o supervisor sobe um processo REAL, sem shell,
 // que SOBREVIVE ao `dev` (detached) e é morto pelo `stop` (árvore por plataforma).
@@ -56,7 +85,7 @@ test("e2e: dev sobe um serviço real (sobrevive ao launcher) e stop o mata", asy
     }
     assert.equal(status, 200, "serviço respondendo após o dev sair (sobreviveu ao launcher)")
 
-    stopCommand([], { cwd: dir })
+    await stopCommand([], { cwd: dir })
 
     // após o stop a porta deve cair
     let down = false
@@ -67,8 +96,7 @@ test("e2e: dev sobe um serviço real (sobrevive ao launcher) e stop o mata", asy
     }
     assert.equal(down, true, "porta liberada após o stop (árvore morta)")
   } finally {
-    try { stopCommand([], { cwd: dir }) } catch { /* idempotente */ }
-    await rm(dir, { recursive: true, force: true, maxRetries: 5 })
+    await cleanupProject(dir, stopCommand)
   }
 })
 
@@ -95,8 +123,7 @@ test("e2e: spawn de binário inexistente não derruba o CLI (status failed)", as
     assert.equal(state.status, "failed", "spawn falho vira status failed (sem crash)")
     assert.ok(!state.pid, "serviço falho não tem pid running")
   } finally {
-    try { stopCommand([], { cwd: dir }) } catch { /* ok */ }
-    await rm(dir, { recursive: true, force: true, maxRetries: 5 })
+    await cleanupProject(dir, stopCommand)
   }
 })
 
@@ -118,7 +145,6 @@ test("e2e: dev duplicado recusa e mantém o mesmo pid (não orfana processos)", 
     const pid2 = JSON.parse(await readFile(path.join(dir, ".gstack", "runtime", "web.json"), "utf-8")).pid
     assert.equal(pid2, pid1, "2ª chamada não relançou — mesmo pid, sem órfão")
   } finally {
-    try { stopCommand([], { cwd: dir }) } catch { /* ok */ }
-    await rm(dir, { recursive: true, force: true, maxRetries: 5 })
+    await cleanupProject(dir, stopCommand)
   }
 })

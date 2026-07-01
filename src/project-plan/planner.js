@@ -3,7 +3,8 @@
  *
  * Não chama LLM. Não executa nada (PR5/executor faz isso). Resolve a recipe via
  * classifier, escolhe o modo (explícito ou recomendado) e expande os step-ids em
- * comandos reais do gstack_vibehard. `runtime:start` vira pendingFeature.
+ * comandos reais do gstack_vibehard. `runtime:*` expande para o supervisor real
+ * (`dev`/`logs`/`open`); só dashboard/deploy continuam pendingFeature.
  */
 import { makePlan, validatePlan, MODE_IDS } from "./schema.js"
 import { classify } from "./classifier.js"
@@ -17,37 +18,40 @@ function projectCwd(projectName) {
   return projectName ? `./${projectName}` : "."
 }
 
+// Steps FIXOS (id → fábrica): expansão declarativa em comando real. `cwd` default é
+// o diretório do projeto (pós-create); `doctor` sobrepõe com "." (roda antes).
+// runtime:* é REAL (PRD14 §4.14): todo template do `create` declara .gstack/runtime.json
+// e `dev` sobe os serviços destacados e RETORNA (não bloqueia o executor).
+const FIXED_STEPS = {
+  "doctor": () => ({ label: "Diagnosticar ambiente", command: [CLI, "doctor"], cwd: ".", required: true }),
+  "context:init": () => ({ label: "Inicializar contexto do projeto", command: [CLI, "context", "init"], required: true }),
+  "context:index": () => ({ label: "Indexar Document Graph local", command: [CLI, "context", "index"], required: true }),
+  "tools:suggested": () => ({ label: "Listar integrações sugeridas", command: [CLI, "tools", "suggested"], required: true }),
+  "runtime:start": () => ({ label: "Iniciar runtime do projeto (dev)", command: [CLI, "dev"], required: false }),
+  "runtime:logs": () => ({ label: "Ver logs do runtime", command: [CLI, "logs"], required: false }),
+  "runtime:open": () => ({ label: "Abrir o app do runtime", command: [CLI, "open"], required: false }),
+}
+
+// Steps por PREFIXO (prefixo → fábrica que recebe o sufixo).
+const PREFIX_STEPS = [
+  ["tools:install:", (tool) => ({ label: `Instalar integração: ${tool}`, command: [CLI, "tools", "install", tool], required: false })],
+  ["tools:mcp:enable:", (tool) => ({ label: `Habilitar MCP: ${tool}`, command: [CLI, "tools", "mcp", "enable", tool], required: false })],
+]
+
 /** Expande um step-id declarativo para um step concreto (comando real ou pendingFeature). */
 export function expandStep(stepId, ctx) {
   const { projectName, template, mode } = ctx
   const cwd = projectCwd(projectName)
 
-  if (stepId === "doctor") {
-    return { id: "doctor", label: "Diagnosticar ambiente", command: [CLI, "doctor"], cwd: ".", required: true }
-  }
   if (stepId === "create") {
     const cmd = [CLI, "create", projectName || "meu-app", "--template", template]
     if (mode === "lite") cmd.push("--lite")
     return { id: "create", label: `Criar projeto (${template}${mode === "lite" ? ", leve" : ""})`, command: cmd, cwd: ".", required: true }
   }
-  if (stepId === "context:init") {
-    return { id: "context:init", label: "Inicializar contexto do projeto", command: [CLI, "context", "init"], cwd, required: true }
-  }
-  if (stepId === "context:index") {
-    return { id: "context:index", label: "Indexar Document Graph local", command: [CLI, "context", "index"], cwd, required: true }
-  }
-  if (stepId === "tools:suggested") {
-    return { id: "tools:suggested", label: "Listar integrações sugeridas", command: [CLI, "tools", "suggested"], cwd, required: true }
-  }
-  if (stepId.startsWith("tools:install:")) {
-    const tool = stepId.slice("tools:install:".length)
-    return { id: stepId, label: `Instalar integração: ${tool}`, command: [CLI, "tools", "install", tool], cwd, required: false }
-  }
-  if (stepId.startsWith("tools:mcp:enable:")) {
-    const tool = stepId.slice("tools:mcp:enable:".length)
-    return { id: stepId, label: `Habilitar MCP: ${tool}`, command: [CLI, "tools", "mcp", "enable", tool], cwd, required: false }
-  }
-  // Features futuras (runtime/dashboard/deploy): fonte única em pending-features.
+  if (FIXED_STEPS[stepId]) return { id: stepId, cwd, ...FIXED_STEPS[stepId]() }
+  const prefixed = PREFIX_STEPS.find(([prefix]) => stepId.startsWith(prefix))
+  if (prefixed) return { id: stepId, cwd, ...prefixed[1](stepId.slice(prefixed[0].length)) }
+  // Features futuras (dashboard/deploy): fonte única em pending-features.
   // Nunca carregam comando — o executor as pula.
   if (isPendingFeature(stepId)) {
     const pf = getPendingFeature(stepId)

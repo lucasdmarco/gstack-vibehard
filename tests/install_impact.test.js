@@ -77,6 +77,34 @@ test("buildInstallImpact: action 'modify' quando o alvo já existe", async () =>
   } finally { await rm(home, { recursive: true, force: true }) }
 })
 
+// ── Regressão PRD14 §4.16: impact e install sincronizados (sem dependência fantasma) ──
+test("buildInstallImpact: deps do impact existem no install real (sem item fantasma)", async () => {
+  const { readFile } = await import("node:fs/promises")
+  const home = await mkdtemp(path.join(tmpdir(), "gstack-impact-"))
+  try {
+    const { buildInstallImpact } = await imp()
+    const impact = buildInstallImpact({ home })
+    const deps = impact.find((c) => c.category === "deps").items.map((i) => i.path)
+
+    // `cli-anything-hub` nunca existiu no npm (E404) — não pode voltar ao preflight
+    const flat = JSON.stringify(impact)
+    assert.ok(!flat.includes("cli-anything-hub"), "impact não lista dependência fantasma")
+
+    // Cada dep anunciada no preflight precisa de âncora REAL no fluxo de install
+    // (install.js ou módulos de deps) — impact sem lastro = promessa falsa ao usuário.
+    const sources = await Promise.all([
+      readFile(path.join(repoRoot, "src", "installer", "install.js"), "utf-8"),
+      readFile(path.join(repoRoot, "src", "installer", "deps.js"), "utf-8").catch(() => ""),
+      readFile(path.join(repoRoot, "src", "harness", "headroom.js"), "utf-8").catch(() => ""),
+    ])
+    const installSrc = sources.join("\n").toLowerCase()
+    for (const dep of deps) {
+      const anchor = dep.split(" ")[0].toLowerCase() // "Playwright Chromium" → "playwright"
+      assert.ok(installSrc.includes(anchor), `dep '${dep}' do impact não tem âncora no install real`)
+    }
+  } finally { await rm(home, { recursive: true, force: true }) }
+})
+
 test("renderImpactMarkdown: gera markdown com aviso de preflight", async () => {
   const home = await mkdtemp(path.join(tmpdir(), "gstack-impact-"))
   try {

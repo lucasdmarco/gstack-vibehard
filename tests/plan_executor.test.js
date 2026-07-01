@@ -68,12 +68,15 @@ test("executor: retoma — passos já concluídos viram journal_hit, não re-exe
 test("executor: passos opcionais só rodam com includeOptional; pendingFeature é pulado", async () => {
   await withPlan(async ({ tmp, plan, planDir }) => {
     const { executePlan } = await imp("src/project-plan/executor.js")
-    // web-app tem optional runtime:start (pendingFeature). Sem includeOptional não entra.
+    // web-app tem optionals runtime:start (REAL → `dev`) e deploy:preview (pending).
     const ran = []
     const r = executePlan({ plan, planDir, cwd: tmp, exec: (c) => ran.push(c.join(" ")), includeOptional: true })
     assert.equal(r.status, "done")
-    // runtime:start é pendingFeature → pulado (nunca vira comando)
-    assert.ok(r.skipped.includes("runtime:start"))
-    assert.ok(!ran.some((c) => c.includes("runtime")))
+    // deploy:preview segue pendingFeature → pulado (nunca vira comando)
+    assert.ok(r.skipped.includes("deploy:preview"))
+    assert.ok(!ran.some((c) => c.includes("deploy")))
+    // runtime:start virou passo real (PRD14): roda `gstack_vibehard dev` no opt-in
+    assert.ok(r.completed.includes("runtime:start"))
+    assert.ok(ran.includes("gstack_vibehard dev"))
   })
 })
