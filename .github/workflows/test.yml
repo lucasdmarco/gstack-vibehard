@@ -94,3 +94,28 @@ jobs:
       - run: GSTACK_TEMPLATE_INSTALL=1 npm run test:templates
         name: "Template build PESADO (fullstack lite: pnpm install + turbo build)"
         timeout-minutes: 15
+
+  # E2E lifecycle CROSS-OS (PRD 12 PR8): caixa-preta do produto PUBLICADO. Empacota
+  # o tarball, instala num projeto temp e roda o BIN num HOME descartável pelo ciclo
+  # doctor → dream audit → create → agents check → install --audit-only → uninstall.
+  # Prova em Linux/Windows/macOS: (1) o truth contract no tarball == repo (18 REAL/0
+  # PLACEBO — guard do fix v3.21.1); (2) isolamento de HOME (read-only e create não
+  # escrevem config gstack; --save-report grava só o relatório).
+  e2e:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+        name: "Install dependencies"
+      - run: npm run test:e2e:lifecycle
+        name: "E2E lifecycle (tarball → HOME fake → ciclo de vida)"
+        env:
+          GSTACK_E2E_LIFECYCLE: "1"
+        timeout-minutes: 10

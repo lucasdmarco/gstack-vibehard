@@ -1,5 +1,15 @@
 # Changelog - gstack-vibehard
 
+## [3.22.0] - 2026-07-01
+
+### E2E lifecycle matrix cross-OS (PRD 12 PR8)
+Caixa-preta do produto **publicado**, rodando em **Linux + Windows + macOS** no CI — o mesmo cenário que a máquina limpa expõe, agora automatizado.
+- **`scripts/test-e2e-lifecycle.mjs`** (`npm run test:e2e:lifecycle`, gated por `GSTACK_E2E_LIFECYCLE=1`): empacota o tarball real → instala num projeto temp → roda o **BIN instalado** num **HOME descartável** pelo ciclo `doctor → dream audit → create --lite → agents check → install --audit-only → uninstall`.
+- **Guard do fix v3.21.1, agora cross-OS**: exige que o `dream audit` no tarball seja **idêntico ao repo** (18 REAL / 0 PLACEBO) em cada OS.
+- **Isolamento de HOME provado em caixa-preta**: footprint gstack-scoped (`.gstack_vibehard`/`.claude`/`.codex`/`.cursor`/`.config/opencode`) — read-only e `create` não escrevem config gstack; `install --audit-only --save-report` grava **exatamente 1** relatório. (Ignora caches de ferramentas terceiras que o sondamento de PMs materializa no HOME, ex.: `~/.bun` — ruído do ambiente, não vazamento do produto.)
+- **`agents check`** no ciclo valida a integridade da Agent Factory shipada (drift/hashes **CRLF-normalizados**) em cada OS.
+- Novo job **`e2e`** (matriz ubuntu/windows/macos, `fail-fast: false`) no `test.yml`.
+
 ## [3.21.1] - 2026-06-30
 
 ### dream audit honesto na instalação publicada (fix)
