@@ -4,6 +4,7 @@ import { ppList, ppSearch, PrintingPressError } from "../printing-press/cli.js"
 import { installTool, uninstallTool } from "../printing-press/install.js"
 import { enableMcp, disableMcp, listMcp } from "../printing-press/mcp.js"
 import { doctorAll } from "../printing-press/doctor.js"
+import { buildMcpInventory, renderInventoryHuman } from "../mcp/inventory.js"
 import { success, warn, error, info, section } from "../cli/index.js"
 
 /** Caminho do registry do projeto no cwd. */
@@ -159,6 +160,14 @@ export async function toolsCommand(args = [], opts = {}) {
     case "mcp": {
       const action = args[1]
       const tool = args[2]
+      // inventory ANTES do banner: `--json` exige stdout puro (contrato de automação).
+      if (action === "inventory") {
+        const inv = buildMcpInventory({ cwd, home: opts.home })
+        if (args.includes("--json")) { process.stdout.write(JSON.stringify(inv) + "\n"); return inv }
+        section("tools mcp inventory — servidores MCP por harness")
+        renderInventoryHuman(inv, { fragmentedOnly: args.includes("--fragmented"), print: (s) => info(s) })
+        return inv
+      }
       section(`tools mcp ${action || ""} ${tool || ""}`)
       if (action === "list") {
         const servers = listMcp(cwd)
@@ -197,7 +206,7 @@ export async function toolsCommand(args = [], opts = {}) {
         else error(`tool invalida: ${tool}`)
         return
       }
-      info("Uso: tools mcp enable|disable|list <tool>")
+      info("Uso: tools mcp enable|disable|list <tool> · tools mcp inventory [--json] [--fragmented]")
       return
     }
 
@@ -250,6 +259,7 @@ export async function toolsCommand(args = [], opts = {}) {
       info("    tools mcp enable <tool>       Registrar pp-<tool> no .mcp.json do projeto")
       info("    tools mcp disable <tool>      Remover o pp-<tool>")
       info("    tools mcp list                Listar MCPs pp-* do projeto")
+      info("    tools mcp inventory [--json] [--fragmented]  Inventario MCP por harness (read-only, secrets redigidos)")
       info("  Qualidade:")
       info("    tools doctor                  Validar binario/auth/MCP das instaladas")
       info("    tools generate                Gerar CLI de cauda-longa via HAR (em breve)")

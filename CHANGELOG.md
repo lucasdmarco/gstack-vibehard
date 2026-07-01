@@ -1,5 +1,16 @@
 # Changelog - gstack-vibehard
 
+## [3.24.0] - 2026-07-01
+
+### MCP Inventory multi-harness (PRD 14 Sprint 2)
+Visibilidade real do custo de contexto: quantos servidores MCP cada harness carrega, onde há duplicidade e onde moram credenciais — **sem nunca vazar um valor de segredo**.
+- **`tools mcp inventory [--json] [--fragmented]`**: lê Claude (`~/.mcp.json` + `~/.claude.json`), Codex (`~/.codex/config.toml`), OpenCode (`opencode.json[c]`, com parser JSONC tolerante a comentários) e o projeto (`./.mcp.json`); normaliza no schema **`gstack.mcp.v1`** (servers, fragmentation, sources, aggregates).
+- **Segurança por construção**: env sai só como NOMES (`envKeys`/`secretEnvKeys`); args/URLs passam por `redactSecrets` (segredo inline vira `***REDACTED***` + flag `hasInlineSecret`). Teste exige que token/chave plantados NÃO apareçam no JSON inteiro.
+- **Leitores read-only e tolerantes** (`src/mcp/readers/*` + `shared.js`): config ausente → `exists:false`; inválida (JSON/TOML/JSONC quebrado) → `valid:false` + erro resumido. Nunca crash, nunca reescrita, BOM-safe (Windows).
+- **Fragmentação**: mesmo servidor declarado em 2+ fontes é reportado com harnesses/fontes (contexto duplicado que o usuário não vê).
+- **`docs/MCP-CONNECTOR-POLICY.md`**: política de admissão de MCP default (universal + MCP>CLI/skill; default ≈ 0–2 conectores), matriz de escrita por modo (full opt-out / project-only e lite nunca) e ritual obrigatório antes de ampliar MCP global.
+- Notas QG (MODERATE, documentado): `buildMcpInventory`/`readMcpSource`/`renderInventoryHuman` no limiar CRAP por cobertura estimada — todos com testes dedicados (5 novos).
+
 ## [3.23.0] - 2026-07-01
 
 ### P1 Hardening (PRD 14 Sprint 1)
