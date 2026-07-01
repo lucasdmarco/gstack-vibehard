@@ -1,5 +1,17 @@
 # Changelog - gstack-vibehard
 
+## [3.23.0] - 2026-07-01
+
+### P1 Hardening (PRD 14 Sprint 1)
+O CLI para de prometer menos do que entrega (runtime como "futuro") e de prometer o que não existe (dependência fantasma). Alinhamento total entre claims públicos e comportamento real.
+- **Paridade planner-runtime**: `runtime:start`/`runtime:logs`/`runtime:open` saíram de `pending-features` — o planner expande para os comandos REAIS `gstack_vibehard dev`/`logs`/`open` (todo `create` declara `.gstack/runtime.json`; `dev` sobe destacado e retorna). `plan --json` e `plan explain` não mostram mais runtime como "feature futura". `expandStep` refatorado para tabela declarativa (FIXED_STEPS/PREFIX_STEPS).
+- **Runtime E2E Windows sem `EBUSY`**: novo `waitPidsExit` no supervisor — `stop` (e `dev --force`) agora esperam a morte REAL dos processos (taskkill/kill retornam antes de o SO soltar handles) antes de reportar "parado"; JSON do `stop` ganha `stillAlive`. Cleanup dos testes E2E com espera de pid + rm com backoff + diagnóstico do arquivo preso. **397/397 no Windows.**
+- **Impact sem dependência fantasma**: `cli-anything-hub` removido de `doctor --impact`/`install --audit-only`; teste de regressão exige que toda dep anunciada no preflight tenha âncora real no fluxo de install.
+- **Nomenclatura ECC padronizada**: README, `create.js` e `modes.js` usam ECC/ecc-universal (`bootEcc2`→`bootEcc`); `ecc2` só como nota histórica de protótipo externo. Gate: `rg "ECC2|ECC 2.0" README.md src/cli/create.js` limpo.
+- **README alinhado à v3.22+**: full documentado como completo com **opt-out** `--no-global-mcp` (lite/project-only nunca escrevem global); `typecheck:ts` (tsc --noEmit baseline) documentado; `dev/stop/logs/open` no dia a dia; `challenge` e `orchestrate` descritos como MVPs com limites declarados.
+- Housekeeping: 43 branches locais mergeadas deletadas; `RETORNOGO.md` (era v2.2.4) e `TESTESLLM.MD` (era v0.1.0) removidos; `.pytest_cache/` no `.gitignore`.
+- Notas QG (MODERATE, documentado): `bootEcc` (rename-only, complexidade pré-existente) e `cleanupProject` (helper de teste E2E) ficam acima do CRAP ideal; demais findings do QG L1 são legado (`introduced: false`) fora do escopo deste sprint.
+
 ## [3.22.0] - 2026-07-01
 
 ### E2E lifecycle matrix cross-OS (PRD 12 PR8)

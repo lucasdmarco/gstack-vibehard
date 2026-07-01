@@ -8,9 +8,9 @@
  */
 
 export const PENDING_FEATURES = Object.freeze({
-  "runtime:start": { id: "runtime:start", label: "Iniciar runtime do projeto", explanation: "Runtime manager local — ainda não implementado (roadmap)." },
-  "runtime:logs": { id: "runtime:logs", label: "Ver logs do runtime", explanation: "Streaming de logs do runtime — roadmap." },
-  "runtime:open": { id: "runtime:open", label: "Abrir o app do runtime", explanation: "Abrir a app servida pelo runtime — roadmap." },
+  // runtime:start/logs/open NÃO são mais pending: o supervisor existe
+  // (`dev`/`logs`/`open`/`stop`) e todo template do `create` declara
+  // .gstack/runtime.json — o planner expande para o comando real (PRD14 §4.14).
   "dashboard:open": { id: "dashboard:open", label: "Abrir o dashboard", explanation: "Painel de planos/tasks/runs — roadmap (contrato no PR futuro)." },
   "deploy:preview": { id: "deploy:preview", label: "Deploy de preview", explanation: "Deploy de pré-visualização — roadmap." },
   "deploy:production": { id: "deploy:production", label: "Deploy de produção", explanation: "Deploy de produção — roadmap (exigirá confirmação explícita)." },

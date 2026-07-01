@@ -295,11 +295,11 @@ default_expose = [".env", ".claude/", ".gstack/", ".agent/"]
 }
 
 // ─────────────────────────────────────────────────────────────
-//  PHASE 3: Daemons & Memory (ECC 2.0 + AgentMemory + Graphify)
+//  PHASE 3: Daemons & Memory (ECC/ecc-universal + AgentMemory + Graphify)
 // ─────────────────────────────────────────────────────────────
 
 // Retorna o STATUS honesto: "installed" | "degraded" | "skipped".
-function bootEcc2(logger, projectDir) {
+function bootEcc(logger, projectDir) {
   if (process.env.GSTACK_SKIP_PREFLIGHT) {
     logger.info("GSTACK_SKIP_PREFLIGHT set — skipping ECC")
     return "skipped"
@@ -332,7 +332,7 @@ function bootEcc2(logger, projectDir) {
 function writeControlPlaneConfig(projectDir, projectName) {
   ensureGstackDir(projectDir)
   writeFileSync(join(projectDir, ".gstack", "control-plane.yaml"),
-`# GStack Control Plane — ECC 2.0 (local)
+`# GStack Control Plane — ECC (ecc-universal, local)
 project: ${projectName}
 version: 1
 
@@ -648,7 +648,7 @@ export function writeRuntimeFiles({ projectDir, projectName, now, projectRoot, t
 
   const tpl = TEMPLATE_MANIFEST[templateName] || TEMPLATE_MANIFEST["fullstack-monorepo"]
 
-  // app.json reflete as CAPACIDADES REAIS (P0.5): em lite não há Atomic/Casdoor/ECC2.
+  // app.json reflete as CAPACIDADES REAIS (P0.5): em lite não há Atomic/Casdoor/ECC.
   writeJson(join(gstackDir, "app.json"), {
     name: projectName,
     runtime: "gstack-workspace",
@@ -960,7 +960,7 @@ ${isLite ? "" : "- VCS: Atomic (token-level isolation, github.com/atomicdotdev/a
 - Omniharness: Claude, Cursor, Codex, Windsurf, OpenCode, Gemini, Kiro, Antigravity, Zed, Hermes, Trae
 - Coverage Gaps: fallow coverage setup (hot/cold path analysis)
 - Workflows: .claude/workflows/ (ativar com /effort ultracode)
-${isLite ? "\n> Modo lite: sem Casdoor/IAM, Atomic VCS, ECC 2.0 ou AgentMemory Federation.\n" : ""}
+${isLite ? "\n> Modo lite: sem Casdoor/IAM, Atomic VCS, ECC (ecc-universal) ou AgentMemory Federation.\n" : ""}
 ## Commands
 - Dev: pnpm dev
 - Managed dev: scripts/dev.sh
@@ -1341,7 +1341,7 @@ export async function createProject(options = {}) {
   const execSync = options.execSync || defaultExecSync
   const now = options.now || (() => new Date().toISOString())
   // DEFAULT = LITE (P0.5): sem `--full`, o create é lite e project-scoped (só ./app,
-  // sem Casdoor/Atomic/ECC2 nem escrita global). `--lite` continua válido; em
+  // sem Casdoor/Atomic/ECC nem escrita global). `--lite` continua válido; em
   // conflito (`--lite --full`), lite vence (mais seguro).
   const isLite = args.includes("--lite") || !args.includes("--full")
 
@@ -1386,7 +1386,7 @@ export async function createProject(options = {}) {
         projectScoped: [projectDir],
         global: isLite ? [] : [join(HOME, ".atomic")],
       },
-      provisions: isLite ? [] : ["Casdoor (Docker)", "Atomic VCS", "ECC2 daemon", "AgentMemory federation"],
+      provisions: isLite ? [] : ["Casdoor (Docker)", "Atomic VCS", "ECC (ecc-universal)", "AgentMemory federation"],
       note: "dry-run: nada foi escrito",
     }
     if (args.includes("--json")) process.stdout.write(JSON.stringify(report) + "\n")
@@ -1401,7 +1401,7 @@ export async function createProject(options = {}) {
   const phases = {}
 
   if (isLite) {
-    console.log(`\n  Modo lite ativado — pulando: Casdoor, Atomic VCS, ECC 2.0, AgentMemory Federation`)
+    console.log(`\n  Modo lite ativado — pulando: Casdoor, Atomic VCS, ECC (ecc-universal), AgentMemory Federation`)
   }
 
   if (!isLite) {
@@ -1418,7 +1418,7 @@ export async function createProject(options = {}) {
 
   if (!isLite) {
     console.log(`\n  === Fase 3/5: Daemons & Memoria ===`)
-    phases.ecc = { status: bootEcc2(logger, projectDir) }
+    phases.ecc = { status: bootEcc(logger, projectDir) }
     writeControlPlaneConfig(projectDir, projectName)
     phases.agentmemory = { status: bootAgentMemory(logger, projectDir) }
     writeMemoryFederationConfig(projectDir)

@@ -82,7 +82,9 @@ const STEP_WHY = {
   "context:init": "Prepara os docs de contexto (ADR/PRD/plans/research) do projeto.",
   "context:index": "Indexa o Document Graph local (busca offline, sem LLM).",
   "tools:suggested": "Lista integrações sugeridas para o template (nada é instalado).",
-  "runtime:start": "Reservado para o runtime manager (feature futura — pulado).",
+  "runtime:start": "Sobe os serviços do projeto com o runtime supervisor (`gstack_vibehard dev`).",
+  "runtime:logs": "Mostra os logs dos serviços do runtime (`gstack_vibehard logs`).",
+  "runtime:open": "Abre a URL do serviço web no navegador (`gstack_vibehard open`).",
 }
 function whyStep(step) {
   if (STEP_WHY[step.id]) return STEP_WHY[step.id]

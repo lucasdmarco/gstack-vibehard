@@ -305,7 +305,7 @@ async function dispatch(command, args) {
       await devCommand(args)
       break
     case "stop":
-      stopCommand(args)
+      await stopCommand(args)
       break
     case "logs":
       logsCommand(args)

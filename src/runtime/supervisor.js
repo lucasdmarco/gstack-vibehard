@@ -150,6 +150,25 @@ export function stopAll(state, opts = {}) {
   return results
 }
 
+/**
+ * Espera BOUNDED até os pids morrerem de verdade. `taskkill`/`kill` retornam antes
+ * de o SO encerrar o processo e liberar seus handles (log fd, cwd) — no Windows,
+ * remover o diretório do projeto logo após o stop dá EBUSY. Retorna os pids que
+ * AINDA estão vivos após o timeout (vazio = todos mortos), para diagnóstico honesto.
+ */
+const sleepMs = (ms) => new Promise((r) => setTimeout(r, ms))
+
+export async function waitPidsExit(pids, { isAlive: alive = isAlive, timeoutMs = 5000, intervalMs = 100, sleep = sleepMs } = {}) {
+  // isAlive já trata pid falsy (retorna false) — sem pré-filtro de truthiness.
+  const deadline = Date.now() + timeoutMs
+  let pending = (pids || []).filter((p) => alive(p))
+  while (pending.length && Date.now() < deadline) {
+    await sleep(intervalMs)
+    pending = pending.filter((p) => alive(p))
+  }
+  return pending
+}
+
 /** Poll de readiness HTTP. `httpGet(url)`→`{status}`|throw. 2xx/3xx = pronto. */
 export async function pollReadiness(url, opts = {}) {
   const httpGet = opts.httpGet

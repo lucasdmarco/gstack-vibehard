@@ -40,7 +40,7 @@ test("planner: plano de SaaS usa template e comandos reais + modo recomendado fu
   assert.ok(plan.suggestedIntegrations.includes("stripe"))
 })
 
-test("planner: modo lite adiciona --lite no create; runtime:start vira pendingFeature", async () => {
+test("planner: modo lite adiciona --lite no create; runtime:start expande para `dev` real", async () => {
   const { buildPlan } = await imp("src/project-plan/planner.js")
   const { plan } = buildPlan({ objective: "app mobile", projectName: "meuapp", mode: "lite" })
 
@@ -49,8 +49,9 @@ test("planner: modo lite adiciona --lite no create; runtime:start vira pendingFe
 
   const runtime = plan.optionalSteps.find((s) => s.id === "runtime:start")
   assert.ok(runtime, "mobile tem runtime:start opcional")
-  assert.equal(runtime.pendingFeature, true)
-  assert.equal(runtime.command, null, "feature futura não carrega comando")
+  assert.ok(!runtime.pendingFeature, "runtime NÃO é mais pending — supervisor existe (PRD14)")
+  assert.deepEqual(runtime.command, ["gstack_vibehard", "dev"], "expande para o supervisor real")
+  assert.equal(runtime.cwd, "./meuapp", "dev roda dentro do projeto criado")
 })
 
 test("planner: cwd dos passos pós-create aponta para o diretório do projeto", async () => {

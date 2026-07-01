@@ -6,8 +6,8 @@
  *    (fullstack-monorepo | saas-auth-stripe | mobile-backend | ai-agent-platform).
  *  - `suggestedIntegrations` reusa a fonte de verdade `SUGGESTIONS_BY_TEMPLATE`
  *    (printing-press/registry) — ids reais de tools.
- *  - Passos são step-ids resolvidos pelo planner para comandos reais; o único
- *    passo sem comando é `runtime:start`, que o planner marca como pendingFeature.
+ *  - Passos são step-ids resolvidos pelo planner para comandos reais, incluindo
+ *    `runtime:start` → `gstack_vibehard dev`; só dashboard/deploy seguem pendingFeature.
  */
 import { SUGGESTIONS_BY_TEMPLATE } from "../printing-press/registry.js"
 

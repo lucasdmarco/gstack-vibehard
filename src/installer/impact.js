@@ -59,11 +59,14 @@ export function buildInstallImpact(opts = {}) {
     out.push(cat("vault", "Vault Obsidian global", [h("gstack-vault")], { optional: true }))
   }
 
-  // Dependências globais (pesadas) — puladas com --skip-deps/--project-only
+  // Dependências globais (pesadas) — puladas com --skip-deps/--project-only.
+  // Fonte de verdade: o que installGlobalDeps (install.js) REALMENTE instala —
+  // teste de regressão em install_impact.test.js impede item fantasma aqui
+  // (ex.: `cli-anything-hub`, que nunca existiu no npm — PRD14 §4.16).
   if (withDeps && !projectOnly) {
     out.push({
       category: "deps", label: "Dependências globais (PATH/caches do sistema)", global: true, optional: true,
-      items: ["Bun", "uv", "Rust", "Playwright Chromium", "pytest", "cli-anything-hub", "Headroom"].map((path) => ({ path, action: "install-if-missing" })),
+      items: ["Bun", "uv", "Rust", "Playwright Chromium", "pytest", "Headroom"].map((path) => ({ path, action: "install-if-missing" })),
     })
   }
 

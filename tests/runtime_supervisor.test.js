@@ -209,3 +209,32 @@ test("isAlive: signal 0 detecta vivo (self) e morto", async () => {
   assert.equal(isAlive(0), false, "pid 0 = sem pid")
   assert.equal(isAlive(2147483646, { kill: () => { throw Object.assign(new Error("ESRCH"), { code: "ESRCH" }) } }), false)
 })
+
+// ── PRD14 §4.14: waitPidsExit espera a morte REAL (anti-EBUSY no Windows) ──
+test("waitPidsExit: retorna vazio imediatamente quando nada está vivo", async () => {
+  const { waitPidsExit } = await imp(supMod)
+  const pending = await waitPidsExit([111, 222], { isAlive: () => false })
+  assert.deepEqual(pending, [], "pids mortos não entram na espera")
+  assert.deepEqual(await waitPidsExit([], {}), [], "lista vazia é no-op")
+  assert.deepEqual(await waitPidsExit([0, null, undefined], {}), [], "pids falsy são ignorados")
+})
+
+test("waitPidsExit: espera até o pid morrer e retorna vazio", async () => {
+  const { waitPidsExit } = await imp(supMod)
+  let checks = 0
+  const pending = await waitPidsExit([333], {
+    isAlive: () => { checks++; return checks < 3 }, // morre na 3ª checagem
+    sleep: async () => {},
+  })
+  assert.deepEqual(pending, [], "pid morreu dentro do timeout")
+  assert.ok(checks >= 3, "poll re-checou até a morte")
+})
+
+test("waitPidsExit: timeout devolve os pids AINDA vivos (diagnóstico honesto)", async () => {
+  const { waitPidsExit } = await imp(supMod)
+  const pending = await waitPidsExit([444, 555], {
+    isAlive: (p) => p === 555, // 444 morre já; 555 nunca morre
+    timeoutMs: 50, intervalMs: 5,
+  })
+  assert.deepEqual(pending, [555], "só o pid preso volta como pendente")
+})
