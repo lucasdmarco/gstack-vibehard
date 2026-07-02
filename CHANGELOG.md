@@ -1,5 +1,18 @@
 # Changelog - gstack-vibehard
 
+## [3.35.0] - 2026-07-02
+
+### Auto-dream learning seguro (PRD 14 Sprint 13)
+
+- **`src/dream/learning.js`**: continuous learning determinístico e SEGURO. `dream aprende de runs REAIS via provenance` mas NUNCA se auto-promove:
+  - `createProposal` — lição/skill draft extraída dos recibos do run (sem LLM, sem invenção); toda proposta carrega `provenance` (runId + hash da cadeia).
+  - `promoteProposal` — exige `--reviewed` (review humano explícito) E AgentShield builtin limpo; CRÍTICO bloqueia (`blocked_shield`). Grava SÓ em staging `.gstack/dream/promoted`, nunca no corpus.
+  - `FORBIDDEN_TARGETS = [core, knowledge, agents/agents]` — auto-learning nunca escreve no corpus; mover para lá é decisão humana + `agents build`.
+  - `rejectProposal` / `learningSummary` — ciclo de vida completo (proposed/promoted/rejected/blocked_shield).
+- **`src/commands/dream.js`**: subcomandos `learn --from-run <id>`, `propose-skill --from-run <id>`, `promote <id> --reviewed`, `reject <id>`, `proposals`, `status` (agora com bloco Learning). Dispatch via tabela `SUBCOMMANDS`.
+- **Testes**: `tests/dream_learning.test.js` (6) — provenance obrigatório, run inexistente → `run_not_found`, promote sem review → `needs_review`, AgentShield bloqueia injection antes de promover, staging não toca core/knowledge/agents, reject conta por status.
+- Provenance: promoção registra recibo `dream:promote` (human-reviewed + agentshield-builtin).
+
 ## [3.34.0] - 2026-07-02
 
 ### Supply Chain Doctor (PRD 14 Sprint 12)
