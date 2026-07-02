@@ -4,6 +4,7 @@ import { join, resolve, dirname, basename } from "path"
 import { fileURLToPath } from "url"
 import { hasExecutionContract } from "../agents/factory.js"
 import { getAdapterInfo, isInstructional } from "../agents/adapter-matrix.js"
+import { capabilityRow, validateScorecard } from "../harness/capabilities.js"
 import { stripBom } from "../util/json.js"
 import { section, success, warn, error, info } from "../cli/index.js"
 
@@ -106,11 +107,13 @@ function doctorCmd(json) {
   const manifest = readManifest()
   const drift = checkDrift()
   const adapters = manifest && manifest.adapters ? manifest.adapters : {}
-  // MATRIZ HONESTA (PRD 13 §8.4): enforcement real do adapter, não o trust de runtime.
-  // Nenhum instrucional é rotulado enforcement/Zero-Trust.
+  // MATRIZ HONESTA V2 (PRD 14 §4.1): scorecard completo por harness — state,
+  // assets, gaps, onramp, verificação, riscos, dono e data. Nenhum instrucional
+  // é rotulado enforcement/Zero-Trust (invariante validada pelo scorecard).
   const matrix = Object.entries(adapters).map(([id, a]) => ({
-    harness: id, status: a.status, files: (a.files || []).length, enforcement: getAdapterInfo(id).enforcement,
+    ...capabilityRow(id), status: a.status, files: (a.files || []).length,
   }))
+  const scorecard = validateScorecard()
   // contrato presente em todos os adapters gerados? (per-agente + combinados copilot/gemini; AGENTS.md/índice não conta)
   const adapterFilesToCheck = []
   const claudeDir = join(GEN, "claude")
@@ -131,7 +134,9 @@ function doctorCmd(json) {
     contract: { checked, missing: missingContract },
     security: manifest ? manifest.security : null,
     matrix,
-    ok: !!manifest && manifest.schemaVersion === 2 && drift.ok && missingContract === 0,
+    matrixSchema: "gstack.capability.v2",
+    scorecard,
+    ok: !!manifest && manifest.schemaVersion === 2 && drift.ok && missingContract === 0 && scorecard.ok,
   }
   if (json) { process.stdout.write(JSON.stringify(report) + "\n"); if (!report.ok) process.exitCode = 1; return }
   section("agents doctor")
@@ -140,8 +145,12 @@ function doctorCmd(json) {
   ;(drift.ok ? success : error)(`  Drift: ${drift.ok ? "nenhum (generated em dia)" : drift.detail}`)
   ;(missingContract === 0 ? success : error)(`  Execution Contract: ${checked - missingContract}/${checked} adapters`)
   if (manifest.security) (manifest.security.verdict === "pass" ? success : error)(`  Security: ${manifest.security.verdict} (crit ${manifest.security.critical}, alto ${manifest.security.high})`)
-  section("Adapter matrix (enforcement REAL — instrucional não é enforcement)")
-  for (const r of matrix) info(`  • ${r.harness}: ${r.status} · ${r.files} arquivo(s) · enforcement=${r.enforcement}`)
+  section("Capability matrix V2 (enforcement REAL — instrucional não é enforcement)")
+  for (const r of matrix) {
+    info(`  • ${r.harness}: ${r.status} · ${r.files} arquivo(s) · state=${r.state} · enforcement=${r.enforcement}`)
+    if (r.riskNotes.length) info(`      risco: ${r.riskNotes[0]} · verificado: ${r.lastVerifiedAt} (${r.owner})`)
+  }
+  ;(scorecard.ok ? success : error)(`  Scorecard: ${scorecard.ok ? "íntegro (nenhum instrucional reivindica hooks)" : scorecard.errors.join("; ")}`)
   if (!report.ok) { process.exitCode = 1; warn("Há pendências acima — rode `agents build`.") }
   else success("Agent Factory saudável.")
 }

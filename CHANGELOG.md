@@ -1,5 +1,15 @@
 # Changelog - gstack-vibehard
 
+## [3.32.0] - 2026-07-02
+
+### Harness Capability Matrix V2 (PRD 14 Sprint 10)
+Scorecard completo por harness — não só "qual enforcement", mas COMO o suporte é entregue, o que falta, como verificar e quem é o dono.
+- **`ADAPTER_MATRIX` V2** (`src/agents/adapter-matrix.js`): cada harness ganha `state` (`native|adapter_backed|instruction_backed|reference_only|unsupported`), `supportedAssets`, `unsupportedSurfaces`, `installOrOnramp`, `verificationCommands`, `riskNotes`, `lastVerifiedAt`, `owner`. API antiga preservada (getAdapterInfo/isInstructional/generatedHarnesses).
+- **`src/harness/capabilities.js`** (novo): `capabilityScorecard()` + `validateScorecard()` com invariante EXECUTÁVEL — `instruction_backed`/`reference_only` reivindicando `real_hooks`/`partial` é ERRO de validação (teste de sabotagem prova).
+- **`agents doctor`**: matriz V2 completa no JSON (`matrixSchema: "gstack.capability.v2"` + `scorecard`); `ok` agora exige scorecard íntegro; humano mostra state+risco+verificado+owner por harness.
+- Harness desconhecido = `unsupported` com "nenhuma promessa" (default honesto).
+- 4 testes novos (campos obrigatórios, invariante anti-claim-falso, unsupported, estados coerentes).
+
 ## [3.31.0] - 2026-07-02
 
 ### README multilíngue + guias (PRD 14 Sprint 9)
