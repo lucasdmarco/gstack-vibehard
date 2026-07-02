@@ -122,6 +122,11 @@ export async function doctor(args = []) {
     info(existsSync(ocPlugins)
       ? "OpenCode plugins globais ATIVOS: carregam em qualquer sessão OpenCode deste usuário."
       : "OpenCode plugins globais: nenhum.")
+    // Output Guard honesto (PRD14 §6.6): o guard padrão audita DEPOIS da resposta.
+    // Prevenção em trânsito é opt-in via proxy — nunca prometida como universal.
+    info("")
+    info("Output Guard: pós-resposta (auditoria via hooks) — detecção, não prevenção.")
+    info("  Redação EM TRÂNSITO (opt-in): `gstack_vibehard proxy` · estado: `gstack_vibehard proxy status`.")
     info("Rollback: `gstack_vibehard uninstall --dry-run` · Integridade: `--install-integrity`.")
     return
   }
