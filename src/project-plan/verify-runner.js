@@ -168,6 +168,10 @@ export function runVerify(opts = {}) {
       run("qg-l1", pyBin, [qgRun, "--path", ".", "--level", "1", ...strict], { required: true })
       run("qg-l2", pyBin, [qgRun, "--path", ".", "--level", "2", ...strict], { required: true })
     }
+  } else if (isRelease) {
+    // PRD15 §7.8.3 P0: se o claim é Quality Gate REAL, o gate não pode ser opcional
+    // no release. Sem Fallow/QG → fail-closed (release não é "pronto" sem o gate).
+    steps.push({ id: "qg", status: "failed", required: true, detail: "Fallow/QG obrigatório no --profile release e não está instalado" })
   } else {
     steps.push({ id: "qg", status: "tool_missing", required: false, detail: "Fallow/QG não instalado" })
   }

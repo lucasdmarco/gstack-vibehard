@@ -1,5 +1,32 @@
 # Changelog - gstack-vibehard
 
+## [3.37.0] - 2026-07-02
+
+### OpenCode "config is sacred" — clean-machine recovery (PRD 15 P0)
+
+Corrige o incidente de máquina limpa em que consolidar `opencode.jsonc` (com OAuth/
+providers/models) sumia com provedores e modelos do OpenCode.
+
+- **`src/installer/opencode-jsonc.js`**: a config do usuário é sagrada.
+  - `planOpenCodeFix` ganha a ação **`preserve`**: se o `.jsonc` contém chaves sensíveis
+    (`OPENCODE_SENSITIVE_KEYS` = provider/providers/model/models/plugin/plugins/auth/oauth/
+    account/token/key/credentials), o GStack **NUNCA** consolida nem renomeia — o `.jsonc`
+    é a fonte de verdade. `merge` só é possível quando o `.jsonc` é seguro.
+  - `applyOpenCodeFix(home, { apply })`: **dry-run é o default**; consolidar exige `apply:true`.
+    A ação `preserve` é **recusada** mesmo com `apply`.
+  - `restoreOpenCodeJsonc`: reverte `.jsonc.gstack-disabled` deixado por versões antigas
+    (backup do `.jsonc` ativo antes; nunca apaga config do usuário).
+  - `diagnoseOpenCode`: relatório read-only (chaves sensíveis por NOME, risco de shadowing,
+    resíduo disabled) — nunca vaza valores.
+- **`doctor --fix opencode`**: dry-run por default; `--apply` (+ confirmação) para consolidar;
+  `preserve` explica o risco sem tocar no disco; `--restore-jsonc` reverte resíduo antigo.
+  **`doctor --opencode [--json]`**: novo diagnóstico read-only.
+- **`verify --profile release`**: Fallow/QG deixa de ser opcional — sem o gate, o release
+  **falha-fechado** (Quality Gate real não pode ser pulado no perfil de publicação).
+- **Testes** invertidos: `tests/opencode_jsonc_doctor.test.js` agora valida `preserve`
+  (jsonc sensível intocável), merge-só-seguro-com-apply, restore, diagnose sem vazamento e
+  **E2E de máquina limpa** (jsonc com codex-auth+providers+models permanece byte-for-byte).
+
 ## [3.36.0] - 2026-07-02
 
 ### Auditoria de Segurança (Principal Security Engineer) + prontidão macOS/Linux VPS

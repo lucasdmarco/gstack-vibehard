@@ -13,7 +13,7 @@ import { resolvePackageManager } from "./package-manager.js"
 import { npmArgv } from "./deps.js"
 import { buildInstallImpact } from "./impact.js"
 import { buildSupplyChainReport } from "./supply-chain.js"
-import { planOpenCodeFix, applyOpenCodeFix } from "./opencode-jsonc.js"
+import { planOpenCodeFix, applyOpenCodeFix, diagnoseOpenCode } from "./opencode-jsonc.js"
 import { section, success, warn, error, info, confirm } from "../cli/index.js"
 
 const HOME = homedir()
@@ -74,16 +74,43 @@ export async function doctor(args = []) {
   // `doctor --json` (diagnóstico completo) → JSON PURO. --strict → exit≠0 se check
   // obrigatório falhar. Não roteia aqui os modos --impact/--install-integrity (têm
   // seu próprio JSON abaixo) nem --fix (interativo).
+  // `doctor --opencode --json` (PRD15 §7.8): diagnóstico READ-ONLY da config OpenCode.
+  if (args.includes("--opencode")) {
+    const diag = diagnoseOpenCode(HOME)
+    if (json) { process.stdout.write(JSON.stringify(diag) + "\n"); if (strict && diag.shadowingRisk === "high") process.exitCode = 1; return }
+    section("doctor --opencode — diagnóstico (read-only, nada é alterado)")
+    info(`  json: ${diag.hasJson ? diag.jsonPath : "(ausente)"}`)
+    info(`  jsonc: ${diag.hasJsonc ? diag.jsoncPath : "(ausente)"}`)
+    if (diag.jsoncSensitiveKeys.length) info(`  chaves sensíveis no jsonc (só nomes): ${diag.jsoncSensitiveKeys.join(", ")}`)
+    if (diag.disabledResidue) warn(`  resíduo de versão anterior: ${diag.disabledResidue} — restaure com \`doctor --fix opencode --restore-jsonc\``)
+    ;(diag.shadowingRisk === "high" ? warn : info)(`  risco de shadowing: ${diag.shadowingRisk}`)
+    info(`  ação recomendada: ${diag.recommendedAction}`)
+    if (diag.parseError) warn(`  parse: ${diag.parseError}`)
+    return
+  }
   if (json && !args.includes("--impact") && !args.includes("--install-integrity") && !args.includes("--fix") && !args.includes("--repair-manifest") && !args.includes("--package-manager") && !args.includes("--pm") && !args.includes("--supply-chain")) {
     const report = await collectDoctorJson(HOME)
     process.stdout.write(JSON.stringify(report) + "\n")
     if (strict && !report.ok) process.exitCode = 1
     return
   }
-  // Correção assistida do drift OpenCode (json + jsonc).
+  // Correção assistida do drift OpenCode (json + jsonc). PRD15 §7.8: DRY-RUN é o
+  // DEFAULT; aplicar exige --apply (+ confirmação); .jsonc com OAuth/provider/model
+  // NUNCA é consolidado; --restore-jsonc reverte resíduo de versões antigas.
   if (args.includes("--fix")) {
-    const dryRun = args.includes("--dry-run")
-    section("doctor --fix — OpenCode config (opencode.json + opencode.jsonc)")
+    section("doctor --fix — OpenCode config (config is sacred)")
+    // Rollback seguro de .jsonc.gstack-disabled deixado por versões anteriores.
+    if (args.includes("--restore-jsonc")) {
+      const diag = diagnoseOpenCode(HOME)
+      if (!diag.disabledResidue) { success("OpenCode: nenhum .jsonc.gstack-disabled para restaurar."); return }
+      info(`  Vai restaurar ${diag.disabledResidue} → ${diag.jsoncPath} (o .jsonc ativo, se houver, é feito backup).`)
+      const okr = args.includes("--yes") || args.includes("--apply") || (process.stdin.isTTY && await confirm("Restaurar o opencode.jsonc agora?", false))
+      if (!okr) { info("Cancelado (use --apply/--yes em modo não-interativo)."); return }
+      const r = applyOpenCodeFix(HOME, { restoreJsonc: true })
+      if (r.restored) success(`OpenCode: ${r.jsoncPath} restaurado. Reabra o OpenCode e confira provider/OAuth.`)
+      else warn(`Não restaurado: ${r.reason}`)
+      return
+    }
     const plan = planOpenCodeFix(HOME)
     if (plan.action === "none") { success("OpenCode: sem conflito json+jsonc — nada a corrigir."); return }
     if (plan.action === "manual") {
@@ -91,16 +118,24 @@ export async function doctor(args = []) {
       warn(`  ${plan.parseError}`)
       return
     }
-    info("Conflito: opencode.json + opencode.jsonc coexistem.")
-    info(`  Plano: merge preservando o que é do usuário (${(plan.userKeysPreserved || []).join(", ") || "—"}) — OAuth/plugin/provider mantidos.`)
-    info(`  → escreve o merge em ${plan.jsonPath}`)
-    info("  → backup de AMBOS (.gstack_vibehard.bak); remove o .jsonc (preservado no backup)")
-    if (dryRun) { info("(--dry-run: nada foi alterado)"); return }
+    if (plan.action === "preserve") {
+      warn("Conflito: opencode.json + opencode.jsonc coexistem, MAS o .jsonc é fonte de verdade.")
+      warn(`  O .jsonc contém: ${plan.sensitiveKeys.join(", ")} (OAuth/provider/model/plugin).`)
+      info("  Config is sacred: o GStack NÃO vai consolidar nem renomear o .jsonc.")
+      info(`  Se quiser remover o shadowing, mova você mesmo ${plan.jsonPath} (com o OpenCode fechado).`)
+      return
+    }
+    // action === "merge" (jsonc SEM chaves sensíveis)
+    info("Conflito: opencode.json + opencode.jsonc coexistem (jsonc sem chaves sensíveis).")
+    info(`  Plano: merge preservando o que é do usuário (${(plan.userKeysPreserved || []).join(", ") || "—"}).`)
+    info(`  → escreveria o merge em ${plan.jsonPath}; renomearia o .jsonc para .gstack-disabled (reversível).`)
+    const apply = args.includes("--apply")
+    if (!apply) { info("(dry-run é o default: nada foi alterado. Use --apply para consolidar.)"); return }
     const ok = args.includes("--yes") || (process.stdin.isTTY && await confirm("Aplicar o merge agora?", false))
     if (!ok) { info("Cancelado (use --yes em modo não-interativo)."); return }
-    const r = applyOpenCodeFix(HOME)
-    if (r.applied) success("OpenCode: merge aplicado. Reabra o OpenCode e verifique provider/OAuth.")
-    else warn("Não aplicado.")
+    const r = applyOpenCodeFix(HOME, { apply: true })
+    if (r.applied) success("OpenCode: merge aplicado. Reverta com `doctor --fix opencode --restore-jsonc` se precisar.")
+    else warn(`Não aplicado (${r.reason || r.hint || "ação não elegível"}).`)
     return
   }
   // Supply Chain Doctor (PRD14 §4.7): registry, binários no PATH, allowlist,
