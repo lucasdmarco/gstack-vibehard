@@ -5,6 +5,7 @@ import { installTool, uninstallTool } from "../printing-press/install.js"
 import { enableMcp, disableMcp, listMcp } from "../printing-press/mcp.js"
 import { doctorAll } from "../printing-press/doctor.js"
 import { buildMcpInventory, renderInventoryHuman } from "../mcp/inventory.js"
+import { agentReachCommand } from "./agent-reach.js"
 import { success, warn, error, info, section } from "../cli/index.js"
 
 /** Caminho do registry do projeto no cwd. */
@@ -157,6 +158,11 @@ export async function toolsCommand(args = [], opts = {}) {
       return
     }
 
+    // Agent Reach: capability layer com seletor de canais (PRD14 §4.15).
+    // Sem section() antes: o subcomando controla o próprio output (--json puro).
+    case "agent-reach":
+      return agentReachCommand(args.slice(1), { ...opts, cwd })
+
     case "mcp": {
       const action = args[1]
       const tool = args[2]
@@ -260,6 +266,9 @@ export async function toolsCommand(args = [], opts = {}) {
       info("    tools mcp disable <tool>      Remover o pp-<tool>")
       info("    tools mcp list                Listar MCPs pp-* do projeto")
       info("    tools mcp inventory [--json] [--fragmented]  Inventario MCP por harness (read-only, secrets redigidos)")
+      info("  Agent Reach (leitura/pesquisa na internet, opt-in):")
+      info("    tools agent-reach enable [--core|--channels a,b|--dry-run|--safe]  Seletor de canais com consentimento")
+      info("    tools agent-reach channels|doctor [--json]   Catalogo e estado por canal")
       info("  Qualidade:")
       info("    tools doctor                  Validar binario/auth/MCP das instaladas")
       info("    tools generate                Gerar CLI de cauda-longa via HAR (em breve)")

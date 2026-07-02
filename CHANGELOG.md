@@ -1,5 +1,17 @@
 # Changelog - gstack-vibehard
 
+## [3.29.0] - 2026-07-01
+
+### Agent Reach com seletor de canais (PRD 14 Sprint 7)
+Capability layer de leitura/pesquisa na internet governada por CONSENTIMENTO por canal — default seguro, nada de cookie/login sem escolha explícita.
+- **`tools agent-reach enable|channels|install-channel|doctor`** (novo): catálogo em `src/tools/agent-reach/catalog.js` com 4 grupos — core zero-config (web-reader/Jina, YouTube, GitHub público, RSS, V2EX, Bilibili), search (Exa), social com cookie/login (Twitter/X, Reddit, Facebook, Instagram, Xiaohongshu) e profissional (LinkedIn, Xueqiu, podcasts).
+- **Consentimento por canal**: TTY = wizard que pergunta canal sensível um a um com riscos; não-interativo sem seleção → `needs_channel_selection` (sugere `--core`/`--channels`); canal cookie/login não-interativo e `--channels all` exigem `--accept-risks` listando os efeitos; consentimento registrado com timestamp.
+- **Teste de aceite do PRD**: Twitter/Reddit/Facebook/Instagram/Xiaohongshu NUNCA entram no default core.
+- **`--dry-run --json`**: canais, dependências, writes, riscos, rollback e regras de consentimento — sem nenhuma escrita. **`--safe`**: só plano/orientação (zero deps, zero writes).
+- **Honestidade de backend**: CLI `agent-reach` ausente → `external_engine_unavailable` (canais ficam registrados, instalação pendente); `doctor --json` traz `active_backend` por canal (null quando não há backend — nunca OK falso). Cookies/tokens nunca em `.env`/`.gstack`/logs (regra declarada no plano e no output).
+- Escrita só em `.gstack/integrations.json` (project-scoped; rollback trivial). Lite/full não instalam Agent Reach por padrão — tudo opt-in.
+- 10 testes novos cobrindo os critérios de aceite do §4.15.
+
 ## [3.28.0] - 2026-07-01
 
 ### Output Guard pre-render como opt-in claro (PRD 14 Sprint 6)
