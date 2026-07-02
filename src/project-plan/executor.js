@@ -3,6 +3,7 @@ import { resolve, join, dirname } from "path"
 import { fileURLToPath } from "url"
 import { appendPlanEvent, completedSteps } from "./journal.js"
 import { setStepStatus, setPlanStatus } from "./state.js"
+import { recordStateEvent } from "../state/store.js"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 // Único binário permitido em planos. Planos são persistidos/editáveis em
@@ -112,5 +113,8 @@ export function executePlan(opts = {}) {
 
   setPlanStatus(planDir, plan.id, "done")
   appendPlanEvent(planDir, { event: "run_ended", planId: plan.id, status: "done" })
+  // State Store (PRD14 §4.4): resumo do run no workflow_runs — best-effort, sem
+  // output bruto (o journal continua sendo a fonte detalhada).
+  recordStateEvent(baseCwd, "workflow_runs", { runId: plan.id, status: "done", completed: result.completed.length, skipped: result.skipped.length })
   return result
 }
