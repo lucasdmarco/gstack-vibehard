@@ -2,7 +2,8 @@ import { existsSync, mkdirSync, writeFileSync } from "fs"
 import { join } from "path"
 import { buildTaskPlan } from "../project-plan/task-planner.js"
 import { taskRunCommand } from "./task-run.js"
-import { warn, error, info, section } from "../cli/index.js"
+import { worktreeCommand } from "./worktree.js"
+import { error, info, section } from "../cli/index.js"
 
 /**
  * `task "<pedido>"` — Loop Engineer MVP. Gera (e persiste) um plano de feature/bugfix
@@ -22,13 +23,11 @@ export async function taskCommand(args = [], opts = {}) {
   // `task run [planId]` — EXECUTA o loop em worktree (worktree→diff→hygiene→accept/reject).
   if (sub === "run") { taskRunCommand(args, opts); return }
 
-  // Subcomandos de inspeção do loop ainda pendentes (status/diff/accept/reject manual).
+  // Inspeção/aceite do loop: delega ao worktree lifecycle (PRD14 §4.3) — os
+  // branches `task/*` criados pelo run são worktrees gstack de primeira classe.
   if (["status", "diff", "accept", "reject"].includes(sub)) {
-    if (json) { process.stdout.write(JSON.stringify({ error: "loop_pending", subcommand: sub }) + "\n"); return }
-    section(`task ${sub}`)
-    warn("Execução/diff/aceite do loop chegam com o motor de execução de tasks.")
-    info("Por ora, `task \"<pedido>\"` gera o plano; rode os comandos recomendados (workflow/delegate) você mesmo.")
-    return
+    const map = { status: "list", diff: "diff", accept: "accept", reject: "discard" }
+    return worktreeCommand([map[sub], ...args.slice(args.indexOf(sub) + 1)], opts)
   }
 
   const request = positional.join(" ").trim()

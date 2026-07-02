@@ -68,12 +68,13 @@ test("task command: --json puro com plano persistido; detecta índice", async ()
   }
 })
 
-test("task command: sub status é honesto (loop_pending), não finge executar", async () => {
+test("task command: sub status delega ao worktree lifecycle (PRD14 §4.3)", async () => {
   const tmp = await mkdtemp(path.join(tmpdir(), "gstack-task2-"))
   try {
     const { taskCommand } = await imp("src/commands/task.js")
+    // fora de repo git: o lifecycle responde com erro honesto (prova o roteamento real)
     const buf = await capture(() => taskCommand(["status", "--json"], { cwd: tmp }))
-    assert.equal(JSON.parse(buf.trim()).error, "loop_pending")
+    assert.equal(JSON.parse(buf.trim()).error, "not_a_git_repo")
   } finally {
     await rm(tmp, { recursive: true, force: true })
   }
