@@ -1,5 +1,16 @@
 # Changelog - gstack-vibehard
 
+## [3.25.0] - 2026-07-01
+
+### Worktree Lifecycle UX (PRD 14 Sprint 3)
+As worktrees que o gstack cria (delegate/task/orchestrate) agora são produto de primeira classe: o usuário vê, diffa, aceita e limpa — com salvaguardas determinísticas.
+- **`worktree list|inspect|diff|accept|discard|cleanup`** (novo comando): estados determinísticos `main|dirty|conflict|merge-ready|merged|stale|idle|unknown` decididos por matriz de regras pura (`src/worktree/lifecycle.js`, testável sem git).
+- **Ownership honesto**: só branches gstack (`gstack/*`, `task/*`) são elegíveis a cleanup — worktrees do usuário NUNCA entram, mesmo mergeadas.
+- **Salvaguardas**: `cleanup --dry-run` nunca toca o filesystem (teste compara o fs antes/depois); `discard` com commits não mergeados exige `--force` explícito + confirmação; não-interativo exige `--yes`; `accept` roda `verify --quick` na worktree ANTES de orientar o merge — **sem auto-merge** (você decide).
+- **`task status|diff|accept|reject` desestubados**: agora roteiam para o worktree lifecycle (os branches `task/*` do `task run` são inspecionáveis de verdade, em vez do aviso "ainda pendente").
+- Reuso: engine de `src/delegation/worktree.js` (removeWorktree/isGitRepo) e `runVerify` — zero lógica duplicada.
+- 10 testes novos (5 puros + 5 E2E com repo git real: idle→merge-ready→dirty→merged, cleanup seletivo, força de discard).
+
 ## [3.24.0] - 2026-07-01
 
 ### MCP Inventory multi-harness (PRD 14 Sprint 2)

@@ -26,6 +26,7 @@ import { orchestrateCommand } from "../commands/orchestrate.js"
 import { planCommand } from "../commands/plan.js"
 import { startCommand } from "../commands/start.js"
 import { taskCommand } from "../commands/task.js"
+import { worktreeCommand } from "../commands/worktree.js"
 import { verifyCommand } from "../commands/verify.js"
 import { dreamCommand } from "../commands/dream.js"
 import { proxyCommand } from "../commands/proxy.js"
@@ -154,6 +155,7 @@ const COMMANDS = [
   { name: "help", group: "common", desc: "Mostrar ajuda (`help advanced` p/ avançados; `help <cmd>` p/ um comando)", usage: "gstack_vibehard help [comando|advanced]" },
   { name: "plan", group: "advanced", desc: "Gerar plano guiado determinístico", usage: "gstack_vibehard plan \"<objetivo>\" [--json --dry-run --recipe <id>] · plan run|status|explain <id>" },
   { name: "task", group: "advanced", desc: "Loop Engineer: plano + execução em worktree", usage: "gstack_vibehard task \"<pedido>\"  ·  task run [planId] --yes" },
+  { name: "worktree", group: "advanced", desc: "Lifecycle de worktrees: estados, diff, accept (verify), cleanup seguro", usage: "gstack_vibehard worktree <list|inspect|diff|accept|discard|cleanup> [id] [--dry-run] [--force] [--json]" },
   { name: "publish-guard", group: "advanced", desc: "Check determinístico pré-publish (tree/bump/CHANGELOG/tag/CI)", usage: "gstack_vibehard publish-guard [--json] [--no-ci]" },
   { name: "dream", group: "advanced", desc: "Auditoria promessas-vs-evidência (audit/status)", usage: "gstack_vibehard dream audit|status [--json]" },
   { name: "proxy", group: "advanced", desc: "Proxy de redaction pré-output (opt-in)", usage: "gstack_vibehard proxy [--port N] [--upstream URL]" },
@@ -346,6 +348,9 @@ async function dispatch(command, args) {
       break
     case "task":
       await taskCommand(args)
+      break
+    case "worktree":
+      await worktreeCommand(args)
       break
     case "verify":
       await verifyCommand(args)
