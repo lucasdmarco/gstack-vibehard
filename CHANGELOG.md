@@ -1,5 +1,15 @@
 # Changelog - gstack-vibehard
 
+## [3.31.0] - 2026-07-02
+
+### README multilíngue + guias (PRD 14 Sprint 9)
+Landing curta estilo ECC: primeiro contato em 100 linhas, detalhe em guias, dois idiomas.
+- **README raiz reescrito (100 linhas, aceite <150)**: seletor de idiomas (PT-BR/EN), pitch de 30s, seção **Official sources only** (npm/GitHub; mirrors = risco), **Pick one path only** (matriz de caminhos com `consult` como árbitro), quickstart com `start`/`consult` antes de `install`, como desfazer, e tabela de documentação com link para todo termo pesado (harness, QG, manifest, worktree, MCP, Headroom, Graphify, Fallow).
+- **`docs/pt-BR/README.md`**: guia completo em português (o README detalhado anterior, preservado).
+- **`docs/en/README.md`**: full guide em inglês (paridade de conteúdo condensada).
+- **`docs/guides/`**: `quickstart.md` (termos explicados), `install-paths.md` (lite vs full + empilhamento), `reset-uninstall.md` (o que o uninstall preserva de propósito), `harness-matrix.md` (enforcement real vs instrucional + caminhos de enforcement sem hook).
+- `SECURITY.md`/`CONTRIBUTING.md`/`THREAT_MODEL.md` já existiam (v3.21.0) e agora são linkados da landing.
+
 ## [3.30.0] - 2026-07-02
 
 ### Onboarding consult/start — trilha única (PRD 14 Sprint 8)
