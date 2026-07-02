@@ -1,5 +1,16 @@
 # Changelog - gstack-vibehard
 
+## [3.33.0] - 2026-07-02
+
+### State Store operacional + GSTACK_AGENT_DATA_HOME (PRD 14 Sprint 11)
+Estado project-scoped em SQLite para sessões, runs, serviços, worktrees, governança, gates, decisões e work items — sem nunca gravar segredo.
+- **`src/state/{store,schema,migrations}.js`** (novos): `.gstack/state.db` via `node:sqlite` (Node ≥22.5) com **fallback JSONL declarado** (`backend: "jsonl_fallback"`, mesma API — nunca OK falso em Node 18/20). Migrações idempotentes versionadas em `gstack_meta`.
+- **Guard de redação POR CONSTRUÇÃO**: chaves proibidas (token/secret/password/cookie/env/transcript...) nunca persistem; valor com segredo detectável vira `***REDACTED***`; strings gigantes são truncadas (anti-transcript). Teste prova que o segredo não está nem no retorno nem no ARQUIVO.
+- **`GSTACK_AGENT_DATA_HOME`** (PRD14 §4.12): isola a memória por harness/projeto — env vence; default seguro é `<projeto>/.gstack` (teste prova que nada vaza pro default quando o env aponta pra outro lugar).
+- **`state summary [--json]`** (novo comando): backend, arquivo e contagem/último evento por entidade — export para o dashboard futuro.
+- **Produtor real**: o executor de planos grava resumo de cada run em `workflow_runs` (best-effort — o store nunca derruba um plano). Journals existentes (`.gstack/plans/*`) intocados (aditivo, teste dedicado).
+- 8 testes novos.
+
 ## [3.32.0] - 2026-07-02
 
 ### Harness Capability Matrix V2 (PRD 14 Sprint 10)

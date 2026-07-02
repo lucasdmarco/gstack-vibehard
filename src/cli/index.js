@@ -26,6 +26,7 @@ import { orchestrateCommand } from "../commands/orchestrate.js"
 import { planCommand } from "../commands/plan.js"
 import { startCommand } from "../commands/start.js"
 import { consultCommand } from "../commands/consult.js"
+import { stateCommand } from "../commands/state.js"
 import { taskCommand } from "../commands/task.js"
 import { worktreeCommand } from "../commands/worktree.js"
 import { verifyCommand } from "../commands/verify.js"
@@ -166,6 +167,7 @@ const COMMANDS = [
   { name: "delegate", group: "advanced", desc: "Delegar tarefa ao OpenCode (opt-in, confirmação)", usage: "gstack_vibehard delegate opencode --task \"...\" [--worktree] [--yes]" },
   { name: "workflow", group: "advanced", desc: "Graph runner determinístico", usage: "gstack_vibehard workflow <run|runs|inspect>" },
   { name: "a2a", group: "advanced", desc: "Agent Card A2A (offline, sem servidor)", usage: "gstack_vibehard a2a" },
+  { name: "state", group: "advanced", desc: "State Store operacional do projeto (resumo por entidade)", usage: "gstack_vibehard state summary [--json]" },
   { name: "monitor", group: "advanced", desc: "TUI: agentes, tokens, QG, ROI", usage: "gstack_vibehard monitor" },
   { name: "runtime", group: "common", desc: "Runtime do projeto (status do manifest)", usage: "gstack_vibehard runtime status [--json]" },
   { name: "dev", group: "common", desc: "Sobe os serviços do projeto (port alloc + health)", usage: "gstack_vibehard dev [--open] [--json]" },
@@ -347,6 +349,9 @@ async function dispatch(command, args) {
       break
     case "consult":
       consultCommand(args)
+      break
+    case "state":
+      stateCommand(args)
       break
     case "plan":
       await planCommand(args)
