@@ -84,6 +84,9 @@ async function setCmd(cwd, args, status, opts) {
   if (!value) { warn("Valor vazio — abortado."); return }
   setSecret(cwd, name, value, opts)
   success(`Guardado ${name} no keychain (${status.provider}).`)
+  // Fluxo de alto risco (PRD14 §6.6): com segredo em jogo, lembra a cobertura honesta
+  // do Output Guard — padrão é auditoria pós-resposta; prevenção em trânsito é opt-in.
+  info("  Output Guard padrão audita DEPOIS da resposta. Redação em trânsito (opt-in): `gstack_vibehard proxy` · `proxy status`.")
 }
 
 function deleteCmd(cwd, args, opts) {

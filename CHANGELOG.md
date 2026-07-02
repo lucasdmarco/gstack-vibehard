@@ -1,5 +1,14 @@
 # Changelog - gstack-vibehard
 
+## [3.28.0] - 2026-07-01
+
+### Output Guard pre-render como opt-in claro (PRD 14 Sprint 6)
+O guard padrão continua auditoria pós-resposta (detecção) — agora o produto DIZ isso em todo lugar relevante e oferece o caminho de prevenção real sem promessa falsa.
+- **`proxy status [--json]`** (novo): cobertura honesta do Output Guard — pós-resposta sempre ativa; pré-render só quando o proxy está VIVO **e** alguma env aponta para ele (`coverage: posthoc_only | pre_render_partial` — nunca "total"). Inclui a matriz de interceptação por harness (`src/security/guard-status.js`): claude/codex via env base-URL, opencode via config manual, cursor/instrucionais = só pós-resposta.
+- **Promoção em fluxos de alto risco**: `secrets set` lembra a cobertura real e o opt-in do proxy; `doctor --impact` (humano) declara "detecção, não prevenção" + como ligar o pré-render. JSON do `--impact` inalterado (contrato preservado).
+- Probe do proxy fail-safe (conexão recusada = inativo; timeout = ocupado/vivo), fetch injetável.
+- 6 testes novos: matriz nunca promete pré-render p/ cursor/instrucionais; proxy vivo sem env apontando ≠ cobertura; JSON puro.
+
 ## [3.27.0] - 2026-07-01
 
 ### Orchestrate v2 (PRD 14 Sprint 5)
