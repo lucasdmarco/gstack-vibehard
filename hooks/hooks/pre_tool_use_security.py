@@ -123,5 +123,68 @@ except Exception:
 if blocked:
     emit_permission_decision(inp, "deny", reason)
 
+# ═══════════════════════════════════════════════════════
+#  CHALLENGE-RESPONSE PRE-TOOL (VFA — PRD14 §6.4)
+#  Ação de ALTO RISCO (config global de harness / comando
+#  destrutivo desafiável) exige justificativa registrada:
+#  `gstack_vibehard challenge evaluate --evidence ...` grava
+#  um grant (recibo allow) que este gate honra por 15min.
+#  Só age em projeto gstack; fail-open em QUALQUER erro.
+# ═══════════════════════════════════════════════════════
+
+# Alvos de escrita em config GLOBAL de harness (na home do usuário).
+GLOBAL_CONFIG_RX = re.compile(
+    r'[/\\]\.(claude|codex|cursor)[/\\]|[/\\]\.?(mcp|claude)\.json$|[/\\]\.config[/\\]opencode',
+    re.IGNORECASE,
+)
+# Comandos desafiáveis (rm -rf/etc. já são hard-block acima; estes exigem evidência).
+CHALLENGE_CMD_RX = re.compile(r'\bgit\s+push\s+--force\b|\bdrop\s+database\b', re.IGNORECASE)
+
+
+def challenge_action_args():
+    """Mapeia a tool call num action VFA de alto risco (args da CLI), ou None."""
+    home = str(Path.home())
+    if tool_name in ("Write", "Edit", "apply_patch") and file_path:
+        p = str(Path(file_path))
+        if p.startswith(home) and GLOBAL_CONFIG_RX.search(p):
+            return ["--intent", "edit_file", "--target", p, "--scope", "global"]
+    if cmd and CHALLENGE_CMD_RX.search(cmd):
+        return ["--intent", "run_command", "--target", cmd[:200]]
+    return None
+
+
+def run_challenge_pretool(action_args, project_root):
+    """Invoca `gstack_vibehard challenge pretool --json` (só no caso raro de alto risco)."""
+    import shutil
+    import subprocess
+    exe = os.environ.get("GSTACK_CLI_BIN") or shutil.which("gstack_vibehard")
+    if not exe:
+        return None
+    argv = [exe, "challenge", "pretool", *action_args, "--harness", "claude", "--json"]
+    if exe.lower().endswith((".cmd", ".bat")):
+        argv = ["cmd.exe", "/c"] + argv
+    out = subprocess.run(argv, capture_output=True, text=True, timeout=20, cwd=str(project_root))
+    lines = [l for l in (out.stdout or "").strip().splitlines() if l.strip()]
+    return json.loads(lines[-1]) if lines else None
+
+
+try:
+    import os
+    from _paths import find_gstack_root
+    _root = find_gstack_root(cwd)
+    if _root is not None:
+        _args = challenge_action_args()
+        if _args:
+            _decision = run_challenge_pretool(_args, _root)
+            if _decision and _decision.get("decision") == "deny":
+                emit_permission_decision(
+                    inp, "deny",
+                    "CHALLENGE (VFA): acao de alto risco '%s' exige justificativa registrada. "
+                    "Forneca a evidencia e tente de novo: %s"
+                    % (_decision.get("rule", "?"), _decision.get("howTo", "gstack_vibehard challenge evaluate")),
+                )
+except Exception:
+    pass  # fail-open: gate de challenge NUNCA trava o turno por erro proprio
+
 # Allow
 sys.exit(0)
