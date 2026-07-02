@@ -1,5 +1,16 @@
 # Changelog - gstack-vibehard
 
+## [3.27.0] - 2026-07-01
+
+### Orchestrate v2 (PRD 14 Sprint 5)
+Evolução do Meta-Harness MVP — sem recriar: reviewer LLM plugável, paralelismo entre passos independentes e limites documentados no próprio output.
+- **Reviewer LLM plugável** (`--reviewer opencode|claude`, `src/meta/reviewers.js`): invoca o binário do harness com prompt one-shot de veredito parseável (`VERDICT: OK|RISK`). SEMPRE advisory; veredito ilegível = sem sinal; erro do binário = fail-soft com `cobertura reduzida` — nunca aprovação falsa nem crash do run.
+- **Fallback determinístico DECLARADO**: reviewer indisponível → `reviewerCoverage: "deterministic_only"` no resultado (o gate decide sozinho, honesto) em vez de fingir revisão.
+- **Paralelismo por waves** (`--parallel <n>`): `buildWaves` agrupa passos independentes via `dependsOn` (dep desconhecida ignorada; ciclo degrada para sequencial); concorrência limitada por chunk; teste prova pico de concorrência e ordem de dependência.
+- **Limites documentados** (aceite PRD14 §8): `orchestrate --json` retorna `limits` + `reviewerCoverage`; o modo humano imprime os limites atuais (advisory-only, paralelismo local, sem auto-merge, harness instrucional sem enforcement).
+- **Regra de ouro intacta**: `decideStatus` inalterado — LLM aprovando NUNCA salva gate reprovado (teste dedicado); `maxIterations` + circuit breaker preservados (breaker corta waves futuras).
+- `runOrchestration`/`orchestrateCommand` agora async (executor/review/gate podem ser assíncronos). 14 testes novos (8 orchestrator v2 + 6 reviewers).
+
 ## [3.26.0] - 2026-07-01
 
 ### Challenge-Response no caminho de execução (PRD 14 Sprint 4)
