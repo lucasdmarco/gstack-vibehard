@@ -12,6 +12,7 @@ import { repairManifest } from "./repair-manifest.js"
 import { resolvePackageManager } from "./package-manager.js"
 import { npmArgv } from "./deps.js"
 import { buildInstallImpact } from "./impact.js"
+import { buildSupplyChainReport } from "./supply-chain.js"
 import { planOpenCodeFix, applyOpenCodeFix } from "./opencode-jsonc.js"
 import { section, success, warn, error, info, confirm } from "../cli/index.js"
 
@@ -73,7 +74,7 @@ export async function doctor(args = []) {
   // `doctor --json` (diagnóstico completo) → JSON PURO. --strict → exit≠0 se check
   // obrigatório falhar. Não roteia aqui os modos --impact/--install-integrity (têm
   // seu próprio JSON abaixo) nem --fix (interativo).
-  if (json && !args.includes("--impact") && !args.includes("--install-integrity") && !args.includes("--fix") && !args.includes("--repair-manifest") && !args.includes("--package-manager") && !args.includes("--pm")) {
+  if (json && !args.includes("--impact") && !args.includes("--install-integrity") && !args.includes("--fix") && !args.includes("--repair-manifest") && !args.includes("--package-manager") && !args.includes("--pm") && !args.includes("--supply-chain")) {
     const report = await collectDoctorJson(HOME)
     process.stdout.write(JSON.stringify(report) + "\n")
     if (strict && !report.ok) process.exitCode = 1
@@ -100,6 +101,26 @@ export async function doctor(args = []) {
     const r = applyOpenCodeFix(HOME)
     if (r.applied) success("OpenCode: merge aplicado. Reabra o OpenCode e verifique provider/OAuth.")
     else warn("Não aplicado.")
+    return
+  }
+  // Supply Chain Doctor (PRD14 §4.7): registry, binários no PATH, allowlist,
+  // fontes oficiais. Offline-first, read-only, JSON puro com --json.
+  if (args.includes("--supply-chain")) {
+    const report = buildSupplyChainReport()
+    if (json) {
+      process.stdout.write(JSON.stringify(report) + "\n")
+      if (strict && report.risk === "high") process.exitCode = 1
+      return
+    }
+    section("doctor --supply-chain — cadeia de suprimento")
+    for (const c of report.checks) {
+      const fn = c.status === "ok" ? success : c.status === "critical" ? error : warn
+      fn(`  ${c.status === "ok" ? "✓" : c.status === "critical" ? "✗" : "⚠"} ${c.id}: ${c.detail}`)
+    }
+    info("")
+    info(`  Fontes oficiais: npm ${report.officialSources.npm} · GitHub ${report.officialSources.github}`)
+    ;(report.risk === "none" ? success : warn)(`  Risco agregado: ${report.risk}`)
+    if (report.risk === "high") process.exitCode = 1
     return
   }
   // Modo impacto: mostra quais componentes GLOBAIS estão ativos nesta máquina

@@ -15,6 +15,7 @@ import { installHeadroom } from "../harness/headroom.js"
 import { trackDegraded, evaluateFullContract } from "./full-contract.js"
 import { ensureDir, copyWithBackup, copyDirSync, backupFile } from "./merge.js"
 import { buildInstallImpact, renderImpactMarkdown } from "./impact.js"
+import { buildSupplyChainReport } from "./supply-chain.js"
 import { checkRemoteDownload } from "./remote-policy.js"
 import { safeCopyDir, safeCopyFile, safeWriteFile, safeAppendBlock } from "./safe-write.js"
 import { findWorkingBinary, getUvCandidates, getBunCandidates, npxArgv, npmArgv, mergeWindowsPath } from "./deps.js"
@@ -501,6 +502,13 @@ export async function install(args = []) {
       info(`${c.label}${c.optional ? " (opcional)" : ""}:`)
       for (const it of c.items) info(`  • [${it.action}] ${it.path}`)
     }
+    // Supply chain risk no preflight (PRD14 §4.7) — read-only, offline-first.
+    try {
+      const sc = buildSupplyChainReport()
+      info("")
+      ;(sc.risk === "none" ? info : warn)(`Supply chain risk: ${sc.risk}${sc.risk !== "none" ? " — detalhe: `gstack_vibehard doctor --supply-chain`" : " (registry oficial, binários íntegros)"}`)
+      for (const c of sc.checks.filter((x) => x.status === "critical")) warn(`  ✗ ${c.id}: ${c.detail}`)
+    } catch { /* preflight nunca quebra por causa do supply chain */ }
     // READ-ONLY por padrão (P0.3): NÃO escreve nada. Só com --save-report grava.
     if (args.includes("--save-report")) {
       try {

@@ -1,5 +1,14 @@
 # Changelog - gstack-vibehard
 
+## [3.34.0] - 2026-07-02
+
+### Supply Chain Doctor (PRD 14 Sprint 12)
+Fontes oficiais viram GATE verificável — não só aviso no README.
+- **`doctor --supply-chain [--json]`** (novo, `src/installer/supply-chain.js`): checagens offline-first e determinísticas — registry npm (mirror não oficial = **critical**, "risco de malware"); binários críticos (node/npm/git/python) e opcionais (bun/uv/fallow/headroom/ecc/opencode) no PATH com **detecção de PATH hijack** (binário resolvido em temp/cwd = critical); allowlist de downloads remotos (remote-policy) e fontes oficiais do produto declaradas. Schema `gstack.supplychain.v1`, risco agregado `none|low|high` (`--strict` + high → exit≠0).
+- **`install --audit-only` inclui supply chain risk** no preflight (criticals detalhados; nunca quebra o preflight).
+- Honestidade: npm indisponível = warning declarado (nunca OK falso); binário opcional ausente = ok.
+- 6 testes novos (mirror, PATH hijack, npm quebrado, ausências, agregação de risco).
+
 ## [3.33.0] - 2026-07-02
 
 ### State Store operacional + GSTACK_AGENT_DATA_HOME (PRD 14 Sprint 11)
