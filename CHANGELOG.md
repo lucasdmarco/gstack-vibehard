@@ -1,5 +1,15 @@
 # Changelog - gstack-vibehard
 
+## [3.26.0] - 2026-07-01
+
+### Challenge-Response no caminho de execução (PRD 14 Sprint 4)
+O VFA sai do "comando manual" e entra no PreToolUse: ação de alto risco agora é BLOQUEADA antes de executar (onde o harness tem hooks reais), com trilha de provenance.
+- **`challenge pretool`** (novo sub): decisão determinística allow/deny. Deny devolve o challenge estruturado + o comando exato de resposta (`howTo`); TODA decisão pretool vira recibo hash-chain (`run: pretool`).
+- **Grants por regra+alvo com TTL**: `challenge evaluate` com TODAS as evidências grava um recibo `allow` que o gate honra por 15 minutos — só para a MESMA regra e o MESMO alvo (teste prova que não transfere entre alvos e que expira).
+- **Hook `pre_tool_use_security.py`**: detecção barata de alto risco (Write/Edit em config global de harness na home; `git push --force`/`drop database`) → só então invoca a CLI (caso raro; sem custo no caminho comum). Regras de ouro preservadas: **só age em projeto gstack** (`find_gstack_root`) e **fail-open** (CLI ausente/saída ilegível/erro → nunca trava o turno).
+- **Matriz honesta intacta**: harness instrucional continua `posthoc_audit_only` — o pretool só reivindica enforcement onde há hook real (Claude Code/Cursor).
+- 11 testes novos (5 JS: fluxo deny→evidence→grant→allow, TTL, isolamento por alvo; 6 Python: deny com challenge, allow passa, passivo fora de gstack, fail-open x2, arquivo comum não invoca CLI).
+
 ## [3.25.0] - 2026-07-01
 
 ### Worktree Lifecycle UX (PRD 14 Sprint 3)

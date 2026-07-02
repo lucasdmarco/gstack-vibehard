@@ -1,4 +1,5 @@
 import { classifyRisk, evaluateChallenge, buildChallenge } from "../vfa/challenge.js"
+import { pretoolCheck } from "../vfa/pretool.js"
 import { recordAction } from "../vfa/provenance.js"
 import { getAdapterInfo } from "../agents/adapter-matrix.js"
 import { section, success, warn, error, info } from "../cli/index.js"
@@ -44,6 +45,17 @@ export function challengeCommand(args = [], opts = {}) {
     info(`  Risco: ${risk.level}${risk.rule ? ` (${risk.rule})` : ""}`)
     if (risk.requiredEvidence.length) info(`  Evidência exigida: ${risk.requiredEvidence.join(", ")}`)
     return risk
+  }
+
+  // pretool: chamado pelo hook PreToolUse (PRD14 §6.4). Allow por grant recente
+  // (challenge evaluate aprovado) ou deny com o challenge + comando de resposta.
+  if (sub === "pretool") {
+    const decision = pretoolCheck(cwd, action, { harness: f.harness, now: opts.now, ttlMs: opts.ttlMs })
+    if (json) { process.stdout.write(JSON.stringify(decision) + "\n"); return decision }
+    section("challenge pretool")
+    if (decision.decision === "allow") success(`  ✓ allow (risco ${decision.risk}${decision.grantedBy ? `, grant ${decision.grantedBy.slice(0, 12)}` : ""})`)
+    else { error(`  ✗ DENY — ${decision.challenge}`); info(`  Responda com: ${decision.howTo}`); process.exitCode = 1 }
+    return decision
   }
 
   // evaluate
