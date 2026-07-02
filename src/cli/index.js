@@ -25,6 +25,7 @@ import { challengeCommand } from "../commands/challenge.js"
 import { orchestrateCommand } from "../commands/orchestrate.js"
 import { planCommand } from "../commands/plan.js"
 import { startCommand } from "../commands/start.js"
+import { consultCommand } from "../commands/consult.js"
 import { taskCommand } from "../commands/task.js"
 import { worktreeCommand } from "../commands/worktree.js"
 import { verifyCommand } from "../commands/verify.js"
@@ -141,7 +142,8 @@ export async function multiSelect(question, options) {
 
 // Registro de comandos — fonte única para help curto, avançado e por-comando.
 const COMMANDS = [
-  { name: "start", group: "common", desc: "Assistente guiado: objetivo → plano → execução", usage: "gstack_vibehard start" },
+  { name: "start", group: "common", desc: "Assistente guiado: objetivo → consult → plano → execução", usage: "gstack_vibehard start" },
+  { name: "consult", group: "common", desc: "Recomendação READ-ONLY: caminho único, preview e rollback (nada é escrito)", usage: "gstack_vibehard consult \"<objetivo>\" [--json]" },
   { name: "create", group: "common", desc: "Criar um app (LITE por padrão, escreve só ./<nome>)", usage: "gstack_vibehard create <nome> [--full] [--vault] [--dry-run --json]" },
   { name: "init", group: "common", desc: "Criar projeto com estrutura completa", usage: "gstack_vibehard init <nome>" },
   { name: "status", group: "common", desc: "Ver se o gstack está ativo neste projeto", usage: "gstack_vibehard status" },
@@ -342,6 +344,9 @@ async function dispatch(command, args) {
       break
     case "start":
       await startCommand(args)
+      break
+    case "consult":
+      consultCommand(args)
       break
     case "plan":
       await planCommand(args)

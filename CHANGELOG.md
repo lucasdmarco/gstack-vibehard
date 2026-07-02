@@ -1,5 +1,15 @@
 # Changelog - gstack-vibehard
 
+## [3.30.0] - 2026-07-02
+
+### Onboarding consult/start — trilha única (PRD 14 Sprint 8)
+O ECC ensina: escolha UM caminho. Agora o gstack recomenda o caminho antes de qualquer escrita — e detecta quando a máquina já está com instalação empilhada.
+- **`consult "<objetivo>"`** (novo, READ-ONLY): classifica o objetivo (reusa classifier/recipes) e responde o contrato do aceite — `recommendedPath` (create-lite/create-full/already-active com o comando exato), `doNotStack`, `previewCommand` (`install --audit-only`) e `rollbackCommand` (`uninstall --dry-run`). Teste prova que NADA é escrito (cwd e home intocados).
+- **Detecção de instalação empilhada**: hooks em `~/.gstack` E `~/.codex` (caminho legado) coexistindo → alerta "você está usando dois caminhos" com repair sugerido (`install --reinstall` / `uninstall --legacy-name-cleanup`).
+- **`start` chama consult internamente**: a recomendação (caminho único + riscos) aparece ANTES do plano — teste garante a ordem.
+- **README**: `start`/`consult` agora vêm antes de `install` no quickstart e no dia a dia, com a regra "um caminho só" explícita.
+- 6 testes novos.
+
 ## [3.29.0] - 2026-07-01
 
 ### Agent Reach com seletor de canais (PRD 14 Sprint 7)

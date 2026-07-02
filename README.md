@@ -60,9 +60,14 @@ cd meu-app && npm install && npm run dev
 # 3) (opcional) Diagnostique o ambiente (read-only):
 npx @gstack-vibehard/installer doctor
 
-# 4) (opcional) Veja o impacto de integrar aos seus harnesses, SEM escrever:
+# 4) (opcional) Peça uma recomendação de caminho ÚNICO (read-only, nada é escrito):
+npx @gstack-vibehard/installer consult "quero um SaaS com login e Stripe"
+
+# 5) (opcional) Veja o impacto de integrar aos seus harnesses, SEM escrever:
 npx @gstack-vibehard/installer install --audit-only
 ```
+
+> **Um caminho só:** `start`/`consult` são a trilha recomendada — escolha `create` (projeto) OU `install` (global) conforme a recomendação, nunca empilhe os dois sem entender o impacto.
 
 - **Primeiro comando seguro:** `gstack_vibehard` sem argumentos (ou `--help`) **só mostra ajuda** — nunca instala nem escreve.
 - **Criar é leve, versionado e seguro:** `create meu-app` é **lite** por padrão (só `./meu-app`), já roda `git init` (o projeto nasce versionado, o graphify se instala sozinho) e gera um **`.gitignore` que mantém o `.env` fora do git**. Melhor ainda: segredos vão pro **keychain do SO** via `gstack_vibehard secrets` (broker — nada em claro no repo). Use `--full` para o stack completo (Casdoor/Atomic/ECC). Veja o plano antes com `create meu-app --dry-run --json`.
@@ -132,6 +137,8 @@ gstack: 🔎 diff-hygiene → sem segredo no diff · 💾 memória salva (chroni
 
 ```bash
 gstack_vibehard --help            # ajuda (curta) · `help advanced` p/ comandos avançados
+gstack_vibehard start             # trilha recomendada: objetivo → consult → plano → execução
+gstack_vibehard consult "objetivo"  # recomendação READ-ONLY (caminho único, preview, rollback)
 gstack_vibehard doctor            # diagnóstico do ambiente (--json p/ automação)
 gstack_vibehard create app        # novo projeto (lite por padrão)
 gstack_vibehard enable            # ativar o gstack neste projeto

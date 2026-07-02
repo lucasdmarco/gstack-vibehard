@@ -3,6 +3,7 @@ import { join } from "path"
 import { runWizard } from "../project-plan/wizard.js"
 import { executePlan } from "../project-plan/executor.js"
 import { modeWizardText } from "../project-plan/modes.js"
+import { buildConsult, renderConsultHuman } from "./consult.js"
 import { printPlanHuman } from "./plan.js"
 import { prompt, select, confirm, success, error, info, section } from "../cli/index.js"
 
@@ -33,6 +34,11 @@ export async function startCommand(args = [], opts = {}) {
   const res = await runWizard(ui, { objective: opts.objective, projectName: opts.projectName, mode: opts.mode })
   if (res.cancelled) { info("Cancelado — nenhum objetivo informado."); return }
   if (!res.validation.ok) { error(`Plano inválido: ${res.validation.errors.join("; ")}`); return }
+
+  // Trilha única ECC-style (PRD14 §4.9): consult READ-ONLY antes de montar/executar
+  // o plano — recomenda o caminho, alerta instalação empilhada, nunca sugere empilhar.
+  renderConsultHuman(buildConsult({ objective: res.plan.objective, cwd }), { compact: true })
+  info("")
 
   // Persiste para que `plan status/run` enxerguem o plano depois.
   const planDir = join(cwd, ".gstack", "plans", res.plan.id)
