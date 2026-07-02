@@ -23,7 +23,7 @@ async function runJson(args, cwd) {
   const { orchestrateCommand } = await import(`${pathToFileURL(cmdMod)}?t=${Date.now()}`)
   let buf = ""; const orig = process.stdout.write.bind(process.stdout); const prev = process.exitCode
   process.stdout.write = (s) => { buf += String(s); return true }
-  try { orchestrateCommand(args, { cwd }) } finally { process.stdout.write = orig; process.exitCode = prev }
+  try { await orchestrateCommand(args, { cwd }) } finally { process.stdout.write = orig; process.exitCode = prev }
   return JSON.parse(buf.trim())
 }
 

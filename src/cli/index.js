@@ -175,7 +175,7 @@ const COMMANDS = [
   { name: "qa", group: "advanced", desc: "QA Multi-Lens: lentes determinísticas sobre o diff (eval/any/secret/...)", usage: "gstack_vibehard qa [--strict] [--json]" },
   { name: "audit", group: "advanced", desc: "Provenance/VFA: recibos com hash-chain (verifica ações críticas)", usage: "gstack_vibehard audit <status|inspect|verify|export|doctor> [runId]" },
   { name: "challenge", group: "advanced", desc: "Challenge-Response: exige justificativa antes de ação de alto risco", usage: "gstack_vibehard challenge <classify|evaluate> --intent <i> --target <t> [--scope global]" },
-  { name: "orchestrate", group: "advanced", desc: "Meta-Harness: executor em worktree + verifier independente + dupla verificação", usage: "gstack_vibehard orchestrate <planId> [--verify-with <harness>] --yes" },
+  { name: "orchestrate", group: "advanced", desc: "Meta-Harness v2: executor em worktree + verifier independente + reviewer plugável (advisory) + paralelismo", usage: "gstack_vibehard orchestrate <planId> [--verify-with <harness>] [--reviewer opencode|claude] [--parallel <n>] --yes" },
   { name: "sprint", group: "advanced", desc: "Salvar decisões e atualizar memórias", usage: "gstack_vibehard sprint --save" },
   { name: "list", group: "advanced", desc: "Listar componentes instalados", usage: "gstack_vibehard list" },
 ]
@@ -331,7 +331,7 @@ async function dispatch(command, args) {
       challengeCommand(args)
       break
     case "orchestrate":
-      orchestrateCommand(args)
+      await orchestrateCommand(args)
       break
     case "tools":
     case "pp":
