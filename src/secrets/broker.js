@@ -17,6 +17,17 @@ export function projectNamespace(projectDir) {
   return createHash("sha256").update(String(projectDir || "")).digest("hex").slice(0, 16)
 }
 
+// Nome de segredo = identificador estilo variável de ambiente. Impede que `name`
+// vire path traversal no provider DPAPI (join(dir, name + ".dpapi")) ou service
+// string malformada no Keychain/Secret Service. Mesma régua do parseDotEnv.
+const SECRET_NAME_RX = /^[A-Za-z_][A-Za-z0-9_]*$/
+export function assertValidSecretName(name) {
+  if (typeof name !== "string" || !SECRET_NAME_RX.test(name)) {
+    throw new Error(`nome de segredo inválido: "${name}" (use A-Z, 0-9, _ começando por letra/_ )`)
+  }
+  return name
+}
+
 function indexBase(opts) { return opts && opts.vaultDir ? opts.vaultDir : vaultBase() }
 function indexPath(ns, opts) { return join(indexBase(opts), ns, "names.json") }
 
@@ -42,7 +53,8 @@ export function brokerStatus(opts = {}) {
 export function setSecret(projectDir, name, value, opts = {}) {
   const provider = opts.provider || detectProvider(opts)
   if (!provider) throw new Error("nenhum keychain disponível (broker indisponível)")
-  if (!name || typeof value !== "string") throw new Error("nome/valor inválido")
+  if (typeof value !== "string") throw new Error("nome/valor inválido")
+  assertValidSecretName(name)
   const ns = projectNamespace(projectDir)
   provider.set(ns, name, value)
   const idx = readIndex(ns, opts)
@@ -55,11 +67,13 @@ export function setSecret(projectDir, name, value, opts = {}) {
 export function getSecret(projectDir, name, opts = {}) {
   const provider = opts.provider || detectProvider(opts)
   if (!provider) return null
+  assertValidSecretName(name)
   return provider.get(projectNamespace(projectDir), name)
 }
 
 /** Remove do keychain + do índice. Idempotente. */
 export function deleteSecret(projectDir, name, opts = {}) {
+  assertValidSecretName(name)
   const provider = opts.provider || detectProvider(opts)
   const ns = projectNamespace(projectDir)
   if (provider) provider.delete(ns, name)
@@ -82,6 +96,7 @@ export function resolveSecrets(projectDir, names, opts = {}) {
   if (!provider) return out
   const ns = projectNamespace(projectDir)
   for (const name of names || []) {
+    if (!SECRET_NAME_RX.test(String(name))) continue // schema hostil não vira traversal
     const v = provider.get(ns, name)
     if (v != null) out[name] = v
   }

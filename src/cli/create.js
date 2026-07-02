@@ -4,6 +4,7 @@ import {
   copyFileSync,
   existsSync,
   mkdirSync,
+  mkdtempSync,
   readdirSync,
   writeFileSync,
   readFileSync,
@@ -96,19 +97,25 @@ function safeDownloadAndRun(url, logger, label, opts = {}) {
     logger.warn(`  Para instalar manualmente: veja ${url} (ou rode com --allow-remote-downloads).`)
     return false
   }
-  const tmp = join(tmpdir(), `gstack-dl-${Date.now()}${process.platform === "win32" ? ".ps1" : ".sh"}`)
+  // Diretório PRIVADO por download (mkdtemp → nome imprevisível, permissão 0700 no
+  // POSIX). Evita TOCTOU/symlink-swap num /tmp compartilhado: nome fixo previsível
+  // (Date.now) permitiria a outro usuário pré-criar/trocar o arquivo antes do exec.
+  const dir = mkdtempSync(join(tmpdir(), "gstack-dl-"))
+  const tmp = join(dir, `script${process.platform === "win32" ? ".ps1" : ".sh"}`)
+  const cleanup = () => { try { rmSync(dir, { recursive: true, force: true }) } catch { /* cleanup */ } }
   try {
     // curl existe nativamente no Windows 10 1803+ ("curl.exe") e em Unix.
     const curlBin = process.platform === "win32" ? "curl.exe" : "curl"
     execFileSync(curlBin, ["-fsSL", url, "-o", tmp], { stdio: "pipe", timeout: 120000, shell: false })
     if (!existsSync(tmp)) {
       logger.warn(`${label}: download falhou (arquivo nao criado)`)
+      cleanup()
       return false
     }
     const content = readFileSync(tmp, "utf-8")
     if (content.length < 10) {
       logger.warn(`${label}: download muito pequeno (${content.length} bytes), possivelmente invalido`)
-      try { unlinkSync(tmp) } catch (e) { /* cleanup */ }
+      cleanup()
       return false
     }
     if (process.platform === "win32") {
@@ -116,10 +123,10 @@ function safeDownloadAndRun(url, logger, label, opts = {}) {
     } else {
       execFileSync("sh", [tmp], { stdio: "pipe", timeout: 180000, shell: false })
     }
-    try { unlinkSync(tmp) } catch (e) { /* cleanup */ }
+    cleanup()
     return true
   } catch (e) {
-    try { unlinkSync(tmp) } catch (e2) { /* cleanup */ }
+    cleanup()
     logger.warn(`${label}: falha no download/execucao segura: ${e.message || e}`)
     return false
   }
@@ -1371,6 +1378,12 @@ export async function createProject(options = {}) {
   // C1: allowlist estrito — apenas letras, numeros, ponto, hifen, underline
   if (!/^[a-zA-Z0-9._-]+$/.test(projectName)) {
     throw new Error(`Nome de projeto invalido: "${projectName}". Use apenas letras, numeros, ponto, hifen e underline.`)
+  }
+  // C1b: o allowlist acima aceita ".", ".." e dotfiles (".git") — todos perigosos
+  // (traversal p/ diretório-pai; clobber de ".git"/".gstack"). Rejeita nome que seja
+  // só pontos ou comece por ponto: um projeto não precisa disso e o risco é real.
+  if (/^\.+$/.test(projectName) || projectName.startsWith(".")) {
+    throw new Error(`Nome de projeto invalido: "${projectName}". Nao use "." , ".." nem nomes iniciados por ponto.`)
   }
 
   const projectDir = join(cwd, projectName)

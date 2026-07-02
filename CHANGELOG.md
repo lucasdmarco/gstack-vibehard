@@ -1,5 +1,36 @@
 # Changelog - gstack-vibehard
 
+## [3.36.0] - 2026-07-02
+
+### Auditoria de Segurança (Principal Security Engineer) + prontidão macOS/Linux VPS
+
+Auditoria da camada lógica (auth/authz, input validation, data security, business logic).
+Deliverable completo em `.docs/AUDITS/security-audit-v3.36.md` — 8 achados (0 Critical),
+por achado: arquivo:linha, severidade, explicação e fix. Acionáveis corrigidos com testes.
+
+**Corrigidos neste sprint:**
+- **SEC-02 (Medium) — path traversal via nome de segredo.** `src/secrets/broker.js`: allowlist
+  `^[A-Za-z_][A-Za-z0-9_]*$` (`assertValidSecretName`) em set/get/delete; `resolveSecrets` ignora
+  nome hostil de schema em vez de traversar. Impedia `secrets set ..\..\evil` gravar blob DPAPI
+  fora do vault no Windows. Regressão em `tests/secrets.test.js`.
+- **SEC-03 (Medium) — temp previsível para script remoto.** `src/cli/create.js`: `safeDownloadAndRun`
+  usa `mkdtempSync` (dir privado, 0700 no POSIX) em vez de `gstack-dl-<Date.now()>` — fecha janela
+  TOCTOU/symlink num `/tmp` compartilhado.
+- **SEC-04 (Low) — nome de projeto traversal/dotfile.** `src/cli/create.js`: rejeita `.`, `..`, `...`
+  e nomes iniciados por ponto (`.git`/`.gstack`/`.env`) após o allowlist. Regressão em
+  `tests/create_command.test.js`.
+- **SEC-01 (macOS) — segredo do Keychain em argv.** `src/secrets/providers.js`: docstring corrigido
+  (não sobre-promete "STDIN-only") + comentário do resíduo conhecido. Fix de código (`security -i`)
+  recomendado no audit, não aplicado às cegas sem macOS para não regredir o armazenamento existente.
+
+**Documentados (SEC-05..08):** defaults fracos em scaffolds gerados (`admin/123`, `postgres:postgres`,
+bind `0.0.0.0`), blocklist de comando do hook contornável (postura advisory declarada), backend cru
+do State Store interpola tabela (guardado pelo wrapper allowlist), redação best-effort.
+
+**Prontidão macOS/Linux VPS:** novo `docs/guides/vps-ubuntu.md` — requisitos mínimos, degradação
+honesta do broker de segredos headless (keychain ausente), `node:sqlite`→`jsonl_fallback` em Node < 22.5,
+TTY-detection nos wizards. CI já cobre matriz ubuntu/windows/macos (Node 18/20/22).
+
 ## [3.35.0] - 2026-07-02
 
 ### Auto-dream learning seguro (PRD 14 Sprint 13)
