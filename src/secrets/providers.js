@@ -7,8 +7,19 @@ import { homedir } from "os"
  * Providers de segredo por SO (PRD 12 §10). O VALOR fica no keychain do SO; o
  * gstack guarda só nomes/metadados. Windows: DPAPI (chave do usuário, externa ao
  * arquivo) via PowerShell. macOS: Keychain (`security`). Linux: Secret Service
- * (`secret-tool`/libsecret). O valor SEMPRE entra por STDIN — nunca em argv (não
- * vaza na lista de processos). `run` é injetável para teste.
+ * (`secret-tool`/libsecret). `run` é injetável para teste.
+ *
+ * Superfície do VALOR por SO (honesto, não sobre-promete):
+ *  - Windows (DPAPI) e Linux (secret-tool): valor entra por STDIN — não aparece
+ *    em argv nem na lista de processos.
+ *  - macOS (`security add-generic-password -w <valor>`): a ferramenta do sistema
+ *    NÃO lê a senha de STDIN de forma não-interativa, então o valor vai em argv.
+ *    RESÍDUO CONHECIDO: por ~milissegundos, outro usuário LOCAL no mesmo Mac pode
+ *    vê-lo via `ps`. Irrelevante num Mac de usuário único (o caso comum); num Mac
+ *    multiusuário é exposição real. Correção recomendada: `security -i` lendo o
+ *    subcomando (com o valor) de STDIN — ver AUDITS/security-audit-v3.36.md
+ *    (SEC-01). Não aplicada aqui sem verificação em macOS para não regredir o
+ *    armazenamento de segredo dos usuários existentes.
  *
  * Interface: { id, isAvailable(), set(ns,name,value), get(ns,name)->str|null, delete(ns,name) }
  */
@@ -65,6 +76,8 @@ function macKeychainProvider(run) {
     id: "macos-keychain",
     isAvailable() { return process.platform === "darwin" && probe(run, "security", ["list-keychains"]) },
     set(ns, name, value) {
+      // RESÍDUO CONHECIDO (SEC-01): `security` não lê a senha de STDIN não-interativo;
+      // o valor vai em argv. Aceitável em Mac de usuário único; ver docstring/audit.
       run("security", ["add-generic-password", "-U", "-a", acct, "-s", svc(ns, name), "-w", value])
     },
     get(ns, name) {

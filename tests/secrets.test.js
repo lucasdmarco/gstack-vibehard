@@ -83,6 +83,27 @@ test("broker: set/list/get/delete; índice NUNCA guarda valor", async () => {
   } finally { await rm(vaultDir, { recursive: true, force: true, maxRetries: 5 }) }
 })
 
+// ── SEC-02: nome de segredo com traversal é rejeitado (não vira path no DPAPI) ──
+test("broker: nome de segredo inválido é rejeitado (anti path traversal)", async () => {
+  const { setSecret, getSecret, deleteSecret, resolveSecrets, assertValidSecretName } = await imp("src/secrets/broker.js")
+  const provider = fakeProvider()
+  const opts = { provider, vaultDir: await mkdtemp(path.join(tmpdir(), "gstack-vault-")) }
+  const cwd = "/proj/x"
+  try {
+    for (const bad of ["../../evil", "..\\..\\evil", "a/b", "a.dpapi", "1leading", "with space", ""]) {
+      assert.throws(() => setSecret(cwd, bad, "v", opts), /nome de segredo inválido/, `set rejeita ${JSON.stringify(bad)}`)
+      assert.throws(() => getSecret(cwd, bad, opts), /nome de segredo inválido/)
+      assert.throws(() => deleteSecret(cwd, bad, opts), /nome de segredo inválido/)
+    }
+    // válidos passam
+    assert.equal(assertValidSecretName("DATABASE_URL"), "DATABASE_URL")
+    setSecret(cwd, "GH_TOKEN", "ghp_ok", opts)
+    assert.equal(getSecret(cwd, "GH_TOKEN", opts), "ghp_ok")
+    // resolveSecrets: nome hostil vindo de schema é ignorado (não traversa), não lança
+    assert.deepEqual(resolveSecrets(cwd, ["../evil", "GH_TOKEN"], opts), { GH_TOKEN: "ghp_ok" })
+  } finally { await rm(opts.vaultDir, { recursive: true, force: true, maxRetries: 5 }) }
+})
+
 // ── redação ──
 test("redact: troca valores de segredo por *** (defesa p/ logs)", async () => {
   const { redact } = await imp("src/secrets/broker.js")

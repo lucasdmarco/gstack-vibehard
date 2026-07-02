@@ -236,3 +236,25 @@ test("create --dry-run --json: retorna plano e NÃO cria diretório", async () =
     await rm(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
   }
 })
+
+// ── SEC-04: nome de projeto perigoso (".", "..", dotfile) é rejeitado ──
+test("create rejeita nome de projeto traversal/dotfile ('.', '..', '.git')", async () => {
+  const tmp = await mkdtemp(path.join(tmpdir(), "gstack-badname-"))
+  try {
+    const cwd = path.join(tmp, "ws"); await mkdir(cwd, { recursive: true })
+    const { createProject } = await import(`${pathToFileURL(modulePath)}?t=${Date.now()}`)
+    const logger = { info: () => {}, success: () => {}, warn: () => {}, error: () => {} }
+    for (const bad of [".", "..", "...", ".git", ".gstack", ".env"]) {
+      await assert.rejects(
+        () => createProject({ args: [bad], cwd, projectRoot: repoRoot, now: () => "x", logger, execSync: () => Buffer.from("ok") }),
+        /Nome de projeto invalido/,
+        `rejeita ${JSON.stringify(bad)}`,
+      )
+    }
+    // controle: nome normal continua válido (dry-run, não escreve)
+    const ok = await createProject({ args: ["meu-app", "--dry-run", "--json"], cwd, projectRoot: repoRoot, logger, execSync: () => Buffer.from("ok") })
+    assert.equal(ok.project, "meu-app")
+  } finally {
+    await rm(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
+  }
+})
