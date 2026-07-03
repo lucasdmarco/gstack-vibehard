@@ -14,6 +14,7 @@ import { npmArgv } from "./deps.js"
 import { buildInstallImpact } from "./impact.js"
 import { buildSupplyChainReport } from "./supply-chain.js"
 import { planOpenCodeFix, applyOpenCodeFix, diagnoseOpenCode } from "./opencode-jsonc.js"
+import { buildConformanceReport } from "../harness/conformance.js"
 import { section, success, warn, error, info, confirm } from "../cli/index.js"
 
 const HOME = homedir()
@@ -48,6 +49,17 @@ export async function collectDoctorJson(home = HOME) {
   const integrity = checkInstallIntegrity(home)
   const impact = buildInstallImpact({ home })
   const oc = inspectOpenCodeConfig(home)
+  // Conformance de eventos por harness (PRD18 Sprint 3) — resumo compacto.
+  const conf = buildConformanceReport()
+  const conformance = {
+    ok: conf.ok,
+    totalViolations: conf.totalViolations,
+    harnesses: Object.fromEntries(Object.entries(conf.harnesses).map(([h, r]) => [h, {
+      enforcement: r.enforcement,
+      enforcedEvents: (r.enforcedEvents || []).length,
+      violations: r.violations.length,
+    }])),
+  }
   const okRequired = !!node && !!python && (integrity.manifestExists ? integrity.safeToUninstall : true)
   return {
     ok: okRequired,
@@ -60,6 +72,7 @@ export async function collectDoctorJson(home = HOME) {
     },
     mcpGlobal: existsSync(join(home, ".mcp.json")),
     opencode: { hasJson: oc.hasJson, hasJsonc: oc.hasJsonc, hasConflict: oc.hasConflict },
+    conformance,
     playwright: { browsersPath: pwBrowsers, chromium },
     deps: { bun: !!toolVer("bun"), rust: !!toolVer("rustc"), gbrain: !!toolVer("gbrain"), graphify: !!toolVer("graphify"), headroom: !!toolVer("headroom") },
     integrity: { manifestExists: integrity.manifestExists, items: integrity.items, drift: integrity.drift, safeToUninstall: integrity.safeToUninstall, issues: integrity.issues },
@@ -74,6 +87,20 @@ export async function doctor(args = []) {
   // `doctor --json` (diagnóstico completo) → JSON PURO. --strict → exit≠0 se check
   // obrigatório falhar. Não roteia aqui os modos --impact/--install-integrity (têm
   // seu próprio JSON abaixo) nem --fix (interativo).
+  // `doctor --conformance [--json]` (PRD18 Sprint 3): eventos por harness —
+  // enforced/partial/advisory/unsupported + violações (claim proibida/drift).
+  if (args.includes("--conformance")) {
+    const conf = buildConformanceReport()
+    if (json) { process.stdout.write(JSON.stringify(conf) + "\n"); if (strict && !conf.ok) process.exitCode = 1; return }
+    section("doctor --conformance — eventos por harness (contrato honesto)")
+    for (const [h, r] of Object.entries(conf.harnesses)) {
+      const fn = r.violations.length ? error : (r.enforcedEvents || []).length ? success : info
+      fn(`  ${r.violations.length ? "✗" : "•"} ${h} [${r.enforcement}]: enforced=${(r.enforcedEvents || []).join(",") || "nenhum"}`)
+      for (const v of r.violations) warn(`      ${v.kind}${v.event ? ` (${v.event})` : ""}: ${v.detail}`)
+    }
+    ;(conf.ok ? success : error)(conf.ok ? "Sem violações — nenhuma claim falsa de enforcement." : `${conf.totalViolations} violação(ões).`)
+    return
+  }
   // `doctor --opencode --json` (PRD15 §7.8): diagnóstico READ-ONLY da config OpenCode.
   if (args.includes("--opencode")) {
     const diag = diagnoseOpenCode(HOME)
