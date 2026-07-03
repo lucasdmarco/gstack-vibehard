@@ -1,5 +1,32 @@
 # Changelog - gstack-vibehard
 
+## [3.38.0] - 2026-07-02
+
+### Policy DSL cross-harness + config em camadas (PRD 15 §7.1/§7.2/§7.6)
+
+Uma policy canônica que COMPILA para cada harness com nível de aplicação honesto.
+
+- **`src/policy/schema.js`**: DSL `.gstack/policy.json` com `permissions.{allow,deny,ask}`,
+  alvos tipados `Read(**)`/`Write(...)`/`Exec(...)`/`mcp__<server>__<tool>`, globs `*`/`**`.
+  - Precedência **`deny > allow > ask > default`** — `deny` sempre vence; um `allow`
+    específico auto-aprova (senão o catch-all `ask`, ex.: `exec`, sombrearia toda a
+    allowlist); `ask` pega o resto; sem regra → default seguro. (Semântica real de
+    Devin/Claude; o exemplo default do PRD15 §10.3 só é coerente com allow antes de ask —
+    divergimos da prosa numerada do PRD que dizia ask>allow, pois ela tornava a allowlist
+    inútil.)
+  - `validatePolicy` **rejeita segredo embutido** (a policy versiona padrões, nunca valores).
+- **`src/policy/compiler.js`**: `compilePolicy(policy, harness)` → nível **honesto** por
+  enforcement (`real_hooks`=enforced, `partial`=partial, `rules_only`/`instructional`/
+  `detection_only`=advisory). Harness instrucional recebe a policy mas NUNCA é rotulado
+  Zero-Trust; artefato `permissions` (Devin-like) ou `rules_markdown`.
+- **`src/policy/layers.js`**: config em camadas — `config.json`/`policy.json` (time,
+  versionado) ← `config.local.json`/`policy.local.json` (pessoal, gitignored). Local
+  sobrepõe/exceção. `localsGitignored` detecta locais fora do `.gitignore`.
+- **`src/commands/policy.js`** (novo comando `policy`): `init` (cria policy.json + conserta
+  .gitignore), `show`, `eval "<alvo>"`, `compile [--harness X]`, `doctor` — todos `[--json]`.
+- **Testes** `tests/policy_dsl.test.js`: precedência, globs/mcp namespaced, rejeição de
+  segredo, compilação honesta por harness, camadas, gitignore-guard, ciclo init→doctor→eval.
+
 ## [3.37.0] - 2026-07-02
 
 ### OpenCode "config is sacred" — clean-machine recovery (PRD 15 P0)
