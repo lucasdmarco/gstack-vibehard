@@ -1,5 +1,6 @@
 import { classifyRisk, buildChallenge } from "./challenge.js"
 import { readAllReceipts, recordAction } from "./provenance.js"
+import { recordHarnessEvent } from "../harness/events.js"
 
 /**
  * Challenge-Response no CAMINHO DE EXECUÇÃO (PRD14 §6.4): o hook pre-tool do
@@ -55,6 +56,18 @@ function denyPayload(action, risk) {
   }
 }
 
+/** Event ledger (PRD18 Sprint 3): a MESMA decisão vira evento `tool.before`
+ * normalizado (sanitizado, sem secrets) — fonte para `audit events`. */
+function recordPretoolEvent(projectDir, action, result, rule, harness) {
+  try {
+    recordHarnessEvent(projectDir, {
+      event: "tool.before", harness: harness || "unknown",
+      intent: action.intent, target: action.target && action.target.pathOrName,
+      decision: result.decision, rule,
+    })
+  } catch { /* ledger best-effort */ }
+}
+
 /** Grava a decisão pretool como recibo encadeado (best-effort — nunca lança). */
 function recordPretool(projectDir, action, result, rule, harness) {
   try {
@@ -66,6 +79,7 @@ function recordPretool(projectDir, action, result, rule, harness) {
       policy: { decision: result.decision, rules: ["challenge-pretool", rule] },
     })
   } catch { /* provenance best-effort — a decisão vale mesmo sem recibo */ }
+  recordPretoolEvent(projectDir, action, result, rule, harness)
 }
 
 /**

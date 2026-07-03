@@ -1,11 +1,12 @@
 import { existsSync } from "fs"
 import { readRun, listRuns, verifyRun, provenanceDir } from "../vfa/provenance.js"
+import { readHarnessEvents } from "../harness/events.js"
 import { section, success, warn, error, info } from "../cli/index.js"
 
 /**
- * `gstack_vibehard audit <status|inspect|verify|export|doctor>` — inspeciona o
- * provenance log (VFA, §10.3). `verify` recomputa a HASH-CHAIN e falha (exit 1) se
- * algum recibo foi adulterado/removido/reordenado.
+ * `gstack_vibehard audit <status|inspect|verify|export|events|doctor>` — inspeciona
+ * o provenance log (VFA, §10.3) e o event ledger (PRD18 Sprint 3). `verify`
+ * recomputa a HASH-CHAIN e falha (exit 1) se algum recibo foi adulterado.
  */
 export function auditCommand(args = [], opts = {}) {
   const cwd = opts.cwd || process.cwd()
@@ -18,9 +19,27 @@ export function auditCommand(args = [], opts = {}) {
   if (sub === "verify") return verifyCmd(cwd, runId, json)
   if (sub === "inspect") return inspectCmd(cwd, runId, json)
   if (sub === "export") return exportCmd(cwd, runId, json)
+  if (sub === "events") return eventsCmd(cwd, args, json)
   if (sub === "doctor") return doctorCmd(cwd, json)
   warn(`Subcomando desconhecido: ${sub}`)
-  info("  Use: audit <status|inspect|verify|export|doctor>")
+  info("  Use: audit <status|inspect|verify|export|events|doctor>")
+}
+
+/** `--limit N` do ledger (default 30, ignora valor inválido). */
+function eventsLimit(args) {
+  const raw = args[args.indexOf("--limit") + 1]
+  const n = parseInt(raw, 10)
+  return Number.isFinite(n) && n > 0 ? n : 30
+}
+
+/** Event ledger local (.gstack/events/events.jsonl) — sem secrets, só resumo. */
+function eventsCmd(cwd, args, json) {
+  const events = readHarnessEvents(cwd, { limit: eventsLimit(args) })
+  if (json) { process.stdout.write(JSON.stringify({ events }) + "\n"); return { events } }
+  section("audit events — ledger local (sanitizado)")
+  if (!events.length) { info("  (sem eventos — produtores: pretool challenge, delegates)"); return { events } }
+  for (const e of events) info(`  • ${e.ts} ${e.event} [${e.harness}] ${e.intent || ""} ${e.decision ? `→ ${e.decision}` : ""}`)
+  return { events }
 }
 
 function statusCmd(cwd, json) {

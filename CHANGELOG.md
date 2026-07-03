@@ -1,5 +1,42 @@
 # Changelog - gstack-vibehard
 
+## [3.43.0] - 2026-07-03
+
+### Hook Event Conformance + Event Ledger (PRD 18 Sprint 3)
+
+Contrato de **eventos cross-harness** e ledger local sanitizado. A matriz para
+de tratar todo harness como igual: cada um DECLARA o que suporta por evento —
+`enforced` (bloqueia), `partial` (mecanismo real, depende de instalação),
+`advisory` (orienta/audita) ou `unsupported`. Nenhum harness instrucional pode
+declarar `enforced` — a claim é rejeitada pelo conformance.
+
+- **`src/harness/events.js`** (novo): contrato de 8 eventos normalizados
+  (`session.start/stop`, `message.output`, `tool.before/after`, `mcp.call`,
+  `file.write`, `command.exec`) + `EVENT_DECLARATIONS` HONESTAS por harness
+  (Claude real_hooks, Cursor/OpenCode partial, Codex/Devin, instrucionais
+  Gemini/Copilot/Windsurf/Kiro nunca enforced, Hermes MCP-partial).
+  - **Event ledger** `.gstack/events/events.jsonl` (append-only): `recordHarnessEvent`
+    valida o nome do evento (evento fora do contrato é REJEITADO), remove campos
+    proibidos (`prompt/transcript/env/token/secret/password/apikey/…`), redige
+    secrets (`redactSecrets`) e trunca a 300 chars. **Nunca grava secret nem
+    prompt bruto.** `readHarnessEvents` com `--limit`.
+- **`src/harness/conformance.js`** (novo): `buildConformanceReport` por harness da
+  adapter-matrix. Violações: `forbidden_claim` (instrucional declarando enforced,
+  ou nível acima do teto do enforcement da matrix), `missing_event` (evento do
+  contrato ausente = drift), `invalid_level`, `missing_declaration`. Determinístico
+  e offline — a EVIDÊNCIA de instalação continua sendo papel do doctor/detector.
+- **`doctor --conformance [--json] [--strict]`**: eventos por harness com
+  enforced/partial/advisory + violações; `doctor --json` passa a reportar
+  `conformance` compacto. Nenhum harness instrucional aparece como Zero-Trust.
+- **`audit events [--json] [--limit N]`**: lê o ledger local (sanitizado).
+- **Produtor real**: `pretool.js` grava `tool.before` no ledger a cada decisão
+  de challenge-response (mesma decisão que já vira recibo de provenance).
+- Testes: `harness_events` (contrato, sanitização/no-secrets, rejeição de evento
+  inválido, `--limit`), `harness_conformance` (relatório real sem violação,
+  forbidden_claim/missing_event/invalid_level), `doctor_harness_matrix`
+  (`collectDoctorJson.conformance` + `doctor --conformance --json` puro).
+  Cobre Claude, Cursor, OpenCode, Codex, Devin e harness instrucional.
+
 ## [3.42.0] - 2026-07-03
 
 ### Context Scout + modelPolicy (PRD 18 Sprint 2)
