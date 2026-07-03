@@ -113,8 +113,8 @@ test("tools install migra registry antigo sem bloco printingPress", async () => 
     // registry ANTIGO: sem printingPress (projeto criado antes da feature)
     await writeFile(path.join(tmp, ".gstack", "integrations.json"), JSON.stringify({ schemaVersion: 1 }))
     const { toolsCommand } = await import(`${pathToFileURL(toolsModule)}?t=${Date.now()}`)
-    // nao deve explodir ao acessar reg.printingPress
-    await toolsCommand(["install", "stripe"], { cwd: tmp, exec: makeExec({}) })
+    // nao deve explodir ao acessar reg.printingPress. --yes confirma o install remoto (PRD18 S8).
+    await toolsCommand(["install", "stripe", "--yes"], { cwd: tmp, exec: makeExec({}) })
     const reg = JSON.parse(await readFile(path.join(tmp, ".gstack", "integrations.json"), "utf-8"))
     assert.ok(reg.printingPress, "bloco printingPress criado na migracao")
     assert.equal(reg.printingPress.installed[0].name, "stripe")
@@ -155,7 +155,7 @@ test("tools install/uninstall atualiza registry (project-scoped)", async () => {
     }))
     const { toolsCommand } = await import(`${pathToFileURL(toolsModule)}?t=${Date.now()}`)
 
-    await toolsCommand(["install", "stripe"], { cwd: tmp, exec: makeExec({}) })
+    await toolsCommand(["install", "stripe", "--yes"], { cwd: tmp, exec: makeExec({}) })
     let reg = JSON.parse(await readFile(path.join(tmp, ".gstack", "integrations.json"), "utf-8"))
     assert.equal(reg.printingPress.enabled, true)
     assert.equal(reg.printingPress.installed.length, 1)

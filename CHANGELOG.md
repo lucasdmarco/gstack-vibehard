@@ -1,5 +1,30 @@
 # Changelog - gstack-vibehard
 
+## [3.48.0] - 2026-07-03
+
+### Tool Catalog Security + External Tools Opt-In (PRD 18 Sprint 8)
+
+A camada `tools` ganha SEGURANÇA: origem, risco, provenance e opt-in explícito —
+sem instalar pacotes remotos por default.
+
+- **`src/tools/catalog.js`** (novo): `annotateCatalogEntry` marca cada tool com
+  origem (`local/bundled/remote`), risco determinístico (`classifyRisk`: remoto=medium,
+  remoto+MCP/rede=high), enforcement (`advisory` — tool não é gate), `installCommand`
+  SUGERIDO (nunca executado), `mcpCompanionOptIn:true`, `autoInstall:false`,
+  `provenanceRequired` p/ remotas. `LOCAL_CATALOG` funciona offline.
+- **`src/tools/skill-scanner.js`** (novo): `scanSkill` BLOQUEIA caminho absoluto
+  (portabilidade/vazamento de layout) e secret embutido; `bulkInstallAllowed()=false`
+  (skills nunca em massa — uma a uma, scanner antes da sugestão forte).
+- **`src/tools/provenance.js`** (novo): `recordToolProvenance`/`readToolProvenance` —
+  toda install/skip de tool remota vira recibo (hash-chain VFA) com origem e risco.
+- **`tools catalog [--json]`** (novo): catálogo anotado, offline, JSON puro.
+  **`tools list --json`** passa a emitir itens anotados (risco/origem). **`tools install`**
+  de fonte remota agora EXIGE confirmação (`--yes` ou TTY); não-interativo sem `--yes`
+  recusa e grava provenance de skip. MCP companion nunca ativa sem opt-in.
+- Testes: `tools_catalog` (risco/origem, JSON puro offline), `tools_provenance`
+  (recibo tool:*, best-effort), `printing_press_optin` (MCP opt-in, install exige
+  confirmação, scanner bloqueia path/secret). 585/585, QG 0.
+
 ## [3.47.0] - 2026-07-03
 
 ### Ruflo Adapter Minimal (PRD 18 Sprint 7)
