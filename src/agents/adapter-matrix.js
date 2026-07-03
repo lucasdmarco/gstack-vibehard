@@ -100,6 +100,17 @@ export const ADAPTER_MATRIX = Object.freeze({
     installOrOnramp: "apenas detectado pelo doctor",
     riskNotes: ["nenhum artefato gerado — cobertura zero"],
   }),
+  devin: row({
+    target: ".devin/config.json + .devin/hooks.v1.json + .devin/skills", enforcement: "real_hooks", generated: true, state: "adapter_backed",
+    supportedAssets: ["permissions (policy compilada)", "hooks", "skills"],
+    unsupportedSurfaces: ["cloud handoff (opt-in explícito, nunca default)"],
+    installOrOnramp: "gstack_vibehard install --harness devin --project-only",
+    verificationCommands: [...VERIFY_BASE, "gstack_vibehard doctor --json", "devin --version"],
+    riskNotes: [
+      "real_hooks depende do Devin instalado E dos hooks carregarem — doctor faz downgrade p/ rules_only/partial se não validar",
+      "cloud handoff pode enviar repo/diff/contexto para Devin Cloud — sempre exige confirmação",
+    ],
+  }),
 })
 
 const UNKNOWN = row({

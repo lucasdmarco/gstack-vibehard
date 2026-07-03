@@ -10,6 +10,7 @@ import { installClaude } from "../harness/claude.js"
 import { installOpenCode } from "../harness/opencode.js"
 import { installCursor } from "../harness/cursor.js"
 import { installHermes } from "../harness/hermes.js"
+import { generateDevinAssets } from "../harness/devin.js"
 import { writeInstructionalGuidance } from "../harness/instructional.js"
 import { installHeadroom } from "../harness/headroom.js"
 import { trackDegraded, evaluateFullContract } from "./full-contract.js"
@@ -491,6 +492,11 @@ export async function install(args = []) {
   // Detect harnesses
   let harnesses = detectHarnesses()
   if (onlyHarness) harnesses = harnesses.filter((h) => h.id === onlyHarness)
+  // Devin é project-scoped: `install --harness devin` gera `.devin/` mesmo sem o
+  // Devin CLI instalado (scaffolding seguro do projeto, não escrita global).
+  if (onlyHarness === "devin" && !harnesses.some((h) => h.id === "devin")) {
+    harnesses = [{ id: "devin", label: "Devin CLI" }]
+  }
 
   // SAFE INSTALL — preflight de impacto (AC1/AC2): com --audit-only NÃO escreve
   // nada; apenas lista, por categoria, os caminhos globais que seriam tocados.
@@ -749,6 +755,14 @@ export async function install(args = []) {
           // registro dos MCP servers via `hermes mcp add` (best-effort).
           await installHermes({ mcp: globalMcp, skills: true }, report, { projectRoot: PROJECT_ROOT })
           break
+        case "devin": {
+          // Project-scoped: gera `.devin/` da Policy DSL (nunca escrita global).
+          const dv = generateDevinAssets(process.cwd())
+          dv.written.forEach((p) => report.added.push(p))
+          info(`devin: ${dv.written.length} arquivo(s) em .devin/ (policy: ${dv.policyLayers.join(" ← ")})`)
+          if (dv.skipped.length) info(`devin: preservado(s) ${dv.skipped.join(", ")}`)
+          break
+        }
         default: {
           // Harness sem API de hooks: integracao instrucional honesta —
           // escreve orientacao de QG/memoria/tokens no convention do harness.
