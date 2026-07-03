@@ -1,5 +1,27 @@
 # Changelog - gstack-vibehard
 
+## [3.40.0] - 2026-07-02
+
+### Delegate Devin (PRD 15 §10.5)
+
+Delegação de tarefas ao Devin com os mesmos guard-rails do OpenCode + cloud handoff seguro.
+
+- **`src/delegation/devin.js`** (`runDevinDelegation`): delega ao `devin -p -- <prompt>`
+  (oneshot; modelo/Adaptive do usuário — o gstack NÃO chama modelo). `--model`,
+  isolamento por `--worktree`, retenta até o `maxIterations` do loop-budget, higiene
+  determinística no retorno (achado HIGH → `needs_review`), **nunca auto-merge** (preserva
+  branch efêmero p/ revisão). Devin ausente → `devin_missing`; task com newline → `invalid_task`.
+- **`src/commands/delegate.js`**: dispatch por target (`opencode`|`devin`).
+  - **Bloqueia `.env` rastreado** (mesma regra do opencode; `--allow-tracked-secrets` p/ liberar).
+  - **`--cloud-handoff`** (só devin): aviso explícito + **confirmação humana obrigatória** —
+    nem `--yes` pula; em não-interativo, **nada é enviado**. Registra o consentimento no provenance.
+  - **Provenance** de toda delegação (`delegate:<target>`, task, decisão, regra cloud-handoff);
+    best-effort, nunca cria raiz nova só p/ registrar.
+- **Testes** `tests/devin_delegation.test.js`: devin_missing/invalid_task, oneshot com
+  `-p --model -- <task>`, falha tipada (exitCode/stderr), bloqueio de `.env`, cloud handoff
+  sem confirmação (não envia) e confirmado (prossegue + provenance `cloud-handoff`),
+  `--cloud-handoff` recusado no opencode.
+
 ## [3.39.0] - 2026-07-02
 
 ### Devin harness adapter (PRD 15 §10)

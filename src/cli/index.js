@@ -165,7 +165,7 @@ const COMMANDS = [
   { name: "proxy", group: "advanced", desc: "Proxy de redaction pré-output (opt-in) + cobertura honesta do guard", usage: "gstack_vibehard proxy [--port N] [--upstream URL] · proxy status [--json]" },
   { name: "tools", group: "advanced", desc: "Integrações: Composio (nuvem) + Printing Press (local)", usage: "gstack_vibehard tools <suggested|list|install|mcp>" },
   { name: "context", group: "advanced", desc: "Context docs (ADR/PRD/plans/research)", usage: "gstack_vibehard context <init|index|status>" },
-  { name: "delegate", group: "advanced", desc: "Delegar tarefa ao OpenCode (opt-in, confirmação)", usage: "gstack_vibehard delegate opencode --task \"...\" [--worktree] [--yes]" },
+  { name: "delegate", group: "advanced", desc: "Delegar tarefa a OpenCode ou Devin (opt-in, worktree, verify, provenance)", usage: "gstack_vibehard delegate <opencode|devin> --task \"...\" [--model M] [--worktree] [--cloud-handoff] [--yes]" },
   { name: "policy", group: "advanced", desc: "Policy DSL cross-harness (.gstack/policy.json): deny>allow>ask>default, compila por harness com nível honesto", usage: "gstack_vibehard policy <init|show|eval|compile|doctor> [--harness X] [--json]" },
   { name: "workflow", group: "advanced", desc: "Graph runner determinístico", usage: "gstack_vibehard workflow <run|runs|inspect>" },
   { name: "a2a", group: "advanced", desc: "Agent Card A2A (offline, sem servidor)", usage: "gstack_vibehard a2a" },
