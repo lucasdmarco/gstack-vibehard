@@ -1,5 +1,32 @@
 # Changelog - gstack-vibehard
 
+## [3.39.0] - 2026-07-02
+
+### Devin harness adapter (PRD 15 §10)
+
+Devin entra como harness cross oficial, **opcional e project-scoped** — nunca central,
+nunca default de cloud.
+
+- **`src/agents/adapter-matrix.js`**: entrada `devin` (`enforcement: real_hooks`,
+  `generated: true`). Riscos HONESTOS: `real_hooks` só quando o Devin está instalado E os
+  hooks carregam — senão o doctor faz downgrade p/ `rules_only`/`partial`; cloud handoff
+  pode enviar repo/diff/contexto e sempre exige confirmação.
+- **`src/harness/detector.js`**: detecção Devin **fail-open** — `%APPDATA%/devin` (Windows)
+  / `~/.config/devin` (Unix) / `.devin/` (projeto) / `devin --version`.
+- **`src/harness/devin.js`**: gera `.devin/` a partir da **Policy DSL** (mesma policy dos
+  outros harnesses): `config.json` (permissões compiladas), `hooks.v1.json` (PreToolUse→
+  `challenge classify`, PostToolUse→`audit status` — comandos REAIS, sem flags inventadas;
+  advisory até haver ponte de stdin), skills `gstack-context`/`gstack-verify`/`gstack-review`
+  (alto risco = `triggers: [user]`). **Nunca** toca `.devin/config.local.json`; backup
+  `.gstack_vibehard.bak` de qualquer arquivo pré-existente.
+- **`install --harness devin --project-only`**: gera `.devin/` mesmo sem o Devin CLI
+  instalado (scaffolding project-scoped, nunca escrita global).
+- **`doctor`/`agents doctor`** listam Devin via matrix/detector; guia
+  `docs/guides/harness-matrix.md` atualizado com o nível honesto.
+- **Testes** `tests/devin_adapter.test.js`: matrix, detector por SO, geração
+  config(policy)+hooks+skills, compilação da policy efetiva do projeto, preservação de
+  `config.local.json` + backup.
+
 ## [3.38.0] - 2026-07-02
 
 ### Policy DSL cross-harness + config em camadas (PRD 15 §7.1/§7.2/§7.6)

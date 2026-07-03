@@ -6,7 +6,8 @@ O gstack nunca rotula harness instrucional como Zero-Trust. A fonte de verdade �
 | Nível | Harnesses | O que existe de verdade |
 |---|---|---|
 | **Hooks reais** (bloqueio automático) | Claude Code, Cursor | PreToolUse/Stop/SessionStart no `settings.json`/`hooks.json` — gates bloqueiam ANTES da ação (inclui Challenge-Response/VFA) |
-| **Hooks reais** (plugins) | OpenCode | Plugins JS manifest-owned (`tool.execute.before`) + kill switch `GSTACK_OPENCODE_DISABLE=1` |
+| **Hooks reais** (plugins) | OpenCode | Plugins JS manifest-owned (`tool.execute.before`) + kill switch `GSTACK_OPENCODE_DISABLE=1`. Config `.jsonc` é sagrada — nunca reescrita (`doctor --opencode`) |
+| **Hooks reais** (project-scoped) | Devin | `.devin/config.json` (permissões compiladas da Policy DSL) + `.devin/hooks.v1.json` (PreToolUse→challenge, PostToolUse→audit) + skills. `real_hooks` **só** quando o Devin está instalado e carrega os hooks — senão o `doctor` faz downgrade honesto p/ `rules_only`/`partial`. Cloud handoff é opt-in explícito, nunca default |
 | **Instrucional** (best-effort) | Codex, Gemini, Windsurf, Kiro, Copilot CLI, Droid, Kilo, Kimi | Arquivo de orientação (`AGENTS.md`/convention do harness) — o agente é ORIENTADO a rodar os gates; **sem bloqueio por API** |
 | **Detecção** | Zed, VS Code | Reconhecidos pelo `doctor`; integração instrucional por-repo |
 

@@ -7,6 +7,9 @@ const HOME = homedir()
 const OPENCODE_HOME_DIR = join(HOME, ".opencode")
 const OPENCODE_CONFIG_DIR = join(HOME, ".config", "opencode")
 const OPENCODE_DIR = existsSync(OPENCODE_HOME_DIR) ? OPENCODE_HOME_DIR : OPENCODE_CONFIG_DIR
+const DEVIN_GLOBAL_DIR = platform() === "win32"
+  ? join(process.env.APPDATA || join(HOME, "AppData", "Roaming"), "devin")
+  : join(HOME, ".config", "devin")
 
 const HARNESS_PATHS = {
   codex: {
@@ -97,6 +100,17 @@ const HARNESS_PATHS = {
     detect: () => {
       if (existsSync(join(HOME, ".kiro"))) return true
       try { execFileSync("kiro", ["--version"], { stdio: "pipe", timeout: 3000 }); return true } catch { return false }
+    },
+  },
+  devin: {
+    label: "Devin CLI",
+    // Windows: %APPDATA%/devin/config.json; Unix: ~/.config/devin/config.json; projeto: .devin/
+    configDir: DEVIN_GLOBAL_DIR,
+    configFile: join(DEVIN_GLOBAL_DIR, "config.json"),
+    // detect fail-open: qualquer erro de comando vira not_found, nunca crash.
+    detect: () => {
+      if (existsSync(DEVIN_GLOBAL_DIR) || existsSync(join(process.cwd(), ".devin"))) return true
+      try { execFileSync("devin", ["--version"], { stdio: "pipe", timeout: 3000 }); return true } catch { return false }
     },
   },
   zed: {
