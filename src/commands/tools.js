@@ -6,8 +6,22 @@ import { enableMcp, disableMcp, listMcp } from "../printing-press/mcp.js"
 import { doctorAll } from "../printing-press/doctor.js"
 import { buildMcpInventory, renderInventoryHuman } from "../mcp/inventory.js"
 import { buildRufloReport } from "../harness/ruflo.js"
+import { buildToolCatalog, annotateCatalogEntry, LOCAL_CATALOG } from "../tools/catalog.js"
+import { recordToolProvenance } from "../tools/provenance.js"
 import { agentReachCommand } from "./agent-reach.js"
-import { success, warn, error, info, section } from "../cli/index.js"
+import { confirm, success, warn, error, info, section } from "../cli/index.js"
+
+/** Catálogo remoto best-effort (nunca lança; vazio se sem rede). */
+function tryRemoteCatalog(opts) {
+  try { const r = ppList(opts); return r && r.available ? r.items : [] } catch { return [] }
+}
+
+/** Confirmação p/ install REMOTO. --yes libera; não-interativo sem --yes recusa. */
+async function confirmRemoteInstall(slug, opts, args) {
+  if (opts.yes || args.includes("--yes")) return true
+  if (!process.stdin.isTTY) { error(`Install de '${slug}' baixa/instala de fonte REMOTA. Confirme com --yes (não-interativo).`); return false }
+  return (opts.confirm || confirm)(`Instalar '${slug}' de fonte remota? (baixa e executa binário)`, false)
+}
 
 /** Caminho do registry do projeto no cwd. */
 function registryPath(cwd = process.cwd()) {
@@ -82,16 +96,33 @@ export async function toolsCommand(args = [], opts = {}) {
       return
     }
 
+    case "catalog": {
+      // Catálogo local ANOTADO (origem/risco/enforcement/comando sugerido) — offline,
+      // JSON puro. Remoto é best-effort por cima; nada é instalado aqui.
+      const remote = tryRemoteCatalog(opts)
+      const entries = buildToolCatalog([...LOCAL_CATALOG, ...remote])
+      if (args.includes("--json")) { process.stdout.write(JSON.stringify({ catalog: entries }) + "\n"); return }
+      section("tools catalog — catálogo com segurança (nada é instalado)")
+      for (const e of entries) info(`  • ${e.name} [${e.origin}] risco=${e.risk} · install: ${e.installCommand || "(local)"}${e.mcpCompanion ? " · MCP companion (opt-in)" : ""}`)
+      return
+    }
+
     case "list":
     case "search": {
-      section(`tools — ${sub === "list" ? "catalogo Printing Press" : "busca"}`)
+      const json = args.includes("--json")
       let result
       try {
         result = sub === "list" ? ppList(opts) : ppSearch(args[1], opts)
       } catch (e) {
-        if (e instanceof PrintingPressError) { error(e.message); return }
+        if (e instanceof PrintingPressError) { if (json) { process.stdout.write(JSON.stringify({ error: e.message }) + "\n"); return } error(e.message); return }
         throw e
       }
+      if (json) {
+        const items = (result.available ? result.items : []).map((it) => annotateCatalogEntry({ ...it, origin: "remote" }))
+        process.stdout.write(JSON.stringify({ available: !!result.available, error: result.error || null, items }) + "\n")
+        return
+      }
+      section(`tools — ${sub === "list" ? "catalogo Printing Press" : "busca"}`)
       if (!result.available) {
         warn(`Catalogo indisponivel (${result.error}). Verifique a rede ou tente novamente.`)
         info("Discovery e best-effort e nao altera nenhuma configuracao.")
@@ -116,7 +147,14 @@ export async function toolsCommand(args = [], opts = {}) {
       section(`tools — install ${slug || ""}`)
       const reg = readRegistry(cwd)
       if (!reg) { warn("Sem .gstack/integrations.json aqui. Rode dentro de um projeto gstack."); return }
+      // Fonte remota nunca instala por default: exige confirmação (ou --yes).
+      if (!(await confirmRemoteInstall(slug, opts, args))) {
+        recordToolProvenance(cwd, { slug, origin: "remote", decision: "skip", risk: "medium" })
+        info("Instalação cancelada — nada foi baixado.")
+        return { status: "declined", slug }
+      }
       const result = installTool(slug, opts)
+      recordToolProvenance(cwd, { slug, origin: "remote", decision: result.status === "installed" ? "install" : "skip", risk: "medium" })
       if (result.status === "installed") {
         reg.printingPress.enabled = true
         reg.printingPress.discoveryInstalled = true
