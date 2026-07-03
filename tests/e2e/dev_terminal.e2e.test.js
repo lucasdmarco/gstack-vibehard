@@ -2,7 +2,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { execFileSync } from "node:child_process"
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
@@ -41,5 +41,19 @@ test("E2E verify --changed-files --json: docs-only passa, JSON puro", () => {
     const d = lastJson(r.out)
     assert.ok(d, "verify emite JSON")
     assert.ok("status" in d || "fallback" in d)
+  } finally { rmSync(cwd, { recursive: true, force: true }) }
+})
+
+test("E2E verify --profile release --dry-run --json: lista comandos, NÃO executa (rápido)", () => {
+  const cwd = mkdtempSync(path.join(tmpdir(), "gstack-e2e-dev-"))
+  try {
+    // projeto mínimo com scripts declarados → o plano lista os gates
+    writeFileSync(path.join(cwd, "package.json"), JSON.stringify({ name: "t", scripts: { lint: "x", test: "x" } }))
+    const started = Date.now()
+    const r = run(["verify", "--profile", "release", "--dry-run", "--json"], cwd)
+    const d = lastJson(r.out)
+    assert.ok(d && d.dryRun === true, "dry-run declarado")
+    assert.ok(Array.isArray(d.plan) && d.plan.some((s) => s.id === "test"))
+    assert.ok(Date.now() - started < 15000, "dry-run é rápido (não roda npm install/test)")
   } finally { rmSync(cwd, { recursive: true, force: true }) }
 })

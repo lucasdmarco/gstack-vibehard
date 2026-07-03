@@ -11,6 +11,7 @@ import { publishGuard } from "./publish-guard.js"
 import { diffHygiene } from "./diff-hygiene.js"
 import { loadRuntimeManifest, validateRuntimeManifest } from "../runtime/manifest.js"
 import { readAllState } from "../runtime/supervisor.js"
+import { runStepProcess } from "../util/exec-step.js"
 
 const PKG_QG = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "hooks", "hooks", "qg.py")
 
@@ -78,6 +79,102 @@ function findQgHook(home) {
   return null
 }
 
+// Timeout POR ETAPA (PRD20 20.1) — o release nunca mais fica mudo por 10 min.
+const STEP_TIMEOUT_MS = { deps: 300000, test: 300000, build: 300000, "qg-l1": 120000, "qg-l2": 180000 }
+function stepTimeout(id) { return STEP_TIMEOUT_MS[id] || 60000 }
+
+// Package manager REAL do projeto (PR2/PR5): packageManager field → lockfile → npm.
+function pmFromLock(cwd) {
+  if (existsSync(join(cwd, "pnpm-lock.yaml"))) return "pnpm"
+  if (existsSync(join(cwd, "yarn.lock"))) return "yarn"
+  if (existsSync(join(cwd, "bun.lockb"))) return "bun"
+  return "npm"
+}
+function resolvePm(cwd, hasPkg, pkgPath) {
+  try { const p = hasPkg ? readJson(pkgPath) : {}; if (p.packageManager) return String(p.packageManager).split("@")[0] } catch { /* ignore */ }
+  return pmFromLock(cwd)
+}
+
+function stepStatus(r) {
+  if (r.timedOut) return "timed_out"
+  return r.code === 0 ? "passed" : "failed"
+}
+function cmdDetail(status, r, command) {
+  if (status === "timed_out") return `timeout: ${command}`
+  if (status === "failed") return (r.stderr || r.stdout || "falhou").split("\n")[0].slice(0, 160)
+  return null
+}
+/** Monta o step de um comando a partir do resultado estruturado (passed/failed/timed_out). */
+function buildCmdStep(id, r, required, command) {
+  const status = stepStatus(r)
+  const step = { id, status, required, command }
+  const detail = cmdDetail(status, r, command)
+  if (detail) step.detail = detail
+  if (r.stdout) step.stdoutTail = r.stdout
+  if (r.stderr) step.stderrTail = r.stderr
+  if (typeof r.durationMs === "number") step.durationMs = r.durationMs
+  return step
+}
+
+/** Resultado estruturado a partir de um erro do exec injetado (throw→failed). */
+function execError(e) {
+  return { code: Number.isInteger(e.status) ? e.status : 1, timedOut: false, stdout: String(e.stdout || ""), stderr: String(e.stderr || e.message || "") }
+}
+
+/**
+ * Runner estruturado de UMA etapa. Default = spawn com timeout + tree-kill
+ * (`runStepProcess`). `exec` injetado (testes) → adaptado ao contrato throw→failed,
+ * sem timeout real (determinístico). Sempre devolve { code, timedOut, stdout, stderr }.
+ */
+function makeStepExec(injected, cwd) {
+  if (!injected) return (file, args, o = {}) => runStepProcess(file, args, { cwd, timeoutMs: o.timeoutMs })
+  return (file, args) => {
+    try { return { code: 0, timedOut: false, stdout: String(injected(file, args, { cwd }) || ""), stderr: "" } }
+    catch (e) { return execError(e) }
+  }
+}
+
+/** Comando de teste do projeto (npm test | pytest | vazio). */
+function testCommand({ scripts = {}, hasPyTests, pm = "npm", pyBin = "python3" }) {
+  if (scripts.test) return `${pm} test`
+  if (hasPyTests) return `${pyBin} -m pytest -q`
+  return ""
+}
+
+/** Flags de fase (profile) — isola os operadores booleanos das specs. */
+function phaseFlags(ctx) {
+  return {
+    notQuick: ctx.profile !== "quick",
+    fullish: ctx.profile === "full" || ctx.profile === "release",
+    strict: ctx.isRelease ? " --strict" : "",
+    testCmd: testCommand(ctx),
+  }
+}
+
+/** Specs [id, incluir?, comando, required?] dos gates executáveis do profile. */
+function gateSpecs(ctx) {
+  const p = phaseFlags(ctx)
+  const { scripts = {}, hasPkg, qgAvailable, pm = "npm" } = ctx
+  return [
+    ["deps", p.notQuick && hasPkg, `${pm} install`, true],
+    ["lint", !!scripts.lint, `${pm} run lint`, false],
+    ["typecheck", p.fullish && !!scripts.typecheck, `${pm} run typecheck`, false],
+    ["test", p.notQuick && !!p.testCmd, p.testCmd, true],
+    ["build", p.fullish && !!scripts.build, `${pm} run build`, true],
+    ["qg-l1", qgAvailable, `qg --level 1${p.strict}`, true],
+    ["qg-l2", qgAvailable && p.notQuick, `qg --level 2${p.strict}`, true],
+  ]
+}
+
+/**
+ * Lista PURA dos comandos de gate que um profile RODARIA (para `--dry-run`). Só os
+ * comandos executáveis — o ponto do dry-run é mostrar o que seria executado sem
+ * executar nada.
+ */
+export function planVerifySteps(ctx) {
+  return gateSpecs(ctx).filter((s) => s[1]).map(([id, , command, required]) => ({ id, command, required }))
+}
+
 export function runVerify(opts = {}) {
   const cwd = opts.cwd || process.cwd()
   const home = opts.home || homedir()
@@ -109,39 +206,42 @@ export function runVerify(opts = {}) {
   const isLibCli = archetype === "library" || archetype === "cli"
   const steps = []
 
+  // Package manager REAL do projeto (movido p/ cima: dry-run e o plano precisam dele).
+  const pm = resolvePm(cwd, hasPkg, pkgPath)
+  // `--dry-run`: lista os comandos do profile SEM executar nada (PRD20 20.1).
+  if (opts.dryRun) {
+    const qgAvailable = !!(isRelease && existsSync(PKG_QG)) || !!qgHook
+    return { profile, dryRun: true, plan: planVerifySteps({ profile, scripts, hasPyTests, hasPkg, qgAvailable, isRelease, pm, pyBin }) }
+  }
+
+  // Progresso incremental (PRD20 20.1): cada etapa é emitida ao sink (arquivo).
+  const stepExec = opts.stepExec || makeStepExec(opts.exec, cwd)
+  const onStep = typeof opts.onStep === "function" ? opts.onStep : null
+  const record = (step) => { steps.push(step); if (onStep) { try { onStep(step) } catch { /* sink best-effort */ } } }
+
   const run = (id, file, args, { required = false } = {}) => {
-    try { exec(file, args, { cwd }); steps.push({ id, status: "passed", required }) }
-    catch (e) { steps.push({ id, status: "failed", required, detail: (e.message || "falhou").split("\n")[0].slice(0, 160) }) }
+    const r = stepExec(file, args, { timeoutMs: stepTimeout(id) })
+    const command = `${file} ${(args || []).join(" ")}`.trim()
+    record(buildCmdStep(id, r, required, command))
   }
-  const na = (id, detail, required = false) => steps.push({ id, status: "not_applicable", required, detail })
+  const na = (id, detail, required = false) => record({ id, status: "not_applicable", required, detail })
 
-  // Package manager REAL do projeto (PR2/PR5): packageManager field → lockfile →
-  // fallback npm. Não usa mais `npm` fixo (quebrava deps/build em projeto pnpm).
-  const pm = (() => {
-    try { const p = hasPkg ? readJson(pkgPath) : {}; if (p.packageManager) return String(p.packageManager).split("@")[0] } catch { /* ignore */ }
-    if (existsSync(join(cwd, "pnpm-lock.yaml"))) return "pnpm"
-    if (existsSync(join(cwd, "yarn.lock"))) return "yarn"
-    if (existsSync(join(cwd, "bun.lockb"))) return "bun"
-    return "npm"
-  })()
   // Exec do PM cross-platform: no Windows o binário é `pm.cmd` → cmd.exe /c (senão ENOENT).
-  const runPm = (id, args, opts) => {
-    if (process.platform === "win32") run(id, process.env.ComSpec || "cmd.exe", ["/c", pm, ...args], opts)
-    else run(id, pm, args, opts)
+  const runPm = (id, args, o) => {
+    if (process.platform === "win32") run(id, process.env.ComSpec || "cmd.exe", ["/c", pm, ...args], o)
+    else run(id, pm, args, o)
   }
 
-  // 1. deps — quick: checagem FILESYSTEM (instantânea, sem spawnar npm que é lento
-  //    no Windows); full/release: install obrigatório.
-  if (isQuick) {
-    if (!hasPkg) na("deps", "sem package.json")
-    else {
-      const pkg = readJson(pkgPath)
-      const declared = Object.keys({ ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) })
-      const missing = declared.filter((d) => !existsSync(join(cwd, "node_modules", d)))
-      if (missing.length === 0) steps.push({ id: "deps", status: "passed", detail: "node_modules ok (check rápido)" })
-      else steps.push({ id: "deps", status: "failed", detail: `deps ausentes: ${missing.slice(0, 5).join(", ")} — rode ${pm} install` })
-    }
+  // 1. deps — quick: checagem FILESYSTEM (instantânea); full/release: install obrigatório.
+  const depsQuick = () => {
+    if (!hasPkg) return na("deps", "sem package.json")
+    const pkg = readJson(pkgPath)
+    const declared = Object.keys({ ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) })
+    const missing = declared.filter((d) => !existsSync(join(cwd, "node_modules", d)))
+    if (missing.length === 0) return record({ id: "deps", status: "passed", detail: "node_modules ok (check rápido)" })
+    record({ id: "deps", status: "failed", detail: `deps ausentes: ${missing.slice(0, 5).join(", ")} — rode ${pm} install` })
   }
+  if (isQuick) depsQuick()
   else if (isFullish) { hasPkg ? runPm("deps", ["install"], { required: true }) : na("deps", "sem package.json") }
   // 2. lint (sempre, se houver)
   scripts.lint ? runPm("lint", ["run", "lint"]) : na("lint", "sem script lint")
@@ -154,27 +254,27 @@ export function runVerify(opts = {}) {
   else na("test", "sem suíte de testes")
   // 5. build (full/release; obrigatório quando existe)
   if (isFullish) { scripts.build ? runPm("build", ["run", "build"], { required: true }) : na("build", "sem script build") }
-  // 6. Quality Gate — quick: só L1 (rápido, binário local). full/release: L1+L2.
-  //    release roda o qg EMPACOTADO (consistência garantida); demais usam o instalado.
+  // 6. Quality Gate — quick: L1 advisory; full/release: L1+L2 bloqueantes (release usa o EMPACOTADO).
   const qgRun = isRelease && existsSync(PKG_QG) ? PKG_QG : qgHook
-  if (qgRun) {
-    if (isQuick) {
-      // quick: QG L1 com timeout CURTO e ADVISORY — garante feedback rápido (< 30s)
-      // e nunca trava o smoke num Fallow lento/sujo. O gate bloqueante é o --profile full.
-      try { exec(pyBin, [qgRun, "--path", ".", "--level", "1", "--timeout", "15"], { cwd }); steps.push({ id: "qg-l1", status: "passed" }) }
-      catch { steps.push({ id: "qg-l1", status: "advisory", detail: "advisory no quick (rode `verify` p/ o gate bloqueante)" }) }
-    } else {
-      const strict = isRelease ? ["--strict"] : []
-      run("qg-l1", pyBin, [qgRun, "--path", ".", "--level", "1", ...strict], { required: true })
-      run("qg-l2", pyBin, [qgRun, "--path", ".", "--level", "2", ...strict], { required: true })
-    }
-  } else if (isRelease) {
-    // PRD15 §7.8.3 P0: se o claim é Quality Gate REAL, o gate não pode ser opcional
-    // no release. Sem Fallow/QG → fail-closed (release não é "pronto" sem o gate).
-    steps.push({ id: "qg", status: "failed", required: true, detail: "Fallow/QG obrigatório no --profile release e não está instalado" })
-  } else {
-    steps.push({ id: "qg", status: "tool_missing", required: false, detail: "Fallow/QG não instalado" })
+  const qgQuick = () => {
+    // quick: L1 com timeout CURTO e ADVISORY — feedback < 30s sem travar num Fallow lento.
+    try { exec(pyBin, [qgRun, "--path", ".", "--level", "1", "--timeout", "15"], { cwd }); record({ id: "qg-l1", status: "passed" }) }
+    catch { record({ id: "qg-l1", status: "advisory", detail: "advisory no quick (rode `verify` p/ o gate bloqueante)" }) }
   }
+  const qgFull = () => {
+    const strict = isRelease ? ["--strict"] : []
+    run("qg-l1", pyBin, [qgRun, "--path", ".", "--level", "1", ...strict], { required: true })
+    run("qg-l2", pyBin, [qgRun, "--path", ".", "--level", "2", ...strict], { required: true })
+  }
+  const qgGate = () => {
+    if (!qgRun) {
+      // Fail-closed no release (claim de QG REAL não pode ser opcional); demais: tool_missing.
+      if (isRelease) return record({ id: "qg", status: "failed", required: true, detail: "Fallow/QG obrigatório no --profile release e não está instalado" })
+      return record({ id: "qg", status: "tool_missing", required: false, detail: "Fallow/QG não instalado" })
+    }
+    isQuick ? qgQuick() : qgFull()
+  }
+  qgGate()
   const qg = qgRun ? qgMeta(qgRun) : { origin: "none", path: null, drift: false }
   // 7. Gates por arquétipo (lib/CLI) — ADVISORY: reportam, nunca bloqueiam o verify
   //    (filosofia observe-only). publish-guard e diff-hygiene são determinísticos.
@@ -183,12 +283,12 @@ export function runVerify(opts = {}) {
       const pg = publishGuard({ cwd, exec, checkCi: false })
       // release: publish-guard é BLOQUEANTE; demais perfis: advisory (observe-only).
       const okStatus = pg.status === "pass" ? "passed" : isRelease ? "failed" : "advisory"
-      steps.push({ id: "publish-guard", status: okStatus, required: isRelease, detail: pg.status === "pass" ? "pronto p/ publicar" : `pendências: ${pg.failed.join(", ")}` })
-    } catch { steps.push({ id: "publish-guard", status: "advisory", detail: "guard indisponível" }) }
+      record({ id: "publish-guard", status: okStatus, required: isRelease, detail: pg.status === "pass" ? "pronto p/ publicar" : `pendências: ${pg.failed.join(", ")}` })
+    } catch { record({ id: "publish-guard", status: "advisory", detail: "guard indisponível" }) }
     try {
       const dh = diffHygiene({ cwd, exec })
-      steps.push({ id: "diff-hygiene", status: dh.findings.length === 0 ? "passed" : "advisory", detail: dh.findings.length ? `${dh.findings.length} achado(s), ${dh.high} HIGH` : "limpo" })
-    } catch { steps.push({ id: "diff-hygiene", status: "advisory", detail: "hygiene indisponível" }) }
+      record({ id: "diff-hygiene", status: dh.findings.length === 0 ? "passed" : "advisory", detail: dh.findings.length ? `${dh.findings.length} achado(s), ${dh.high} HIGH` : "limpo" })
+    } catch { record({ id: "diff-hygiene", status: "advisory", detail: "hygiene indisponível" }) }
   }
 
   // 8. runtime/preview — verify CONHECE o runtime entregue (PR5): valida o Runtime
@@ -200,32 +300,36 @@ export function runVerify(opts = {}) {
   } else {
     const rm = loadRuntimeManifest(cwd)
     if (!rm) {
-      steps.push({ id: "runtime:start", status: "pending_feature", productCritical: hasRunScript, detail: "sem .gstack/runtime.json — `gstack_vibehard create` declara o runtime" })
-      steps.push({ id: "preview:open", status: "pending_feature", productCritical: hasRunScript })
+      record({ id: "runtime:start", status: "pending_feature", productCritical: hasRunScript, detail: "sem .gstack/runtime.json — `gstack_vibehard create` declara o runtime" })
+      record({ id: "preview:open", status: "pending_feature", productCritical: hasRunScript })
     } else {
       const v = validateRuntimeManifest(rm)
       const state = (() => { try { return readAllState(cwd) } catch { return [] } })()
       const ready = state.filter((s) => s.status === "ready")
       if (!v.valid) {
-        steps.push({ id: "runtime:start", status: "failed", required: isFullish, detail: `runtime manifest INVÁLIDO: ${v.errors[0]}` })
+        record({ id: "runtime:start", status: "failed", required: isFullish, detail: `runtime manifest INVÁLIDO: ${v.errors[0]}` })
       } else if (ready.length) {
-        steps.push({ id: "runtime:start", status: "passed", detail: `${ready.length}/${rm.services.length} serviço(s) ready (dev rodou)` })
+        record({ id: "runtime:start", status: "passed", detail: `${ready.length}/${rm.services.length} serviço(s) ready (dev rodou)` })
       } else {
-        steps.push({ id: "runtime:start", status: "advisory", productCritical: false, detail: `runtime válido (${rm.services.length} serviço(s)) — rode \`gstack_vibehard dev\`` })
+        record({ id: "runtime:start", status: "advisory", productCritical: false, detail: `runtime válido (${rm.services.length} serviço(s)) — rode \`gstack_vibehard dev\`` })
       }
       const web = state.find((s) => s.url)
-      if (web) steps.push({ id: "preview:open", status: "passed", detail: web.url })
-      else steps.push({ id: "preview:open", status: "advisory", detail: "preview chega com `gstack_vibehard dev --open`" })
+      if (web) record({ id: "preview:open", status: "passed", detail: web.url })
+      else record({ id: "preview:open", status: "advisory", detail: "preview chega com `gstack_vibehard dev --open`" })
     }
   }
 
   // Qualquer gate que FALHOU bloqueia "ready" (lint quebrado não é "pronto").
   const failed = steps.filter((s) => s.status === "failed").map((s) => s.id)
+  const timedOut = steps.filter((s) => s.status === "timed_out").map((s) => s.id)
   const toolMissing = steps.filter((s) => s.status === "tool_missing").map((s) => s.id)
   const productPending = steps.some((s) => s.status === "pending_feature" && s.productCritical)
 
+  // Timeout tem sinal PRÓPRIO (PRD20 20.1): distinto de `blocked` — o gate não
+  // falhou, estourou o tempo (e os filhos foram encerrados). DX/CI precisam saber.
   let status
-  if (failed.length) status = "blocked"
+  if (timedOut.length) status = "timed_out"
+  else if (failed.length) status = "blocked"
   else if (productPending) status = "pending_product"
   else if (toolMissing.length) status = "ready_with_warnings"
   else if (qg.drift) status = "ready_with_warnings" // QG instalado ≠ empacotado: não é ready silencioso
@@ -238,7 +342,7 @@ export function runVerify(opts = {}) {
   const ready = status === "ready"
   const usable = ready || status === "ready_with_warnings"
 
-  const result = { profile, archetype, status, ready, usable, reducedTrust, qg, qgDrift: qg.drift, harness: opts.harness || null, steps, failed, toolMissing }
+  const result = { profile, archetype, status, ready, usable, reducedTrust, qg, qgDrift: qg.drift, harness: opts.harness || null, steps, failed, timedOut, toolMissing }
   if (isQuick) writeVerifyCache(cwd, { profile: "quick", fingerprint, result, savedAt: new Date().toISOString() })
   return result
 }

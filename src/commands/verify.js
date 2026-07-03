@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync, existsSync } from "fs"
+import { mkdirSync, writeFileSync, appendFileSync, existsSync } from "fs"
 import { join } from "path"
 import { randomUUID } from "crypto"
 import { execFileSync } from "child_process"
@@ -6,6 +6,21 @@ import { runVerify } from "../project-plan/verify-runner.js"
 import { runChangedFilesVerify } from "../project-plan/changed-files.js"
 import { npxArgv } from "../installer/deps.js"
 import { success, warn, error, info, section } from "../cli/index.js"
+
+/**
+ * Sink de progresso incremental (PRD20 20.1): a cada etapa, append em
+ * `verify.progress.jsonl` + reescrita do `verify.json` PARCIAL. Assim o release
+ * NUNCA fica mudo — dá pra observar em qual gate está. Best-effort (nunca lança).
+ */
+function makeProgressSink(dir, runId) {
+  const seen = []
+  try { mkdirSync(dir, { recursive: true }) } catch { /* best-effort */ }
+  return (step) => {
+    seen.push(step)
+    try { appendFileSync(join(dir, "verify.progress.jsonl"), JSON.stringify({ ts: new Date().toISOString(), ...step }) + "\n") } catch { /* best-effort */ }
+    try { writeFileSync(join(dir, "verify.json"), JSON.stringify({ runId, partial: true, steps: seen }, null, 2) + "\n") } catch { /* best-effort */ }
+  }
+}
 
 /**
  * ECC AgentShield (opt-in via `--agentshield` ou GSTACK_AGENTSHIELD=1): consome o
@@ -25,6 +40,43 @@ function runAgentShield(cwd, exec) {
   }
 }
 
+function renderChangedFiles(r) {
+  section(`verify --changed-files — ${r.files.length} arquivo(s) alterado(s)`)
+  for (const s of r.steps) info(`  ${s.status === "passed" ? "✓" : "✗"} ${s.id}: ${s.status}${s.detail ? ` (${s.detail})` : ""}`)
+  if (r.status === "clean") success("Nada alterado — nada a verificar.")
+  else if (r.status === "ready") success(`Alterados OK. ${r.note}`)
+  else error(`BLOQUEADO: ${r.failed.join(", ")}. ${r.note}`)
+}
+
+/** Gate seletivo por arquivos alterados. @returns resultado (terminou) ou null (fallback). */
+function handleChangedFiles(cwd, opts, json) {
+  const r = runChangedFilesVerify({ cwd, exec: opts.exec })
+  if (r.status === "fallback") { if (!json) warn(`${r.note} — rodando o verify completo.`); return null }
+  if (json) { process.stdout.write(JSON.stringify(r) + "\n"); return r }
+  renderChangedFiles(r)
+  return r
+}
+
+function pickProfile(args) {
+  if (args.includes("--quick")) return "quick"
+  if (args.includes("--release")) return "release"
+  const pi = args.indexOf("--profile")
+  return pi !== -1 && args[pi + 1] ? args[pi + 1] : "full"
+}
+function pickHarness(args, opts) {
+  const hi = args.indexOf("--harness")
+  return hi !== -1 && args[hi + 1] ? args[hi + 1] : opts.harness
+}
+
+/** `--dry-run`: lista os comandos do profile SEM executar nada (PRD20 20.1). */
+function handleDryRun(cwd, profile, opts, json) {
+  const plan = runVerify({ cwd, profile, home: opts.home, dryRun: true })
+  if (json) { process.stdout.write(JSON.stringify(plan) + "\n"); return plan }
+  section(`verify --dry-run — perfil ${plan.profile} (nada executado)`)
+  for (const s of plan.plan) info(`  ${s.required ? "▸" : "·"} ${s.id}: ${s.command}`)
+  return plan
+}
+
 /**
  * `verify` — roda os delivery gates do projeto e salva o relatório.
  *   gstack_vibehard verify [--profile scaffold|full] [--json]
@@ -34,40 +86,27 @@ export async function verifyCommand(args = [], opts = {}) {
   const cwd = opts.cwd || process.cwd()
   const json = args.includes("--json")
 
-  // Gate SELETIVO por arquivos alterados (PRD18 Sprint 1): rápido, honesto e
-  // NUNCA substitui o release gate. Sem git → fallback declarado p/ verify completo.
+  // Gate seletivo por arquivos alterados: NUNCA substitui o release gate.
   if (args.includes("--changed-files")) {
-    const r = runChangedFilesVerify({ cwd, exec: opts.exec })
-    if (r.status !== "fallback") {
-      if (json) { process.stdout.write(JSON.stringify(r) + "\n"); return r }
-      section(`verify --changed-files — ${r.files.length} arquivo(s) alterado(s)`)
-      for (const s of r.steps) info(`  ${s.status === "passed" ? "✓" : "✗"} ${s.id}: ${s.status}${s.detail ? ` (${s.detail})` : ""}`)
-      if (r.status === "clean") success("Nada alterado — nada a verificar.")
-      else if (r.status === "ready") success(`Alterados OK. ${r.note}`)
-      else error(`BLOQUEADO: ${r.failed.join(", ")}. ${r.note}`)
-      return r
-    }
-    if (!json) warn(`${r.note} — rodando o verify completo.`)
-    // fallback: segue para o verify completo abaixo (mapeamento incerto).
+    const r = handleChangedFiles(cwd, opts, json)
+    if (r) return r // null = fallback → segue o verify completo abaixo
   }
 
-  const pi = args.indexOf("--profile")
-  const profile = args.includes("--quick") ? "quick"
-    : args.includes("--release") ? "release"
-    : pi !== -1 && args[pi + 1] ? args[pi + 1] : "full"
-  const hi = args.indexOf("--harness")
-  const harness = hi !== -1 && args[hi + 1] ? args[hi + 1] : opts.harness
+  const profile = pickProfile(args)
+  const harness = pickHarness(args, opts)
 
-  const report = runVerify({ cwd, profile, harness, exec: opts.exec, home: opts.home })
+  if (args.includes("--dry-run")) return handleDryRun(cwd, profile, opts, json)
+
+  const runId = opts.runId || randomUUID().slice(0, 8)
+  const dir = join(cwd, ".gstack", "runs", runId)
+  const report = runVerify({ cwd, profile, harness, exec: opts.exec, stepExec: opts.stepExec, home: opts.home, runId, onStep: makeProgressSink(dir, runId) })
 
   // ECC AgentShield (opt-in): camada de segurança de prompt-injection, advisory.
   if (args.includes("--agentshield") || process.env.GSTACK_AGENTSHIELD === "1") {
     report.agentShield = runAgentShield(cwd, opts.exec)
   }
 
-  // Persiste em .gstack/runs/<runId>/verify.json
-  const runId = opts.runId || randomUUID().slice(0, 8)
-  const dir = join(cwd, ".gstack", "runs", runId)
+  // Persiste o verify.json FINAL (substitui os parciais do sink) em .gstack/runs/<runId>/.
   try {
     mkdirSync(dir, { recursive: true })
     writeFileSync(join(dir, "verify.json"), JSON.stringify({ runId, ...report }, null, 2) + "\n")
@@ -82,7 +121,7 @@ export async function verifyCommand(args = [], opts = {}) {
   }
   for (const s of report.steps) {
     const icon = s.status === "passed" ? "✓" : s.status === "failed" ? "✗"
-      : s.status === "pending_feature" ? "◷" : s.status === "tool_missing" ? "⚠"
+      : s.status === "timed_out" ? "⏱" : s.status === "pending_feature" ? "◷" : s.status === "tool_missing" ? "⚠"
       : s.status === "advisory" ? "•" : s.status === "cache_hit" ? "⚡" : "–"
     const note = s.detail ? ` (${s.detail})` : ""
     info(`  ${icon} ${s.id}: ${s.status}${note}`)
@@ -99,6 +138,7 @@ export async function verifyCommand(args = [], opts = {}) {
   if (report.status === "ready") success("Projeto PRONTO — todos os gates aplicáveis passaram.")
   else if (report.status === "ready_with_warnings") warn(`Pronto COM AVISOS — faltou ferramenta esperada: ${report.toolMissing.join(", ")}. Não é Zero-Trust completo.`)
   else if (report.status === "pending_product") warn("NÃO declarado pronto: runtime/preview pendente (o app/preview não roda ainda). Build/testes passaram.")
+  else if (report.status === "timed_out") { error(`TIMEOUT — etapa(s) estouraram o tempo: ${(report.timedOut || []).join(", ")}`); warn("Os processos filhos foram encerrados. Investigue a etapa e rode de novo.") }
   else { error(`BLOQUEADO — gates obrigatórios falharam: ${report.failed.join(", ")}`); warn("Corrija e rode `verify` de novo (ou acione `task`).") }
   return report
 }
