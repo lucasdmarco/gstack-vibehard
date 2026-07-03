@@ -5,6 +5,7 @@ import { installTool, uninstallTool } from "../printing-press/install.js"
 import { enableMcp, disableMcp, listMcp } from "../printing-press/mcp.js"
 import { doctorAll } from "../printing-press/doctor.js"
 import { buildMcpInventory, renderInventoryHuman } from "../mcp/inventory.js"
+import { buildRufloReport } from "../harness/ruflo.js"
 import { agentReachCommand } from "./agent-reach.js"
 import { success, warn, error, info, section } from "../cli/index.js"
 
@@ -237,6 +238,19 @@ export async function toolsCommand(args = [], opts = {}) {
         const icon = r.status === "ok" ? "✓" : r.status === "warning" ? "⚠" : "✗"
         info(`  ${icon} ${r.tool} — binary:${r.binary} version:${r.version} auth:${r.auth} mcp:${r.mcp} [${r.status}]`)
       }
+      return
+    }
+
+    case "ruflo": {
+      // Ruflo (PRD18 Sprint 7): adapter opcional READ-ONLY. Nunca instala; mostra
+      // canais + MCP default-deny. Escolha de canais é opt-in explícito do usuário.
+      const rep = buildRufloReport()
+      if (args.includes("--json")) { process.stdout.write(JSON.stringify(rep) + "\n"); return }
+      section("tools ruflo — adapter opcional (read-only, nada é instalado)")
+      info(`  CLI: ${rep.present ? "presente" : "ausente"} · executor · plugin-lite: ${rep.pluginLiteAvailable} · full init: ${rep.fullInitRecommended ? "recomendado" : "NÃO recomendado"}`)
+      info("  canais (você escolhe ao ativar):")
+      for (const c of rep.channels) info(`   - [${c.default ? "x" : " "}] ${c.id}: ${c.label}${c.safe ? "" : " (sensível)"}`)
+      warn(`  MCP default-deny · negadas: ${rep.mcpPolicy.deny.join(", ")}`)
       return
     }
 

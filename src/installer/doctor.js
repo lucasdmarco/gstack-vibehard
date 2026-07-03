@@ -16,6 +16,7 @@ import { buildSupplyChainReport } from "./supply-chain.js"
 import { planOpenCodeFix, applyOpenCodeFix, diagnoseOpenCode } from "./opencode-jsonc.js"
 import { buildConformanceReport } from "../harness/conformance.js"
 import { buildCandidateReport } from "../harness/candidates.js"
+import { buildRufloReport } from "../harness/ruflo.js"
 import { section, success, warn, error, info, confirm } from "../cli/index.js"
 
 const HOME = homedir()
@@ -100,6 +101,18 @@ function candidatesReport(json) {
   for (const c of rep.candidates) printCandidate(c)
 }
 
+/** `doctor --ruflo` — adapter opcional Ruflo. READ-ONLY, full init nunca automático. */
+function rufloReport(json) {
+  const rep = buildRufloReport()
+  if (json) { process.stdout.write(JSON.stringify(rep) + "\n"); return }
+  section("doctor --ruflo — adapter opcional (read-only, full init NÃO automático)")
+  info(`  CLI: ${rep.present ? "presente" : "ausente"} · role: ${rep.role} · plugin-lite: ${rep.pluginLiteAvailable} · full init recomendado: ${rep.fullInitRecommended}`)
+  info(`  canais (default: ${rep.defaultChannels.join(", ") || "—"}):`)
+  for (const c of rep.channels) info(`   - ${c.id}: ${c.label}${c.safe ? "" : " [sensível — opt-in]"}`)
+  info(`  MCP: default=${rep.mcpPolicy.default} · allow=${rep.mcpPolicy.allow.join(",")}`)
+  warn(`  MCP negadas por default: ${rep.mcpPolicy.deny.join(", ")}`)
+}
+
 export async function doctor(args = []) {
   const json = args.includes("--json")
   const strict = args.includes("--strict")
@@ -124,6 +137,9 @@ export async function doctor(args = []) {
   // (Codebuff/Freebuff) — READ-ONLY. Reporta presente/ausente, risco (modelos
   // externos, rede), disclosure e bloqueio de delegate no Windows sem shell.
   if (args.includes("--candidates")) return candidatesReport(json)
+  // `doctor --ruflo [--json]` (PRD18 Sprint 7): adapter opcional Ruflo — READ-ONLY.
+  // CLI presente, plugin-lite, full init NÃO recomendado, canais + MCP default-deny.
+  if (args.includes("--ruflo")) return rufloReport(json)
   // `doctor --opencode --json` (PRD15 §7.8): diagnóstico READ-ONLY da config OpenCode.
   if (args.includes("--opencode")) {
     const diag = diagnoseOpenCode(HOME)

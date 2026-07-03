@@ -1,5 +1,27 @@
 # Changelog - gstack-vibehard
 
+## [3.47.0] - 2026-07-03
+
+### Ruflo Adapter Minimal (PRD 18 Sprint 7)
+
+PRD16 conservador: Ruflo entra como adapter OPCIONAL (executor, não fonte de
+verdade), **nunca instalado por default**, `full init` nunca automático.
+
+- **`src/harness/ruflo.js`** (novo): descritor + `detectRuflo` READ-ONLY (fail-open —
+  ausência nunca quebra o GStack). `buildRufloReport` (presente/ausente, plugin-lite,
+  `fullInitRecommended:false`, canais, MCP policy).
+  - **MCP DEFAULT-DENY**: `rufloMcpDecision` nega por padrão; nega explicitamente
+    `terminal/system/agent_spawn/swarm_init/workflow_delete/autopilot/memory_store/
+    federation` (e substrings, ex.: `system_exec`); só a allowlist explícita passa.
+  - **Canais**: só `core` (read-only) é default; `agents`/`federation` são sensíveis
+    e opt-in — o usuário escolhe ao ativar.
+- **`src/agents/adapter-matrix.js`**: `CANDIDATE_ADAPTERS.ruflo` (executor); NÃO entra
+  no `ADAPTER_MATRIX` iterado — conformance segue limpo.
+- **`doctor --ruflo [--json]`** e **`tools ruflo [--json]`**: READ-ONLY; mostram
+  canais + MCP default-deny; nada é instalado.
+- Testes: `harness_ruflo` (executor, plugin-lite, fail-open, canais, doctor JSON),
+  `ruflo_policy` (default-deny, substrings perigosas, allowlist explícita). 577/577, QG 0.
+
 ## [3.46.0] - 2026-07-03
 
 ### Codebuff/Freebuff Bridges + Delegate (PRD 18 Sprint 6)
