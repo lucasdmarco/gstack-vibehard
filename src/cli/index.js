@@ -164,7 +164,7 @@ const COMMANDS = [
   { name: "dream", group: "advanced", desc: "Auditoria promessas-vs-evidência (audit/status)", usage: "gstack_vibehard dream audit|status [--json]" },
   { name: "proxy", group: "advanced", desc: "Proxy de redaction pré-output (opt-in) + cobertura honesta do guard", usage: "gstack_vibehard proxy [--port N] [--upstream URL] · proxy status [--json]" },
   { name: "tools", group: "advanced", desc: "Integrações: Composio (nuvem) + Printing Press (local)", usage: "gstack_vibehard tools <suggested|list|install|mcp>" },
-  { name: "context", group: "advanced", desc: "Context docs (ADR/PRD/plans/research)", usage: "gstack_vibehard context <init|index|status>" },
+  { name: "context", group: "advanced", desc: "Context docs + scout read-only (paths+linhas, local-first, sem dump)", usage: "gstack_vibehard context <init|index|scout|search|related|explain|status>" },
   { name: "delegate", group: "advanced", desc: "Delegar tarefa a OpenCode ou Devin (opt-in, worktree, verify, provenance)", usage: "gstack_vibehard delegate <opencode|devin> --task \"...\" [--model M] [--worktree] [--cloud-handoff] [--yes]" },
   { name: "policy", group: "advanced", desc: "Policy DSL cross-harness (.gstack/policy.json): deny>allow>ask>default, compila por harness com nível honesto", usage: "gstack_vibehard policy <init|show|eval|compile|doctor> [--harness X] [--json]" },
   { name: "workflow", group: "advanced", desc: "Graph runner determinístico", usage: "gstack_vibehard workflow <run|runs|inspect>" },
