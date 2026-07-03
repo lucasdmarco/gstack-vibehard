@@ -1,5 +1,27 @@
 # Changelog - gstack-vibehard
 
+## [3.49.0] - 2026-07-03
+
+### Terminal E2E + Release/Docs/I18n (PRD 18 Sprint 9 — fecha o PRD18)
+
+Fecha a fase com testes caixa-preta e onboarding claro: o projeto precisa ser
+fácil de entender, não só poderoso.
+
+- **Terminal E2E (caixa-preta)** em `tests/e2e/`: `doctor_terminal` (JSON puro,
+  conformance, candidates/ruflo read-only), `start_terminal` (dry-run não escreve
+  nada + policy doctor + context scout), `dev_terminal` (dev/verify sem crash,
+  resposta honesta), `delegate_terminal` (nada roda sem consentimento; candidato
+  exige worktree). Runner `scripts/test-terminal-e2e.mjs` + `npm run test:e2e:terminal`.
+- **Docs/i18n**: `.docs/QUICKSTART.md` (PT), `README.en.md` (EN), `.docs/GLOSSARY.md`
+  (harness, gate, policy, worktree, provenance, scout, runtime, ledgers, candidate,
+  delegate, Lite vs Complete), `.docs/ARCHITECTURE.md`, `.docs/RELEASE.md` (disciplina:
+  matriz verde 3-OS antes de publicar).
+- **ADRs** (`.docs/ADRS/`): 001 adapter-vs-fork, 002 LLM advisory vs gate determinístico,
+  003 segurança do Lite, 004 cloud handoff explícito, **005 precedência de policy
+  `deny > allow > ask > default`** (registro da divergência consciente vs prosa do PRD15,
+  conferida contra `src/policy/schema.js`).
+- 595/595 verde (inclui E2E), QG 0.
+
 ## [3.48.0] - 2026-07-03
 
 ### Tool Catalog Security + External Tools Opt-In (PRD 18 Sprint 8)
