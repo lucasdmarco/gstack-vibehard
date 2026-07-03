@@ -133,6 +133,9 @@ const UNKNOWN = row({
 export const CANDIDATE_ADAPTERS = Object.freeze({
   codebuff: Object.freeze({ enforcement: "advisory_reviewer", candidateAdapter: true, externalModelRisk: true, networkRequired: true }),
   freebuff: Object.freeze({ enforcement: "advisory_reviewer", candidateAdapter: true, externalModelRisk: true, networkRequired: true, requiresAcceptance: true }),
+  // Ruflo (PRD18 Sprint 7): EXECUTOR opcional, não fonte de verdade. Plugin-lite
+  // project-scoped; full init nunca automático; MCP default-deny (ver src/harness/ruflo.js).
+  ruflo: Object.freeze({ enforcement: "candidate_adapter", candidateAdapter: true, role: "executor", externalModelRisk: false, networkRequired: false }),
 })
 
 export function isCandidateAdapter(id) {
