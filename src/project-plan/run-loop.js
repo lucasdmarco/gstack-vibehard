@@ -8,6 +8,7 @@ import { runChangedFilesVerify } from "./changed-files.js"
 import { loadRuntimeManifest } from "../runtime/manifest.js"
 import { readAllState } from "../runtime/supervisor.js"
 import { scout } from "../context-docs/scout.js"
+import { recordEvidence, writeTaskMd } from "./evidence-ledger.js"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const CLI_ENTRY = join(__dirname, "..", "index.js")
@@ -234,6 +235,39 @@ function scoutStage(ctx, stages) {
 const GATE_STAGES = new Set(["test", "verify"])
 const POST_CREATE_STAGES = [["dev", devStage], ["test", testStage], ["verify", verifyStage], ["preview", previewStage]]
 
+// Fonte de evidência por estágio (define o que PODE provar). test/verify = gate real;
+// scout/review nunca provam (viram advisory). O status honesto vem do próprio estágio.
+const STAGE_SOURCE = Object.freeze({
+  intent: "command", plan: "command", scout: "review", create: "command",
+  dev: "command", test: "test", review: "review", verify: "verify", preview: "command",
+})
+const STAGE_STATUS_TO_EVIDENCE = Object.freeze({
+  ready: "proved", failed: "failed", pending: "pending",
+  advisory: "advisory", not_applicable: "not_applicable", pending_feature: "pending",
+})
+
+/**
+ * Espelha os estágios do pipeline no Evidence Ledger da task (=plan.id), PRD18 S4.
+ * `start` e `task` compartilham o MESMO ledger. Só test/verify (gate) podem `proved`;
+ * o resto que reivindicar prova sem fonte determinística é rebaixado a advisory.
+ */
+function stageEvidenceEntry(objective, stage, s) {
+  return {
+    step: stage, objective, action: `pipeline:${stage}`,
+    result: s.detail, evidence: s.url || s.detail,
+    source: STAGE_SOURCE[stage] || "command",
+    status: STAGE_STATUS_TO_EVIDENCE[s.status] || "pending",
+  }
+}
+
+function writePipelineEvidence(ctx, stages) {
+  const taskId = ctx.plan.id
+  for (const stage of PIPELINE_STAGES) {
+    if (stages[stage]) recordEvidence(ctx.cwd, taskId, stageEvidenceEntry(ctx.plan.objective, stage, stages[stage]))
+  }
+  try { writeTaskMd(ctx.cwd, taskId, ctx.plan.objective) } catch { /* TASK.md best-effort */ }
+}
+
 /** Fecha o run: handoff.md quando aplicável + journal + status.json. */
 function finishPipeline(ctx, stages, status, failedStage) {
   let handoffPath
@@ -243,6 +277,7 @@ function finishPipeline(ctx, stages, status, failedStage) {
   }
   appendRunEvent(ctx.runDir, { event: "pipeline_ended", status, failedStage: failedStage || null, attempts: ctx.attempts })
   writeRunStatus(ctx.runDir, { runId: ctx.runId, planId: ctx.plan.id, status, stages, attempts: ctx.attempts })
+  try { writePipelineEvidence(ctx, stages) } catch { /* evidence best-effort — não derruba o run */ }
   return { runId: ctx.runId, status, stages, attempts: ctx.attempts, execResult: ctx.execResult, ...(handoffPath ? { handoffPath } : {}) }
 }
 

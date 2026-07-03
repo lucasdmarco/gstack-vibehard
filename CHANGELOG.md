@@ -1,5 +1,35 @@
 # Changelog - gstack-vibehard
 
+## [3.44.0] - 2026-07-03
+
+### Evidence Task Ledger + Resume/Handoff (PRD 18 Sprint 4)
+
+`no proof, no done`. Um ledger de evidência por task ensina o sistema a saber o
+que foi **provado**, retomar de onde parou e entregar handoff humano quando para.
+
+- **`src/project-plan/evidence-ledger.js`** (novo): `.gstack/tasks/<taskId>/evidence.jsonl`
+  (recibos) + `TASK.md` (espelho humano). Cada recibo tem objetivo/ação/comando/
+  resultado/evidência/status (`proved|failed|pending|not_applicable|advisory`).
+  - **Regra dura**: só uma FONTE determinística (`gate/test/build/verify/command`)
+    marca `proved`; LLM/review é rebaixado a `advisory` (registrado, NUNCA prova).
+  - `taskComplete` = `no proof, no done`: precisa de ≥1 prova e nada `failed`/`pending`.
+  - **Redação obrigatória**: secrets redigidos (`redactSecrets`) e valores truncados
+    (400 chars) — o ledger nunca grava segredo nem output bruto.
+- **`src/project-plan/stopping-rules.js`** (estendido): `resumeIndex` (pula
+  proved/not_applicable/advisory, volta ao 1º failed/pending), `shouldStop`
+  (complete/hard_cap/blocked) — puros, sem I/O.
+- **`src/project-plan/evidence-loop.js`** (novo): `runEvidenceLoop` roda passos com
+  RETOMADA + HARD CAP. `runStep` injetável. Passo `failed` sempre interrompe; hard
+  cap fecha em handoff (nunca loop zumbi). Distinto do `runTaskLoop` de worktree.
+- **`src/project-plan/journal.js`** (estendido): `renderTaskHandoff`/`writeTaskHandoff`
+  — resumo acionável com erros persistentes, pendências e arquivos tocados; sem secrets.
+- **Ledger compartilhado**: o run loop (`start`) espelha cada estágio do pipeline no
+  MESMO ledger da task (=`plan.id`); só `test`/`verify` (gate) provam. Novos
+  subcomandos `task evidence <id> [--json]` e `task resume <id> [--json]`.
+- Testes: `evidence_ledger` (regra de fonte, redação/no-secrets, complete),
+  `task_loop_resume` (não repete provado, retoma failed/pending, hard cap),
+  `workflow_handoff` (handoff acionável + persistência). 551/551 verde, QG 0.
+
 ## [3.43.0] - 2026-07-03
 
 ### Hook Event Conformance + Event Ledger (PRD 18 Sprint 3)
