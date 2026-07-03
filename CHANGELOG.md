@@ -1,5 +1,40 @@
 # Changelog - gstack-vibehard
 
+## [3.41.0] - 2026-07-03
+
+### Replit-like Run Loop MVP (PRD 18 Sprint 1)
+
+`start` vira pipeline executável — `Intent → Plan → Scout → Create → Dev → Test →
+Review → Verify → Preview` — REUSANDO runtime supervisor/executor/journal/verify
+(nada foi recriado).
+
+- **`src/project-plan/run-loop.js`** (novo): orquestra o pipeline.
+  - Create com **hard iteration cap** (default 3) + retomada (journal pula passos
+    concluídos); cap esgotado → **handoff humano** `.gstack/runs/<runId>/handoff.md`
+    (acionável, sem secrets), nunca loop zumbi.
+  - Gate determinístico decide: test/verify `failed` sem passo retomável → handoff
+    imediato. **LLM nunca aprova** (estágio review é `advisory` sempre).
+  - Estágios com status honesto: `ready|failed|pending|advisory|pending_feature|not_applicable`
+    — scout é `pending_feature` (chega no Sprint 2); dev/preview distinguem projeto
+    inexistente (`not_applicable`) de serviço unhealthy (`failed`) e sem URL (`pending`).
+  - Artefatos por run: `.gstack/runs/<runId>/{journal.jsonl,status.json}` (só resumo,
+    comandos sanitizados). `renderPlanMarkdown` gera o `plan.md` humano.
+  - Dev/preview integrados ao supervisor real (`dev --json`, state de serviços, URL).
+- **`src/commands/start.js`**: aceita objetivo POSICIONAL + `--name/--mode/--yes`;
+  **`start --dry-run --json` é JSON PURO** (nada escrito, nada executado, comandos
+  sanitizados); execução persiste `plan.json` + **`plan.md`** e roda o pipeline;
+  saída humana mostra estágio a estágio + preview URL. Contrato antigo preservado
+  (`{plan, result, executed}` + novo `pipeline`).
+- **`verify --changed-files`** (novo, `src/project-plan/changed-files.js`): gate
+  SELETIVO — `node --check` por JS alterado, roda SÓ os testes alterados, `py_compile`
+  nos .py; docs-only passa sem gates de código; sem git → **fallback declarado** p/ o
+  verify completo. **Não substitui** `--profile release` (segue fail-closed).
+- **Testes**: `tests/start_pipeline.test.js` (6 — dry-run puro, artefatos por run,
+  hard cap exato + handoff, runtime manifest → dev/preview ready, gate falhou →
+  handoff) e `tests/verify_changed_files.test.js` (6 — clean/fallback/docs-only/
+  seletivo/blocked/JSON puro).
+- Zero escrita global; nenhum `.env` copiado; journal nunca guarda output bruto.
+
 ## [3.40.0] - 2026-07-02
 
 ### Delegate Devin (PRD 15 §10.5)

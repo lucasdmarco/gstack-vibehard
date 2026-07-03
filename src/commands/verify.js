@@ -3,6 +3,7 @@ import { join } from "path"
 import { randomUUID } from "crypto"
 import { execFileSync } from "child_process"
 import { runVerify } from "../project-plan/verify-runner.js"
+import { runChangedFilesVerify } from "../project-plan/changed-files.js"
 import { npxArgv } from "../installer/deps.js"
 import { success, warn, error, info, section } from "../cli/index.js"
 
@@ -32,6 +33,24 @@ function runAgentShield(cwd, exec) {
 export async function verifyCommand(args = [], opts = {}) {
   const cwd = opts.cwd || process.cwd()
   const json = args.includes("--json")
+
+  // Gate SELETIVO por arquivos alterados (PRD18 Sprint 1): rápido, honesto e
+  // NUNCA substitui o release gate. Sem git → fallback declarado p/ verify completo.
+  if (args.includes("--changed-files")) {
+    const r = runChangedFilesVerify({ cwd, exec: opts.exec })
+    if (r.status !== "fallback") {
+      if (json) { process.stdout.write(JSON.stringify(r) + "\n"); return r }
+      section(`verify --changed-files — ${r.files.length} arquivo(s) alterado(s)`)
+      for (const s of r.steps) info(`  ${s.status === "passed" ? "✓" : "✗"} ${s.id}: ${s.status}${s.detail ? ` (${s.detail})` : ""}`)
+      if (r.status === "clean") success("Nada alterado — nada a verificar.")
+      else if (r.status === "ready") success(`Alterados OK. ${r.note}`)
+      else error(`BLOQUEADO: ${r.failed.join(", ")}. ${r.note}`)
+      return r
+    }
+    if (!json) warn(`${r.note} — rodando o verify completo.`)
+    // fallback: segue para o verify completo abaixo (mapeamento incerto).
+  }
+
   const pi = args.indexOf("--profile")
   const profile = args.includes("--quick") ? "quick"
     : args.includes("--release") ? "release"
