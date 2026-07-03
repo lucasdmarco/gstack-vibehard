@@ -1,5 +1,32 @@
 # Changelog - gstack-vibehard
 
+## [3.50.0] - 2026-07-03
+
+### Release Gate Observável e Controlável (PRD 20 Sprint 20.1)
+
+`verify --profile release` deixa de ficar mudo por minutos e de orfanar processos.
+Agora é observável, tem timeout por etapa e cleanup — confiável para usuário e CI.
+
+- **`src/util/exec-step.js`** (novo): `runStepProcess` roda uma etapa de gate com
+  **timeout POR ETAPA** e, no estouro, mata a ÁRVORE de processos reusando
+  `killTreeCommand` do runtime supervisor (Windows `taskkill /T /F`; POSIX grupo via
+  `detached`). Captura stdout/stderr resumidos e distingue TIMEOUT de falha. `spawn`/
+  `killer` injetáveis (testável sem processo real).
+- **`verify.progress.jsonl` incremental**: cada etapa é emitida a um sink que faz
+  append em `.gstack/runs/<runId>/verify.progress.jsonl` + reescreve um `verify.json`
+  PARCIAL — dá pra ver em qual gate está, ao vivo. Best-effort, nunca derruba o run.
+- **Status distintos** (PRD20 20.1): `timed_out` (etapa estourou o tempo, filhos
+  encerrados) é diferente de `blocked` (gate falhou). Ambos ≠ `ready`/`ready_with_warnings`.
+- **`verify --profile release --dry-run --json`**: lista os comandos do profile
+  (`deps/lint/typecheck/test/build/qg-l1/qg-l2`) **sem executar nada** (rápido).
+- **`--json` puro** preservado (progresso vai só para o arquivo); ícone `⏱` no humano.
+- **Dívida de complexidade REDUZIDA** (encaixe do PRD20 20.2): ao tornar o verify
+  observável, `runVerify` caiu de cc62→59 e `verifyCommand` de cc44→35 (extração de
+  `planVerifySteps`/`buildCmdStep`/gates internos e dos handlers changed-files/dry-run).
+  Blockers CRITICAL/HIGH do Fallow: 65→64. Zero introduzidos.
+- Testes: `verify_release_observable` (tree-kill no timeout, dry-run não executa,
+  `timed_out`≠`blocked`, sink incremental) + e2e `verify --dry-run`. 604/604 verde.
+
 ## [3.49.0] - 2026-07-03
 
 ### Terminal E2E + Release/Docs/I18n (PRD 18 Sprint 9 — fecha o PRD18)
