@@ -119,6 +119,26 @@ const UNKNOWN = row({
   riskNotes: ["harness fora da matriz — nenhuma promessa"],
 })
 
+/**
+ * Candidatos externos opt-in (PRD18 Sprint 5) — Codebuff/Freebuff. NÃO entram no
+ * ADAPTER_MATRIX (que dirige install/conformance de harnesses instaláveis): são
+ * uma categoria à parte, com eixos próprios. Descritores completos + detecção em
+ * src/harness/{codebuff,freebuff}.js; relatório read-only em src/harness/candidates.js.
+ *
+ *   candidate_adapter  = adapter POSSÍVEL, opt-in, nunca instalado automaticamente.
+ *   advisory_reviewer  = participa só como reviewer; NUNCA é o gate final.
+ *   external_model_risk= roteia por modelos externos (código sai da máquina).
+ *   network_required   = precisa de rede; não é local/offline.
+ */
+export const CANDIDATE_ADAPTERS = Object.freeze({
+  codebuff: Object.freeze({ enforcement: "advisory_reviewer", candidateAdapter: true, externalModelRisk: true, networkRequired: true }),
+  freebuff: Object.freeze({ enforcement: "advisory_reviewer", candidateAdapter: true, externalModelRisk: true, networkRequired: true, requiresAcceptance: true }),
+})
+
+export function isCandidateAdapter(id) {
+  return Object.prototype.hasOwnProperty.call(CANDIDATE_ADAPTERS, id)
+}
+
 export function getAdapterInfo(id) {
   return ADAPTER_MATRIX[id] || UNKNOWN
 }

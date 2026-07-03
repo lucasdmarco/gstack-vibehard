@@ -1,5 +1,30 @@
 # Changelog - gstack-vibehard
 
+## [3.45.0] - 2026-07-03
+
+### Codebuff/Freebuff Detector/Doctor (PRD 18 Sprint 5)
+
+Codebuff e Freebuff entram como **candidatos externos OPT-IN** — detectados e
+reportados, **nunca instalados automaticamente**, nunca em `lite`.
+
+- **`src/harness/codebuff.js`** / **`src/harness/freebuff.js`** (novos): descritores
+  honestos + detecção READ-ONLY (config/binário; fail-open, sem efeito colateral).
+  Ambos são `advisory_reviewer` (reviewer, NUNCA gate final), `externalModelRisk` e
+  `networkRequired`. Freebuff com disclosure REFORÇADO (rede externa mesmo parecendo
+  grátis, anúncios, modelos externos) e `requiresAcceptance` (aceite na 1ª vez).
+- **`src/harness/candidates.js`** (novo): `buildCandidateReport` agrega os dois +
+  checa ambiente — `shellCompat` (no Windows exige Git Bash **ou** WSL p/ delegate),
+  `envReadiness` (node/npm/proxy). Relatório `readonly:true`, `autoInstall:false`;
+  cada candidato traz risco, disclosure e `delegateBlocked` com mensagem útil.
+- **`src/agents/adapter-matrix.js`**: novo `CANDIDATE_ADAPTERS` + `isCandidateAdapter`
+  com os eixos `candidate_adapter`/`advisory_reviewer`/`external_model_risk`/
+  `network_required`. Candidatos NÃO entram no `ADAPTER_MATRIX` (não contaminam
+  install/conformance de harnesses instaláveis — o conformance segue limpo).
+- **`doctor --candidates [--json]`**: READ-ONLY. Presente/ausente, riscos, disclosure
+  e bloqueio de delegate no Windows sem shell compatível.
+- Testes: `harness_codebuff` (reviewer advisory, fora da matrix, doctor JSON puro),
+  `harness_freebuff` (aceite/disclosure, nunca enforcement, shell coerente). 559/559, QG 0.
+
 ## [3.44.0] - 2026-07-03
 
 ### Evidence Task Ledger + Resume/Handoff (PRD 18 Sprint 4)
