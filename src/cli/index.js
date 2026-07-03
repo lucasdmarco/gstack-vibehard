@@ -26,6 +26,7 @@ import { orchestrateCommand } from "../commands/orchestrate.js"
 import { planCommand } from "../commands/plan.js"
 import { startCommand } from "../commands/start.js"
 import { consultCommand } from "../commands/consult.js"
+import { policyCommand } from "../commands/policy.js"
 import { stateCommand } from "../commands/state.js"
 import { taskCommand } from "../commands/task.js"
 import { worktreeCommand } from "../commands/worktree.js"
@@ -165,6 +166,7 @@ const COMMANDS = [
   { name: "tools", group: "advanced", desc: "Integrações: Composio (nuvem) + Printing Press (local)", usage: "gstack_vibehard tools <suggested|list|install|mcp>" },
   { name: "context", group: "advanced", desc: "Context docs (ADR/PRD/plans/research)", usage: "gstack_vibehard context <init|index|status>" },
   { name: "delegate", group: "advanced", desc: "Delegar tarefa ao OpenCode (opt-in, confirmação)", usage: "gstack_vibehard delegate opencode --task \"...\" [--worktree] [--yes]" },
+  { name: "policy", group: "advanced", desc: "Policy DSL cross-harness (.gstack/policy.json): deny>allow>ask>default, compila por harness com nível honesto", usage: "gstack_vibehard policy <init|show|eval|compile|doctor> [--harness X] [--json]" },
   { name: "workflow", group: "advanced", desc: "Graph runner determinístico", usage: "gstack_vibehard workflow <run|runs|inspect>" },
   { name: "a2a", group: "advanced", desc: "Agent Card A2A (offline, sem servidor)", usage: "gstack_vibehard a2a" },
   { name: "state", group: "advanced", desc: "State Store operacional do projeto (resumo por entidade)", usage: "gstack_vibehard state summary [--json]" },
@@ -349,6 +351,9 @@ async function dispatch(command, args) {
       break
     case "consult":
       consultCommand(args)
+      break
+    case "policy":
+      policyCommand(args)
       break
     case "state":
       stateCommand(args)
