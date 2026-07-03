@@ -1,5 +1,27 @@
 # Changelog - gstack-vibehard
 
+## [3.46.0] - 2026-07-03
+
+### Codebuff/Freebuff Bridges + Delegate (PRD 18 Sprint 6)
+
+Delegação SEGURA para candidatos externos, com trilha fechada: worktree
+obrigatória → contexto sem secrets → provenance → **verify determinístico final**.
+
+- **`src/harness/candidate-bridge.js`** (novo): `runCandidateBridge` com regras
+  inegociáveis — worktree OBRIGATÓRIA (nunca toca o branch principal); `.env*`
+  rastreado BLOQUEIA; contexto project-scoped seguro (`knowledge.md` redigido +
+  `.<id>ignore` derivado da policy, sempre bloqueando `.env*/*.pem/*.key/secrets/`);
+  metadados em `.gstack/harness/<id>.json`; NADA global. O reviewer externo é
+  ADVISORY — o **verify roda DEPOIS** e é o gate final (falhou → conclusão IMPEDIDA).
+  - `acceptanceGate`: Freebuff exige aceite de disclosure na 1ª vez; `--yes` NÃO
+    pula (persistido em `.gstack/harness/freebuff-accepted.json`).
+- **`src/commands/delegate.js`**: novos alvos `codebuff`/`freebuff`. Sem `--worktree`
+  → recusa; imprime disclosure; `--accept-disclosure` para o aceite; provenance
+  registrada; render honesto (needs_acceptance / review_ready / verify_failed).
+- Testes: `codebuff_bridge` (ignore bloqueia .env, knowledge sem secret, verify
+  final, falha impede), `delegate_codebuff` (worktree obrigatória, .env bloqueia,
+  provenance), `delegate_freebuff` (--yes não pula disclosure, aceite persiste). 570/570, QG 0.
+
 ## [3.45.0] - 2026-07-03
 
 ### Codebuff/Freebuff Detector/Doctor (PRD 18 Sprint 5)

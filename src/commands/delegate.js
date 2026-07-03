@@ -1,8 +1,13 @@
-import { existsSync } from "fs"
+import { existsSync, readFileSync } from "fs"
+import { join } from "path"
 import { runDelegation } from "../delegation/opencode.js"
 import { runDevinDelegation } from "../delegation/devin.js"
 import { checkTrackedSecrets } from "../delegation/worktree.js"
 import { recordAction } from "../vfa/provenance.js"
+import { runCandidateBridge } from "../harness/candidate-bridge.js"
+import { CODEBUFF } from "../harness/codebuff.js"
+import { FREEBUFF } from "../harness/freebuff.js"
+import { runVerify } from "../project-plan/verify-runner.js"
 import { confirm, success, warn, error, info, section } from "../cli/index.js"
 
 function parseFlags(args) {
@@ -16,18 +21,23 @@ function parseFlags(args) {
     else if (a === "--cloud-handoff") out.cloudHandoff = true
     else if (a === "--allow-tracked-secrets") out.allowTrackedSecrets = true
     else if (a === "--yes" || a === "-y") out.yes = true
+    else if (a === "--accept-disclosure") out.acceptDisclosure = true
     else out._.push(a)
   }
   return out
 }
 
 const TARGETS = { opencode: runDelegation, devin: runDevinDelegation }
+// Candidatos externos (PRD18 Sprint 6): reviewer advisory, worktree OBRIGATÓRIA.
+const CANDIDATE_RUNNERS = { codebuff: CODEBUFF, freebuff: FREEBUFF }
 
 function usage() {
   section("delegate — delegar tarefa para outro harness")
-  info("  gstack_vibehard delegate <opencode|devin> --task \"...\" [--model M] [--worktree] [--yes]")
+  info("  gstack_vibehard delegate <opencode|devin|codebuff|freebuff> --task \"...\" [--model M] [--worktree] [--yes]")
   info("  --worktree: roda numa git worktree isolada (não toca o branch principal).")
   info("  --cloud-handoff (só devin): pode enviar repo/diff/contexto p/ Devin Cloud — SEMPRE confirma.")
+  info("  codebuff/freebuff: reviewer ADVISORY externo (rede/modelo externo). EXIGE --worktree;")
+  info("    freebuff exige --accept-disclosure na 1ª vez. Gate final é o verify determinístico.")
   info("  BLOQUEIA se houver .env rastreado no git (libere com --allow-tracked-secrets).")
 }
 
@@ -95,12 +105,51 @@ function recordProvenance(cwd, target, task, result, cloud) {
   } catch { /* provenance best-effort */ }
 }
 
+function isKnownTarget(target) { return !!TARGETS[target] || !!CANDIDATE_RUNNERS[target] }
+
 /** Valida target/task/flags antes de qualquer efeito. Retorna código de erro ou null. */
 function preflight(target, task, flags) {
-  if (!TARGETS[target]) return "usage"
+  if (!isKnownTarget(target)) return "usage"
   if (!task) return "no_task"
   if (flags.cloudHandoff && target !== "devin") return "cloud_only_devin"
   return null
+}
+
+function loadPolicy(cwd) {
+  try { return JSON.parse(readFileSync(join(cwd, ".gstack", "policy.json"), "utf-8")) } catch { return {} }
+}
+
+function renderNeedsAcceptance(r) {
+  warn(r.summary)
+  for (const d of r.disclosure || []) warn(`  - ${d}`)
+  info("Reenvie com --accept-disclosure para aceitar o risco de rede/modelo externo (1ª vez).")
+}
+const CANDIDATE_RENDER = {
+  needs_acceptance: renderNeedsAcceptance,
+  review_ready: (r) => { success(r.summary); info(`Reviewer ADVISORY. Gate final verify=${r.verify.status}. Branch p/ revisar: ${r.reviewBranch}`) },
+  verify_failed: (r) => error(r.summary),
+}
+function renderCandidateResult(r, target) {
+  const fn = CANDIDATE_RENDER[r.status] || ((x) => error(x.summary || `delegate ${target}: ${x.status}`))
+  fn(r)
+}
+
+/** Delegação a candidato externo (Codebuff/Freebuff): worktree obrigatória + verify final. */
+function runCandidateDelegate(target, task, flags, cwd, exec) {
+  const candidate = CANDIDATE_RUNNERS[target]
+  for (const d of candidate.disclosure) warn(`  ${d}`)
+  if (!flags.worktree) { error("Candidato externo EXIGE --worktree (isolamento obrigatório)."); return { status: "worktree_required" } }
+  const result = runCandidateBridge({
+    candidate, task, cwd, exec, worktree: true,
+    acceptDisclosure: flags.acceptDisclosure, verifyRunner: runVerify, policy: loadPolicy(cwd),
+    recordProvenance: () => recordAction(cwd, {
+      runId: `delegate-${target}-${Date.now().toString(36)}`, intent: `delegate:${target}`,
+      target: { kind: "task", pathOrName: String(task).slice(0, 200) },
+      policy: { decision: "allow", rules: ["external-candidate", "worktree", "advisory-reviewer"] },
+    }),
+  })
+  renderCandidateResult(result, target)
+  return result
 }
 
 /** Imprime o cabeçalho/erros de preflight. Retorna true se pode prosseguir. */
@@ -128,6 +177,9 @@ export async function delegateCommand(args = [], opts = {}) {
   if (!cloud.ok) return { status: "cloud_handoff_declined" }
 
   if (!(await confirmDelegation(target, flags.worktree, flags, opts, doConfirm))) { info("Delegação cancelada."); return }
+
+  // Candidatos externos têm caminho próprio (bridge com verify final + aceite).
+  if (CANDIDATE_RUNNERS[target]) return runCandidateDelegate(target, task, flags, cwd, exec)
 
   const result = TARGETS[target]({ task, cwd, model: flags.model, maxIterations: flags.maxIterations, worktree: flags.worktree, cloudHandoff: cloud.cloud, exec })
   recordProvenance(cwd, target, task, result, cloud.cloud)
