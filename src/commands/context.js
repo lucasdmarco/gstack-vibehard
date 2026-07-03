@@ -5,6 +5,8 @@ import { execFileSync } from "child_process"
 import { buildContextRegistry, countDocs, DOC_SOURCES } from "../context-docs/registry.js"
 import { setObsidianPath, getObsidianPath, obsidianDetected, getGlobalObsidianDefault, chooseObsidian } from "../context-docs/obsidian.js"
 import { findGraphifyOutput } from "../context-docs/graphify.js"
+import { scout } from "../context-docs/scout.js"
+import { resolveModel } from "../model-policy/index.js"
 import { success, warn, error, info, section, select, prompt } from "../cli/index.js"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -143,6 +145,44 @@ export async function contextCommand(args = [], opts = {}) {
       return
     }
 
+    case "scout": {
+      const q = args[1]
+      const json = args.includes("--json")
+      const mi = args.indexOf("--max")
+      const maxResults = mi !== -1 && args[mi + 1] ? parseInt(args[mi + 1], 10) : 12
+      if (!q) {
+        const err = { ok: false, error: 'pergunta obrigatória: context scout "como X funciona?"' }
+        json ? process.stdout.write(JSON.stringify(err) + "\n") : error(err.error)
+        return err
+      }
+      // FastContext/remoto NUNCA por default (PRD18) — opt-in explícito ainda não implementado.
+      if (args.includes("--backend") && args[args.indexOf("--backend") + 1] === "fastcontext") {
+        const err = { ok: false, error: "backend remoto (fastcontext) requer opt-in explícito e ainda não é suportado — o scout é local-first" }
+        json ? process.stdout.write(JSON.stringify(err) + "\n") : error(err.error)
+        return err
+      }
+      // Camada de docs (SQLite/FTS) injetada quando o índice existe — degrada sem quebrar.
+      const ftsSearch = existsSync(dbPath(cwd)) ? (question) => {
+        const r = runIndexer(["search", "--db", dbPath(cwd), "--query", question, "--json"])
+        if (!r.ok) return []
+        try {
+          const parsed = JSON.parse(r.stdout)
+          return (parsed.results || []).slice(0, 5).map((d) => ({ file: d.path, reason: `doc: ${String(d.heading || "").slice(0, 80)}`, confidence: 0.5 }))
+        } catch { return [] }
+      } : null
+      const report = scout({ cwd, question: q, ftsSearch, maxResults })
+      report.modelRouting = resolveModel(cwd, "explore") // cheap/local — nunca modelo forte p/ explorar
+      if (json) { process.stdout.write(JSON.stringify(report) + "\n"); return report }
+      section(`context scout — ${q}`)
+      if (!report.ok) { error(report.error); return report }
+      info(`  keywords: ${report.keywords.join(", ")} · backends: ${report.backendsUsed.join(", ")}`)
+      for (const r of report.results) info(`  ${r.file}${r.lineStart ? `:${r.lineStart}-${r.lineEnd}` : ""} — ${r.reason} (${r.confidence.toFixed(2)}, ${r.backend})`)
+      if (report.results.length === 0) warn("  nenhum hit — refine a pergunta")
+      info(`  tokens evitados (estimativa): ~${report.tokensAvoided.estimate}`)
+      info(`  roteamento: ${report.modelRouting.tier}${report.modelRouting.fallback ? ` → ${report.modelRouting.fallback}` : ` (${report.modelRouting.model})`}`)
+      return report
+    }
+
     case "search": {
       const q = args[1]
       const json = args.includes("--json")
@@ -193,6 +233,7 @@ export async function contextCommand(args = [], opts = {}) {
       section("context — Document Graph local (offline, sem LLM)")
       info("  gstack_vibehard context init             Criar .gstack/context.json + docs/{adr,prd,plans,research}")
       info("  gstack_vibehard context index            Indexar docs em SQLite/FTS5 (.gstack/context/context.db)")
+      info("  gstack_vibehard context scout \"<pergunta>\" Explorador read-only: paths+linhas, não dumps (local-first)")
       info("  gstack_vibehard context search \"<termo>\"  Buscar (FTS5, offline)")
       info("  gstack_vibehard context related <Nome>   Entidades/relações de um termo")
       info("  gstack_vibehard context explain \"<top>\"   Docs + entidades de um tópico")

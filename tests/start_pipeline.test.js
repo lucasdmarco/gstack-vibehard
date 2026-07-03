@@ -70,7 +70,7 @@ test("pipeline: run done cria journal/status por run e estágios honestos (sem p
     // estágios honestos: projeto não foi criado de verdade (exec fake) → dev/verify not_applicable
     assert.equal(status.stages.dev.status, "not_applicable")
     assert.equal(status.stages.verify.status, "not_applicable")
-    assert.equal(status.stages.scout.status, "pending_feature", "scout ainda não existe — honesto")
+    assert.equal(status.stages.scout.status, "not_applicable", "projeto novo — nada a explorar antes do create")
     assert.equal(status.stages.review.status, "advisory", "review nunca é gate")
   } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
 })

@@ -1,5 +1,37 @@
 # Changelog - gstack-vibehard
 
+## [3.42.0] - 2026-07-03
+
+### Context Scout + modelPolicy (PRD 18 Sprint 2)
+
+Subagente explorador READ-ONLY e econômico: devolve **paths + linhas + razão**,
+nunca despeja arquivos. Local-first de verdade.
+
+- **`src/context-docs/scout.js`** (novo): `context scout "<pergunta>"`.
+  - Backends locais em ordem: scanner Node puro (walk+match; `rg` não é dependência) →
+    SQLite/FTS dos context docs (quando o índice existe) → **Graphify**
+    (`graphify-out/graph.json`, nós → `source_file`+`L<range>`). **FastContext/remoto
+    NUNCA por default**: `--backend fastcontext` é recusado com erro honesto (opt-in
+    explícito ainda não suportado — nenhuma chamada de rede silenciosa).
+  - **`SCOUT_DENYLIST` testada**: `.env*`, `secrets/`, `.pem/.key/.dpapi`, `id_rsa*`,
+    `names.json` (vault), `.git/node_modules/.gstack/graphify-out` — nem lidos, nem
+    reportados (vale também para nós do Graphify).
+  - Resultado: `{file, lineStart, lineEnd, reason, confidence, backend}` +
+    `tokensAvoided` (estimativa DECLARADA como heurística) + keywords determinísticas
+    (stopwords pt/en, sem LLM). Orçamentos duros (3000 arquivos, 512KB/arquivo, 60 hits).
+- **`src/model-policy/`** (novo): `.gstack/model-policy.json` —
+  `explore/review=cheap, implement=default, architecture/security=strong`.
+  `resolveModel(kind)` **nunca exige modelo externo**: sem modelo configurado p/ o tier
+  → `fallback: "local_deterministic"`. Arquivo inválido → default com warning, sem crash.
+- **Pipeline `start`**: estágio `scout` agora é REAL — roda antes do create quando o
+  projeto já existe (5 hits, tokens evitados no detail); projeto novo → `not_applicable`
+  (substitui o `pending_feature` do Sprint 1). `scoutRunner` injetável p/ teste.
+- **`context scout --json`** é JSON puro; inclui `modelRouting` (explore→cheap→local).
+- **Testes**: `tests/context_scout.test.js` (6 — paths+linhas sem dump, denylist unidade
+  e integração, graphify backend com filtro de secret, stopwords/mergeLines, JSON puro +
+  recusa fastcontext, estágio scout real no pipeline) e `tests/model_policy.test.js`
+  (5 — defaults, fallback local, override do usuário, corrompido→default, init idempotente).
+
 ## [3.41.0] - 2026-07-03
 
 ### Replit-like Run Loop MVP (PRD 18 Sprint 1)

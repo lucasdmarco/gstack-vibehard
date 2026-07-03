@@ -7,6 +7,7 @@ import { runVerify } from "./verify-runner.js"
 import { runChangedFilesVerify } from "./changed-files.js"
 import { loadRuntimeManifest } from "../runtime/manifest.js"
 import { readAllState } from "../runtime/supervisor.js"
+import { scout } from "../context-docs/scout.js"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const CLI_ENTRY = join(__dirname, "..", "index.js")
@@ -189,14 +190,14 @@ function previewStage(ctx, stages) {
  * status: "done" | "handoff".
  */
 function buildPipelineCtx(opts, plan, planDir) {
-  const { cwd = process.cwd(), verifyProfile = "scaffold", exec, gateExec, devRunner, verifyRunner } = opts
+  const { cwd = process.cwd(), verifyProfile = "scaffold", exec, gateExec, devRunner, verifyRunner, scoutRunner } = opts
   const runId = opts.runId || `${plan.id}-${Date.now().toString(36)}`
   const maxAttempts = Number.isInteger(opts.maxAttempts) && opts.maxAttempts > 0 ? opts.maxAttempts : DEFAULT_MAX_ATTEMPTS
   return {
     plan, planDir, cwd, runId,
     runDir: runsDir(cwd, runId),
     projectDir: resolve(cwd, plan.projectName || "."),
-    exec, gateExec, devRunner, verifyRunner, verifyProfile, // gateExec = exec dos GATES; default real
+    exec, gateExec, devRunner, verifyRunner, scoutRunner, verifyProfile, // gateExec = exec dos GATES; default real
     includeOptional: opts.includeOptional === true,
     maxAttempts,
     attempts: 0,
@@ -207,9 +208,26 @@ function initialStages(plan) {
   return {
     intent: { status: "ready", detail: `${plan.intent} (template ${plan.template}, modo ${plan.mode})` },
     plan: { status: "ready", detail: "plan.json + plan.md persistidos" },
-    // Honesto (PRD18): pending_feature SÓ quando o componente realmente não existe.
-    scout: { status: "pending_feature", detail: "context scout chega no Sprint 2 (PRD18)" },
     review: { status: "advisory", detail: "revisão é ADVISORY (qa/reviewer) — o gate determinístico decide; rode `gstack_vibehard qa` p/ lentes no diff" },
+  }
+}
+
+function scoutResultToStage(r) {
+  if (r.ok) return { status: "ready", detail: `${r.results.length} hit(s) locais · ~${r.tokensAvoided.estimate} tokens evitados (estimativa)` }
+  return { status: "pending", detail: r.error || "scout sem termos utilizáveis" }
+}
+
+/**
+ * Scout (PRD18 Sprint 2): explora ANTES do create quando o projeto JÁ existe —
+ * contexto mínimo (paths+linhas) via backends locais. Projeto novo → not_applicable.
+ */
+function scoutStage(ctx, stages) {
+  if (!existsSync(ctx.projectDir)) { stages.scout = { status: "not_applicable", detail: "projeto novo — nada a explorar antes do create" }; return }
+  try {
+    const r = (ctx.scoutRunner || scout)({ cwd: ctx.projectDir, question: ctx.plan.objective, maxResults: 5 })
+    stages.scout = scoutResultToStage(r)
+  } catch (e) {
+    stages.scout = { status: "pending", detail: `scout indisponível: ${String(e.message || "").slice(0, 80)}` }
   }
 }
 
@@ -246,6 +264,10 @@ export function runPipeline(opts = {}) {
   const ctx = buildPipelineCtx(opts, plan, planDir)
   const stages = initialStages(plan)
   appendRunEvent(ctx.runDir, { event: "pipeline_started", runId: ctx.runId, planId: plan.id, stages: PIPELINE_STAGES })
+
+  // Scout ANTES do create (projeto existente): contexto mínimo, read-only.
+  scoutStage(ctx, stages)
+  appendRunEvent(ctx.runDir, { event: "stage_done", stage: "scout", status: stages.scout.status })
 
   // Create (com hard cap + retomada). Cap esgotado → handoff, nunca loop infinito.
   ctx.execResult = createStage(ctx, stages)
