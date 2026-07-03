@@ -15,6 +15,7 @@ import { buildInstallImpact } from "./impact.js"
 import { buildSupplyChainReport } from "./supply-chain.js"
 import { planOpenCodeFix, applyOpenCodeFix, diagnoseOpenCode } from "./opencode-jsonc.js"
 import { buildConformanceReport } from "../harness/conformance.js"
+import { buildCandidateReport } from "../harness/candidates.js"
 import { section, success, warn, error, info, confirm } from "../cli/index.js"
 
 const HOME = homedir()
@@ -81,6 +82,24 @@ export async function collectDoctorJson(home = HOME) {
   }
 }
 
+/** Linha humana de um candidato externo (read-only). */
+function printCandidate(c) {
+  const stat = c.present ? "presente" : "ausente"
+  ;(c.delegateBlocked ? warn : info)(`  • ${c.label} [${c.enforcement}] — ${stat}${c.delegateBlocked ? " · delegate BLOQUEADO" : ""}`)
+  info(`      risco: modelos externos=${c.externalModelRisk} · rede=${c.networkRequired} · aceite=${c.requiresAcceptance}`)
+  for (const d of c.disclosure) info(`      - ${d}`)
+  if (c.delegateBlockReason) warn(`      ${c.delegateBlockReason}`)
+}
+
+/** `doctor --candidates` — candidatos externos opt-in. READ-ONLY, nunca instala. */
+function candidatesReport(json) {
+  const rep = buildCandidateReport()
+  if (json) { process.stdout.write(JSON.stringify(rep) + "\n"); return }
+  section("doctor --candidates — externos opt-in (read-only, nada é instalado)")
+  info(`  shell delegate: ${rep.shell.shell} (${rep.shell.ok ? "ok" : "INDISPONÍVEL"}) · node=${rep.env.node} npm=${rep.env.npm} proxy=${rep.env.proxy}`)
+  for (const c of rep.candidates) printCandidate(c)
+}
+
 export async function doctor(args = []) {
   const json = args.includes("--json")
   const strict = args.includes("--strict")
@@ -101,6 +120,10 @@ export async function doctor(args = []) {
     ;(conf.ok ? success : error)(conf.ok ? "Sem violações — nenhuma claim falsa de enforcement." : `${conf.totalViolations} violação(ões).`)
     return
   }
+  // `doctor --candidates [--json]` (PRD18 Sprint 5): candidatos externos opt-in
+  // (Codebuff/Freebuff) — READ-ONLY. Reporta presente/ausente, risco (modelos
+  // externos, rede), disclosure e bloqueio de delegate no Windows sem shell.
+  if (args.includes("--candidates")) return candidatesReport(json)
   // `doctor --opencode --json` (PRD15 §7.8): diagnóstico READ-ONLY da config OpenCode.
   if (args.includes("--opencode")) {
     const diag = diagnoseOpenCode(HOME)
