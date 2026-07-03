@@ -42,3 +42,6 @@ coverage/
 
 # pnpm não é usado neste repo (npm-based) — evita cruft de testes
 pnpm-lock.yaml
+
+# Graphify (artefato local gerado — 25MB; regenere com `graphify update .`)
+graphify-out/
