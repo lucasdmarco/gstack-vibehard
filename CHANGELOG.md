@@ -1,5 +1,35 @@
 # Changelog - gstack-vibehard
 
+## [3.56.0] - 2026-07-04
+
+### OpenCode Doctor v2 (PRD 24 Sprint 24.1)
+
+`doctor --opencode` evolui de diagnóstico config-only (v1) para um doctor de
+máquina-limpa inspirado no oh-my-openagent — **read-only, sem escrita destrutiva,
+config sagrada preservada byte-for-byte**.
+
+- **`src/harness/opencode-doctor.js`** (novo): `buildOpenCodeDoctorV2` **puro/injetável**
+  (`home`/`probe`/`pluginDir`/`pluginNames`) — schema `gstack.opencode.v2` com categorias
+  `system`/`config`/`plugins`/`skills`/`models`/`residue` + `recommendedActions` +
+  `exitCode` (**0** ok · **1** error · **2** warn; `exitCode` do JSON == `process.exitCode`).
+  Compõe `diagnoseOpenCode` + `inspectOpenCodeConfig` + detecção dos plugins gerenciados
+  + probe do CLI OpenCode. `enforcement` declara honestamente `rules_only`/`plugin_backed`.
+- **`configAuthority`** (`jsonc`/`json`/`directory_only`/`conflict`): um `.jsonc`
+  **sensível** (plugin/provider/model/OAuth) é a **autoridade** mesmo com um `.json` ao
+  lado (que fica sombreado); `conflict` só quando ambos coexistem e o `.jsonc` não é
+  sensível. Campo aditivo em `diagnoseOpenCode` (v1 intacto — clean-machine depende).
+- **`doctor --help`** agora lista `--opencode` e `--fix opencode [--dry-run|--apply|
+  --restore-jsonc]` (gap de UX corrigido). `--opencode --json` emite v2 **puro** no stdout.
+- **Plugin `gstack-session.js`**: `session.deleted` reporta **degraded** curto (sem
+  spawn de python) quando `stop.py` some de `~/.gstack/hooks` **e** `~/.codex/hooks`;
+  `resolveStopPy` extraído (injetável).
+- Fixtures de máquina-limpa (homes isoladas): jsonc sensível byte-for-byte, conflito
+  (authority `jsonc`, shadowing `high`, exit 2), jsonc malformado (error, exit 1),
+  resíduo `restore-jsonc`, plugins presentes, CLI ausente (warn/strict-error).
+- Testes: `opencode_doctor_categories` (6), `opencode_plugin_degraded` (2),
+  `doctor_opencode_help` (1) + `configAuthority` e fixture provider/model/plugin
+  byte-for-byte. QG CRIT/HIGH ciclomático **0**, lint+`tsc` verdes.
+
 ## [3.55.0] - 2026-07-04
 
 ### Public Claims / Onboarding honesto (PRD 20 Sprint 20.6)
