@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from "fs"
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs"
 import { join } from "path"
 import { ppList, ppSearch, PrintingPressError } from "../printing-press/cli.js"
 import { installTool, uninstallTool } from "../printing-press/install.js"
@@ -8,6 +8,7 @@ import { buildMcpInventory, renderInventoryHuman } from "../mcp/inventory.js"
 import { buildRufloReport } from "../harness/ruflo.js"
 import { buildToolCatalog, annotateCatalogEntry, LOCAL_CATALOG } from "../tools/catalog.js"
 import { recordToolProvenance } from "../tools/provenance.js"
+import { buildReadiness } from "../tools/readiness.js"
 import { agentReachCommand } from "./agent-reach.js"
 import { confirm, success, warn, error, info, section } from "../cli/index.js"
 
@@ -315,6 +316,7 @@ function handleToolsHelp() {
   info("    tools agent-reach enable [--core|--channels a,b|--dry-run|--safe]  Seletor de canais com consentimento")
   info("    tools agent-reach channels|doctor [--json]   Catalogo e estado por canal")
   info("  Qualidade:")
+  info("    tools readiness [--json] [--write] [--clean-machine]  Estado REAL das ferramentas (Fallow/Graphify/Headroom/context)")
   info("    tools doctor                  Validar binario/auth/MCP das instaladas")
   info("    tools generate                Gerar CLI de cauda-longa via HAR (em breve)")
   info("")
@@ -322,8 +324,42 @@ function handleToolsHelp() {
   info("  Escrita / OAuth / apps padrao → Composio (nuvem)")
 }
 
+const readyIcon = (s) => (s === "routed" || s === "callable" ? "✓" : s === "callable_not_routed" ? "▲" : s === "missing" ? "–" : "⚠")
+const freshnessNote = (f) => (f ? ` · graph ${f.state}${f.state === "stale" ? ` (built ${String(f.builtAtCommit || "?").slice(0, 7)} ≠ HEAD ${String(f.head || "?").slice(0, 7)})` : ""}` : "")
+function renderReadinessTool(name, t) {
+  info(`  ${readyIcon(t.status)} ${name}: ${t.status}${freshnessNote(t.freshness)}`)
+  if (t.exitCode !== null && t.exitCode !== 0 && t.stderr) info(`      exit ${t.exitCode} · ${t.stderr}`)
+}
+function renderReadiness(report) {
+  section(`tools readiness — estado real (read-only${report.cleanMachine ? ", clean-machine" : ""})`)
+  const e = report.env
+  info(`  OS ${e.os} · Node ${e.node || "?"} · npm ${e.npm || "?"} · Python ${e.python || "?"} · PATH ${e.pathSummary.entries} entradas`)
+  for (const [name, t] of Object.entries(report.tools)) renderReadinessTool(name, t)
+  const h = report.harnessDiscovery
+  info(`  Harness discovery (instrucional): codex=${h.codex.present} claude=${h.claude.present} opencode=${h.opencode.present}`)
+  info("  Read-only: nada foi escrito (use --write para gerar .gstack/tool-readiness.json).")
+}
+// `--write` só grava o registry PROJECT-SCOPED (.gstack/); nunca toca global/.env.
+// Silencioso (retorna o path) — o log fica no modo humano, p/ não sujar o --json.
+function writeReadiness(cwd, report) {
+  const dir = join(cwd, ".gstack")
+  mkdirSync(dir, { recursive: true })
+  const path = join(dir, "tool-readiness.json")
+  writeFileSync(path, JSON.stringify(report, null, 2) + "\n")
+  return path
+}
+function handleReadiness({ args, opts, cwd }) {
+  const report = buildReadiness({ cwd, home: opts.home, probe: opts.probe, git: opts.git, now: opts.now, cleanMachine: args.includes("--clean-machine") })
+  const wrote = args.includes("--write") ? writeReadiness(cwd, report) : null
+  if (args.includes("--json")) return emitTools(wrote ? { ...report, writtenTo: wrote } : report)
+  renderReadiness(report)
+  if (wrote) success(`tool-readiness.json gerado em ${wrote} (project-scoped).`)
+  return report
+}
+
 const TOOLS_HANDLERS = {
   suggested: handleSuggested,
+  readiness: handleReadiness,
   catalog: handleCatalog,
   list: handleListSearch,
   search: handleListSearch,
