@@ -54,4 +54,21 @@ node src/index.js audit events --json  # local event ledger (sanitized, no secre
 - **Lite**: no global writes; no external harness/candidate installed.
 - **Complete**: generates adapters for detected harnesses, with opt-out (`--no-global-mcp`).
 
+## What's real, callable, opt-in, or roadmap
+
+Maturity is separated honestly in **[capabilities](docs/guides/capabilities.md)**
+(live source: `tools readiness --json`). Key point: **Headroom does not save tokens
+automatically** — until it is `routed`, the honest status is `callable_not_routed`,
+and gstack never claims automatic savings in that state. Prove a clean machine with
+`node src/index.js tools clean-machine --json` (12 offline scenarios: OpenCode
+config-sacred byte-for-byte, Lite no global write, uninstall restores).
+
+## Get started honestly, in 3 commands
+
+```bash
+npx @gstack-vibehard/installer start                                # guided path
+node src/index.js context scout "how does this project work?" --json  # offline index
+node src/index.js verify --changed-files --json                     # gate only what changed
+```
+
 See the ADRs in [`.docs/ADRS/`](./.docs/ADRS/) for the key design decisions.
