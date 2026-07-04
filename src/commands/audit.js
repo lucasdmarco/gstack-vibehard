@@ -13,14 +13,8 @@ export function auditCommand(args = [], opts = {}) {
   const json = args.includes("--json")
   const positional = args.filter((a) => !a.startsWith("-"))
   const sub = positional[0] || "status"
-  const runId = positional[1]
-
-  if (sub === "status") return statusCmd(cwd, json)
-  if (sub === "verify") return verifyCmd(cwd, runId, json)
-  if (sub === "inspect") return inspectCmd(cwd, runId, json)
-  if (sub === "export") return exportCmd(cwd, runId, json)
-  if (sub === "events") return eventsCmd(cwd, args, json)
-  if (sub === "doctor") return doctorCmd(cwd, json)
+  const handler = AUDIT_SUBS[sub]
+  if (handler) return handler(cwd, positional[1], args, json)
   warn(`Subcomando desconhecido: ${sub}`)
   info("  Use: audit <status|inspect|verify|export|events|doctor>")
 }
@@ -50,24 +44,36 @@ function statusCmd(cwd, json) {
   for (const r of runs) info(`  • ${r.runId}: ${r.count} ação(ões) · até ${r.last}`)
 }
 
+const allValid = (results) => results.length === 0 || results.every((r) => r.valid)
+const verifyLine = (r) => `  ${r.valid ? "✓" : "✗"} ${r.runId}: ${r.valid ? `cadeia íntegra (${r.length} recibos)` : `${r.reason} @${r.brokenAt}`}`
+function renderVerifyResults(results) {
+  for (const r of results) (r.valid ? success : error)(verifyLine(r))
+}
+function emitVerifyJson(ok, results) {
+  process.stdout.write(JSON.stringify({ ok, results }) + "\n")
+  if (!ok) process.exitCode = 1
+}
 function verifyCmd(cwd, runId, json) {
   const targets = runId ? [{ runId }] : listRuns(cwd)
   const results = targets.map((t) => ({ runId: t.runId, ...verifyRun(cwd, t.runId) }))
-  const ok = results.length === 0 ? true : results.every((r) => r.valid)
-  if (json) { process.stdout.write(JSON.stringify({ ok, results }) + "\n"); if (!ok) process.exitCode = 1; return }
+  const ok = allValid(results)
+  if (json) return emitVerifyJson(ok, results)
   section(runId ? `audit verify — ${runId}` : "audit verify — todos os runs")
-  if (!results.length) { info("  (nada a verificar)"); return }
-  for (const r of results) (r.valid ? success : error)(`  ${r.valid ? "✓" : "✗"} ${r.runId}: ${r.valid ? `cadeia íntegra (${r.length} recibos)` : `${r.reason} @${r.brokenAt}`}`)
+  if (!results.length) return info("  (nada a verificar)")
+  renderVerifyResults(results)
   if (!ok) { process.exitCode = 1; error("Provenance ADULTERADO — a cadeia não fecha.") }
 }
 
+const decisionOf = (r) => r.policy && r.policy.decision
+const targetOf = (r) => `${(r.target && r.target.kind) || "?"}:${(r.target && r.target.pathOrName) || "?"}`
+const inspectLine = (r) => `  • ${r.actionId} · ${r.intent} → ${decisionOf(r)} · ${targetOf(r)}`
 function inspectCmd(cwd, runId, json) {
-  if (!runId) { error("Uso: audit inspect <runId>"); return }
+  if (!runId) return error("Uso: audit inspect <runId>")
   const run = readRun(cwd, runId)
-  if (json) { process.stdout.write(JSON.stringify({ runId, receipts: run }) + "\n"); return }
+  if (json) return process.stdout.write(JSON.stringify({ runId, receipts: run }) + "\n")
   section(`audit inspect — ${runId}`)
-  if (!run.length) { warn("Sem recibos para esse run."); return }
-  for (const r of run) info(`  • ${r.actionId} · ${r.intent} → ${r.policy && r.policy.decision} · ${(r.target && r.target.kind) || "?"}:${(r.target && r.target.pathOrName) || "?"}`)
+  if (!run.length) return warn("Sem recibos para esse run.")
+  for (const r of run) info(inspectLine(r))
 }
 
 function exportCmd(cwd, runId, json) {
@@ -75,13 +81,26 @@ function exportCmd(cwd, runId, json) {
   process.stdout.write(JSON.stringify({ runId, receipts: readRun(cwd, runId), verify: verifyRun(cwd, runId) }, null, json ? 0 : 2) + "\n")
 }
 
+function renderDoctor(report, broken) {
+  section("audit doctor")
+  info(`  Provenance: ${report.provenance ? "presente" : "ausente"} · ${report.runs} run(s)`)
+  ;(report.ok ? success : error)(report.ok ? "Todas as cadeias íntegras." : `${broken} run(s) com cadeia QUEBRADA — investigue.`)
+  if (!report.ok) process.exitCode = 1
+}
 function doctorCmd(cwd, json) {
   const runs = listRuns(cwd)
   const broken = runs.filter((r) => !verifyRun(cwd, r.runId).valid).length
   const report = { provenance: existsSync(provenanceDir(cwd)), runs: runs.length, broken, ok: broken === 0 }
   if (json) { process.stdout.write(JSON.stringify(report) + "\n"); if (!report.ok) process.exitCode = 1; return }
-  section("audit doctor")
-  info(`  Provenance: ${report.provenance ? "presente" : "ausente"} · ${report.runs} run(s)`)
-  ;(report.ok ? success : error)(report.ok ? "Todas as cadeias íntegras." : `${broken} run(s) com cadeia QUEBRADA — investigue.`)
-  if (!report.ok) process.exitCode = 1
+  renderDoctor(report, broken)
+}
+
+// Dispatch (definido após os handlers; auditCommand só o lê em runtime).
+const AUDIT_SUBS = {
+  status: (cwd, runId, args, json) => statusCmd(cwd, json),
+  verify: (cwd, runId, args, json) => verifyCmd(cwd, runId, json),
+  inspect: (cwd, runId, args, json) => inspectCmd(cwd, runId, json),
+  export: (cwd, runId, args, json) => exportCmd(cwd, runId, json),
+  events: (cwd, runId, args, json) => eventsCmd(cwd, args, json),
+  doctor: (cwd, runId, args, json) => doctorCmd(cwd, json),
 }
