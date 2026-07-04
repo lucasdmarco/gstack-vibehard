@@ -328,8 +328,14 @@ function handleToolsHelp() {
 
 const readyIcon = (s) => (s === "routed" || s === "callable" ? "✓" : s === "callable_not_routed" ? "▲" : s === "missing" ? "–" : "⚠")
 const freshnessNote = (f) => (f ? ` · graph ${f.state}${f.state === "stale" ? ` (built ${String(f.builtAtCommit || "?").slice(0, 7)} ≠ HEAD ${String(f.head || "?").slice(0, 7)})` : ""}` : "")
+// Notas por-tool (cada uma no-op quando o campo não existe → seguro aplicar a todos).
+const metricsNote = (t) => (t.metrics ? ` · ${t.metrics.nodes} nós/${t.metrics.edges} arestas` : "")
+const verdictNote = (t) => (t.auditSummary && t.auditSummary.verdict ? ` · audit ${t.auditSummary.verdict}` : "")
+const countsNote = (t) => (t.counts ? ` · ${t.counts.documents} docs (prd ${t.counts.bySource.prd}/plans ${t.counts.bySource.plans})` : "")
+const routingNote = (t) => (t.routing && t.routing.proxyRunning ? " · proxy on" : "")
 function renderReadinessTool(name, t) {
-  info(`  ${readyIcon(t.status)} ${name}: ${t.status}${freshnessNote(t.freshness)}`)
+  const extra = freshnessNote(t.freshness) + metricsNote(t) + verdictNote(t) + countsNote(t) + routingNote(t)
+  info(`  ${readyIcon(t.status)} ${name}: ${t.status}${extra}`)
   if (t.exitCode !== null && t.exitCode !== 0 && t.stderr) info(`      exit ${t.exitCode} · ${t.stderr}`)
 }
 function renderReadiness(report) {

@@ -1,5 +1,28 @@
 # Changelog - gstack-vibehard
 
+## [3.57.0] - 2026-07-04
+
+### Tool Readiness — campos ricos por ferramenta (PRD 24 Sprint 24.2)
+
+`tools readiness` (já oficial desde 3.52.0) ganha os campos que o PRD24 §5 exige,
+mantendo a honestidade (`callable_not_routed`, sem economia automática por Headroom):
+
+- **Graphify** `metrics`: `{ indexedCommit, nodes, edges, communities }` — lidos do
+  `graphify-out/graph.json` numa única parse (reusa a do freshness). No repo: 17807
+  nós · 23163 arestas · 1540 comunidades.
+- **Fallow** `auditSummary`: `{ verdict, deadCode, complexity, duplication, maxCyclomatic }`
+  via runner **injetável** `fallowAudit`. Por default **não roda o audit** (pesado) —
+  declara `verdict:"unknown"` com nota; é populado quando injetado (`tools refresh`/CI).
+- **Context DB** `counts` **tipados**: `{ documents, chunks, entities, edges,
+  bySource:{adr,prd,plans,research,docs,readme,repo,changelog} }` via
+  `context_db.py status --db --json` (`runFull` bounded, sem truncar), só quando a DB existe.
+- **Headroom** `routing`: `{ proxyRunning, byHarness:{claude,codex,opencode}, routed }`
+  parseado do `headroom doctor`. Invariante mantida: `routed` só com proxy+routed provados.
+- Topo: `lastUpdated` + `staleAfterSeconds` (freshness declarada). Render humano
+  mostra métricas/verdict/counts/proxy. JSON puro; `schemaVersion` 2.
+- Runners injetáveis (`runFull`/`fallowAudit`) → testes determinísticos sem spawn
+  (`tool_readiness` 9). QG CRIT/HIGH ciclomático **0**, lint+`tsc` verdes.
+
 ## [3.56.0] - 2026-07-04
 
 ### OpenCode Doctor v2 (PRD 24 Sprint 24.1)
