@@ -14,6 +14,8 @@ import { success, warn, error, info, section, confirm } from "../cli/index.js"
  *   gstack_vibehard plan "<objetivo>" --json     # JSON puro p/ automação
  *   gstack_vibehard plan "<objetivo>" --dry-run  # idêntico (PR3 nunca executa)
  */
+const PLAN_VALUE_FLAGS = { "--name": "name", "--mode": "mode", "--recipe": "recipe" }
+const PLAN_BOOL_FLAGS = new Set(["--json", "--dry-run", "--yes", "-y", "--with-optional"])
 function parse(args) {
   const out = {
     _: [], json: args.includes("--json"), dryRun: args.includes("--dry-run"),
@@ -21,11 +23,9 @@ function parse(args) {
   }
   for (let i = 0; i < args.length; i++) {
     const a = args[i]
-    if (a === "--name") out.name = args[++i]
-    else if (a === "--mode") out.mode = args[++i]
-    else if (a === "--recipe") out.recipe = args[++i]
-    else if (["--json", "--dry-run", "--yes", "-y", "--with-optional"].includes(a)) { /* flag */ }
-    else out._.push(a)
+    const key = PLAN_VALUE_FLAGS[a]
+    if (key) out[key] = args[++i]
+    else if (!PLAN_BOOL_FLAGS.has(a)) out._.push(a)
   }
   return out
 }
@@ -93,17 +93,20 @@ function whyStep(step) {
   return "Passo do plano."
 }
 
+const STATUS_ICON = { completed: "✓", failed: "✗", skipped: "•" }
+const statusIcon = (s) => STATUS_ICON[s] || "·"
+function renderStatusSteps(st) {
+  for (const [id, s] of Object.entries(st.steps || {})) info(`   ${statusIcon(s)} ${id} — ${s}`)
+}
 function planStatus(cwd, flags) {
   const planId = flags._[1]
-  const st = readState(join(plansDir(cwd), planId || ""))
-  if (flags.json) { process.stdout.write(JSON.stringify(st || { error: "not_found", planId }) + "\n"); return }
-  section(`plan status ${planId || ""}`)
-  if (!st) { warn(`Plano não encontrado: ${planId || "(sem id)"}`); return }
+  const disp = planId || ""
+  const st = readState(join(plansDir(cwd), disp))
+  if (flags.json) return process.stdout.write(JSON.stringify(st || { error: "not_found", planId }) + "\n")
+  section(`plan status ${disp}`)
+  if (!st) return warn(`Plano não encontrado: ${disp || "(sem id)"}`)
   info(`  status: ${st.status}`)
-  for (const [id, s] of Object.entries(st.steps || {})) {
-    const icon = s === "completed" ? "✓" : s === "failed" ? "✗" : s === "skipped" ? "•" : "·"
-    info(`   ${icon} ${id} — ${s}`)
-  }
+  renderStatusSteps(st)
 }
 
 function planExplain(cwd, flags) {
@@ -120,71 +123,69 @@ function planExplain(cwd, flags) {
   plan.steps.forEach((s, i) => info(`   ${i + 1}. ${s.label}\n        por quê: ${whyStep(s)}\n        $ ${(s.command || []).join(" ")}`))
 }
 
+function planRunNotFound(planId, json) {
+  if (json) { process.stdout.write(JSON.stringify({ error: "not_found", planId }) + "\n"); return }
+  section("plan run"); error('Plano não encontrado: ' + (planId || "(sem id)") + '. Gere primeiro com: plan "<objetivo>"')
+}
+// Execução segura: sem TTY e sem --yes → recusa. @returns true se abortou (já emitiu).
+function planRunRefused(json, autoYes) {
+  if (autoYes || process.stdin.isTTY) return false
+  if (json) process.stdout.write(JSON.stringify({ error: "needs_confirmation", hint: "use --yes" }) + "\n")
+  else { section("plan run"); error("Modo não-interativo: confirme explicitamente com --yes.") }
+  return true
+}
+// Imprime o plano (humano) e confirma. @returns false se o usuário cancelou.
+async function planRunGate(plan, json, autoYes) {
+  if (!json) printPlanHuman(plan)
+  if (autoYes) return true
+  const ok = await confirm(`Executar o plano ${plan.id} (${plan.steps.length} passos)?`, false)
+  if (!ok) info("Execução cancelada.")
+  return ok
+}
+function renderPlanResult(result) {
+  if (result.status === "done") success(`Plano concluído: ${result.completed.length} passo(s) ok, ${result.skipped.length} pulado(s).`)
+  else { error(`Plano parou em '${result.failed?.stepId}': ${result.failed?.summary}`); info("Corrija e rode `plan run` de novo — passos concluídos são retomados (journal).") }
+}
 async function planRun(cwd, flags, opts) {
   const planId = flags._[1]
   const plan = loadPlan(cwd, planId)
-  if (!plan) {
-    if (flags.json) { process.stdout.write(JSON.stringify({ error: "not_found", planId }) + "\n"); return }
-    section("plan run"); error('Plano não encontrado: ' + (planId || "(sem id)") + '. Gere primeiro com: plan "<objetivo>"')
-    return
-  }
-  const planDir = join(plansDir(cwd), plan.id)
+  if (!plan) return planRunNotFound(planId, flags.json)
   const autoYes = flags.yes || opts.yes === true
-
-  // Execução segura: sem TTY e sem --yes → recusa (não roda comando sem consentimento).
-  if (!autoYes && !process.stdin.isTTY) {
-    if (flags.json) { process.stdout.write(JSON.stringify({ error: "needs_confirmation", hint: "use --yes" }) + "\n"); return }
-    section("plan run"); error("Modo não-interativo: confirme explicitamente com --yes."); return
-  }
-
-  if (!flags.json) {
-    printPlanHuman(plan)
-  }
-  if (!autoYes) {
-    const ok = await confirm(`Executar o plano ${plan.id} (${plan.steps.length} passos)?`, false)
-    if (!ok) { info("Execução cancelada."); return }
-  }
-
-  const result = executePlan({ plan, planDir, cwd, exec: opts.exec, includeOptional: flags.withOptional })
-
-  if (flags.json) { process.stdout.write(JSON.stringify(result) + "\n"); return }
-  if (result.status === "done") success(`Plano concluído: ${result.completed.length} passo(s) ok, ${result.skipped.length} pulado(s).`)
-  else { error(`Plano parou em '${result.failed?.stepId}': ${result.failed?.summary}`); info("Corrija e rode `plan run` de novo — passos concluídos são retomados (journal).") }
+  if (planRunRefused(flags.json, autoYes)) return
+  if (!(await planRunGate(plan, flags.json, autoYes))) return
+  const result = executePlan({ plan, planDir: join(plansDir(cwd), plan.id), cwd, exec: opts.exec, includeOptional: flags.withOptional })
+  if (flags.json) return process.stdout.write(JSON.stringify(result) + "\n")
+  renderPlanResult(result)
   return result
 }
 
+const PLAN_SUBS = { status: planStatus, explain: planExplain }
+function emitMissingObjective(json) {
+  if (json) { process.stdout.write(JSON.stringify({ error: "missing objective" }) + "\n"); return }
+  section("plan")
+  error("Forneça um objetivo: plan \"quero criar um SaaS com login e Stripe\"")
+  info("Flags: --name <proj> --mode lite|full --recipe <id> --json --dry-run")
+}
+function emitInvalidPlan(validation, json) {
+  if (json) { process.stdout.write(JSON.stringify({ error: "invalid_plan", details: validation.errors }) + "\n"); return }
+  error(`Plano inválido: ${validation.errors.join("; ")}`)
+}
+// Persistência é não-destrutiva; --dry-run apenas reforça que nada é executado.
+function emitPlanResult(plan, dir, flags) {
+  if (flags.json) return process.stdout.write(JSON.stringify({ plan, savedTo: dir }) + "\n")
+  printPlanHuman(plan)
+  if (flags.dryRun) success("--dry-run: nenhum comando executado (esperado neste release).")
+}
 export async function planCommand(args = [], opts = {}) {
   const cwd = opts.cwd || process.cwd()
   const flags = parse(args)
   const sub = flags._[0]
-
-  if (sub === "status") return planStatus(cwd, flags)
-  if (sub === "explain") return planExplain(cwd, flags)
   if (sub === "run") return planRun(cwd, flags, opts)
-
+  if (PLAN_SUBS[sub]) return PLAN_SUBS[sub](cwd, flags)
   const objective = flags._.join(" ").trim()
-  if (!objective) {
-    if (flags.json) { process.stdout.write(JSON.stringify({ error: "missing objective" }) + "\n"); return }
-    section("plan")
-    error("Forneça um objetivo: plan \"quero criar um SaaS com login e Stripe\"")
-    info("Flags: --name <proj> --mode lite|full --recipe <id> --json --dry-run")
-    return
-  }
-
+  if (!objective) return emitMissingObjective(flags.json)
   const { plan, validation } = buildPlan({ objective, projectName: flags.name, mode: flags.mode, recipeId: flags.recipe })
-  if (!validation.ok) {
-    if (flags.json) { process.stdout.write(JSON.stringify({ error: "invalid_plan", details: validation.errors }) + "\n"); return }
-    error(`Plano inválido: ${validation.errors.join("; ")}`)
-    return
-  }
-
-  // Persistência é não-destrutiva; --dry-run apenas reforça que nada é executado.
+  if (!validation.ok) return emitInvalidPlan(validation, flags.json)
   const dir = persistPlan(cwd, plan)
-
-  if (flags.json) {
-    process.stdout.write(JSON.stringify({ plan, savedTo: dir }) + "\n")
-    return
-  }
-  printPlanHuman(plan)
-  if (flags.dryRun) success("--dry-run: nenhum comando executado (esperado neste release).")
+  return emitPlanResult(plan, dir, flags)
 }
