@@ -11,6 +11,7 @@ import { recordToolProvenance } from "../tools/provenance.js"
 import { buildReadiness } from "../tools/readiness.js"
 import { runCleanMachine } from "../installer/clean-machine.js"
 import { buildToolRefresh } from "../tools/refresh.js"
+import { enableRouting, disableRouting } from "../tools/headroom-route.js"
 import { agentReachCommand } from "./agent-reach.js"
 import { confirm, success, warn, error, info, section } from "../cli/index.js"
 
@@ -321,6 +322,7 @@ function handleToolsHelp() {
   info("    tools readiness [--json] [--write] [--clean-machine]  Estado REAL das ferramentas (Fallow/Graphify/Headroom/context)")
   info("    tools clean-machine [--json] [--no-write] [--keep]    Proof pack offline: OpenCode sacred, backup/restore byte-for-byte, matriz de tools")
   info("    tools refresh [--changed] [--json] [--strict]         Action close: refresca graphify/context/headroom/fallow (bounded) + report + readiness")
+  info("    tools headroom doctor|enable --harness codex|claude --project-only|disable --restore  Routing opt-in, project-scoped (nunca global/wrap)")
   info("    tools doctor                  Validar binario/auth/MCP das instaladas")
   info("    tools generate                Gerar CLI de cauda-longa via HAR (em breve)")
   info("")
@@ -406,10 +408,40 @@ function handleRefresh({ args, cwd }) {
   return rep
 }
 
+const flagVal = (args, name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : null }
+// `tools headroom doctor`: reusa o readiness (routed só quando doctor prova proxy+routed).
+function headroomDoctorCmd(args, cwd, opts) {
+  const h = buildReadiness({ cwd, home: opts.home, probe: opts.probe, git: opts.git, now: opts.now }).tools.headroom
+  if (args.includes("--json")) return emitTools(h)
+  info(`  headroom: ${h.status}${h.routing && h.routing.proxyRunning ? " · proxy on" : ""}`)
+  return h
+}
+function headroomEnableCmd(args, cwd) {
+  const r = enableRouting({ cwd, harness: flagVal(args, "--harness"), projectOnly: !args.includes("--global") })
+  if (args.includes("--json")) return emitTools(r)
+  if (r.refused) { error(r.reason); return r }
+  if (r.enabled) { success(`Headroom routing (${r.harness}) project-scoped criado — nada global tocado.`); info(`  ${r.note}`) }
+  return r
+}
+function headroomDisableCmd(args, cwd) {
+  const r = disableRouting({ cwd })
+  if (args.includes("--json")) return emitTools(r)
+  ;(r.disabled ? success : info)(r.disabled ? `Routing revertido (${r.removed.length} arquivo(s) removidos).` : r.reason)
+  return r
+}
+// `tools headroom <doctor|enable|disable>` (PRD24 24.7): routing opt-in, project-scoped.
+function handleHeadroom({ args, cwd, opts }) {
+  const sub = args[1]
+  if (sub === "enable") return headroomEnableCmd(args, cwd)
+  if (sub === "disable") return headroomDisableCmd(args, cwd)
+  return headroomDoctorCmd(args, cwd, opts)
+}
+
 const TOOLS_HANDLERS = {
   suggested: handleSuggested,
   readiness: handleReadiness,
   refresh: handleRefresh,
+  headroom: handleHeadroom,
   "clean-machine": handleCleanMachine,
   catalog: handleCatalog,
   list: handleListSearch,

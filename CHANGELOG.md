@@ -1,5 +1,26 @@
 # Changelog - gstack-vibehard
 
+## [3.60.0] - 2026-07-04
+
+### Headroom Routing seguro e opt-in (PRD 24 Sprint 24.7) — fecha a trilha PRD24
+
+Permite economia via Headroom **sem quebrar config global** de Claude/Codex/OpenCode.
+Entra só depois de 24.1 (OpenCode Doctor v2) e 24.2 (Tool Readiness), como o PRD exige.
+
+- **`src/tools/headroom-route.js`** (novo): `enableRouting`/`disableRouting`. O
+  roteamento é feito por um **ENV project-scoped** controlado pelo GStack
+  (`.gstack/headroom/env.sh` + `env.ps1` + `routing.json` manifest) que o usuário faz
+  `source` **antes** de abrir o harness — o GStack **não** injeta em shell global,
+  **nunca** roda `headroom wrap`, **nunca** edita `~/.codex`/`~/.claude`/
+  `~/.config/opencode`, **nunca** registra MCP global.
+- Recusa **OpenCode** (fora do routing automático até doctor específico) e o **modo
+  global** (só `--project-only`). `disable --restore` **reverte** tudo que foi criado.
+- **`tools headroom doctor|enable --harness codex|claude --project-only|disable
+  --restore`**. O `doctor` reusa `buildReadiness` — `readiness` só marca `routed`
+  quando `headroom doctor` prova proxy+routed (habilitar **não** mente sobre estar roteado).
+- Teste `headroom_route` (4): env project-scoped/nada global, recusa opencode+global,
+  restore reverte, CLI `--json` puro. QG CRIT/HIGH ciclomático **0**, lint+`tsc` verdes.
+
 ## [3.59.0] - 2026-07-04
 
 ### Action Close Tool Refresh (PRD 24 Sprint 24.3)
