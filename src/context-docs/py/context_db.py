@@ -24,14 +24,22 @@ from pathlib import Path
 
 SCHEMA_VERSION = 1
 
-# Fontes obrigatórias (relativas ao root do projeto)
-DOC_GLOBS = [
-    ("adr", "docs/adr"),
-    ("prd", "docs/prd"),
-    ("plans", "docs/plans"),
-    ("research", "docs/research"),
+# Diretórios varridos RECURSIVAMENTE por *.md (rel ao root, source default). Cobre
+# `docs/` (minúsculo) E `.docs/` — o layout REAL deste repo (.docs/PLANS, .docs/ADRS,
+# .docs/AUDITS) antes era IGNORADO: o índice via só README+CHANGELOG (PRD20 §P0).
+DOC_DIRS = [
+    (".docs/PLANS", "plans"), (".docs/ADRS", "adr"), (".docs/AUDITS", "audits"),
+    ("docs/adr", "adr"), ("docs/prd", "prd"), ("docs/plans", "plans"),
+    ("docs/research", "research"), ("docs/guides", "docs"),
 ]
-EXTRA_FILES = [("readme", "README.md"), ("changelog", "CHANGELOG.md")]
+# .md soltos no TOPO (não recursivo — subdirs já cobertos por DOC_DIRS).
+DOC_TOP_DIRS = [(".docs", "docs"), ("docs", "docs")]
+# Arquivos-raiz de contrato/onboarding. AGENTS.md/CLAUDE.md contam como "repo".
+EXTRA_FILES = [
+    ("readme", "README.md"), ("readme", "README.en.md"), ("changelog", "CHANGELOG.md"),
+    ("repo", "AGENTS.md"), ("repo", "CLAUDE.md"), ("docs", "CONTRIBUTING.md"),
+    ("docs", "SECURITY.md"), ("docs", "THREAT_MODEL.md"),
+]
 
 # Nunca indexar (segurança/ruído)
 UNSAFE_PARTS = {".git", "node_modules", "dist", "build", ".venv", "__pycache__", ".gstack"}
@@ -121,32 +129,54 @@ def is_safe(path: Path) -> bool:
     return True
 
 
+def classify_source(default_source: str, filename: str) -> str:
+    """PRD/ADR viram fonte própria pelo NOME do arquivo, onde quer que estejam
+    (ex.: .docs/PLANS/prd18.md → 'prd'), para o status por-fonte ser honesto."""
+    low = filename.lower()
+    if low.startswith("prd"):
+        return "prd"
+    if low.startswith("adr"):
+        return "adr"
+    return default_source
+
+
 def discover(root: Path, obsidian_dir: str | None = None) -> list[tuple[str, str, Path]]:
-    """Retorna (source, kind, path) das fontes a indexar.
+    """Retorna (source, kind, path) das fontes a indexar, SEM duplicar.
 
     obsidian_dir: pasta Obsidian EXPLICITAMENTE configurada (opt-in). Read-only;
     nunca varre vault global implicitamente. Ausente/inacessível → ignorada.
     """
-    found = []
-    for source, rel in DOC_GLOBS:
+    found: list[tuple[str, str, Path]] = []
+    seen: set[str] = set()
+
+    def add(default_source: str, kind: str, f: Path, rel_check: Path) -> None:
+        key = str(f.resolve())
+        if key in seen or not f.is_file() or f.name == ".gitkeep" or not is_safe(rel_check):
+            return
+        seen.add(key)
+        found.append((classify_source(default_source, f.name), kind, f))
+
+    for rel, source in DOC_DIRS:
         d = root / rel
         if d.exists():
             for f in sorted(d.rglob("*.md")):
-                if f.is_file() and is_safe(f.relative_to(root)) and f.name != ".gitkeep":
-                    found.append((source, source, f))
-    for kind, rel in EXTRA_FILES:
-        f = root / rel
-        if f.exists() and f.is_file():
-            found.append(("repo", kind, f))
+                add(source, source, f, f.relative_to(root))
+    for rel, source in DOC_TOP_DIRS:
+        d = root / rel
+        if d.exists() and d.is_dir():
+            for f in sorted(d.glob("*.md")):
+                add(source, source, f, f.relative_to(root))
+    for kind, name in EXTRA_FILES:
+        f = root / name
+        if f.exists():
+            add(kind, kind, f, Path(name))
     # Obsidian: somente a pasta configurada, read-only.
     if obsidian_dir:
         od = Path(obsidian_dir)
         if od.exists() and od.is_dir():
             for f in sorted(od.rglob("*.md")):
-                # caminho do doc usa o nome relativo à pasta obsidian (prefixado)
                 try:
-                    if f.is_file() and is_safe(f):
-                        found.append(("obsidian", "obsidian", f))
+                    add("obsidian", "obsidian", f, f)
                 except OSError:
                     continue
     return found
@@ -344,6 +374,56 @@ def bridge_graphify(con, graph_path: Path) -> None:
                 (nid_to_eid[a], nid_to_eid[b], f"{node_label.get(a)}->{node_label.get(b)}"[:120]))
 
 
+# Marcadores de DECISÃO (PT/EN): heading/conteúdo com escolha/trade-off/rejeição.
+DECISION_RE = re.compile(
+    r"\b(decis|decid|escolh|opta|trade-?off|non-?goal|regra de ouro|rejeit|"
+    r"rationale|we chose|chosen|prefer|invariante|por que|porqu[eê])\b", re.I)
+
+
+def first_line(text: str) -> str:
+    for ln in (text or "").splitlines():
+        s = ln.strip().lstrip("#").strip()
+        if s:
+            return s
+    return ""
+
+
+def is_decision(heading: str, content: str) -> bool:
+    return bool(DECISION_RE.search(heading or "") or DECISION_RE.search(content or ""))
+
+
+def token_accounting(results: list) -> dict:
+    """ESTIMATIVA local (chars/4), NÃO medição de tokenizer — declarado honesto."""
+    chars = sum(len(r.get("evidence", "")) for r in results)
+    return {"isEstimate": True, "method": "chars_div_4", "estimatedTokens": chars // 4}
+
+
+def decision_cmd(args) -> int:
+    """scout --mode decision_context: retorna {decisão, evidência, arquivo, linhas}."""
+    con = connect(args.db)
+    like = f"%{args.query.strip()}%"
+    rows = con.execute(
+        "SELECT d.path path, c.heading heading, c.content content, c.start_line s, c.end_line e "
+        "FROM chunks c JOIN documents d ON d.id=c.document_id "
+        "WHERE c.content LIKE ? ORDER BY c.document_id LIMIT ?",
+        (like, max(args.limit * 4, 40))).fetchall()
+    results = []
+    for r in rows:
+        if len(results) >= args.limit:
+            break
+        if is_decision(r["heading"], r["content"]):
+            results.append({
+                "decision": (r["heading"] or first_line(r["content"]))[:160],
+                "evidence": (r["content"] or "").strip()[:280],
+                "file": r["path"], "lineStart": r["s"], "lineEnd": r["e"],
+                "backend": "scan",
+            })
+    out = {"query": args.query.strip(), "mode": "decision_context",
+           "results": results, "tokenAccounting": token_accounting(results)}
+    print(json.dumps(out))
+    return 0
+
+
 def search_cmd(args) -> int:
     con = connect(args.db)
     fts = con.execute("SELECT value FROM index_meta WHERE key='fts_enabled'").fetchone()
@@ -364,9 +444,11 @@ def search_cmd(args) -> int:
             "SELECT d.path AS path, c.heading AS heading, substr(c.content,1,160) AS snip, 0 AS rank "
             "FROM chunks c JOIN documents d ON d.id=c.document_id "
             "WHERE c.content LIKE ? LIMIT ?", (like, args.limit)).fetchall()
-    results = [{"path": r["path"], "heading": r["heading"], "snippet": r["snip"], "score": r["rank"]} for r in rows]
+    # backend REAL por resultado (fts5 vs varredura LIKE) — declarado, nunca fingido.
+    backend = "fts" if has_fts else "scan"
+    results = [{"path": r["path"], "heading": r["heading"], "snippet": r["snip"], "score": r["rank"], "backend": backend} for r in rows]
     if args.json:
-        print(json.dumps({"query": q, "fts": has_fts, "results": results}))
+        print(json.dumps({"query": q, "fts": has_fts, "backend": backend, "results": results}))
     else:
         if not results:
             print("(sem resultados)")
@@ -414,26 +496,35 @@ def related_cmd(args) -> int:
     return 0
 
 
+def by_source(con) -> dict:
+    """Contagem de documentos POR FONTE (ADR/PRD/plans/docs/readme/changelog…)."""
+    rows = con.execute("SELECT source, COUNT(*) c FROM documents GROUP BY source ORDER BY c DESC").fetchall()
+    return {r["source"]: r["c"] for r in rows}
+
+
 def status_cmd(args) -> int:
     con = connect(args.db)
     fts = con.execute("SELECT value FROM index_meta WHERE key='fts_enabled'").fetchone()
+    src = by_source(con)
     out = {
         "documents": count(con, "documents"), "chunks": count(con, "chunks"),
         "entities": count(con, "entities"), "edges": count(con, "edges"),
         "fts_enabled": bool(fts and fts["value"] == "1"),
+        "by_source": src,
     }
     if args.json:
         print(json.dumps(out))
     else:
+        by = " ".join(f"{k}={v}" for k, v in src.items()) or "-"
         print(f"documents={out['documents']} chunks={out['chunks']} entities={out['entities']} "
-              f"edges={out['edges']} fts={'on' if out['fts_enabled'] else 'LIKE'}")
+              f"edges={out['edges']} fts={'on' if out['fts_enabled'] else 'LIKE'} | por fonte: {by}")
     return 0
 
 
 def main() -> int:
     p = argparse.ArgumentParser(description="Document Graph local (SQLite/FTS5 stdlib)")
     sub = p.add_subparsers(dest="cmd", required=True)
-    for name in ("index", "search", "related", "status"):
+    for name in ("index", "search", "related", "status", "decision"):
         sp = sub.add_parser(name)
         sp.add_argument("--db", required=True)
         sp.add_argument("--json", action="store_true")
@@ -442,13 +533,14 @@ def main() -> int:
             sp.add_argument("--reindex", action="store_true")
             sp.add_argument("--obsidian", default=None)
             sp.add_argument("--graphify", default=None)
-        if name == "search":
+        if name in ("search", "decision"):
             sp.add_argument("--query", required=True)
             sp.add_argument("--limit", type=int, default=10)
         if name == "related":
             sp.add_argument("--entity", required=True)
     args = p.parse_args()
-    return {"index": index_cmd, "search": search_cmd, "related": related_cmd, "status": status_cmd}[args.cmd](args)
+    return {"index": index_cmd, "search": search_cmd, "related": related_cmd,
+            "status": status_cmd, "decision": decision_cmd}[args.cmd](args)
 
 
 if __name__ == "__main__":
