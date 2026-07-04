@@ -1,5 +1,31 @@
 # Changelog - gstack-vibehard
 
+## [3.53.0] - 2026-07-04
+
+### Context Index Completo + Decision Context (PRD 20 Sprint 20.4)
+
+O Document Graph local (SQLite/FTS5) deixa de enxergar **só README+CHANGELOG (2
+docs)** e passa a representar o repo de verdade — o layout REAL vive em `.docs/`
+(maiúsculo), que a descoberta antiga (`docs/adr`, `docs/prd`…) ignorava.
+
+- **`context index --reindex`** cobre `.docs/PLANS`, `.docs/ADRS`, `.docs/AUDITS`,
+  `docs/*`, `README*`, `AGENTS.md`, `CLAUDE.md`, `CHANGELOG.md` + contrato/segurança.
+  No próprio repo: **68 documentos** (prd 22 · plans 21 · docs 13 · adr 6 · readme 2
+  · repo 2 · changelog 1 · audits 1) — antes 2. `discover()` reescrito com
+  `classify_source` (arquivo `prd*`/`adr*` vira fonte própria) e dedup por path.
+- **`context status --db`** agora traz `by_source` — contagem por ADR/PRD/plans/docs/
+  README/changelog. Acessível mesmo sem `context init` (o índice é independente do
+  registry).
+- **`context scout --mode decision_context --json`** (novo subcomando `decision` no
+  indexer): retorna `{ decision, evidence, file, lineStart, lineEnd, backend }` para
+  decisões (heading/conteúdo com escolha/trade-off/rejeição/rationale, PT+EN).
+- **Backend REAL por resultado**: `search`/scout marcam `fts` vs `scan` por hit
+  (nunca fingem o motor usado).
+- **`tokenAccounting.isEstimate`**: o scout DECLARA que a contagem de tokens é
+  ESTIMATIVA local (`chars_div_4` / heurística), não medição de tokenizer — honesto.
+- Teste `context_index_sources` (cobertura `.docs`, status por-fonte, decision_context
+  com linhas + tokenAccounting). 17 JS + 9 Python context tests verdes. QG 0.
+
 ## [3.52.0] - 2026-07-04
 
 ### Tool Readiness como Produto (PRD 20 Sprint 20.3)

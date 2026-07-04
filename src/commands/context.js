@@ -83,21 +83,37 @@ function ctxInit(args, cwd) {
   return initObsidian(cwd)
 }
 
+const safeParse = (s) => { try { return JSON.parse(s) } catch { return null } }
+function renderBySource(bs) {
+  const parts = Object.keys(bs).map((k) => `${k}=${bs[k]}`)
+  if (parts.length) info(`  por fonte: ${parts.join(" · ")}`)
+}
 function statusDb(cwd) {
   if (!existsSync(dbPath(cwd))) return info("índice: não criado (rode `context index`)")
-  const r = runIndexer(["status", "--db", dbPath(cwd)])
-  if (r.ok) info(`índice: ${r.stdout.trim()}`)
+  const r = runIndexer(["status", "--db", dbPath(cwd), "--json"])
+  if (!r.ok) return
+  const s = safeParse(r.stdout)
+  if (!s) return info(`índice: ${r.stdout.trim()}`)
+  info(`índice: documents=${s.documents} chunks=${s.chunks} entities=${s.entities} edges=${s.edges} fts=${s.fts_enabled ? "on" : "LIKE"}`)
+  renderBySource(s.by_source || {})
 }
+const injectMode = (reg) => reg.sessionStart?.injectMode || "summary-only"
 function ctxStatus(args, cwd) {
   section("context status")
+  const wantsDb = args.includes("--db")
   const p = contextPath(cwd)
-  if (!existsSync(p)) return warn("Sem .gstack/context.json. Rode `gstack_vibehard context init`.")
+  // O índice (--db) é independente do registry — mostra mesmo sem `context init`.
+  if (!existsSync(p)) {
+    warn("Sem .gstack/context.json. Rode `gstack_vibehard context init`.")
+    if (wantsDb) statusDb(cwd)
+    return
+  }
   let reg
   try { reg = JSON.parse(readFileSync(p, "utf-8")) } catch (e) { return warn(`context.json ilegível: ${e.message}`) }
   const c = countDocs(cwd)
-  info(`injectMode: ${reg.sessionStart?.injectMode || "summary-only"}`)
+  info(`injectMode: ${injectMode(reg)}`)
   info(`ADR: ${c.adr} · PRD: ${c.prd} · plans: ${c.plans} · research: ${c.research} · total: ${c.total}`)
-  if (args.includes("--db")) statusDb(cwd)
+  if (wantsDb) statusDb(cwd)
 }
 
 // Fontes opcionais opt-in: Obsidian (configurado) + Graphify (auto-detect).
@@ -175,14 +191,38 @@ function renderScout(report, q) {
   info(`  tokens evitados (estimativa): ~${report.tokensAvoided.estimate}`)
   info(`  roteamento: ${scoutRouting(report)}`)
 }
+const scoutMode = (args) => { const i = args.indexOf("--mode"); return i !== -1 ? args[i + 1] : null }
+// tokenAccounting HONESTO: o scout local ESTIMA (heurística), não mede tokenizer real.
+const scoutTokenAccounting = (report) => ({ isEstimate: true, method: "heuristic", estimatedTokensAvoided: report.tokensAvoided.estimate })
+function renderDecisions(out) {
+  section(`context scout — decision_context: ${out.query}`)
+  for (const d of out.results) {
+    info(`  ${d.file}:${d.lineStart}-${d.lineEnd} · ${d.decision} (${d.backend})`)
+    info(`      ${String(d.evidence || "").slice(0, 120)}`)
+  }
+  if (out.results.length === 0) warn("  nenhuma decisão encontrada — refine a pergunta")
+  info(`  tokens (estimativa=${out.tokenAccounting.isEstimate}): ~${out.tokenAccounting.estimatedTokens}`)
+}
+// scout --mode decision_context: decisões {decisão, evidência, arquivo, linhas} via o índice.
+function decisionContext(cwd, q, json) {
+  if (!existsSync(dbPath(cwd))) return scoutError("Índice não existe. Rode `context index` antes.", json)
+  const r = runIndexer(["decision", "--db", dbPath(cwd), "--query", q, "--json"])
+  if (!r.ok) return scoutError(r.error || "decision_search_failed", json)
+  const out = safeParse(r.stdout) || { query: q, mode: "decision_context", results: [], tokenAccounting: { isEstimate: true, estimatedTokens: 0 } }
+  if (json) { ctxJson(out); return out }
+  renderDecisions(out)
+  return out
+}
 function ctxScout(args, cwd) {
   const q = args[1]
   const json = args.includes("--json")
   if (!q) return scoutError('pergunta obrigatória: context scout "como X funciona?"', json)
   // FastContext/remoto NUNCA por default (PRD18) — opt-in explícito ainda não implementado.
   if (isFastcontextBackend(args)) return scoutError("backend remoto (fastcontext) requer opt-in explícito e ainda não é suportado — o scout é local-first", json)
+  if (scoutMode(args) === "decision_context") return decisionContext(cwd, q, json)
   const report = scout({ cwd, question: q, ftsSearch: makeFtsSearch(cwd), maxResults: scoutMaxResults(args) })
   report.modelRouting = resolveModel(cwd, "explore") // cheap/local — nunca modelo forte p/ explorar
+  report.tokenAccounting = scoutTokenAccounting(report)
   if (json) { ctxJson(report); return report }
   renderScout(report, q)
   return report
