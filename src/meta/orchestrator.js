@@ -39,10 +39,12 @@ export function decideStatus({ deterministicGate = {}, llmReview = {} } = {}) {
   return { status: "passed" }
 }
 
+const stepSpecialty = (step) => step.specialty || step.kind || "implementation"
+const matchesSpec = (specs, want) => Array.isArray(specs) && specs.includes(want)
 /** Planner: escolhe o harness executor pela matriz de especialidade. */
 export function pickExecutor(step = {}, matrix = {}) {
-  const want = step.specialty || step.kind || "implementation"
-  for (const [h, specs] of Object.entries(matrix)) if (Array.isArray(specs) && specs.includes(want)) return h
+  const want = stepSpecialty(step)
+  for (const [h, specs] of Object.entries(matrix)) if (matchesSpec(specs, want)) return h
   return Object.keys(matrix)[0] || "claude"
 }
 
@@ -143,52 +145,76 @@ function applyBreaker(result, entries, caps, sameFailLimit) {
   return false
 }
 
+const resolveMaxIterations = (caps, steps) =>
+  (Number.isInteger(caps.maxIterations) && caps.maxIterations > 0 ? caps.maxIterations : steps.length)
+function buildRunConfig(opts) {
+  const steps = opts.steps || []
+  const caps = opts.caps || {}
+  return {
+    steps, caps,
+    maxIterations: resolveMaxIterations(caps, steps),
+    sameFailLimit: caps.maxConsecutiveSameFailure || 3,
+    concurrency: Math.max(1, opts.concurrency || 1),
+  }
+}
+const defaultVerifierReview = (reviewer) =>
+  (reviewer && reviewer.available ? (step, exec) => reviewer.review(step, exec) : () => ({ ok: true, advisory: true }))
+function buildCtx(opts, reviewer) {
+  return {
+    runId: opts.runId,
+    matrix: opts.matrix || { claude: ["implementation", "refactor"], codex: ["code-review", "tests"] },
+    verifyWith: opts.verifyWith,
+    executeStep: opts.executeStep || (() => ({ branch: "wt", diff: "" })),
+    verifierReview: opts.verifierReview || defaultVerifierReview(reviewer),
+    gate: opts.gate || (() => ({ passed: true })),
+    record: opts.record || (() => {}),
+  }
+}
+function initResult(reviewer, opts) {
+  return {
+    status: "done", steps: [], handoff: null, iterations: 0, consecutive: 0,
+    reviewer: reviewer ? { id: reviewer.id, mode: reviewer.mode, note: reviewer.note } : null,
+    reviewerCoverage: reviewerCoverage(opts),
+    limits: [...ORCHESTRATION_LIMITS],
+  }
+}
+
+// Executa um batch (dentro do limite de concorrência). @returns true se deve parar.
+async function runBatch(batch, ctx, cfg, result) {
+  const room = cfg.maxIterations - result.iterations
+  if (room <= 0) { result.status = "handoff"; result.handoff = { reason: "maxIterations", at: batch[0].id }; return true }
+  const toRun = batch.slice(0, room)
+  result.iterations += toRun.length
+  const outcomes = await Promise.all(toRun.map((s) => runStep(s, ctx)))
+  const blocked = outcomes.find((o) => o.blocked)
+  if (blocked) { result.status = "handoff"; result.handoff = blocked.blocked; return true }
+  return applyBreaker(result, outcomes.map((o) => o.entry), cfg.caps, cfg.sameFailLimit)
+}
+async function runWaves(ctx, cfg, result) {
+  for (const wave of buildWaves(cfg.steps)) {
+    if (result.status === "handoff") break
+    for (const batch of chunk(wave, cfg.concurrency)) {
+      if (result.status === "handoff") break
+      if (await runBatch(batch, ctx, cfg, result)) break
+    }
+  }
+}
+function finalizeStatus(result) {
+  delete result.consecutive
+  if (result.status === "done" && result.steps.some((s) => s.status !== "passed")) result.status = "partial"
+  return result
+}
+
 /**
  * Orquestra os passos em waves (paralelismo entre independentes, concorrência
  * limitada). Hard caps (maxIterations, abortOnRepeatedFailure) preservados —
  * o breaker corta waves FUTURAS (a wave em voo termina; documentado em limits).
  */
 export async function runOrchestration(opts = {}) {
-  const steps = opts.steps || []
-  const caps = opts.caps || {}
-  const matrix = opts.matrix || { claude: ["implementation", "refactor"], codex: ["code-review", "tests"] }
-  const maxIterations = Number.isInteger(caps.maxIterations) && caps.maxIterations > 0 ? caps.maxIterations : steps.length
-  const sameFailLimit = caps.maxConsecutiveSameFailure || 3
-  const concurrency = Math.max(1, opts.concurrency || 1)
   const reviewer = opts.reviewer || null
-  const ctx = {
-    runId: opts.runId,
-    matrix,
-    verifyWith: opts.verifyWith,
-    executeStep: opts.executeStep || (() => ({ branch: "wt", diff: "" })),
-    verifierReview: opts.verifierReview || (reviewer && reviewer.available ? (step, exec) => reviewer.review(step, exec) : () => ({ ok: true, advisory: true })),
-    gate: opts.gate || (() => ({ passed: true })),
-    record: opts.record || (() => {}),
-  }
-
-  const result = {
-    status: "done", steps: [], handoff: null, iterations: 0, consecutive: 0,
-    reviewer: reviewer ? { id: reviewer.id, mode: reviewer.mode, note: reviewer.note } : null,
-    reviewerCoverage: reviewerCoverage(opts),
-    limits: [...ORCHESTRATION_LIMITS],
-  }
-
-  for (const wave of buildWaves(steps)) {
-    if (result.status === "handoff") break
-    for (const batch of chunk(wave, concurrency)) {
-      if (result.status === "handoff") break
-      const room = maxIterations - result.iterations
-      if (room <= 0) { result.status = "handoff"; result.handoff = { reason: "maxIterations", at: batch[0].id }; break }
-      const toRun = batch.slice(0, room)
-      result.iterations += toRun.length
-      const outcomes = await Promise.all(toRun.map((s) => runStep(s, ctx)))
-      const blocked = outcomes.find((o) => o.blocked)
-      if (blocked) { result.status = "handoff"; result.handoff = blocked.blocked; break }
-      if (applyBreaker(result, outcomes.map((o) => o.entry), caps, sameFailLimit)) break
-    }
-  }
-
-  delete result.consecutive
-  if (result.status === "done" && result.steps.some((s) => s.status !== "passed")) result.status = "partial"
-  return result
+  const cfg = buildRunConfig(opts)
+  const ctx = buildCtx(opts, reviewer)
+  const result = initResult(reviewer, opts)
+  await runWaves(ctx, cfg, result)
+  return finalizeStatus(result)
 }
