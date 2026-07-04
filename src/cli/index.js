@@ -69,11 +69,13 @@ let _consoleFixed = false
  * só rodamos no render direto (TTY), onde de fato ajuda; sem TTY não há ganho e
  * não mexemos na codepage à toa. Pula terminais já UTF-8 (Windows Terminal/VSCode).
  */
+const isModernWinTerminal = () => !!(process.env.WT_SESSION || process.env.TERM_PROGRAM || process.env.WT_PROFILE_ID)
+// Windows Terminal/VSCode já falam UTF-8; só o conhost/PS legado precisa do chcp.
+const isLegacyWinConsole = () => process.platform === "win32" && !!process.stdout.isTTY && !isModernWinTerminal()
 function ensureReadableConsole() {
   if (_consoleFixed) return
   _consoleFixed = true
-  if (process.platform !== "win32" || !process.stdout.isTTY) return
-  if (process.env.WT_SESSION || process.env.TERM_PROGRAM || process.env.WT_PROFILE_ID) return
+  if (!isLegacyWinConsole()) return
   try { execSync("chcp 65001", { stdio: "ignore", windowsHide: true }) }
   catch { asciiMode = true } // não deu p/ trocar a codepage → cai no banner ASCII
 }
@@ -186,20 +188,17 @@ const COMMANDS = [
   { name: "list", group: "advanced", desc: "Listar componentes instalados", usage: "gstack_vibehard list" },
 ]
 
+const helpGroups = (mode) => (mode === "advanced" ? ["advanced"] : mode === "full" ? ["common", "advanced"] : ["common"])
+function printHelpGroup(g) {
+  console.log(color(g === "common" ? "  Comandos:" : "  Avançados:", COLORS.bold))
+  for (const c of COMMANDS.filter((x) => x.group === g)) console.log(color(`    ${c.name.padEnd(14)} ${c.desc}`, COLORS.cyan))
+  console.log("")
+}
 export function showHelp(mode = "short") {
   console.log(color("  Uso: gstack_vibehard <comando> [opções]   ·   `<comando> --help` p/ detalhes", COLORS.bold))
   console.log("")
-  const groups = mode === "advanced" ? ["advanced"] : mode === "full" ? ["common", "advanced"] : ["common"]
-  for (const g of groups) {
-    console.log(color(g === "common" ? "  Comandos:" : "  Avançados:", COLORS.bold))
-    for (const c of COMMANDS.filter((x) => x.group === g)) {
-      console.log(color(`    ${c.name.padEnd(14)} ${c.desc}`, COLORS.cyan))
-    }
-    console.log("")
-  }
-  if (mode === "short") {
-    console.log(color("  Primeira vez? → `gstack_vibehard start`   ·   Avançados → `gstack_vibehard help advanced`", COLORS.dim))
-  }
+  for (const g of helpGroups(mode)) printHelpGroup(g)
+  if (mode === "short") console.log(color("  Primeira vez? → `gstack_vibehard start`   ·   Avançados → `gstack_vibehard help advanced`", COLORS.dim))
 }
 
 export function helpFor(name) {
@@ -232,171 +231,90 @@ export function section(title) {
   console.log(`\n${color(`  ── ${title}`, COLORS.bold)}`)
 }
 
-export async function runCLI(command, args) {
-  if (args.includes("--ascii")) asciiMode = true
-  if (args.includes("--no-color")) noColor = true
-  ensureReadableConsole() // Windows legado → console UTF-8 (ou ASCII fallback)
-  // Saída-máquina (JSON) precisa de stdout limpo: suprime o banner quando há
-  // --json ou em comandos que emitem JSON puro (a2a).
-  const quiet = args.includes("--json") || command === "a2a"
-  const wantsHelp = args.includes("--help") || args.includes("-h")
-
-  // FIRST-RUN SEGURO + HELP UNIVERSAL: nada que pareça ajuda pode instalar/escrever.
-  // no-args, --help/-h, ou `help [topico]` → só ajuda, exit 0, zero escrita.
-  if (command === undefined || command === "--help" || command === "-h" || command === "help") {
-    if (!quiet) logo()
-    const topic = command === "help" ? args[0] : null
-    if (topic === "advanced") showHelp("advanced")
-    else if (topic && isKnownCommand(topic)) helpFor(topic)
-    else {
-      showHelp("short")
-      if (command === undefined) { console.log(""); info("Dica: comece por `gstack_vibehard start` (seguro, guiado). Nada é instalado por este comando.") }
-    }
-    return
-  }
-  // `<comando> --help` → mostra a ajuda do subcomando e NÃO executa.
-  if (wantsHelp) {
-    if (!quiet) logo()
-    helpFor(command)
-    return
-  }
-
-  if (!quiet) logo()
-  try {
-    await dispatch(command, args)
-  } catch (e) {
+const isHelpInvocation = (command) => command === undefined || command === "--help" || command === "-h" || command === "help"
+const isQuiet = (command, args) => args.includes("--json") || command === "a2a"
+const wantsHelp = (args) => args.includes("--help") || args.includes("-h")
+// `help [topico]`: advanced, um comando conhecido, ou o resumo curto.
+function showTopicHelp(command, args) {
+  const topic = command === "help" ? args[0] : null
+  if (topic === "advanced") return showHelp("advanced")
+  if (topic && isKnownCommand(topic)) return helpFor(topic)
+  showHelp("short")
+  if (command === undefined) { console.log(""); info("Dica: comece por `gstack_vibehard start` (seguro, guiado). Nada é instalado por este comando.") }
+}
+async function runDispatch(command, args) {
+  try { await dispatch(command, args) }
+  catch (e) {
     error(`Falha ao executar '${command}': ${e.message}`)
     if (process.env.GSTACK_DEBUG) console.error(e.stack)
     process.exit(1)
   }
 }
+export async function runCLI(command, args) {
+  if (args.includes("--ascii")) asciiMode = true
+  if (args.includes("--no-color")) noColor = true
+  ensureReadableConsole() // Windows legado → console UTF-8 (ou ASCII fallback)
+  // Saída-máquina (JSON/a2a) suprime o banner p/ stdout limpo. Todos os ramos
+  // imprimem o logo sob a mesma condição, então o gate é único aqui.
+  const quiet = isQuiet(command, args)
+  if (!quiet) logo()
+  // FIRST-RUN SEGURO + HELP UNIVERSAL: nada que pareça ajuda pode instalar/escrever.
+  if (isHelpInvocation(command)) return showTopicHelp(command, args)
+  if (wantsHelp(args)) return helpFor(command) // `<comando> --help` → não executa
+  await runDispatch(command, args)
+}
+
+// Registro de comandos → handler. Fonte única do dispatch (sem switch gigante).
+const DISPATCH = {
+  install: (a) => install(a),
+  create: (a) => createCommand(a),
+  init: (a) => initCommand(a),
+  doctor: (a) => doctor(a),
+  enable: (a) => activateCommand("enable", a),
+  disable: (a) => activateCommand("disable", a),
+  status: (a) => activateCommand("status", a),
+  uninstall: (a) => uninstall(a),
+  sprint: (a) => sprintCommand(a),
+  list: () => list(),
+  monitor: () => monitorCommand(),
+  runtime: (a) => runtimeCommand(a, { strict: a.includes("--strict") }),
+  dev: (a) => devCommand(a),
+  stop: (a) => stopCommand(a),
+  logs: (a) => logsCommand(a),
+  open: (a) => openCommand(a),
+  secrets: (a) => secretsCommand(a),
+  agents: (a) => agentsCommand(a),
+  qa: (a) => qaCommand(a),
+  audit: (a) => auditCommand(a),
+  challenge: (a) => challengeCommand(a),
+  orchestrate: (a) => orchestrateCommand(a),
+  tools: (a) => toolsCommand(a),
+  pp: (a) => toolsCommand(a),
+  context: (a) => contextCommand(a),
+  start: (a) => startCommand(a),
+  consult: (a) => consultCommand(a),
+  policy: (a) => policyCommand(a),
+  state: (a) => stateCommand(a),
+  plan: (a) => planCommand(a),
+  task: (a) => taskCommand(a),
+  worktree: (a) => worktreeCommand(a),
+  verify: (a) => verifyCommand(a),
+  "publish-guard": (a) => publishGuardCommand(a),
+  update: (a) => updateCommand(a),
+  dream: (a) => dreamCommand(a),
+  proxy: (a) => proxyCommand(a),
+  delegate: (a) => delegateCommand(a),
+  workflow: (a) => workflowCommand(a),
+  a2a: (a) => a2aCommand(a),
+  help: () => showHelp(),
+}
 
 async function dispatch(command, args) {
-  switch (command) {
-    case "install":
-      await install(args)
-      break
-    case "create":
-      await createCommand(args)
-      break
-    case "init":
-      await initCommand(args)
-      break
-    case "doctor":
-      await doctor(args)
-      break
-    case "enable":
-      await activateCommand("enable", args)
-      break
-    case "disable":
-      await activateCommand("disable", args)
-      break
-    case "status":
-      await activateCommand("status", args)
-      break
-    case "uninstall":
-      await uninstall(args)
-      break
-    case "sprint":
-      await sprintCommand(args)
-      break
-    case "list":
-      await list()
-      break
-    case "monitor":
-      await monitorCommand()
-      break
-    case "runtime":
-      await runtimeCommand(args, { strict: args.includes("--strict") })
-      break
-    case "dev":
-      await devCommand(args)
-      break
-    case "stop":
-      await stopCommand(args)
-      break
-    case "logs":
-      logsCommand(args)
-      break
-    case "open":
-      openCommand(args)
-      break
-    case "secrets":
-      await secretsCommand(args)
-      break
-    case "agents":
-      await agentsCommand(args)
-      break
-    case "qa":
-      qaCommand(args)
-      break
-    case "audit":
-      auditCommand(args)
-      break
-    case "challenge":
-      challengeCommand(args)
-      break
-    case "orchestrate":
-      await orchestrateCommand(args)
-      break
-    case "tools":
-    case "pp":
-      await toolsCommand(args)
-      break
-    case "context":
-      await contextCommand(args)
-      break
-    case "start":
-      await startCommand(args)
-      break
-    case "consult":
-      consultCommand(args)
-      break
-    case "policy":
-      policyCommand(args)
-      break
-    case "state":
-      stateCommand(args)
-      break
-    case "plan":
-      await planCommand(args)
-      break
-    case "task":
-      await taskCommand(args)
-      break
-    case "worktree":
-      await worktreeCommand(args)
-      break
-    case "verify":
-      await verifyCommand(args)
-      break
-    case "publish-guard":
-      await publishGuardCommand(args)
-      break
-    case "update":
-      await updateCommand(args)
-      break
-    case "dream":
-      await dreamCommand(args)
-      break
-    case "proxy":
-      await proxyCommand(args)
-      break
-    case "delegate":
-      await delegateCommand(args)
-      break
-    case "workflow":
-      await workflowCommand(args)
-      break
-    case "a2a":
-      await a2aCommand(args)
-      break
-    case "help":
-      showHelp()
-      break
-    default:
-      console.log(color(`  Comando desconhecido: ${command}`, COLORS.red))
-      showHelp()
-      process.exit(1)
+  const handler = DISPATCH[command]
+  if (!handler) {
+    console.log(color(`  Comando desconhecido: ${command}`, COLORS.red))
+    showHelp()
+    process.exit(1)
   }
+  await handler(args)
 }
