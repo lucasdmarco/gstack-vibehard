@@ -1,5 +1,37 @@
 # Changelog - gstack-vibehard
 
+## [3.54.0] - 2026-07-04
+
+### Clean-Machine Proof Pack (PRD 20 Sprint 20.5)
+
+Prova **offline e reproduzível** de que o GStack não quebra a máquina real de um
+usuário com Claude/Codex/OpenCode. `tools clean-machine [--json] [--no-write]
+[--keep]` roda 12 cenários contra **homes-fixture isoladas** (nunca o `~` real,
+sem rede) exercitando o **código de produção** — `safeWriteFile`,
+`restoreBackupsFromManifest`, `diagnoseOpenCode`, `buildInstallImpact`,
+`buildReadiness` — e afirma invariantes verificáveis:
+
+- **OpenCode config-sacred**: sem config → `none`; só `.jsonc` sensível → detectado
+  por nome e **byte-for-byte intocado**; conflito `json`+`jsonc` sensível → plano
+  `preserve` (nunca consolida) + `shadowingRisk high` + ambos intactos; `.jsonc`
+  malformado → `manual` sem escrita; resíduo `.jsonc.gstack-disabled` → `restore-jsonc`.
+- **Lite mode não escreve nada global** (nenhum manifest em home; config do usuário
+  intocada; escrita fica no projeto).
+- **Full mode = Safe Write + manifest + backup**: arquivo novo vai ao manifest sem
+  backup; arquivo existente ganha backup byte-for-byte + `restoreOnUninstall`.
+- **Uninstall restaura configs preexistentes byte-for-byte** (rollback report sem erros).
+- **Matriz de estados**: Headroom ausente/`callable_not_routed`/`routed`; Graphify
+  `absent`/`fresh`/`stale`; Fallow `missing`/`callable`.
+- Artefatos em `.gstack/reports/clean-machine/<runId>/` (`clean-machine.json`,
+  `tool-readiness.json`, `install-impact.json`, `opencode-diagnosis.json`,
+  `rollback-report.json`, `verify.json`).
+
+O núcleo de restore do uninstall foi **extraído para `src/installer/restore.js`**
+(injetável por `home`) — o proof pack roda o MESMO código, não uma reimplementação.
+`uninstall.js` foi decomposto (`unregisterHooks`/`removeHermes`/`uninstall`/`list`,
+cc→≤6) ao entrar no escopo diff do Fallow, behavior-preserving. Teste
+`clean_machine_proof` (5). QG CRIT/HIGH **0**, lint+`tsc` verdes.
+
 ## [3.53.0] - 2026-07-04
 
 ### Context Index Completo + Decision Context (PRD 20 Sprint 20.4)

@@ -9,6 +9,7 @@ import { buildRufloReport } from "../harness/ruflo.js"
 import { buildToolCatalog, annotateCatalogEntry, LOCAL_CATALOG } from "../tools/catalog.js"
 import { recordToolProvenance } from "../tools/provenance.js"
 import { buildReadiness } from "../tools/readiness.js"
+import { runCleanMachine } from "../installer/clean-machine.js"
 import { agentReachCommand } from "./agent-reach.js"
 import { confirm, success, warn, error, info, section } from "../cli/index.js"
 
@@ -317,6 +318,7 @@ function handleToolsHelp() {
   info("    tools agent-reach channels|doctor [--json]   Catalogo e estado por canal")
   info("  Qualidade:")
   info("    tools readiness [--json] [--write] [--clean-machine]  Estado REAL das ferramentas (Fallow/Graphify/Headroom/context)")
+  info("    tools clean-machine [--json] [--no-write] [--keep]    Proof pack offline: OpenCode sacred, backup/restore byte-for-byte, matriz de tools")
   info("    tools doctor                  Validar binario/auth/MCP das instaladas")
   info("    tools generate                Gerar CLI de cauda-longa via HAR (em breve)")
   info("")
@@ -357,9 +359,32 @@ function handleReadiness({ args, opts, cwd }) {
   return report
 }
 
+const cmIcon = (ok) => (ok ? "✓" : "✗")
+function renderCleanMachine(rep) {
+  section(`tools clean-machine — proof pack (${rep.passed}/${rep.total} cenários)`)
+  for (const s of rep.scenarios) {
+    info(`  ${cmIcon(s.ok)} ${s.id}: ${s.title}`)
+    for (const c of s.checks.filter((x) => !x.ok)) warn(`      falhou: ${c.name}${c.detail ? " — " + c.detail : ""}`)
+  }
+  if (rep.writtenTo) success(`Artefatos gravados em ${rep.writtenTo}`)
+  if (rep.ok) success("Clean-machine: todas as invariantes provadas offline.")
+  else error("Clean-machine: há invariantes NÃO provadas — não publicar.")
+}
+// Proof pack offline (PRD20 20.5): homes-fixture isoladas, nunca ~ real; artefatos
+// project-scoped em .gstack/reports/clean-machine/<runId>/ com --write (default on).
+function handleCleanMachine({ args, cwd }) {
+  const write = !args.includes("--no-write")
+  const reportsDir = join(cwd, ".gstack", "reports", "clean-machine")
+  const rep = runCleanMachine({ reportsDir, write, keep: args.includes("--keep") })
+  if (args.includes("--json")) return emitTools(rep)
+  renderCleanMachine(rep)
+  return rep
+}
+
 const TOOLS_HANDLERS = {
   suggested: handleSuggested,
   readiness: handleReadiness,
+  "clean-machine": handleCleanMachine,
   catalog: handleCatalog,
   list: handleListSearch,
   search: handleListSearch,
