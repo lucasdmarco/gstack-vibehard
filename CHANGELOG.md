@@ -1,5 +1,26 @@
 # Changelog - gstack-vibehard
 
+## [3.59.0] - 2026-07-04
+
+### Action Close Tool Refresh (PRD 24 Sprint 24.3)
+
+Contrato de fechamento de ação da IA: mantém contexto/ferramentas frescos **sem
+tocar config global, sem ligar proxy/wrap, sem MCP global**.
+
+- **`src/tools/refresh.js`** (novo): `buildToolRefresh` **puro/injetável** —
+  refresca `graphify`/`context`/`headroom`/`fallow` em etapas **bounded/degraded**
+  (nunca lança). Grava `.gstack/reports/tool-refresh/<runId>.json` e atualiza
+  `.gstack/tool-readiness.json` com o **audit fresco** do Fallow (fecha 24.2↔24.3).
+  `graphify` **pula** quando `--changed` e nenhum arquivo relevante mudou. Headroom
+  **só classifica** routing (`doctor`) — nunca proxy/wrap. Falha = `degraded` (não
+  trava o usuário comum); em `--strict` uma etapa bloqueante falha vira `error`.
+- **`tools refresh [--changed] [--json] [--strict]`**. É batch (sem PTY) —
+  **tmux nunca entra** (runners cross-platform via `execFileSync` bounded).
+- **`stop.py`**: chamada **opt-in** (`GSTACK_TOOL_REFRESH=1`) bounded/best-effort no
+  fim de sessão — **default OFF** para não adicionar lentidão.
+- Teste `tool_refresh` (4): report+readiness, skip graphify, degraded vs error
+  (strict), headroom só `doctor`. QG CRIT/HIGH ciclomático **0**, lint+`tsc` verdes.
+
 ## [3.58.0] - 2026-07-04
 
 ### Context DB — `.docs/RESEARCH` + regressão `search PRD22` (PRD 24 Sprint 24.4)
