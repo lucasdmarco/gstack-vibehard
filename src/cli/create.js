@@ -88,6 +88,21 @@ function safeExec(file, args, opts) {
   catch { return null }
 }
 
+// curl existe nativamente no Windows 10 1803+ ("curl.exe") e em Unix.
+const curlBinary = () => (process.platform === "win32" ? "curl.exe" : "curl")
+const scriptExt = () => (process.platform === "win32" ? ".ps1" : ".sh")
+// Baixa o script p/ `tmp` e valida (arquivo criado + tamanho mínimo). @returns bool.
+function fetchRemoteScript(url, tmp, logger, label) {
+  execFileSync(curlBinary(), ["-fsSL", url, "-o", tmp], { stdio: "pipe", timeout: 120000, shell: false })
+  if (!existsSync(tmp)) { logger.warn(`${label}: download falhou (arquivo nao criado)`); return false }
+  const content = readFileSync(tmp, "utf-8")
+  if (content.length < 10) { logger.warn(`${label}: download muito pequeno (${content.length} bytes), possivelmente invalido`); return false }
+  return true
+}
+function execRemoteScript(tmp) {
+  if (process.platform === "win32") execFileSync("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", tmp], { stdio: "pipe", timeout: 180000, shell: false })
+  else execFileSync("sh", [tmp], { stdio: "pipe", timeout: 180000, shell: false })
+}
 function safeDownloadAndRun(url, logger, label, opts = {}) {
   // POLÍTICA REMOTA (P0.6): por padrão NÃO baixa/executa script remoto — sugere o
   // comando manual. Só prossegue com opt-in explícito + origem na allowlist HTTPS.
@@ -101,28 +116,11 @@ function safeDownloadAndRun(url, logger, label, opts = {}) {
   // POSIX). Evita TOCTOU/symlink-swap num /tmp compartilhado: nome fixo previsível
   // (Date.now) permitiria a outro usuário pré-criar/trocar o arquivo antes do exec.
   const dir = mkdtempSync(join(tmpdir(), "gstack-dl-"))
-  const tmp = join(dir, `script${process.platform === "win32" ? ".ps1" : ".sh"}`)
+  const tmp = join(dir, `script${scriptExt()}`)
   const cleanup = () => { try { rmSync(dir, { recursive: true, force: true }) } catch { /* cleanup */ } }
   try {
-    // curl existe nativamente no Windows 10 1803+ ("curl.exe") e em Unix.
-    const curlBin = process.platform === "win32" ? "curl.exe" : "curl"
-    execFileSync(curlBin, ["-fsSL", url, "-o", tmp], { stdio: "pipe", timeout: 120000, shell: false })
-    if (!existsSync(tmp)) {
-      logger.warn(`${label}: download falhou (arquivo nao criado)`)
-      cleanup()
-      return false
-    }
-    const content = readFileSync(tmp, "utf-8")
-    if (content.length < 10) {
-      logger.warn(`${label}: download muito pequeno (${content.length} bytes), possivelmente invalido`)
-      cleanup()
-      return false
-    }
-    if (process.platform === "win32") {
-      execFileSync("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", tmp], { stdio: "pipe", timeout: 180000, shell: false })
-    } else {
-      execFileSync("sh", [tmp], { stdio: "pipe", timeout: 180000, shell: false })
-    }
+    if (!fetchRemoteScript(url, tmp, logger, label)) { cleanup(); return false }
+    execRemoteScript(tmp)
     cleanup()
     return true
   } catch (e) {
@@ -159,27 +157,21 @@ volumes:
 `)
 }
 
-function startCasdoor(logger, projectDir) {
-  if (process.env.GSTACK_SKIP_PREFLIGHT) {
-    logger.info("GSTACK_SKIP_PREFLIGHT set — skipping Casdoor")
-    return null
-  }
-  if (!findBinary("docker")) {
-    logger.warn("Docker nao encontrado — Casdoor IAM local nao iniciado. Instale Docker para IAM local.")
-    return null
-  }
-  const existing = safeExec("docker", ["ps", "-a", "--filter", "name=casdoor", "--format", "{{.Names}}"])
-  if (existing && existing.toString().trim() === "casdoor") {
-    const running = safeExec("docker", ["ps", "--filter", "name=casdoor", "--format", "{{.Names}}"])
-    if (running && running.toString().trim() === "casdoor") {
-      logger.success("Casdoor IAM ja rodando em localhost:8000")
-      return "http://localhost:8000"
-    }
-    logger.info("Casdoor container existe, reiniciando...")
-    safeExec("docker", ["start", "casdoor"])
-    logger.success("Casdoor reiniciado em localhost:8000")
+const casdoorExists = (name) => !!name && name.toString().trim() === "casdoor"
+// Container casdoor já existe: reusa se rodando, senão reinicia. @returns URL.
+function reuseCasdoor(logger) {
+  const running = safeExec("docker", ["ps", "--filter", "name=casdoor", "--format", "{{.Names}}"])
+  if (casdoorExists(running)) {
+    logger.success("Casdoor IAM ja rodando em localhost:8000")
     return "http://localhost:8000"
   }
+  logger.info("Casdoor container existe, reiniciando...")
+  safeExec("docker", ["start", "casdoor"])
+  logger.success("Casdoor reiniciado em localhost:8000")
+  return "http://localhost:8000"
+}
+// Sobe o Casdoor via compose (v2 → fallback v1). @returns URL ou null.
+function composeCasdoorUp(logger, projectDir) {
   logger.info("Iniciando Casdoor IAM local via docker-compose...")
   writeCasdoorCompose(projectDir)
   const composeFile = join(projectDir, ".gstack", "docker-compose.yml")
@@ -195,6 +187,19 @@ function startCasdoor(logger, projectDir) {
   }
   logger.warn("Casdoor nao iniciou — IAM local indisponivel. Projeto continua sem gateway de identidade.")
   return null
+}
+function startCasdoor(logger, projectDir) {
+  if (process.env.GSTACK_SKIP_PREFLIGHT) {
+    logger.info("GSTACK_SKIP_PREFLIGHT set — skipping Casdoor")
+    return null
+  }
+  if (!findBinary("docker")) {
+    logger.warn("Docker nao encontrado — Casdoor IAM local nao iniciado. Instale Docker para IAM local.")
+    return null
+  }
+  const existing = safeExec("docker", ["ps", "-a", "--filter", "name=casdoor", "--format", "{{.Names}}"])
+  if (casdoorExists(existing)) return reuseCasdoor(logger)
+  return composeCasdoorUp(logger, projectDir)
 }
 
 function ensureGstackDir(projectDir) {
@@ -216,34 +221,35 @@ function writeCasdoorProjectConfig(projectDir) {
 //  PHASE 2: Parallelism (Atomic VCS)
 // ─────────────────────────────────────────────────────────────
 
+// Atomic VCS real = github.com/atomicdotdev/atomic (Rust), instalado via cargo do
+// código-fonte (não há pacote npm/PyPI/Homebrew). @returns "installed" | "degraded".
+function installAtomicViaCargo(logger) {
+  if (!findBinary("cargo")) {
+    logger.warn("Atomic VCS nao instalado — requer Rust/cargo (instale o stack completo ou rustup).")
+    return "degraded"
+  }
+  logger.info("Atomic VCS nao encontrado — instalando via cargo de github.com/atomicdotdev/atomic (compila Rust, pode levar minutos)...")
+  const cloneDir = join(tmpdir(), `atomic-build-${Date.now()}`)
+  const cloned = safeExec("git", ["clone", "--depth", "1", "https://github.com/atomicdotdev/atomic.git", cloneDir], { timeout: 120000 })
+  if (cloned !== null && existsSync(join(cloneDir, "atomic-cli"))) {
+    safeExec("cargo", ["install", "--path", join(cloneDir, "atomic-cli")], { timeout: 600000 })
+  }
+  try { rmSync(cloneDir, { recursive: true, force: true }) } catch { /* cleanup */ }
+  if (!findBinary("atomic")) {
+    logger.warn("Atomic VCS nao pode ser instalado/compilado — continuando sem VCS atomico (Git permanece).")
+    logger.warn("  Manual: git clone https://github.com/atomicdotdev/atomic && cargo install --path atomic/atomic-cli")
+    return "degraded"
+  }
+  logger.success("Atomic VCS instalado (cargo: atomicdotdev/atomic)")
+  return "installed"
+}
 // Retorna o STATUS honesto do componente: "installed" | "degraded" | "skipped".
 function initAtomic(logger, projectDir, opts = {}) {
   if (process.env.GSTACK_SKIP_PREFLIGHT) {
     logger.info("GSTACK_SKIP_PREFLIGHT set — skipping Atomic init")
     return "skipped"
   }
-  if (!findBinary("atomic")) {
-    // Atomic VCS real = github.com/atomicdotdev/atomic (Rust), instalado via cargo
-    // do código-fonte (não há pacote npm/PyPI/Homebrew). O domínio de download
-    // antigo estava MORTO (não resolvia) — era download fantasma.
-    if (!findBinary("cargo")) {
-      logger.warn("Atomic VCS nao instalado — requer Rust/cargo (instale o stack completo ou rustup).")
-      return "degraded"
-    }
-    logger.info("Atomic VCS nao encontrado — instalando via cargo de github.com/atomicdotdev/atomic (compila Rust, pode levar minutos)...")
-    const cloneDir = join(tmpdir(), `atomic-build-${Date.now()}`)
-    const cloned = safeExec("git", ["clone", "--depth", "1", "https://github.com/atomicdotdev/atomic.git", cloneDir], { timeout: 120000 })
-    if (cloned !== null && existsSync(join(cloneDir, "atomic-cli"))) {
-      safeExec("cargo", ["install", "--path", join(cloneDir, "atomic-cli")], { timeout: 600000 })
-    }
-    try { rmSync(cloneDir, { recursive: true, force: true }) } catch { /* cleanup */ }
-    if (!findBinary("atomic")) {
-      logger.warn("Atomic VCS nao pode ser instalado/compilado — continuando sem VCS atomico (Git permanece).")
-      logger.warn("  Manual: git clone https://github.com/atomicdotdev/atomic && cargo install --path atomic/atomic-cli")
-      return "degraded"
-    }
-    logger.success("Atomic VCS instalado (cargo: atomicdotdev/atomic)")
-  }
+  if (!findBinary("atomic") && installAtomicViaCargo(logger) === "degraded") return "degraded"
   const out = safeExec("atomic", ["init"], { cwd: projectDir })
   if (out) {
     logger.success("Atomic VCS inicializado — views paralelas disponiveis")
@@ -647,88 +653,70 @@ const TEMPLATE_MANIFEST = {
   },
 }
 
-export function writeRuntimeFiles({ projectDir, projectName, now, projectRoot, templateName, isLite = false }) {
-  const gstackDir = join(projectDir, ".gstack")
-  const scriptsDir = join(projectDir, "scripts")
-  mkdirSync(gstackDir, { recursive: true })
-  mkdirSync(scriptsDir, { recursive: true })
-
-  const tpl = TEMPLATE_MANIFEST[templateName] || TEMPLATE_MANIFEST["fullstack-monorepo"]
-
-  // app.json reflete as CAPACIDADES REAIS (P0.5): em lite não há Atomic/Casdoor/ECC.
-  writeJson(join(gstackDir, "app.json"), {
+const resolvePort = (tpl) =>
+  (tpl.ports.length === 1 ? tpl.ports[0].port : (tpl.ports.find((p) => p.name === "web")?.port || tpl.ports[0].port))
+// app.json reflete as CAPACIDADES REAIS (P0.5): em lite não há Atomic/Casdoor/ECC.
+function buildAppManifest({ projectName, now, isLite, tpl }) {
+  return {
     name: projectName,
     runtime: "gstack-workspace",
     mode: isLite ? "lite" : "full",
     createdAt: now(),
     packageManager: "pnpm",
-    harnesses: OMNIHARNESS_MAP.map(h => h.id),
+    harnesses: OMNIHARNESS_MAP.map((h) => h.id),
     vcs: isLite ? "git" : "atomic",
     sandbox: "openhands",
     controlPlane: isLite ? null : "ecc-universal",
     mcpGateway: isLite ? null : "casdoor",
-    meshFederation: isLite ? false : true,
+    meshFederation: !isLite,
     ticketOrchestration: "paperclip",
     iam: isLite ? "none" : "casdoor-local",
     run_command: tpl.run_command,
     build_command: tpl.build_command,
     env: tpl.env,
-    port: tpl.ports.length === 1 ? tpl.ports[0].port : tpl.ports.find(p => p.name === "web")?.port || tpl.ports[0].port,
-  })
-
-  writeJson(join(gstackDir, "services.json"), {
-    services: tpl.services,
-  })
-
-  writeJson(join(gstackDir, "ports.json"), {
-    version: 1,
-    ports: tpl.ports,
-  })
-
-  // Runtime Manifest V2 (PRD 12 PR3): contrato que o supervisor (`dev`) consome —
-  // comandos em array, port autoAllocate, health readiness/liveness, restart.
+    port: resolvePort(tpl),
+  }
+}
+// Secrets schema v2 (PRD 12 §10): nomes + metadados, NUNCA valores (valor no keychain).
+const SECRETS_SCHEMA = {
+  schemaVersion: 2,
+  provider: "os-keychain",
+  required: [
+    { name: "DATABASE_URL", scope: "runtime", services: ["api"], sensitive: true },
+  ],
+  optional: [
+    "CASDOOR_CLIENT_SECRET",
+    "GH_TOKEN",
+    "LITELLM_BASE_URL",
+    "AGENTMEMORY_FED_TOKEN",
+    "PAPERCLIP_API_KEY",
+  ],
+}
+function writeGstackManifests(gstackDir, { projectName, now, isLite, tpl, templateName }) {
+  writeJson(join(gstackDir, "app.json"), buildAppManifest({ projectName, now, isLite, tpl }))
+  writeJson(join(gstackDir, "services.json"), { services: tpl.services })
+  writeJson(join(gstackDir, "ports.json"), { version: 1, ports: tpl.ports })
+  // Runtime Manifest V2 (PRD 12 PR3): contrato consumido pelo supervisor (`dev`).
   writeJson(join(gstackDir, "runtime.json"), buildRuntimeManifest({ services: tpl.services }))
-
-  // Secrets schema v2 (PRD 12 §10): nomes + metadados, NUNCA valores. O valor vive
-  // no keychain do SO via `gstack_vibehard secrets`. `required[].services` declara
-  // quem recebe cada segredo no `dev` (allowlist por serviço).
-  writeJson(join(gstackDir, "secrets.schema.json"), {
-    schemaVersion: 2,
-    provider: "os-keychain",
-    required: [
-      { name: "DATABASE_URL", scope: "runtime", services: ["api"], sensitive: true },
-    ],
-    optional: [
-      "CASDOOR_CLIENT_SECRET",
-      "GH_TOKEN",
-      "LITELLM_BASE_URL",
-      "AGENTMEMORY_FED_TOKEN",
-      "PAPERCLIP_API_KEY",
-    ],
-  })
-
-  // Registry de integracoes (dual-lane Composio nuvem + Printing Press local).
-  // Declarativo: sugere ferramentas por template, NAO instala nada. Opt-in via
-  // `gstack_vibehard tools`.
+  writeJson(join(gstackDir, "secrets.schema.json"), SECRETS_SCHEMA)
+  // Registry declarativo (dual-lane Composio + Printing Press); NÃO instala nada.
   writeJson(join(gstackDir, "integrations.json"), buildIntegrationsRegistry(templateName))
-
-  // Context docs + loop budget (governanca de workflows agenticos).
-  // Declarativo: context.json (summary-only no session_start) + loop-budget.json
-  // (caps/circuit breakers consumidos pelo graph runner; delegacao opt-in).
+  // Context docs + loop budget (governança de workflows agênticos; delegação opt-in).
   writeJson(join(gstackDir, "context.json"), buildContextRegistry())
   writeJson(join(gstackDir, "loop-budget.json"), DEFAULT_LOOP_BUDGET)
+}
+function writeContextDocDirs(projectDir) {
   for (const rel of Object.values(CONTEXT_DOC_SOURCES)) {
     const d = join(projectDir, rel)
     mkdirSync(d, { recursive: true })
     const keep = join(d, ".gitkeep")
     if (!existsSync(keep)) writeFileSync(keep, "")
   }
+}
 
-  // Dockerfile por stack: AI = Python (uvicorn); demais = Node multi-stage.
-  // Mobile (Expo) nao e containerizado — Docker cobre apenas a API.
-  const isPython = templateName === "ai-agent-platform"
-  const dockerfile = isPython
-? `FROM python:3.11-slim AS base
+// Dockerfile por stack: AI = Python (uvicorn); demais = Node multi-stage.
+// Mobile (Expo) não é containerizado — Docker cobre apenas a API.
+const PY_DOCKERFILE = `FROM python:3.11-slim AS base
 WORKDIR /app
 ENV PYTHONUNBUFFERED=1
 COPY pyproject.toml ./
@@ -739,7 +727,7 @@ USER gstack
 EXPOSE 8000
 CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 `
-: `FROM node:20-alpine AS deps
+const NODE_DOCKERFILE = `FROM node:20-alpine AS deps
 WORKDIR /app
 COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* ./
 RUN corepack enable && pnpm install --frozen-lockfile || pnpm install
@@ -756,10 +744,9 @@ COPY --from=build --chown=gstack:gstack /app /app
 USER gstack
 CMD ["node", "apps/api/dist/index.js"]
 `
-  writeFileSync(join(projectDir, "Dockerfile"), dockerfile)
+const pickDockerfile = (isPython) => (isPython ? PY_DOCKERFILE : NODE_DOCKERFILE)
 
-  writeFileSync(join(projectDir, ".dockerignore"),
-`node_modules
+const DOCKERIGNORE = `node_modules
 .git
 .env
 .env.*
@@ -768,16 +755,8 @@ build
 coverage
 graphify-out
 .gstack/casdoor.json
-`)
-
-  // .gitignore SEMPRE gerado em runtime (não empacotado): o npm faz strip de
-  // qualquer arquivo `.gitignore` do tarball, então o do template nunca chega ao
-  // usuário. Como o create agora roda `git init`, sem isto um `git add -A` estagia
-  // node_modules e — pior — o `.env` com secrets. Só escreve se não houver um.
-  const gitignorePath = join(projectDir, ".gitignore")
-  if (!existsSync(gitignorePath)) {
-    writeFileSync(gitignorePath,
-`# Dependências
+`
+const GITIGNORE = `# Dependências
 node_modules/
 
 # Build / saída
@@ -805,16 +784,23 @@ graphify-out/
 # SO / logs
 .DS_Store
 *.log
-`)
-  }
+`
+// .gitignore SEMPRE gerado em runtime (não empacotado): o npm faz strip de qualquer
+// `.gitignore` do tarball. Como o create roda `git init`, sem isto um `git add -A`
+// estagiaria node_modules e — pior — o `.env` com secrets. Só escreve se não houver.
+function writeGitignoreIfAbsent(projectDir) {
+  const gitignorePath = join(projectDir, ".gitignore")
+  if (existsSync(gitignorePath)) return
+  writeFileSync(gitignorePath, GITIGNORE)
+}
 
-  // Comando de dev por stack: AI = uvicorn; mobile = dev:api + dev:mobile
-  // (nao ha root `dev`); demais = pnpm dev.
-  const devCommand = isPython
-    ? "uv run uvicorn api.main:app --reload --port \"${API_PORT:-8000}\""
-    : (templateName === "mobile-backend"
-      ? "pnpm dev:api & pnpm dev:mobile"
-      : "pnpm dev")
+// Comando de dev por stack: AI = uvicorn; mobile = dev:api + dev:mobile; demais = pnpm dev.
+function pickDevCommand(isPython, templateName) {
+  if (isPython) return "uv run uvicorn api.main:app --reload --port \"${API_PORT:-8000}\""
+  if (templateName === "mobile-backend") return "pnpm dev:api & pnpm dev:mobile"
+  return "pnpm dev"
+}
+function writeDevScript(scriptsDir, devCommand) {
   const devScript =
 `#!/usr/bin/env sh
 set -eu
@@ -830,12 +816,31 @@ echo "gstack dev: web=$WEB_PORT api=$API_PORT teams=1"
 ${devCommand}
 `
   writeFileSync(join(scriptsDir, "dev.sh"), devScript)
-  try { chmodSync(join(scriptsDir, "dev.sh"), 0o755) } catch {}
-
+  try { chmodSync(join(scriptsDir, "dev.sh"), 0o755) } catch { /* chmod best-effort */ }
+}
+function copyHelperScripts(projectRoot, scriptsDir) {
   for (const script of ["deep_research.py", "team_builder.py"]) {
     const src = join(projectRoot, "scripts", "scripts", script)
     if (existsSync(src)) copyFileSync(src, join(scriptsDir, script))
   }
+}
+
+export function writeRuntimeFiles({ projectDir, projectName, now, projectRoot, templateName, isLite = false }) {
+  const gstackDir = join(projectDir, ".gstack")
+  const scriptsDir = join(projectDir, "scripts")
+  mkdirSync(gstackDir, { recursive: true })
+  mkdirSync(scriptsDir, { recursive: true })
+  const tpl = TEMPLATE_MANIFEST[templateName] || TEMPLATE_MANIFEST["fullstack-monorepo"]
+
+  writeGstackManifests(gstackDir, { projectName, now, isLite, tpl, templateName })
+  writeContextDocDirs(projectDir)
+
+  const isPython = templateName === "ai-agent-platform"
+  writeFileSync(join(projectDir, "Dockerfile"), pickDockerfile(isPython))
+  writeFileSync(join(projectDir, ".dockerignore"), DOCKERIGNORE)
+  writeGitignoreIfAbsent(projectDir)
+  writeDevScript(scriptsDir, pickDevCommand(isPython, templateName))
+  copyHelperScripts(projectRoot, scriptsDir)
 }
 
 async function writeJsonMerge(targetPath, newConfig, opts) {
@@ -1339,233 +1344,202 @@ export function scaffoldVerticalTemplate(templateName, projectDir, projectName, 
 //  createProject — DAG Boot Sequencial Estrito
 // ─────────────────────────────────────────────────────────────
 
-export async function createProject(options = {}) {
+const VALID_TEMPLATES = {
+  "fullstack-monorepo": { label: "Fullstack (React + Express + Supabase)", default: true },
+  "saas-auth-stripe": { label: "SaaS (Next.js + Supabase + Stripe)", default: false },
+  "mobile-backend": { label: "Mobile (Expo + tRPC + PostgreSQL)", default: false },
+  "ai-agent-platform": { label: "AI Agent Platform (LangGraph + Vector DB)", default: false },
+}
+const resolveTemplateName = (args) => {
+  const i = args.findIndex((a) => a === "--template")
+  return i !== -1 && args[i + 1] ? args[i + 1] : "fullstack-monorepo"
+}
+function createRuntime(options) {
+  return {
+    logger: options.logger || defaultLogger,
+    cwd: options.cwd || process.cwd(),
+    projectRoot: options.projectRoot || getProjectRoot(),
+    execSync: options.execSync || defaultExecSync,
+    now: options.now || (() => new Date().toISOString()),
+  }
+}
+function resolveCreateCtx(options) {
   const args = options.args || []
-  const projectName = args[0]
-  const logger = options.logger || defaultLogger
-  const cwd = options.cwd || process.cwd()
-  const projectRoot = options.projectRoot || getProjectRoot()
-  const execSync = options.execSync || defaultExecSync
-  const now = options.now || (() => new Date().toISOString())
-  // DEFAULT = LITE (P0.5): sem `--full`, o create é lite e project-scoped (só ./app,
-  // sem Casdoor/Atomic/ECC nem escrita global). `--lite` continua válido; em
-  // conflito (`--lite --full`), lite vence (mais seguro).
-  const isLite = args.includes("--lite") || !args.includes("--full")
-
-  // Parse --template flag
-  const templateFlagIndex = args.findIndex((a) => a === "--template")
-  const templateName = templateFlagIndex !== -1 && args[templateFlagIndex + 1]
-    ? args[templateFlagIndex + 1]
-    : "fullstack-monorepo"
-
-  const VALID_TEMPLATES = {
-    "fullstack-monorepo": { label: "Fullstack (React + Express + Supabase)", default: true },
-    "saas-auth-stripe": { label: "SaaS (Next.js + Supabase + Stripe)", default: false },
-    "mobile-backend": { label: "Mobile (Expo + tRPC + PostgreSQL)", default: false },
-    "ai-agent-platform": { label: "AI Agent Platform (LangGraph + Vector DB)", default: false },
+  return {
+    args, options,
+    projectName: args[0],
+    // DEFAULT = LITE (P0.5): sem `--full`, é project-scoped; em conflito lite vence.
+    isLite: args.includes("--lite") || !args.includes("--full"),
+    templateName: resolveTemplateName(args),
+    ...createRuntime(options),
   }
+}
+function validateCreate(projectName, templateName) {
+  if (!VALID_TEMPLATES[templateName]) throw new Error(`Template invalido: "${templateName}". Validos: ${Object.keys(VALID_TEMPLATES).join(", ")}`)
+  if (!projectName) throw new Error(`Uso: gstack_vibehard create <nome-do-app> [--template ${Object.keys(VALID_TEMPLATES).join("|")}]`)
+  // C1: allowlist estrito. C1b: rejeita ".", ".." e dotfiles (traversal/clobber de .git/.gstack).
+  if (!/^[a-zA-Z0-9._-]+$/.test(projectName)) throw new Error(`Nome de projeto invalido: "${projectName}". Use apenas letras, numeros, ponto, hifen e underline.`)
+  if (/^\.+$/.test(projectName) || projectName.startsWith(".")) throw new Error(`Nome de projeto invalido: "${projectName}". Nao use "." , ".." nem nomes iniciados por ponto.`)
+}
 
-  if (!VALID_TEMPLATES[templateName]) {
-    throw new Error(
-      `Template invalido: "${templateName}". Validos: ${Object.keys(VALID_TEMPLATES).join(", ")}`
-    )
+function buildDryRunReport(c, projectDir) {
+  const { isLite, projectName, templateName } = c
+  return {
+    project: projectName, template: templateName, mode: isLite ? "lite" : "full", dir: projectDir,
+    writes: { projectScoped: [projectDir], global: isLite ? [] : [join(HOME, ".atomic")] },
+    provisions: isLite ? [] : ["Casdoor (Docker)", "Atomic VCS", "ECC (ecc-universal)", "AgentMemory federation"],
+    note: "dry-run: nada foi escrito",
   }
+}
+// DRY-RUN (P0.5): mostra o impacto e NÃO escreve nada. Com --json, JSON puro.
+function createDryRun(c, projectDir) {
+  const report = buildDryRunReport(c, projectDir)
+  if (c.args.includes("--json")) process.stdout.write(JSON.stringify(report) + "\n")
+  else console.log(`\n  create --dry-run (${report.mode}): criaria ${projectDir} (escrita global: ${report.writes.global.length ? report.writes.global.join(", ") : "nenhuma"})`)
+  return report
+}
 
-  if (!projectName) {
-    throw new Error(`Uso: gstack_vibehard create <nome-do-app> [--template ${Object.keys(VALID_TEMPLATES).join("|")}]`)
-  }
-
-  // C1: allowlist estrito — apenas letras, numeros, ponto, hifen, underline
-  if (!/^[a-zA-Z0-9._-]+$/.test(projectName)) {
-    throw new Error(`Nome de projeto invalido: "${projectName}". Use apenas letras, numeros, ponto, hifen e underline.`)
-  }
-  // C1b: o allowlist acima aceita ".", ".." e dotfiles (".git") — todos perigosos
-  // (traversal p/ diretório-pai; clobber de ".git"/".gstack"). Rejeita nome que seja
-  // só pontos ou comece por ponto: um projeto não precisa disso e o risco é real.
-  if (/^\.+$/.test(projectName) || projectName.startsWith(".")) {
-    throw new Error(`Nome de projeto invalido: "${projectName}". Nao use "." , ".." nem nomes iniciados por ponto.`)
-  }
-
-  const projectDir = join(cwd, projectName)
-
-  // DRY-RUN (P0.5): mostra o impacto e NÃO escreve nada. Com --json, JSON puro.
-  if (args.includes("--dry-run")) {
-    const report = {
-      project: projectName,
-      template: templateName,
-      mode: isLite ? "lite" : "full",
-      dir: projectDir,
-      writes: {
-        projectScoped: [projectDir],
-        global: isLite ? [] : [join(HOME, ".atomic")],
-      },
-      provisions: isLite ? [] : ["Casdoor (Docker)", "Atomic VCS", "ECC (ecc-universal)", "AgentMemory federation"],
-      note: "dry-run: nada foi escrito",
-    }
-    if (args.includes("--json")) process.stdout.write(JSON.stringify(report) + "\n")
-    else console.log(`\n  create --dry-run (${report.mode}): criaria ${projectDir} (escrita global: ${report.writes.global.length ? report.writes.global.join(", ") : "nenhuma"})`)
-    return report
-  }
-
-  if (existsSync(projectDir)) {
-    throw new Error(`Diretorio '${projectName}' ja existe.`)
-  }
-
+// Fases 1-3 do Full (Casdoor/Atomic/ECC/AgentMemory). STATUS honesto por componente.
+function runFullProvisioning(c, projectDir) {
+  const { logger, args, projectName } = c
   const phases = {}
-
-  if (isLite) {
-    console.log(`\n  Modo lite ativado — pulando: Casdoor, Atomic VCS, ECC (ecc-universal), AgentMemory Federation`)
-  }
-
-  if (!isLite) {
-    console.log(`\n  === Fase 1/5: IAM Local (Casdoor) ===`)
-    mkdirSync(projectDir, { recursive: true })
-    const casdoorUrl = startCasdoor(logger, projectDir)
-    // STATUS honesto: online se subiu; degraded se Docker/Casdoor não disponíveis.
-    phases.casdoor = { status: casdoorUrl ? "online" : "degraded", url: casdoorUrl }
-
-    console.log(`\n  === Fase 2/5: Atomic VCS ===`)
-    writeAtomicConfig(projectDir)
-    phases.atomic = { status: initAtomic(logger, projectDir, { allowRemote: args.includes("--allow-remote-downloads") }) }
-  }
-
-  if (!isLite) {
-    console.log(`\n  === Fase 3/5: Daemons & Memoria ===`)
-    phases.ecc = { status: bootEcc(logger, projectDir) }
-    writeControlPlaneConfig(projectDir, projectName)
-    phases.agentmemory = { status: bootAgentMemory(logger, projectDir) }
-    writeMemoryFederationConfig(projectDir)
-  }
-
-  // Em lite, o VCS é o git (app.json `vcs: "git"`): garante o diretório (ainda não
-  // criado em lite) e inicializa o repo ANTES do graphify, para ele instalar os
-  // hooks de commit sem precisar de `git init` manual. Em full, o VCS é o Atomic.
-  if (isLite) {
-    mkdirSync(projectDir, { recursive: true })
-    bootGit(logger, projectDir, options.gitExec)
-  }
-  bootGraphify(logger, projectDir)
-
+  console.log(`\n  === Fase 1/5: IAM Local (Casdoor) ===`)
+  mkdirSync(projectDir, { recursive: true })
+  const casdoorUrl = startCasdoor(logger, projectDir)
+  phases.casdoor = { status: casdoorUrl ? "online" : "degraded", url: casdoorUrl }
+  console.log(`\n  === Fase 2/5: Atomic VCS ===`)
+  writeAtomicConfig(projectDir)
+  phases.atomic = { status: initAtomic(logger, projectDir, { allowRemote: args.includes("--allow-remote-downloads") }) }
+  console.log(`\n  === Fase 3/5: Daemons & Memoria ===`)
+  phases.ecc = { status: bootEcc(logger, projectDir) }
+  writeControlPlaneConfig(projectDir, projectName)
+  phases.agentmemory = { status: bootAgentMemory(logger, projectDir) }
+  writeMemoryFederationConfig(projectDir)
+  return phases
+}
+function scaffoldTemplate(c, projectDir) {
+  const { templateName, projectRoot, projectName, logger } = c
   console.log(`\n  === Fase 4/5: Scaffold ${templateName} (${OMNIHARNESS_MAP.length} IDEs) ===`)
-  if (templateName === "fullstack-monorepo") {
-    const templateRoot = join(projectRoot, "templates", "templates", "fullstack-monorepo")
-    copyRecursive(templateRoot, projectDir)
-  } else {
-    scaffoldVerticalTemplate(templateName, projectDir, projectName, logger)
-  }
-  writeRuntimeFiles({ projectDir, projectName, now, projectRoot, templateName, isLite })
+  if (templateName === "fullstack-monorepo") copyRecursive(join(projectRoot, "templates", "templates", "fullstack-monorepo"), projectDir)
+  else scaffoldVerticalTemplate(templateName, projectDir, projectName, logger)
+  writeRuntimeFiles({ projectDir, projectName, now: c.now, projectRoot, templateName, isLite: c.isLite })
   writeSkillsDir(projectDir)
-
+}
+async function tryHarnessBridge(projectDir, options, logger) {
+  try { await writeRealHarnessBridge(projectDir, options) }
+  catch (e) { logger.warn(`Harness Bridge nao pode ser escrito: ${e.message || e} (non-blocking)`) }
+}
+async function scaffoldOrchestration(c, projectDir) {
+  const { projectName, isLite, options, logger } = c
   console.log(`\n  === Fase 5/5: Scaffold & Orquestracao Macro ===`)
   writeHarnessFiles(projectDir, projectName, { isLite })
-  if (!isLite) {
-    try {
-      await writeRealHarnessBridge(projectDir, options)
-    } catch (e) {
-      logger.warn(`Harness Bridge nao pode ser escrito: ${e.message || e} (non-blocking)`)
-    }
-  }
+  if (!isLite) await tryHarnessBridge(projectDir, options, logger)
   writeTeamMatrix(projectDir, projectName)
   writeGatewayMcpConfig(projectDir)
   writePaperclipManifest(projectDir, projectName)
-  // Casdoor/IAM nao existe em modo lite — nao escrever config que aponta para
-  // um servico offline (admin/123 @ localhost:8000)
+  // Casdoor/IAM não existe em lite — não escrever config apontando p/ serviço offline.
   if (!isLite) writeCasdoorProjectConfig(projectDir)
+  bootHeadroom(logger, projectDir) // non-critical, try/catch interno
+}
 
-  // ── Boot Headroom (non-critical, wrapped in try/catch) ──
-  bootHeadroom(logger, projectDir)
-
-  // ── Obsidian Vault Global (P0.5): só em --full ou --vault. Em LITE (padrão) o
-  //    gstack NÃO escreve nada global — nada em ~/gstack-vault.
-  const writeVault = !isLite || args.includes("--vault")
-  let vaultProjectDir = null
-  if (writeVault) {
-    const vaultDir = join(homedir(), "gstack-vault")
-    vaultProjectDir = join(vaultDir, "projects", projectName)
-    mkdirSync(vaultProjectDir, { recursive: true })
-    logger.info(`Vault project: ${vaultProjectDir}`)
-
-  // Symlink graphify-out/graph.json into vault (if graphify has run)
+function writeLinkVaultScripts(projectDir, vaultProjectDir) {
+  const postInitScript = join(projectDir, "scripts", "link-vault.sh")
+  mkdirSync(dirname(postInitScript), { recursive: true })
+  writeFileSync(postInitScript, [
+    "#!/bin/sh",
+    `# Auto-generated: link graph.json to ${vaultProjectDir}`,
+    `VAULT_TARGET="${vaultProjectDir}/graph.json"`,
+    `GRAPH_SOURCE="${projectDir}/graphify-out/graph.json"`,
+    'if [ -f "$GRAPH_SOURCE" ]; then',
+    '  ln -sf "$GRAPH_SOURCE" "$VAULT_TARGET" 2>/dev/null || cp "$GRAPH_SOURCE" "$VAULT_TARGET"',
+    '  echo "Vault graph link: $VAULT_TARGET"',
+    'fi',
+  ].join("\n") + "\n")
+  const postInitPs1 = join(projectDir, "scripts", "link-vault.ps1")
+  writeFileSync(postInitPs1, [
+    "# Auto-generated: link graph.json to vault",
+    `$vaultTarget = "${vaultProjectDir.replace(/\\/g, '\\\\')}\\graph.json"`,
+    `$graphSource = "${projectDir.replace(/\\/g, '\\\\')}\\graphify-out\\graph.json"`,
+    "if (Test-Path $graphSource) {",
+    "  Remove-Item -Force $vaultTarget -ErrorAction SilentlyContinue",
+    "  New-Item -ItemType SymbolicLink -Path $vaultTarget -Target $graphSource -ErrorAction SilentlyContinue | Out-Null",
+    '  if (-not (Test-Path $vaultTarget)) { Copy-Item $graphSource $vaultTarget -Force }',
+    '  Write-Host "Vault graph link: $vaultTarget"',
+    "}",
+  ].join("\n") + "\n")
+}
+function linkExistingGraph(graphSource, graphTarget, logger) {
+  try { unlinkSync(graphTarget) } catch { /* sem stale */ }
+  try { symlinkSync(graphSource, graphTarget, "file"); logger.success(`Graph symlink: ${graphTarget} → ${graphSource}`) }
+  catch { copyFileSync(graphSource, graphTarget); logger.info(`Graph copied: ${graphTarget}`) } // Windows sem admin
+}
+function writeGraphPlaceholder(graphTarget, projectDir, vaultProjectDir, projectName, logger, now) {
+  writeFileSync(graphTarget, JSON.stringify({ nodes: [], edges: [], project: projectName, created_at: now(), status: "pending" }, null, 2))
+  logger.info(`Graph placeholder: ${graphTarget} (aguardando graphify)`)
+  writeLinkVaultScripts(projectDir, vaultProjectDir)
+}
+function linkVaultGraph(projectDir, vaultProjectDir, projectName, logger, now) {
   const graphSource = join(projectDir, "graphify-out", "graph.json")
   const graphTarget = join(vaultProjectDir, "graph.json")
   try {
-    if (existsSync(graphSource)) {
-      // Remove stale symlink/file at target before linking
-      try { unlinkSync(graphTarget) } catch {}
-      try {
-        symlinkSync(graphSource, graphTarget, "file")
-        logger.success(`Graph symlink: ${graphTarget} → ${graphSource}`)
-      } catch {
-        // Fallback: copy if symlink not supported (Windows without admin/elevation)
-        copyFileSync(graphSource, graphTarget)
-        logger.info(`Graph copied: ${graphTarget}`)
-      }
-    } else {
-      // Create placeholder so vault always has the file structure
-      writeFileSync(graphTarget, JSON.stringify({ nodes: [], edges: [], project: projectName, created_at: now(), status: "pending" }, null, 2))
-      logger.info(`Graph placeholder: ${graphTarget} (aguardando graphify)`)
+    if (existsSync(graphSource)) linkExistingGraph(graphSource, graphTarget, logger)
+    else writeGraphPlaceholder(graphTarget, projectDir, vaultProjectDir, projectName, logger, now)
+  } catch (e) { logger.warn(`Vault graph symlink: ${e.message} (non-blocking)`) }
+}
+// Vault Global (P0.5): só em --full ou --vault. Em LITE nada global é escrito.
+function setupVault(c, projectDir) {
+  if (!(!c.isLite || c.args.includes("--vault"))) return null
+  const vaultProjectDir = join(homedir(), "gstack-vault", "projects", c.projectName)
+  mkdirSync(vaultProjectDir, { recursive: true })
+  c.logger.info(`Vault project: ${vaultProjectDir}`)
+  linkVaultGraph(projectDir, vaultProjectDir, c.projectName, c.logger, c.now)
+  return vaultProjectDir
+}
 
-      // Write a post-init script that will symlink once graphify runs
-      const postInitScript = join(projectDir, "scripts", "link-vault.sh")
-      mkdirSync(dirname(postInitScript), { recursive: true })
-      writeFileSync(postInitScript, [
-        "#!/bin/sh",
-        `# Auto-generated: link graph.json to ${vaultProjectDir}`,
-        `VAULT_TARGET="${vaultProjectDir}/graph.json"`,
-        `GRAPH_SOURCE="${projectDir}/graphify-out/graph.json"`,
-        'if [ -f "$GRAPH_SOURCE" ]; then',
-        '  ln -sf "$GRAPH_SOURCE" "$VAULT_TARGET" 2>/dev/null || cp "$GRAPH_SOURCE" "$VAULT_TARGET"',
-        '  echo "Vault graph link: $VAULT_TARGET"',
-        'fi',
-      ].join("\n") + "\n")
-
-      // Windows variant
-      const postInitPs1 = join(projectDir, "scripts", "link-vault.ps1")
-      writeFileSync(postInitPs1, [
-        "# Auto-generated: link graph.json to vault",
-        `$vaultTarget = "${vaultProjectDir.replace(/\\/g, '\\\\')}\\graph.json"`,
-        `$graphSource = "${projectDir.replace(/\\/g, '\\\\')}\\graphify-out\\graph.json"`,
-        "if (Test-Path $graphSource) {",
-        "  Remove-Item -Force $vaultTarget -ErrorAction SilentlyContinue",
-        "  New-Item -ItemType SymbolicLink -Path $vaultTarget -Target $graphSource -ErrorAction SilentlyContinue | Out-Null",
-        '  if (-not (Test-Path $vaultTarget)) { Copy-Item $graphSource $vaultTarget -Force }',
-        '  Write-Host "Vault graph link: $vaultTarget"',
-        "}",
-      ].join("\n") + "\n")
-    }
-    } catch (e) {
-      logger.warn(`Vault graph symlink: ${e.message} (non-blocking)`)
-    }
-  }
-
+const compIcon = (st) => ((st === "online" || st === "installed") ? "✓" : st === "degraded" ? "⚠" : "–")
+const phaseStatus = (phases, key) => (phases[key] ? phases[key].status : undefined)
+// STATUS HONESTO por componente do Full (installed/online vs degraded).
+function printFullComponents(phases, logger) {
+  logger.info("  Componentes do Full (status real nesta maquina):")
+  const comps = [
+    ["Casdoor IAM", phaseStatus(phases, "casdoor")],
+    ["Atomic VCS", phaseStatus(phases, "atomic")],
+    ["ECC (otimizador)", phaseStatus(phases, "ecc")],
+    ["AgentMemory mesh", phaseStatus(phases, "agentmemory")],
+  ]
+  for (const [name, st] of comps) logger.info(`    ${compIcon(st)} ${name}: ${st || "n/a"}`)
+  if (comps.some(([, s]) => s === "degraded")) logger.info("    (⚠ degraded = nao instalado nesta maquina; veja os avisos acima p/ o reparo — Git/projeto seguem funcionais)")
+}
+function printCreateSummary(c, projectDir, phases, vaultProjectDir) {
+  const { logger, projectName, templateName, isLite } = c
   logger.success(`Projeto '${projectName}' criado (template: ${templateName})`)
   logger.info(`  Diretorio: ${projectDir}`)
   logger.info(`  Template: ${templateName}`)
-  // STATUS HONESTO por componente do Full (installed/online vs degraded). Nada de
-  // "✓ configurado" falso: se a máquina não tinha Docker/Rust, aparece degraded.
-  if (!isLite) {
-    logger.info("  Componentes do Full (status real nesta maquina):")
-    const comps = [
-      ["Casdoor IAM", phases.casdoor?.status],
-      ["Atomic VCS", phases.atomic?.status],
-      ["ECC (otimizador)", phases.ecc?.status],
-      ["AgentMemory mesh", phases.agentmemory?.status],
-    ]
-    for (const [name, st] of comps) {
-      const icon = (st === "online" || st === "installed") ? "✓" : st === "degraded" ? "⚠" : "–"
-      logger.info(`    ${icon} ${name}: ${st || "n/a"}`)
-    }
-    if (comps.some(([, s]) => s === "degraded")) {
-      logger.info("    (⚠ degraded = nao instalado nesta maquina; veja os avisos acima p/ o reparo — Git/projeto seguem funcionais)")
-    }
-  }
+  if (!isLite) printFullComponents(phases, logger)
   if (!isLite) logger.info(`  IAM: http://localhost:8000 (admin/123)`)
   if (vaultProjectDir) logger.info(`  Vault: ${vaultProjectDir}`)
   else logger.info(`  Modo lite: projeto isolado em ./${projectName} (sem escrita global). Use --full ou --vault para o vault Obsidian.`)
   logger.info(`  Quality gate: npx fallow audit --format json`)
   logger.info(`  Dev: cd ${projectName} && pnpm dev`)
+}
 
-  return { projectDir, phases, vaultDir: vaultProjectDir, template: templateName }
+export async function createProject(options = {}) {
+  const c = resolveCreateCtx(options)
+  validateCreate(c.projectName, c.templateName)
+  const projectDir = join(c.cwd, c.projectName)
+  if (c.args.includes("--dry-run")) return createDryRun(c, projectDir)
+  if (existsSync(projectDir)) throw new Error(`Diretorio '${c.projectName}' ja existe.`)
+  if (c.isLite) console.log(`\n  Modo lite ativado — pulando: Casdoor, Atomic VCS, ECC (ecc-universal), AgentMemory Federation`)
+  const phases = c.isLite ? {} : runFullProvisioning(c, projectDir)
+  // Em lite, o VCS é o git: garante o dir e inicializa o repo ANTES do graphify
+  // (hooks de commit sem `git init` manual). Em full, o VCS é o Atomic.
+  if (c.isLite) { mkdirSync(projectDir, { recursive: true }); bootGit(c.logger, projectDir, options.gitExec) }
+  bootGraphify(c.logger, projectDir)
+  scaffoldTemplate(c, projectDir)
+  await scaffoldOrchestration(c, projectDir)
+  const vaultProjectDir = setupVault(c, projectDir)
+  printCreateSummary(c, projectDir, phases, vaultProjectDir)
+  return { projectDir, phases, vaultDir: vaultProjectDir, template: c.templateName }
 }
 
 export async function createCommand(args) {

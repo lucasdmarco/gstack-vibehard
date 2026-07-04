@@ -45,33 +45,38 @@ function checkDrift() {
   }
 }
 
+function agentsBuild(args) {
+  section("agents build")
+  try { runScript(args.includes("--dry-run") ? ["--dry-run"] : []); success("Adapters gerados (agents/generated/).") }
+  catch { error("Falha no build dos agentes."); process.exitCode = 1 }
+}
+function agentsCheck(json) {
+  const d = checkDrift()
+  if (json) { process.stdout.write(JSON.stringify(d) + "\n"); if (!d.ok) process.exitCode = 1; return }
+  section("agents check")
+  if (d.ok) success("OK — generated em dia com core/knowledge/agents.")
+  else { error(`Drift: ${d.detail}`); info("  Corrija com `gstack_vibehard agents build`."); process.exitCode = 1 }
+}
+function agentsDiff() {
+  section("agents diff (dry-run)")
+  try { runScript(["--dry-run"]) } catch { /* dry-run não bloqueia */ }
+}
+const explainId = (args) => args.filter((a) => !a.startsWith("-"))[1]
+
+const AGENTS_HANDLERS = {
+  build: (args) => agentsBuild(args),
+  check: (args, json) => agentsCheck(json),
+  diff: () => agentsDiff(),
+  list: (args, json) => listCmd(json),
+  explain: (args, json) => explainCmd(explainId(args), json),
+  doctor: (args, json) => doctorCmd(json),
+}
+
 export async function agentsCommand(args = [], opts = {}) {
   const sub = args.find((a) => !a.startsWith("-")) || "doctor"
   const json = args.includes("--json")
-
-  if (sub === "build") {
-    section("agents build")
-    try { runScript(args.includes("--dry-run") ? ["--dry-run"] : []); success("Adapters gerados (agents/generated/).") }
-    catch { error("Falha no build dos agentes."); process.exitCode = 1 }
-    return
-  }
-  if (sub === "check") {
-    const d = checkDrift()
-    if (json) { process.stdout.write(JSON.stringify(d) + "\n"); if (!d.ok) process.exitCode = 1; return }
-    section("agents check")
-    if (d.ok) success("OK — generated em dia com core/knowledge/agents.")
-    else { error(`Drift: ${d.detail}`); info("  Corrija com `gstack_vibehard agents build`."); process.exitCode = 1 }
-    return
-  }
-  if (sub === "diff") {
-    section("agents diff (dry-run)")
-    try { runScript(["--dry-run"]) } catch { /* dry-run não bloqueia */ }
-    return
-  }
-  if (sub === "list") return listCmd(json)
-  if (sub === "explain") return explainCmd(args.filter((a) => !a.startsWith("-"))[1], json)
-  if (sub === "doctor") return doctorCmd(json)
-
+  const handler = AGENTS_HANDLERS[sub]
+  if (handler) return handler(args, json)
   warn(`Subcomando desconhecido: ${sub}`)
   info("  Use: agents <build|check|diff|doctor|list|explain>")
 }
@@ -83,74 +88,122 @@ function listCmd(json) {
   for (const a of agents) info(`  • ${a.id}${a.description ? ` — ${a.description}` : ""}`)
 }
 
-function explainCmd(id, json) {
-  if (!id) { error("Uso: agents explain <agent>"); return }
-  const a = listSourceAgents().find((x) => x.id === id)
-  if (!a) { warn(`Agente não encontrado: ${id}`); return }
+const adapterStatusOf = (p) => (existsSync(p) ? (hasExecutionContract(readFileSync(p, "utf-8")) ? "ok+contract" : "SEM contrato") : "ausente")
+const descOr = (d) => d || "(sem descrição)"
+function agentAdapterStatus(id) {
   const adapters = {
     claude: join(GEN, "claude", id, "SKILL.md"),
     codex: join(GEN, "codex", `${id}.toml`),
     cursor: join(GEN, "cursor", "rules", `${id}.mdc`),
   }
   const status = {}
-  for (const [k, p] of Object.entries(adapters)) {
-    status[k] = existsSync(p) ? (hasExecutionContract(readFileSync(p, "utf-8")) ? "ok+contract" : "SEM contrato") : "ausente"
-  }
-  if (json) { process.stdout.write(JSON.stringify({ id, description: a.description, source: a.file, adapters: status }) + "\n"); return }
-  section(`agents explain — ${id}`)
-  info(`  Descrição: ${a.description || "(sem descrição)"}`)
-  info(`  Fonte: ${a.file}`)
+  for (const [k, p] of Object.entries(adapters)) status[k] = adapterStatusOf(p)
+  return status
+}
+function printAdapterStatus(status) {
   for (const [k, s] of Object.entries(status)) (s.startsWith("ok") ? success : warn)(`  ${k}: ${s}`)
+}
+function explainCmd(id, json) {
+  if (!id) return error("Uso: agents explain <agent>")
+  const a = listSourceAgents().find((x) => x.id === id)
+  if (!a) return warn(`Agente não encontrado: ${id}`)
+  const status = agentAdapterStatus(id)
+  if (json) return process.stdout.write(JSON.stringify({ id, description: a.description, source: a.file, adapters: status }) + "\n")
+  section(`agents explain — ${id}`)
+  info(`  Descrição: ${descOr(a.description)}`)
+  info(`  Fonte: ${a.file}`)
+  printAdapterStatus(status)
+}
+
+// contrato presente em todos os adapters gerados? (per-agente + combinados
+// copilot/gemini; AGENTS.md/índice não conta).
+function collectClaudeAdapters(files) {
+  const dir = join(GEN, "claude")
+  if (!existsSync(dir)) return
+  for (const d of readdirSync(dir)) { const f = join(dir, d, "SKILL.md"); if (existsSync(f)) files.push(f) }
+}
+function collectExtAdapters(files, dirParts, ext) {
+  const dir = join(GEN, ...dirParts)
+  if (!existsSync(dir)) return
+  for (const f of readdirSync(dir)) if (f.endsWith(ext)) files.push(join(dir, f))
+}
+function collectAdapterFiles() {
+  const files = []
+  collectClaudeAdapters(files)
+  collectExtAdapters(files, ["codex"], ".toml")
+  collectExtAdapters(files, ["cursor", "rules"], ".mdc")
+  for (const combined of [join(GEN, "copilot", "copilot-instructions.md"), join(GEN, "gemini", "GEMINI.md")]) if (existsSync(combined)) files.push(combined)
+  return files
+}
+function countMissingContract(files) {
+  let missing = 0
+  for (const f of files) { try { if (!hasExecutionContract(readFileSync(f, "utf-8"))) missing += 1 } catch { missing += 1 } }
+  return { checked: files.length, missing }
+}
+// MATRIZ HONESTA V2 (PRD 14 §4.1): scorecard por harness; instrucional nunca é
+// rotulado enforcement/Zero-Trust (invariante validada pelo scorecard).
+const buildMatrix = (adapters) => Object.entries(adapters).map(([id, a]) => ({ ...capabilityRow(id), status: a.status, files: (a.files || []).length }))
+const agentsDoctorOk = (manifest, drift, contract, scorecard) =>
+  !!manifest && manifest.schemaVersion === 2 && drift.ok && contract.missing === 0 && scorecard.ok
+function buildAgentsDoctorReport(manifest, drift, matrix, contract, scorecard) {
+  return {
+    schemaVersion: manifest ? manifest.schemaVersion : null,
+    compilerVersion: manifest ? manifest.compilerVersion : null,
+    agents: manifest ? manifest.agents : 0,
+    drift: drift.ok ? null : drift.detail,
+    contract,
+    security: manifest ? manifest.security : null,
+    matrix,
+    matrixSchema: "gstack.capability.v2",
+    scorecard,
+    ok: agentsDoctorOk(manifest, drift, contract, scorecard),
+  }
+}
+
+function renderDoctorHeader(manifest, drift) {
+  info(`  Manifest: schemaVersion ${manifest.schemaVersion} · compilado por ${manifest.compilerVersion} · ${manifest.agents} agentes`)
+  ;(drift.ok ? success : error)(`  Drift: ${drift.ok ? "nenhum (generated em dia)" : drift.detail}`)
+}
+function renderDoctorContract(contract) {
+  ;(contract.missing === 0 ? success : error)(`  Execution Contract: ${contract.checked - contract.missing}/${contract.checked} adapters`)
+}
+function renderDoctorSecurity(manifest) {
+  if (!manifest.security) return
+  ;(manifest.security.verdict === "pass" ? success : error)(`  Security: ${manifest.security.verdict} (crit ${manifest.security.critical}, alto ${manifest.security.high})`)
+}
+function renderAgentsMatrix(matrix) {
+  section("Capability matrix V2 (enforcement REAL — instrucional não é enforcement)")
+  for (const r of matrix) {
+    info(`  • ${r.harness}: ${r.status} · ${r.files} arquivo(s) · state=${r.state} · enforcement=${r.enforcement}`)
+    if (r.riskNotes.length) info(`      risco: ${r.riskNotes[0]} · verificado: ${r.lastVerifiedAt} (${r.owner})`)
+  }
+}
+function renderDoctorScorecard(scorecard) {
+  ;(scorecard.ok ? success : error)(`  Scorecard: ${scorecard.ok ? "íntegro (nenhum instrucional reivindica hooks)" : scorecard.errors.join("; ")}`)
+}
+function renderDoctorVerdict(report) {
+  if (!report.ok) { process.exitCode = 1; return warn("Há pendências acima — rode `agents build`.") }
+  success("Agent Factory saudável.")
+}
+function renderAgentsDoctor(report, manifest, drift, scorecard) {
+  section("agents doctor")
+  renderDoctorHeader(manifest, drift)
+  renderDoctorContract(report.contract)
+  renderDoctorSecurity(manifest)
+  renderAgentsMatrix(report.matrix)
+  renderDoctorScorecard(scorecard)
+  renderDoctorVerdict(report)
 }
 
 function doctorCmd(json) {
   const manifest = readManifest()
   const drift = checkDrift()
   const adapters = manifest && manifest.adapters ? manifest.adapters : {}
-  // MATRIZ HONESTA V2 (PRD 14 §4.1): scorecard completo por harness — state,
-  // assets, gaps, onramp, verificação, riscos, dono e data. Nenhum instrucional
-  // é rotulado enforcement/Zero-Trust (invariante validada pelo scorecard).
-  const matrix = Object.entries(adapters).map(([id, a]) => ({
-    ...capabilityRow(id), status: a.status, files: (a.files || []).length,
-  }))
+  const matrix = buildMatrix(adapters)
   const scorecard = validateScorecard()
-  // contrato presente em todos os adapters gerados? (per-agente + combinados copilot/gemini; AGENTS.md/índice não conta)
-  const adapterFilesToCheck = []
-  const claudeDir = join(GEN, "claude")
-  if (existsSync(claudeDir)) for (const d of readdirSync(claudeDir)) { const f = join(claudeDir, d, "SKILL.md"); if (existsSync(f)) adapterFilesToCheck.push(f) }
-  const codexDir = join(GEN, "codex")
-  if (existsSync(codexDir)) for (const f of readdirSync(codexDir)) if (f.endsWith(".toml")) adapterFilesToCheck.push(join(codexDir, f))
-  const cursorRules = join(GEN, "cursor", "rules")
-  if (existsSync(cursorRules)) for (const f of readdirSync(cursorRules)) if (f.endsWith(".mdc")) adapterFilesToCheck.push(join(cursorRules, f))
-  for (const combined of [join(GEN, "copilot", "copilot-instructions.md"), join(GEN, "gemini", "GEMINI.md")]) if (existsSync(combined)) adapterFilesToCheck.push(combined)
-  let missingContract = 0
-  const checked = adapterFilesToCheck.length
-  for (const f of adapterFilesToCheck) { try { if (!hasExecutionContract(readFileSync(f, "utf-8"))) missingContract += 1 } catch { missingContract += 1 } }
-  const report = {
-    schemaVersion: manifest ? manifest.schemaVersion : null,
-    compilerVersion: manifest ? manifest.compilerVersion : null,
-    agents: manifest ? manifest.agents : 0,
-    drift: drift.ok ? null : drift.detail,
-    contract: { checked, missing: missingContract },
-    security: manifest ? manifest.security : null,
-    matrix,
-    matrixSchema: "gstack.capability.v2",
-    scorecard,
-    ok: !!manifest && manifest.schemaVersion === 2 && drift.ok && missingContract === 0 && scorecard.ok,
-  }
+  const contract = countMissingContract(collectAdapterFiles())
+  const report = buildAgentsDoctorReport(manifest, drift, matrix, contract, scorecard)
   if (json) { process.stdout.write(JSON.stringify(report) + "\n"); if (!report.ok) process.exitCode = 1; return }
-  section("agents doctor")
   if (!manifest) { error("manifest.json ausente — rode `agents build`."); process.exitCode = 1; return }
-  info(`  Manifest: schemaVersion ${manifest.schemaVersion} · compilado por ${manifest.compilerVersion} · ${manifest.agents} agentes`)
-  ;(drift.ok ? success : error)(`  Drift: ${drift.ok ? "nenhum (generated em dia)" : drift.detail}`)
-  ;(missingContract === 0 ? success : error)(`  Execution Contract: ${checked - missingContract}/${checked} adapters`)
-  if (manifest.security) (manifest.security.verdict === "pass" ? success : error)(`  Security: ${manifest.security.verdict} (crit ${manifest.security.critical}, alto ${manifest.security.high})`)
-  section("Capability matrix V2 (enforcement REAL — instrucional não é enforcement)")
-  for (const r of matrix) {
-    info(`  • ${r.harness}: ${r.status} · ${r.files} arquivo(s) · state=${r.state} · enforcement=${r.enforcement}`)
-    if (r.riskNotes.length) info(`      risco: ${r.riskNotes[0]} · verificado: ${r.lastVerifiedAt} (${r.owner})`)
-  }
-  ;(scorecard.ok ? success : error)(`  Scorecard: ${scorecard.ok ? "íntegro (nenhum instrucional reivindica hooks)" : scorecard.errors.join("; ")}`)
-  if (!report.ok) { process.exitCode = 1; warn("Há pendências acima — rode `agents build`.") }
-  else success("Agent Factory saudável.")
+  renderAgentsDoctor(report, manifest, drift, scorecard)
 }

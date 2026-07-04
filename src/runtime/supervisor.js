@@ -62,32 +62,42 @@ export function pickState(obj = {}) {
  * processo = base OS-essencial + porta alocada + APENAS os segredos declarados em
  * `secretRefs` (lidos de `opts.envSource`). Nunca o process.env inteiro.
  */
+const readinessPathOf = (s) => s.health && s.health.readiness && s.health.readiness.path
+const readinessTimeoutOf = (s) => (s.health && s.health.readiness && s.health.readiness.timeoutSeconds) || 60
+async function applyPort(s, env, allocate) {
+  if (!s.port) return null
+  const port = s.port.autoAllocate ? await allocate(s.port.preferred) : s.port.preferred
+  if (s.port.env) env[s.port.env] = String(port)
+  return port
+}
+// só os segredos DECLARADOS chegam ao processo (allowlist explícita)
+function applySecrets(s, source, env) {
+  for (const ref of s.secretRefs || []) {
+    if (Object.prototype.hasOwnProperty.call(source, ref) && source[ref] != null) env[ref] = String(source[ref])
+  }
+}
+function buildServicePlan(s, env, port) {
+  return {
+    name: s.name,
+    file: s.command[0],
+    args: s.command.slice(1),
+    cwd: s.cwd || ".",
+    env,
+    port,
+    command: [s.command[0], ...s.command.slice(1)].join(" "),
+    readinessPath: readinessPathOf(s),
+    readinessTimeout: readinessTimeoutOf(s),
+  }
+}
 export async function planStart(manifest, opts = {}) {
   const source = opts.envSource || opts.env || {}
   const allocate = opts.allocatePort || ((p) => allocatePort(p))
   const plans = []
   for (const s of manifest.services || []) {
     const env = safeBaseEnv(source)
-    let port = null
-    if (s.port) {
-      port = s.port.autoAllocate ? await allocate(s.port.preferred) : s.port.preferred
-      if (s.port.env) env[s.port.env] = String(port)
-    }
-    // só os segredos DECLARADOS chegam ao processo (allowlist explícita)
-    for (const ref of s.secretRefs || []) {
-      if (Object.prototype.hasOwnProperty.call(source, ref) && source[ref] != null) env[ref] = String(source[ref])
-    }
-    plans.push({
-      name: s.name,
-      file: s.command[0],
-      args: s.command.slice(1),
-      cwd: s.cwd || ".",
-      env,
-      port,
-      command: [s.command[0], ...s.command.slice(1)].join(" "),
-      readinessPath: s.health && s.health.readiness && s.health.readiness.path,
-      readinessTimeout: (s.health && s.health.readiness && s.health.readiness.timeoutSeconds) || 60,
-    })
+    const port = await applyPort(s, env, allocate)
+    applySecrets(s, source, env)
+    plans.push(buildServicePlan(s, env, port))
   }
   return plans
 }
@@ -127,27 +137,34 @@ export function isProcessOurs(svc, liveAgeSec, nowMs = Date.now(), tolSec = 10) 
  * `-<pid>`). Windows: `taskkill /T /F` via `exec`. Antes de matar, valida o DONO do
  * PID (se `getAgeSec` fornecido): pid reusado/foreign é PULADO, não morto.
  */
-export function stopAll(state, opts = {}) {
-  const exec = opts.exec
-  const kill = opts.kill || ((pid, sig) => process.kill(pid, sig))
-  const getAgeSec = opts.getAgeSec
-  const platform = opts.platform || process.platform
-  const results = []
-  for (const svc of state || []) {
-    if (!svc || !svc.pid) { results.push({ name: svc && svc.name, status: "no-pid" }); continue }
-    if (getAgeSec && !isProcessOurs(svc, getAgeSec(svc.pid))) {
-      results.push({ name: svc.name, status: "skipped-foreign", pid: svc.pid })
-      continue
-    }
-    try {
-      if (exec) { const { file, args } = killTreeCommand(svc.pid, platform); exec(file, args) }
-      else kill(platform === "win32" ? svc.pid : -svc.pid, "SIGTERM")
-      results.push({ name: svc.name, status: "stopped", pid: svc.pid })
-    } catch (e) {
-      results.push({ name: svc.name, status: "already-gone", pid: svc.pid, detail: e.message })
-    }
+// POSIX: caminho NATIVO `process.kill(-pid, SIGTERM)` (mata o GRUPO via syscall).
+// Windows: `taskkill /T /F` via `exec`.
+function doKill(svc, exec, kill, platform) {
+  if (exec) { const { file, args } = killTreeCommand(svc.pid, platform); exec(file, args); return }
+  kill(platform === "win32" ? svc.pid : -svc.pid, "SIGTERM")
+}
+const svcName = (svc) => svc && svc.name
+// Encerra UM serviço. Idempotente; pid reusado/foreign é PULADO, não morto.
+function stopService(svc, ctx) {
+  if (!svc || !svc.pid) return { name: svcName(svc), status: "no-pid" }
+  if (ctx.getAgeSec && !isProcessOurs(svc, ctx.getAgeSec(svc.pid))) {
+    return { name: svc.name, status: "skipped-foreign", pid: svc.pid }
   }
-  return results
+  try {
+    doKill(svc, ctx.exec, ctx.kill, ctx.platform)
+    return { name: svc.name, status: "stopped", pid: svc.pid }
+  } catch (e) {
+    return { name: svc.name, status: "already-gone", pid: svc.pid, detail: e.message }
+  }
+}
+export function stopAll(state, opts = {}) {
+  const ctx = {
+    exec: opts.exec,
+    kill: opts.kill || ((pid, sig) => process.kill(pid, sig)),
+    getAgeSec: opts.getAgeSec,
+    platform: opts.platform || process.platform,
+  }
+  return (state || []).map((svc) => stopService(svc, ctx))
 }
 
 /**
@@ -169,20 +186,27 @@ export async function waitPidsExit(pids, { isAlive: alive = isAlive, timeoutMs =
   return pending
 }
 
+// só 2xx/3xx = saudável. 4xx/5xx = NÃO pronto (404 na rota de health não é "de pé").
+const isHealthy = (res) => res && res.status >= 200 && res.status < 400
+async function probeReadiness(httpGet, url) {
+  try { const res = await httpGet(url); return isHealthy(res) ? res.status : null } catch { return null }
+}
+function pollOpts(opts) {
+  return {
+    httpGet: opts.httpGet,
+    timeoutMs: (opts.timeoutSeconds || 60) * 1000,
+    intervalMs: opts.intervalMs || 500,
+    sleep: opts.sleep || ((ms) => new Promise((r) => setTimeout(r, ms))),
+    now: opts.now || (() => Date.now()),
+  }
+}
 /** Poll de readiness HTTP. `httpGet(url)`→`{status}`|throw. 2xx/3xx = pronto. */
 export async function pollReadiness(url, opts = {}) {
-  const httpGet = opts.httpGet
-  const timeoutMs = (opts.timeoutSeconds || 60) * 1000
-  const intervalMs = opts.intervalMs || 500
-  const sleep = opts.sleep || ((ms) => new Promise((r) => setTimeout(r, ms)))
-  const now = opts.now || (() => Date.now())
+  const { httpGet, timeoutMs, intervalMs, sleep, now } = pollOpts(opts)
   const start = now()
   while (now() - start < timeoutMs) {
-    try {
-      const res = await httpGet(url)
-      // só 2xx/3xx = saudável. 4xx/5xx = NÃO pronto (404 na rota de health não é "de pé").
-      if (res && res.status >= 200 && res.status < 400) return { ok: true, status: res.status }
-    } catch { /* serviço ainda subindo */ }
+    const status = await probeReadiness(httpGet, url)
+    if (status != null) return { ok: true, status }
     await sleep(intervalMs)
   }
   return { ok: false, status: null, timedOut: true }

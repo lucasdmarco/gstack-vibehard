@@ -11,66 +11,54 @@ import { homedir } from "os"
  *
  * @returns {Array<{category, label, global, optional, items: Array<{path, action}>}>}
  */
+const impactAction = (path) => (existsSync(path) ? "modify" : "create")
+function cat(category, label, paths, { global = true, optional = false } = {}) {
+  return { category, label, global, optional, items: paths.map((path) => ({ path, action: impactAction(path) })) }
+}
+function impactOpts(opts) {
+  return {
+    home: opts.home || homedir(),
+    harnessIds: opts.harnessIds || ["codex", "claude", "cursor", "opencode"],
+    withDeps: opts.withDeps !== false,
+    withMcp: opts.withMcp !== false,
+    projectOnly: !!opts.projectOnly,
+  }
+}
+// Config dos harnesses selecionados.
+function harnessConfigPaths(harnessIds, h) {
+  const paths = []
+  if (harnessIds.includes("claude")) paths.push(h(".claude", "settings.json"))
+  if (harnessIds.includes("cursor")) paths.push(h(".cursor", "hooks.json"))
+  if (harnessIds.includes("opencode")) paths.push(h(".config", "opencode", "plugins"), h(".config", "opencode", "opencode.json"))
+  return paths
+}
+// MCP global (opt-in) — muda ferramentas em todo projeto. null se pulado.
+function mcpImpact(o, h) {
+  if (o.projectOnly || !o.withMcp) return null
+  return cat("mcp-global", "MCP global (muda ferramentas em todo projeto)", [h(".mcp.json"), h(".claude.json")], { optional: true })
+}
+// Dependências globais (pesadas). Fonte de verdade: installGlobalDeps (install.js);
+// install_impact.test.js impede item fantasma aqui (ex.: `cli-anything-hub`).
+function depsImpact() {
+  return {
+    category: "deps", label: "Dependências globais (PATH/caches do sistema)", global: true, optional: true,
+    items: ["Bun", "uv", "Rust", "Playwright Chromium", "pytest", "Headroom"].map((path) => ({ path, action: "install-if-missing" })),
+  }
+}
 export function buildInstallImpact(opts = {}) {
-  const home = opts.home || homedir()
-  const harnessIds = opts.harnessIds || ["codex", "claude", "cursor", "opencode"]
-  const withDeps = opts.withDeps !== false
-  const withMcp = opts.withMcp !== false
-  const projectOnly = !!opts.projectOnly
-  const h = (...p) => join(home, ...p)
-  const cat = (category, label, paths, { global = true, optional = false } = {}) => ({
-    category, label, global, optional,
-    items: paths.map((path) => ({ path, action: existsSync(path) ? "modify" : "create" })),
-  })
-
-  const out = []
-
-  // Hooks Python (Quality/Security Gates) — registrados global
-  out.push(cat("hooks", "Hooks (Quality/Security Gates)", [
-    h(".gstack", "hooks"), h(".codex", "hooks"), h(".claude", "hooks"),
-  ]))
-
-  // Config dos harnesses selecionados
-  const harnessPaths = []
-  if (harnessIds.includes("claude")) harnessPaths.push(h(".claude", "settings.json"))
-  if (harnessIds.includes("cursor")) harnessPaths.push(h(".cursor", "hooks.json"))
-  if (harnessIds.includes("opencode")) harnessPaths.push(h(".config", "opencode", "plugins"), h(".config", "opencode", "opencode.json"))
-  if (harnessPaths.length) out.push(cat("harness-config", "Config dos harnesses", harnessPaths))
-
-  // MCP global (opt-in: só com --global-mcp) — muda ferramentas em todo projeto
-  if (!projectOnly && withMcp) {
-    out.push(cat("mcp-global", "MCP global (muda ferramentas em todo projeto)", [
-      h(".mcp.json"), h(".claude.json"),
-    ], { optional: true }))
-  }
-
-  // Skills/scripts globais
-  out.push(cat("skills-scripts", "Skills e scripts globais", [
-    h(".agents", "skills"), h(".agents", "scripts"),
-  ]))
-
-  // Identidade/instrução global
-  out.push(cat("identity", "Identidade/instrução global", [
-    h("CLAUDE.md"), h(".claude", "rules", "ultracode.md"),
-  ]))
-
-  // Vault (segundo cérebro) — pulado em project-only
-  if (!projectOnly) {
-    out.push(cat("vault", "Vault Obsidian global", [h("gstack-vault")], { optional: true }))
-  }
-
-  // Dependências globais (pesadas) — puladas com --skip-deps/--project-only.
-  // Fonte de verdade: o que installGlobalDeps (install.js) REALMENTE instala —
-  // teste de regressão em install_impact.test.js impede item fantasma aqui
-  // (ex.: `cli-anything-hub`, que nunca existiu no npm — PRD14 §4.16).
-  if (withDeps && !projectOnly) {
-    out.push({
-      category: "deps", label: "Dependências globais (PATH/caches do sistema)", global: true, optional: true,
-      items: ["Bun", "uv", "Rust", "Playwright Chromium", "pytest", "Headroom"].map((path) => ({ path, action: "install-if-missing" })),
-    })
-  }
-
-  return out
+  const o = impactOpts(opts)
+  const h = (...p) => join(o.home, ...p)
+  const harnessPaths = harnessConfigPaths(o.harnessIds, h)
+  const sections = [
+    cat("hooks", "Hooks (Quality/Security Gates)", [h(".gstack", "hooks"), h(".codex", "hooks"), h(".claude", "hooks")]),
+    harnessPaths.length ? cat("harness-config", "Config dos harnesses", harnessPaths) : null,
+    mcpImpact(o, h),
+    cat("skills-scripts", "Skills e scripts globais", [h(".agents", "skills"), h(".agents", "scripts")]),
+    cat("identity", "Identidade/instrução global", [h("CLAUDE.md"), h(".claude", "rules", "ultracode.md")]),
+    o.projectOnly ? null : cat("vault", "Vault Obsidian global", [h("gstack-vault")], { optional: true }),
+    (o.withDeps && !o.projectOnly) ? depsImpact() : null,
+  ]
+  return sections.filter(Boolean)
 }
 
 /** Renderiza o impacto como Markdown (para o install-report e o --audit-only). */

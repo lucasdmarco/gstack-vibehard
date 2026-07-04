@@ -146,18 +146,18 @@ async function confirmAndRunPipeline(plan, flags, opts, json, cwd) {
   return { plan, result: pipeline.execResult, pipeline, executed: true }
 }
 
-export async function startCommand(args = [], opts = {}) {
-  const cwd = opts.cwd || process.cwd()
+function resolveStartCtx(args, opts) {
   const flags = parseStartArgs(args)
   const objective = opts.objective !== undefined ? opts.objective : flags.objective
-  const json = flags.json || opts.json === true
+  return { flags, objective, cwd: opts.cwd || process.cwd(), json: flags.json || opts.json === true }
+}
+// start é interativo: sem TTY e sem entradas injetadas/posicionais → orienta `plan`.
+const startNeedsHelp = (objective, opts) => !process.stdin.isTTY && !(objective !== undefined || opts.prompt)
 
+export async function startCommand(args = [], opts = {}) {
+  const { flags, objective, cwd, json } = resolveStartCtx(args, opts)
   if (flags.dryRun) return handleDryRun(flags, objective, json, cwd)
-
-  // start é interativo: sem TTY e sem entradas injetadas/posicionais → orienta `plan`.
-  const injected = objective !== undefined || opts.prompt
-  if (!process.stdin.isTTY && !injected) return printNonInteractiveHelp()
-
+  if (startNeedsHelp(objective, opts)) return printNonInteractiveHelp()
   const res = await collectPlan(flags, opts, objective, json, cwd)
   if (!res) return
   return confirmAndRunPipeline(res.plan, flags, opts, json, cwd)

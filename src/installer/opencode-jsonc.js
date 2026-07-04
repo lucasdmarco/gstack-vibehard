@@ -23,25 +23,41 @@ export const OPENCODE_SENSITIVE_KEYS = Object.freeze([
 
 const DISABLED_SUFFIX = ".gstack-disabled"
 
+// Scanner JSONC: um passo por caractere; muta `st` e devolve o texto a emitir. Em
+// aberturas de comentário / `*​/`, marca `st.skip` para consumir o próximo char.
+function scanSingleLine(st, c) {
+  if (c === "\n") { st.inSL = false; return c }
+  return ""
+}
+function scanMultiLine(st, c, n) {
+  if (c === "*" && n === "/") { st.inML = false; st.skip = true }
+  return ""
+}
+function scanInString(st, c) {
+  if (st.esc) st.esc = false
+  else if (c === "\\") st.esc = true
+  else if (c === '"') st.inStr = false
+  return c
+}
+function scanDefault(st, c, n) {
+  if (c === '"') { st.inStr = true; return c }
+  if (c === "/" && n === "/") { st.inSL = true; st.skip = true; return "" }
+  if (c === "/" && n === "*") { st.inML = true; st.skip = true; return "" }
+  return c
+}
+function scanChar(st, c, n) {
+  if (st.inSL) return scanSingleLine(st, c)
+  if (st.inML) return scanMultiLine(st, c, n)
+  if (st.inStr) return scanInString(st, c)
+  return scanDefault(st, c, n)
+}
 /** Remove comentários // e /* *​/ (respeitando strings) e trailing commas. */
 export function stripJsonc(text) {
+  const st = { inStr: false, inSL: false, inML: false, esc: false, skip: false }
   let out = ""
-  let inStr = false, inSL = false, inML = false, esc = false
   for (let i = 0; i < text.length; i++) {
-    const c = text[i], n = text[i + 1]
-    if (inSL) { if (c === "\n") { inSL = false; out += c } continue }
-    if (inML) { if (c === "*" && n === "/") { inML = false; i++ } continue }
-    if (inStr) {
-      out += c
-      if (esc) esc = false
-      else if (c === "\\") esc = true
-      else if (c === '"') inStr = false
-      continue
-    }
-    if (c === '"') { inStr = true; out += c; continue }
-    if (c === "/" && n === "/") { inSL = true; i++; continue }
-    if (c === "/" && n === "*") { inML = true; i++; continue }
-    out += c
+    if (st.skip) { st.skip = false; continue }
+    out += scanChar(st, text[i], text[i + 1])
   }
   return out.replace(/,(\s*[}\]])/g, "$1")
 }
@@ -72,14 +88,19 @@ function ocPaths(home) {
  *  - "merge":    conflito E o `.jsonc` é seguro (sem chaves sensíveis) → merge
  *                pode ser OFERECIDO, mas só aplica com --apply + confirmação.
  */
+// Faz o parse dos dois arquivos (best-effort). @returns { json, jsonc, parseError }.
+function parseOpenCodePair(jsonPath, jsoncPath) {
+  let json = {}, jsonc = {}, parseError = null
+  try { json = JSON.parse(readFileSync(jsonPath, "utf-8")) } catch (e) { parseError = `opencode.json: ${e.message}` }
+  try { jsonc = parseJsonc(readFileSync(jsoncPath, "utf-8")) } catch (e) { parseError = `${parseError ? parseError + "; " : ""}opencode.jsonc: ${e.message}` }
+  return { json, jsonc, parseError }
+}
 export function planOpenCodeFix(home = homedir()) {
   const { jsonPath, jsoncPath } = ocPaths(home)
   const hasJson = existsSync(jsonPath), hasJsonc = existsSync(jsoncPath)
   if (!(hasJson && hasJsonc)) return { action: "none", jsonPath, jsoncPath, reason: "sem conflito json+jsonc" }
 
-  let json = {}, jsonc = {}, parseError = null
-  try { json = JSON.parse(readFileSync(jsonPath, "utf-8")) } catch (e) { parseError = `opencode.json: ${e.message}` }
-  try { jsonc = parseJsonc(readFileSync(jsoncPath, "utf-8")) } catch (e) { parseError = `${parseError ? parseError + "; " : ""}opencode.jsonc: ${e.message}` }
+  const { json, jsonc, parseError } = parseOpenCodePair(jsonPath, jsoncPath)
   if (parseError) return { action: "manual", jsonPath, jsoncPath, parseError }
 
   const sensitive = sensitiveKeysPresent(jsonc)

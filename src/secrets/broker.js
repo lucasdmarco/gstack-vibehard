@@ -90,16 +90,17 @@ export function listSecretNames(projectDir, opts = {}) {
 }
 
 /** Resolve um conjunto de nomes para `{NAME: value}` EM MEMÓRIA (só os existentes). */
+function collectSecret(provider, ns, name, out) {
+  if (!SECRET_NAME_RX.test(String(name))) return // schema hostil não vira traversal
+  const v = provider.get(ns, name)
+  if (v != null) out[name] = v
+}
 export function resolveSecrets(projectDir, names, opts = {}) {
   const provider = opts.provider || detectProvider(opts)
   const out = {}
   if (!provider) return out
   const ns = projectNamespace(projectDir)
-  for (const name of names || []) {
-    if (!SECRET_NAME_RX.test(String(name))) continue // schema hostil não vira traversal
-    const v = provider.get(ns, name)
-    if (v != null) out[name] = v
-  }
+  for (const name of names || []) collectSecret(provider, ns, name, out)
   return out
 }
 
@@ -113,20 +114,22 @@ export function redact(text, values) {
 }
 
 /** Parse de `.env` (KEY=VALUE) — para `secrets import`. Ignora comentários/linhas vazias. */
+const isEnvComment = (line) => !line || line.startsWith("#")
+const unquote = (val) =>
+  ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'")) ? val.slice(1, -1) : val)
+function parseEnvLine(raw, out) {
+  const line = raw.trim()
+  if (isEnvComment(line)) return
+  const eq = line.indexOf("=")
+  if (eq <= 0) return
+  let key = line.slice(0, eq).trim()
+  if (key.startsWith("export ")) key = key.slice(7).trim()
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) return
+  out[key] = unquote(line.slice(eq + 1).trim())
+}
 export function parseDotEnv(text) {
   const out = {}
-  for (const raw of String(text || "").split(/\r?\n/)) {
-    const line = raw.trim()
-    if (!line || line.startsWith("#")) continue
-    const eq = line.indexOf("=")
-    if (eq <= 0) continue
-    let key = line.slice(0, eq).trim()
-    if (key.startsWith("export ")) key = key.slice(7).trim()
-    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) continue
-    let val = line.slice(eq + 1).trim()
-    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) val = val.slice(1, -1)
-    out[key] = val
-  }
+  for (const raw of String(text || "").split(/\r?\n/)) parseEnvLine(raw, out)
   return out
 }
 

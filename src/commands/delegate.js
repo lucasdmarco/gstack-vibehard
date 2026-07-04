@@ -10,18 +10,20 @@ import { FREEBUFF } from "../harness/freebuff.js"
 import { runVerify } from "../project-plan/verify-runner.js"
 import { confirm, success, warn, error, info, section } from "../cli/index.js"
 
+const DELEGATE_VALUE_FLAGS = { "--task": "task", "--model": "model" }
+const DELEGATE_INT_FLAGS = { "--max-iterations": "maxIterations" }
+const DELEGATE_BOOL_FLAGS = {
+  "--worktree": "worktree", "--cloud-handoff": "cloudHandoff",
+  "--allow-tracked-secrets": "allowTrackedSecrets", "--yes": "yes", "-y": "yes",
+  "--accept-disclosure": "acceptDisclosure",
+}
 function parseFlags(args) {
   const out = { _: [] }
   for (let i = 0; i < args.length; i++) {
     const a = args[i]
-    if (a === "--task") out.task = args[++i]
-    else if (a === "--model") out.model = args[++i]
-    else if (a === "--max-iterations") out.maxIterations = parseInt(args[++i], 10)
-    else if (a === "--worktree") out.worktree = true
-    else if (a === "--cloud-handoff") out.cloudHandoff = true
-    else if (a === "--allow-tracked-secrets") out.allowTrackedSecrets = true
-    else if (a === "--yes" || a === "-y") out.yes = true
-    else if (a === "--accept-disclosure") out.acceptDisclosure = true
+    if (DELEGATE_VALUE_FLAGS[a]) out[DELEGATE_VALUE_FLAGS[a]] = args[++i]
+    else if (DELEGATE_INT_FLAGS[a]) out[DELEGATE_INT_FLAGS[a]] = parseInt(args[++i], 10)
+    else if (DELEGATE_BOOL_FLAGS[a]) out[DELEGATE_BOOL_FLAGS[a]] = true
     else out._.push(a)
   }
   return out

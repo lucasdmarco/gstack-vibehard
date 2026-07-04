@@ -28,99 +28,126 @@ function openUrl(url) {
   } catch { return false }
 }
 
+function loadValidDevManifest(cwd) {
+  const m = loadRuntimeManifest(cwd)
+  if (!m) { warn("Sem manifest de runtime — rode dentro de um projeto `gstack_vibehard create`."); return null }
+  const v = validateRuntimeManifest(m)
+  if (!v.valid) { v.errors.forEach((e) => warn(`  ✗ ${e}`)); error("Runtime manifest inválido — corrija antes do `dev`."); return null }
+  return m
+}
+// Reinicia (--force): mata a árvore antiga e ESPERA a morte real (senão o antigo
+// ainda segura a porta/log e o novo nasce unhealthy — race do taskkill).
+async function restartAlive(alive, json) {
+  const onWin = process.platform === "win32"
+  const killed = stopAll(alive, onWin ? { exec: (f, a) => execFileSync(f, a, { stdio: "ignore" }) } : {})
+  if (!json) killed.forEach((r) => info(`  • reiniciando — parei o antigo ${r.name}: ${r.status}`))
+  await waitPidsExit(killed.filter((r) => r.status === "stopped").map((r) => r.pid))
+}
+// idempotência: se já há runtime VIVO, NÃO relança sem --force (senão órfã os
+// antigos). Retorna false → o `dev` deve abortar.
+async function ensureNotAlreadyRunning(cwd, force, json) {
+  const alive = readAllState(cwd).filter((s) => s.pid && isAlive(s.pid))
+  if (alive.length === 0) return true
+  if (!force) {
+    warn(`Já há runtime ativo: ${alive.map((s) => `${s.name} (pid ${s.pid})`).join(", ")}.`)
+    info("  Rode `gstack_vibehard stop` antes, ou `gstack_vibehard dev --force` para reiniciar.")
+    return false
+  }
+  await restartAlive(alive, json)
+  return true
+}
+// Segredos DECLARADOS (secretRefs) do BROKER (keychain), em memória. Precedência
+// sobre o env do shell. Sem broker → cai no env.
+function resolveDevSecrets(m, cwd, opts) {
+  const refNames = [...new Set((m.services || []).flatMap((s) => s.secretRefs || []))]
+  return refNames.length ? resolveSecrets(cwd, refNames, opts) : {}
+}
+
+// fd numérico (não WriteStream — spawn exige fd/'pipe'/'inherit'); stdout+stderr no
+// mesmo log. detached em TODAS as plataformas: o filho SOBREVIVE ao `dev`.
+function spawnServiceChild(p, cwd, logPath) {
+  const fd = openSync(logPath, "a")
+  const child = spawn(p.file, p.args, { cwd: join(cwd, p.cwd), env: p.env, stdio: ["ignore", fd, fd], shell: false, detached: true, windowsHide: true })
+  return { child, fd }
+}
+// espera DETERMINÍSTICA do desfecho: 'spawn'=subiu, 'error'=falhou (senão o 'error'
+// async de um binário inexistente DERRUBA o CLI).
+function awaitSpawn(child) {
+  return new Promise((res) => {
+    let done = false
+    child.once("spawn", () => { if (!done) { done = true; res({ ok: true }) } })
+    child.once("error", (err) => { if (!done) { done = true; res({ ok: false, err }) } })
+  })
+}
+const spawnDetail = (err) => (err && (err.code || err.message)) || "spawn falhou"
+function failService(cwd, p, logPath, json, detail) {
+  writeServiceState(cwd, p.name, { name: p.name, port: p.port, status: "failed", log: logPath, command: p.command, detail })
+  if (!json) warn(`  ✗ ${p.name}: falhou ao iniciar — ${detail}`)
+  return null
+}
+async function startOneService(p, cwd, json) {
+  const logPath = join(logsDir(cwd), `${p.name}.log`)
+  const { child, fd } = spawnServiceChild(p, cwd, logPath)
+  const outcome = await awaitSpawn(child)
+  child.unref()
+  try { closeSync(fd) } catch { /* ok */ }
+  if (!outcome.ok) return failService(cwd, p, logPath, json, spawnDetail(outcome.err))
+  const startedAt = new Date().toISOString()
+  writeServiceState(cwd, p.name, { name: p.name, pid: child.pid, port: p.port, status: "starting", log: logPath, command: p.command, startedAt })
+  if (!json) info(`  ▸ ${p.name} (pid ${child.pid})${p.port ? ` :${p.port}` : ""} — ${p.command}`)
+  return { name: p.name, pid: child.pid, port: p.port, log: logPath, command: p.command, startedAt, readinessPath: p.readinessPath, readinessTimeout: p.readinessTimeout }
+}
+async function startAllServices(plans, cwd, json) {
+  const started = []
+  for (const p of plans) { const s = await startOneService(p, cwd, json); if (s) started.push(s) }
+  return started
+}
+
+function reportReadiness(s, r, url, status) {
+  const detail = r.ok ? ` (${url})` : " — veja os logs: gstack_vibehard logs " + s.name
+  ;(r.ok ? success : warn)(`  ${r.ok ? "✓" : "⚠"} ${s.name}: ${status}${detail}`)
+}
+// readiness por serviço (HTTP): 2xx/3xx = pronto; marca ready/unhealthy honesto.
+async function checkServiceReadiness(s, cwd, json) {
+  if (!s.port || !s.readinessPath) {
+    writeServiceState(cwd, s.name, { name: s.name, pid: s.pid, port: s.port, status: "running", log: s.log, command: s.command, startedAt: s.startedAt })
+    return
+  }
+  const url = `http://127.0.0.1:${s.port}${s.readinessPath}`
+  const r = await pollReadiness(url, { httpGet, timeoutSeconds: s.readinessTimeout })
+  const status = r.ok ? "ready" : "unhealthy"
+  s.status = status; s.url = url
+  writeServiceState(cwd, s.name, { name: s.name, pid: s.pid, port: s.port, status, url, log: s.log, command: s.command, startedAt: s.startedAt })
+  if (!json) reportReadiness(s, r, url, status)
+}
+async function checkAllReadiness(started, cwd, json) {
+  for (const s of started) await checkServiceReadiness(s, cwd, json)
+}
+function openPreview(args, started) {
+  const web = started.find((s) => s.name === "web") || started.find((s) => s.url)
+  if (args.includes("--open") && web && web.url) openUrl(web.url) && info(`  Preview aberto: ${web.url}`)
+  info("")
+  info("  Logs: `gstack_vibehard logs <serviço>` · Parar: `gstack_vibehard stop`")
+}
+
 /** `gstack_vibehard dev [--open] [--force] [--json]` — sobe os serviços do manifest. */
 export async function devCommand(args = [], opts = {}) {
   const cwd = opts.cwd || process.cwd()
   const json = args.includes("--json")
-  const force = args.includes("--force")
-  const m = loadRuntimeManifest(cwd)
-  if (!m) { warn("Sem manifest de runtime — rode dentro de um projeto `gstack_vibehard create`."); return }
-  const v = validateRuntimeManifest(m)
-  if (!v.valid) { v.errors.forEach((e) => warn(`  ✗ ${e}`)); error("Runtime manifest inválido — corrija antes do `dev`."); return }
-
-  // idempotência: se já há runtime VIVO, NÃO relança (senão perde o controle dos
-  // processos antigos — vira órfão). Exige `stop` antes, ou `--force` para reiniciar.
-  const alive = readAllState(cwd).filter((s) => s.pid && isAlive(s.pid))
-  if (alive.length > 0 && !force) {
-    warn(`Já há runtime ativo: ${alive.map((s) => `${s.name} (pid ${s.pid})`).join(", ")}.`)
-    info("  Rode `gstack_vibehard stop` antes, ou `gstack_vibehard dev --force` para reiniciar.")
-    return
-  }
-  if (alive.length > 0 && force) {
-    const onWin = process.platform === "win32"
-    const killed = stopAll(alive, onWin ? { exec: (f, a) => execFileSync(f, a, { stdio: "ignore" }) } : {})
-    if (!json) killed.forEach((r) => info(`  • reiniciando — parei o antigo ${r.name}: ${r.status}`))
-    // Espera a morte REAL antes de relançar: sem isso o processo antigo ainda
-    // segura a porta/log e o novo serviço nasce unhealthy (race do taskkill).
-    await waitPidsExit(killed.filter((r) => r.status === "stopped").map((r) => r.pid))
-  }
+  const m = loadValidDevManifest(cwd)
+  if (!m) return
+  if (!(await ensureNotAlreadyRunning(cwd, args.includes("--force"), json))) return
   clearState(cwd)
-
   mkdirSync(logsDir(cwd), { recursive: true })
   if (!json) section("dev — subindo o runtime")
-  // Resolve os segredos DECLARADOS (secretRefs) do BROKER (keychain) — em memória,
-  // nunca a disco. Têm precedência sobre o env do shell. Sem broker → cai no env.
-  const refNames = [...new Set((m.services || []).flatMap((s) => s.secretRefs || []))]
-  const brokerSecrets = refNames.length ? resolveSecrets(cwd, refNames, opts) : {}
+  const brokerSecrets = resolveDevSecrets(m, cwd, opts)
   // envSource = env do shell + segredos do broker (precedência). O plano só repassa
-  // ao serviço a base OS-essencial, a porta e os secretRefs declarados — nunca tudo.
+  // ao serviço a base OS-essencial, a porta e os secretRefs — nunca tudo.
   const plans = await planStart(m, { envSource: { ...process.env, ...brokerSecrets }, allocatePort: opts.allocatePort })
-  const started = []
-  for (const p of plans) {
-    const logPath = join(logsDir(cwd), `${p.name}.log`)
-    // fd numérico (não WriteStream — spawn exige fd/'pipe'/'inherit'). stdout+stderr
-    // no mesmo log. Fecha o fd do pai após o spawn (o filho herdou o seu).
-    const fd = openSync(logPath, "a")
-    // detached em TODAS as plataformas: o filho precisa SOBREVIVER ao `dev` (que
-    // sobe e sai). POSIX: vira líder de grupo → `kill -TERM -pid` mata a árvore.
-    // Windows: roda independente do console do pai (windowsHide + stdio em arquivo
-    // = sem janela); a árvore é morta por `taskkill /T /F`.
-    const child = spawn(p.file, p.args, {
-      cwd: join(cwd, p.cwd), env: p.env,
-      stdio: ["ignore", fd, fd], shell: false,
-      detached: true, windowsHide: true,
-    })
-    // espera DETERMINÍSTICA do desfecho: 'spawn' = subiu, 'error' = falhou. Sem isso
-    // um binário inexistente vira Unhandled 'error' (async) e DERRUBA o CLI.
-    const outcome = await new Promise((res) => {
-      let done = false
-      child.once("spawn", () => { if (!done) { done = true; res({ ok: true }) } })
-      child.once("error", (err) => { if (!done) { done = true; res({ ok: false, err }) } })
-    })
-    child.unref()
-    try { closeSync(fd) } catch { /* ok */ }
-
-    if (!outcome.ok) {
-      const detail = (outcome.err && (outcome.err.code || outcome.err.message)) || "spawn falhou"
-      writeServiceState(cwd, p.name, { name: p.name, port: p.port, status: "failed", log: logPath, command: p.command, detail })
-      if (!json) warn(`  ✗ ${p.name}: falhou ao iniciar — ${detail}`)
-      continue
-    }
-    const startedAt = new Date().toISOString()
-    writeServiceState(cwd, p.name, { name: p.name, pid: child.pid, port: p.port, status: "starting", log: logPath, command: p.command, startedAt })
-    started.push({ name: p.name, pid: child.pid, port: p.port, log: logPath, command: p.command, startedAt, readinessPath: p.readinessPath, readinessTimeout: p.readinessTimeout })
-    if (!json) info(`  ▸ ${p.name} (pid ${child.pid})${p.port ? ` :${p.port}` : ""} — ${p.command}`)
-  }
-
-  // readiness por serviço (HTTP); marca ready/unhealthy honestamente (2xx/3xx = pronto)
-  for (const s of started) {
-    if (!s.port || !s.readinessPath) {
-      writeServiceState(cwd, s.name, { name: s.name, pid: s.pid, port: s.port, status: "running", log: s.log, command: s.command, startedAt: s.startedAt })
-      continue
-    }
-    const url = `http://127.0.0.1:${s.port}${s.readinessPath}`
-    const r = await pollReadiness(url, { httpGet, timeoutSeconds: s.readinessTimeout })
-    const status = r.ok ? "ready" : "unhealthy"
-    s.status = status; s.url = url
-    writeServiceState(cwd, s.name, { name: s.name, pid: s.pid, port: s.port, status, url, log: s.log, command: s.command, startedAt: s.startedAt })
-    if (!json) (r.ok ? success : warn)(`  ${r.ok ? "✓" : "⚠"} ${s.name}: ${status}${r.ok ? ` (${url})` : " — veja os logs: gstack_vibehard logs " + s.name}`)
-  }
-
-  const web = started.find((s) => s.name === "web") || started.find((s) => s.url)
-  if (json) { process.stdout.write(JSON.stringify({ services: readAllState(cwd) }) + "\n"); return }
-  if (args.includes("--open") && web && web.url) { openUrl(web.url) && info(`  Preview aberto: ${web.url}`) }
-  info("")
-  info("  Logs: `gstack_vibehard logs <serviço>` · Parar: `gstack_vibehard stop`")
+  const started = await startAllServices(plans, cwd, json)
+  await checkAllReadiness(started, cwd, json)
+  if (json) return process.stdout.write(JSON.stringify({ services: readAllState(cwd) }) + "\n")
+  openPreview(args, started)
 }
 
 /**
@@ -128,60 +155,65 @@ export async function devCommand(args = [], opts = {}) {
  * de matar. Windows: elapsed via Get-Process (subtração local, sem fuso). POSIX:
  * `ps -o etimes=`. Qualquer falha → null (stopAll procede, fallback honesto).
  */
+const finiteOrNull = (v) => (Number.isFinite(v) ? v : null)
+// Windows: elapsed via Get-Process (subtração local, sem fuso).
+function procAgeWin(id) {
+  const out = execFileSync("powershell", ["-NoProfile", "-NonInteractive", "-Command",
+    `try{[int]((Get-Date)-(Get-Process -Id ${id} -ErrorAction Stop).StartTime).TotalSeconds}catch{''}`],
+    { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"], timeout: 5000 })
+  return finiteOrNull(parseInt(String(out).trim(), 10))
+}
+// POSIX: `ps -o etimes=`.
+function procAgePosix(id) {
+  const out = execFileSync("ps", ["-o", "etimes=", "-p", String(id)], { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"], timeout: 5000 })
+  return finiteOrNull(parseInt(String(out).trim(), 10))
+}
 function procAgeSec(pid) {
   const id = Number(pid)
   if (!Number.isInteger(id) || id <= 0) return null
-  try {
-    if (process.platform === "win32") {
-      const out = execFileSync("powershell", ["-NoProfile", "-NonInteractive", "-Command",
-        `try{[int]((Get-Date)-(Get-Process -Id ${id} -ErrorAction Stop).StartTime).TotalSeconds}catch{''}`],
-        { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"], timeout: 5000 })
-      const v = parseInt(String(out).trim(), 10)
-      return Number.isFinite(v) ? v : null
-    }
-    const out = execFileSync("ps", ["-o", "etimes=", "-p", String(id)],
-      { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"], timeout: 5000 })
-    const v = parseInt(String(out).trim(), 10)
-    return Number.isFinite(v) ? v : null
-  } catch { return null }
+  try { return process.platform === "win32" ? procAgeWin(id) : procAgePosix(id) }
+  catch { return null }
 }
 
-/** `gstack_vibehard stop` — encerra a árvore de processos. Idempotente. */
-export async function stopCommand(args = [], opts = {}) {
-  const cwd = opts.cwd || process.cwd()
-  const json = args.includes("--json")
-  const state = readAllState(cwd)
-  if (state.length === 0) { if (!json) info("Nada rodando (sem state de runtime)."); else process.stdout.write('{"stopped":[]}\n'); return }
-  // Valida o DONO do PID (idade do processo vs registrada) antes de matar: pid
-  // reusado / state adulterado é PULADO (skipped-foreign), não morto. Windows:
-  // taskkill /T /F via exec; POSIX: caminho nativo (process.kill(-pid) = grupo).
+function stopNothing(json) {
+  if (!json) info("Nada rodando (sem state de runtime).")
+  else process.stdout.write('{"stopped":[]}\n')
+}
+// Valida o DONO do PID (idade vs registrada) antes de matar: pid reusado/adulterado
+// é PULADO. Windows: taskkill /T /F via exec; POSIX: nativo (process.kill(-pid)).
+function stopExecOpts(opts) {
   const onWin = process.platform === "win32"
-  const results = stopAll(state, {
-    getAgeSec: opts.getAgeSec || procAgeSec,
-    ...(onWin ? { exec: (file, a) => execFileSync(file, a, { stdio: "ignore" }) } : {}),
-  })
-  // `stop` só reporta "parado" quando os processos MORRERAM de verdade: taskkill/
-  // kill retornam antes de o SO liberar handles — sem esta espera, remover o
-  // diretório do projeto logo após o stop dá EBUSY no Windows (PRD14 §4.14).
-  const stillAlive = await waitPidsExit(
-    results.filter((r) => r.status === "stopped").map((r) => r.pid),
-    { timeoutMs: opts.waitTimeoutMs || 5000 },
-  )
-  clearState(cwd)
-  if (json) { process.stdout.write(JSON.stringify({ stopped: results, stillAlive }) + "\n"); return }
+  return { getAgeSec: opts.getAgeSec || procAgeSec, ...(onWin ? { exec: (file, a) => execFileSync(file, a, { stdio: "ignore" }) } : {}) }
+}
+function renderStop(results, stillAlive, opts) {
   section("stop — encerrando o runtime")
   for (const r of results) info(`  • ${r.name}: ${r.status}${r.pid ? ` (pid ${r.pid})` : ""}`)
   if (stillAlive.length) warn(`  ⚠ pid(s) ainda finalizando após ${opts.waitTimeoutMs || 5000}ms: ${stillAlive.join(", ")}`)
   else success("Runtime parado.")
 }
+/** `gstack_vibehard stop` — encerra a árvore de processos. Idempotente. */
+export async function stopCommand(args = [], opts = {}) {
+  const cwd = opts.cwd || process.cwd()
+  const json = args.includes("--json")
+  const state = readAllState(cwd)
+  if (state.length === 0) return stopNothing(json)
+  const results = stopAll(state, stopExecOpts(opts))
+  // `stop` só reporta "parado" quando os processos MORRERAM de verdade (senão remover
+  // o dir do projeto logo após dá EBUSY no Windows — PRD14 §4.14).
+  const stillAlive = await waitPidsExit(results.filter((r) => r.status === "stopped").map((r) => r.pid), { timeoutMs: opts.waitTimeoutMs || 5000 })
+  clearState(cwd)
+  if (json) return process.stdout.write(JSON.stringify({ stopped: results, stillAlive }) + "\n")
+  renderStop(results, stillAlive, opts)
+}
 
+const noLogFile = (t) => !t || !t.log || !existsSync(t.log)
 /** `gstack_vibehard logs [serviço] [--follow]`. */
 export function logsCommand(args = [], opts = {}) {
   const cwd = opts.cwd || process.cwd()
   const svc = args.find((a) => !a.startsWith("-"))
   const state = readAllState(cwd)
   const target = svc ? state.find((s) => s.name === svc) : state[0]
-  if (!target || !target.log || !existsSync(target.log)) { warn(`Sem log para '${svc || "(primeiro serviço)"}'. Rode \`gstack_vibehard dev\` primeiro.`); return }
+  if (noLogFile(target)) return warn(`Sem log para '${svc || "(primeiro serviço)"}'. Rode \`gstack_vibehard dev\` primeiro.`)
   section(`logs — ${target.name}`)
   process.stdout.write(readFileSync(target.log, "utf-8"))
   if (args.includes("--follow")) info("\n  (--follow contínuo chega no refinamento; por ora mostra o acumulado.)")

@@ -50,6 +50,23 @@ async function tryFetch(url, ms = 1500) {
   try { const r = await fetch(url, { signal: ctrl.signal }); return r.status } catch { return null } finally { clearTimeout(t) }
 }
 
+// Polling helpers: sobe (retorna status 2xx) / cai (porta liberada após stop).
+async function waitForUp(url, tries = 20) {
+  for (let i = 0; i < tries; i++) {
+    const status = await tryFetch(url)
+    if (status !== null) return status
+    await new Promise((r) => setTimeout(r, 250))
+  }
+  return null
+}
+async function waitForDown(url, tries = 20) {
+  for (let i = 0; i < tries; i++) {
+    if ((await tryFetch(url, 800)) === null) return true
+    await new Promise((r) => setTimeout(r, 250))
+  }
+  return false
+}
+
 test("e2e: dev sobe um serviço real (sobrevive ao launcher) e stop o mata", async () => {
   const { devCommand, stopCommand } = await import(`${pathToFileURL(cmdMod)}?t=${Date.now()}`)
   const dir = await mkdtemp(path.join(tmpdir(), "gstack-e2e-"))
@@ -78,22 +95,13 @@ test("e2e: dev sobe um serviço real (sobrevive ao launcher) e stop o mata", asy
     assert.ok(realPort >= port, "porta alocada a partir da preferred")
 
     // o serviço deve continuar de pé DEPOIS do dev retornar (prova do detached)
-    let status = null
-    for (let i = 0; i < 20 && status === null; i++) {
-      status = await tryFetch(`http://127.0.0.1:${realPort}/`)
-      if (status === null) await new Promise((r) => setTimeout(r, 250))
-    }
+    const status = await waitForUp(`http://127.0.0.1:${realPort}/`)
     assert.equal(status, 200, "serviço respondendo após o dev sair (sobreviveu ao launcher)")
 
     await stopCommand([], { cwd: dir })
 
     // após o stop a porta deve cair
-    let down = false
-    for (let i = 0; i < 20 && !down; i++) {
-      const s = await tryFetch(`http://127.0.0.1:${realPort}/`, 800)
-      if (s === null) down = true
-      else await new Promise((r) => setTimeout(r, 250))
-    }
+    const down = await waitForDown(`http://127.0.0.1:${realPort}/`)
     assert.equal(down, true, "porta liberada após o stop (árvore morta)")
   } finally {
     await cleanupProject(dir, stopCommand)

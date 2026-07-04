@@ -1,5 +1,42 @@
 # Changelog - gstack-vibehard
 
+## [3.51.0] - 2026-07-04
+
+### QG Debt Burn-Down (PRD 20 Sprint 20.2)
+
+Zera a dívida de complexidade ciclomática **CRITICAL/HIGH** do Fallow (65→0) que
+bloqueava o release gate. Refatoração **behavior-preserving**: monólitos (switch/
+if-chains gigantes, funções de 50–160 linhas) viram dispatchers finos + helpers
+nomeados, com cada função em complexidade ≤6. Nenhuma mudança de comportamento —
+cada comando validado por teste focado; **`--json` puro preservado**; suíte
+completa **604/604 verde**.
+
+- **Padrões aplicados**: (a) `switch`/if-chain de subcomando → mapa-registry
+  (`DISPATCH`/`*_SUBS`/`*_HANDLERS`) + dispatcher enxuto; (b) cada `&&`/`||`/`?:`/
+  `?.` custa +1 no Fallow → extraídos para micro-helpers nomeados; (c) render humano
+  vs JSON separados; (d) parsing de flags por tabela.
+- **CLIs decompostos**: `create.js` (`createProject` cc51, `writeRuntimeFiles` cc20),
+  `install.js`, `doctor.js` (cc166), `tools.js` (cc89), `context.js` (cc78),
+  `cli/index.js` (`dispatch` cc42), `orchestrate.js` (cc41), `challenge.js` (cc27),
+  `plan.js`, `audit.js`, `secrets.js`, `verify.js`, `agents.js`, `runtime-supervisor.js`,
+  `task.js`, `start.js`, `delegate.js`, `proxy.js`.
+- **Núcleo decomposto**: `meta/orchestrator.js` (`runOrchestration` cc25),
+  `runtime/supervisor.js` (`planStart` cc19/`stopAll`/`pollReadiness`),
+  `project-plan/{verify-runner,executor,planner}.js`, `secrets/broker.js`
+  (`parseDotEnv` cc12), `installer/{impact,opencode-jsonc}.js` (`stripJsonc` cc16
+  → scanner por estado).
+- **Mocks de teste** também zerados: `printing_press_install` (exec-mock cc18 →
+  route-table), `runtime_e2e` (loops de polling → `waitForUp`/`waitForDown`).
+- **Fix de regressão pega pela suíte**: o refactor de `cli/index.js` (switch→mapa)
+  removeu os `case "<cmd>"` que o auditor anti-placebo (`dream/auditor.js`) usava como
+  evidência de wiring — 6 capacidades REAIS (verify/runtime-supervisor/secrets-broker/
+  agent-factory/vfa-provenance/meta-harness) passaram a ser sub-declaradas PARTIAL.
+  `cliHasCommand` agora reconhece o registry-map (`name: "<cmd>"`); placar de volta a
+  **REAL:18** (idêntico ao repo pré-sprint). `audit()` (cc68) também decomposto em 21
+  builders puros de claim.
+- Fallow L1 (Sprint 20.2): **CRITICAL/HIGH 64→0**, zero introduzidos. Lint + `tsc`
+  `--noEmit` verdes.
+
 ## [3.50.0] - 2026-07-03
 
 ### Release Gate Observável e Controlável (PRD 20 Sprint 20.1)

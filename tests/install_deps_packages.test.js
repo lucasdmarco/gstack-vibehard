@@ -36,7 +36,7 @@ test("create instala Atomic da fonte real atomicdotdev/atomic (não do domínio 
 })
 
 test("install: MCP global é OPT-OUT no completo (--no-global-mcp), não mais opt-in", () => {
-  assert.match(installSrc, /globalMcp\s*=\s*!projectOnly\s*&&\s*!args\.includes\("--no-global-mcp"\)/, "Full escreve MCP global por padrão; opt-out --no-global-mcp")
+  assert.match(installSrc, /globalMcp\s*[:=]\s*!projectOnly\s*&&\s*!args\.includes\("--no-global-mcp"\)/, "Full escreve MCP global por padrão; opt-out --no-global-mcp")
 })
 
 test("install: Full tenta instalar o app Obsidian (winget/brew) com opt-out --no-obsidian", () => {
