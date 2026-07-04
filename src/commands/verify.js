@@ -77,6 +77,68 @@ function handleDryRun(cwd, profile, opts, json) {
   return plan
 }
 
+const STEP_ICONS = { passed: "✓", failed: "✗", timed_out: "⏱", pending_feature: "◷", tool_missing: "⚠", advisory: "•", cache_hit: "⚡" }
+const stepIcon = (status) => STEP_ICONS[status] || "–"
+const wantsAgentShield = (args) => args.includes("--agentshield") || process.env.GSTACK_AGENTSHIELD === "1"
+
+function renderQgInfo(report) {
+  if (!report.qg || !report.qg.path) return
+  info(`  QG: ${report.qg.origin} v${report.qg.version || "?"} (${report.qg.path})`)
+  if (report.qgDrift) warn(`  QG DRIFT: o qg.py instalado difere do empacotado (v${report.qg.packagedVersion || "?"}). Rode \`gstack_vibehard install\` p/ atualizar.`)
+}
+function renderVerifyHeader(report) {
+  section(`verify — perfil ${report.profile} · arquétipo ${report.archetype} · status ${report.status}${report.cached ? " (cache)" : ""}`)
+  renderQgInfo(report)
+}
+function renderVerifySteps(report) {
+  for (const s of report.steps) info(`  ${stepIcon(s.status)} ${s.id}: ${s.status}${s.detail ? ` (${s.detail})` : ""}`)
+}
+function renderAgentShieldLine(report) {
+  if (!report.agentShield) return
+  const a = report.agentShield
+  const icon = a.status === "advisory" ? "•" : a.status === "unavailable" ? "⚠" : "–"
+  info(`  ${icon} agentshield (ECC): ${a.status}${a.detail ? ` — ${a.detail}` : ""}`)
+}
+// Mensagem honesta: "PRONTO" só em ready; nunca em pending_product/blocked/timeout.
+function renderVerifyStatus(report) {
+  if (report.status === "ready") return success("Projeto PRONTO — todos os gates aplicáveis passaram.")
+  if (report.status === "ready_with_warnings") return warn(`Pronto COM AVISOS — faltou ferramenta esperada: ${report.toolMissing.join(", ")}. Não é Zero-Trust completo.`)
+  if (report.status === "pending_product") return warn("NÃO declarado pronto: runtime/preview pendente (o app/preview não roda ainda). Build/testes passaram.")
+  if (report.status === "timed_out") {
+    error(`TIMEOUT — etapa(s) estouraram o tempo: ${(report.timedOut || []).join(", ")}`)
+    return warn("Os processos filhos foram encerrados. Investigue a etapa e rode de novo.")
+  }
+  error(`BLOQUEADO — gates obrigatórios falharam: ${report.failed.join(", ")}`)
+  warn("Corrija e rode `verify` de novo (ou acione `task`).")
+}
+function renderVerify(report, runId) {
+  renderVerifyHeader(report)
+  renderVerifySteps(report)
+  renderAgentShieldLine(report)
+  if (report.reducedTrust) warn(`Confiança REDUZIDA: harness '${report.harness}' não tem controle real (best-effort).`)
+  info(`  Relatório: .gstack/runs/${runId}/verify.json`)
+  renderVerifyStatus(report)
+}
+// Persiste o verify.json FINAL (substitui os parciais do sink) em .gstack/runs/<runId>/.
+function persistVerify(dir, runId, report) {
+  try { mkdirSync(dir, { recursive: true }); writeFileSync(join(dir, "verify.json"), JSON.stringify({ runId, ...report }, null, 2) + "\n") }
+  catch (e) { report.persistError = e.message }
+}
+/** Gate seletivo por arquivos alterados (NUNCA substitui o release gate). null = fallback. */
+function tryChangedFiles(args, cwd, opts, json) {
+  if (!args.includes("--changed-files")) return null
+  return handleChangedFiles(cwd, opts, json)
+}
+function runFullVerify(args, cwd, opts) {
+  const runId = opts.runId || randomUUID().slice(0, 8)
+  const dir = join(cwd, ".gstack", "runs", runId)
+  const report = runVerify({ cwd, profile: pickProfile(args), harness: pickHarness(args, opts), exec: opts.exec, stepExec: opts.stepExec, home: opts.home, runId, onStep: makeProgressSink(dir, runId) })
+  // ECC AgentShield (opt-in): camada de segurança de prompt-injection, advisory.
+  if (wantsAgentShield(args)) report.agentShield = runAgentShield(cwd, opts.exec)
+  persistVerify(dir, runId, report)
+  return { report, runId }
+}
+
 /**
  * `verify` — roda os delivery gates do projeto e salva o relatório.
  *   gstack_vibehard verify [--profile scaffold|full] [--json]
@@ -85,60 +147,11 @@ function handleDryRun(cwd, profile, opts, json) {
 export async function verifyCommand(args = [], opts = {}) {
   const cwd = opts.cwd || process.cwd()
   const json = args.includes("--json")
-
-  // Gate seletivo por arquivos alterados: NUNCA substitui o release gate.
-  if (args.includes("--changed-files")) {
-    const r = handleChangedFiles(cwd, opts, json)
-    if (r) return r // null = fallback → segue o verify completo abaixo
-  }
-
-  const profile = pickProfile(args)
-  const harness = pickHarness(args, opts)
-
-  if (args.includes("--dry-run")) return handleDryRun(cwd, profile, opts, json)
-
-  const runId = opts.runId || randomUUID().slice(0, 8)
-  const dir = join(cwd, ".gstack", "runs", runId)
-  const report = runVerify({ cwd, profile, harness, exec: opts.exec, stepExec: opts.stepExec, home: opts.home, runId, onStep: makeProgressSink(dir, runId) })
-
-  // ECC AgentShield (opt-in): camada de segurança de prompt-injection, advisory.
-  if (args.includes("--agentshield") || process.env.GSTACK_AGENTSHIELD === "1") {
-    report.agentShield = runAgentShield(cwd, opts.exec)
-  }
-
-  // Persiste o verify.json FINAL (substitui os parciais do sink) em .gstack/runs/<runId>/.
-  try {
-    mkdirSync(dir, { recursive: true })
-    writeFileSync(join(dir, "verify.json"), JSON.stringify({ runId, ...report }, null, 2) + "\n")
-  } catch (e) { report.persistError = e.message }
-
+  const changed = tryChangedFiles(args, cwd, opts, json)
+  if (changed) return changed // null = fallback → segue o verify completo abaixo
+  if (args.includes("--dry-run")) return handleDryRun(cwd, pickProfile(args), opts, json)
+  const { report, runId } = runFullVerify(args, cwd, opts)
   if (json) { process.stdout.write(JSON.stringify({ runId, ...report }) + "\n"); return report }
-
-  section(`verify — perfil ${report.profile} · arquétipo ${report.archetype} · status ${report.status}${report.cached ? " (cache)" : ""}`)
-  if (report.qg && report.qg.path) {
-    info(`  QG: ${report.qg.origin} v${report.qg.version || "?"} (${report.qg.path})`)
-    if (report.qgDrift) warn(`  QG DRIFT: o qg.py instalado difere do empacotado (v${report.qg.packagedVersion || "?"}). Rode \`gstack_vibehard install\` p/ atualizar.`)
-  }
-  for (const s of report.steps) {
-    const icon = s.status === "passed" ? "✓" : s.status === "failed" ? "✗"
-      : s.status === "timed_out" ? "⏱" : s.status === "pending_feature" ? "◷" : s.status === "tool_missing" ? "⚠"
-      : s.status === "advisory" ? "•" : s.status === "cache_hit" ? "⚡" : "–"
-    const note = s.detail ? ` (${s.detail})` : ""
-    info(`  ${icon} ${s.id}: ${s.status}${note}`)
-  }
-  if (report.agentShield) {
-    const a = report.agentShield
-    const icon = a.status === "advisory" ? "•" : a.status === "unavailable" ? "⚠" : "–"
-    info(`  ${icon} agentshield (ECC): ${a.status}${a.detail ? ` — ${a.detail}` : ""}`)
-  }
-  if (report.reducedTrust) warn(`Confiança REDUZIDA: harness '${report.harness}' não tem controle real (best-effort).`)
-  info(`  Relatório: .gstack/runs/${runId}/verify.json`)
-
-  // Mensagem honesta: "PRONTO" só em ready; nunca em pending_product/blocked.
-  if (report.status === "ready") success("Projeto PRONTO — todos os gates aplicáveis passaram.")
-  else if (report.status === "ready_with_warnings") warn(`Pronto COM AVISOS — faltou ferramenta esperada: ${report.toolMissing.join(", ")}. Não é Zero-Trust completo.`)
-  else if (report.status === "pending_product") warn("NÃO declarado pronto: runtime/preview pendente (o app/preview não roda ainda). Build/testes passaram.")
-  else if (report.status === "timed_out") { error(`TIMEOUT — etapa(s) estouraram o tempo: ${(report.timedOut || []).join(", ")}`); warn("Os processos filhos foram encerrados. Investigue a etapa e rode de novo.") }
-  else { error(`BLOQUEADO — gates obrigatórios falharam: ${report.failed.join(", ")}`); warn("Corrija e rode `verify` de novo (ou acione `task`).") }
+  renderVerify(report, runId)
   return report
 }
