@@ -48,54 +48,55 @@ function resumeCmd(cwd, taskId, json) {
   for (const e of pend) info(`   - [${e.status}] ${e.step}: ${e.result || "(sem detalhe)"}`)
 }
 
+// Subcomandos de execução/inspeção. @returns true se um handler assumiu o comando.
+function dispatchTaskSub(sub, args, cwd, positional, json, opts) {
+  // `task run [planId]` — EXECUTA o loop em worktree (worktree→diff→hygiene→accept/reject).
+  if (sub === "run") { taskRunCommand(args, opts); return true }
+  // `task evidence <id>` / `task resume <id>` — Evidence Ledger (PRD18 Sprint 4).
+  if (sub === "evidence") { evidenceCmd(cwd, positional[1], json); return true }
+  if (sub === "resume") { resumeCmd(cwd, positional[1], json); return true }
+  // Inspeção/aceite: delega ao worktree lifecycle (PRD14 §4.3) — branches `task/*`.
+  if (["status", "diff", "accept", "reject"].includes(sub)) {
+    const map = { status: "list", diff: "diff", accept: "accept", reject: "discard" }
+    worktreeCommand([map[sub], ...args.slice(args.indexOf(sub) + 1)], opts)
+    return true
+  }
+  return false
+}
+const stepTag = (s) => (s.requiresConfirmation ? " [requer confirmação]" : s.optional ? " [opcional]" : "")
+// Persiste (não-destrutivo). @returns o diretório do plano.
+function persistTask(cwd, plan) {
+  const dir = join(tasksDir(cwd), plan.id)
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, "task.json"), JSON.stringify(plan, null, 2) + "\n")
+  return dir
+}
+function renderTaskPlan(request, plan) {
+  section(`task — ${request}`)
+  info(`  Loop escolhido: ${plan.loopPattern}  (${plan.loopReason})`)
+  info("")
+  info("  Plano de feature (comandos reais; nada foi executado):")
+  plan.steps.forEach((s, i) => info(`   ${i + 1}. ${s.label}${stepTag(s)}\n        $ ${s.command.join(" ")}`))
+  info("")
+  for (const n of plan.notes) info(`  • ${n}`)
+  info("")
+  info(`  Plano salvo em .gstack/tasks/${plan.id}/`)
+}
 export async function taskCommand(args = [], opts = {}) {
   const cwd = opts.cwd || process.cwd()
   const json = args.includes("--json")
   const positional = args.filter((a) => !a.startsWith("--"))
   const sub = positional[0]
-
-  // `task run [planId]` — EXECUTA o loop em worktree (worktree→diff→hygiene→accept/reject).
-  if (sub === "run") { taskRunCommand(args, opts); return }
-
-  // `task evidence <id>` / `task resume <id>` — Evidence Ledger (PRD18 Sprint 4).
-  if (sub === "evidence") return evidenceCmd(cwd, positional[1], json)
-  if (sub === "resume") return resumeCmd(cwd, positional[1], json)
-
-  // Inspeção/aceite do loop: delega ao worktree lifecycle (PRD14 §4.3) — os
-  // branches `task/*` criados pelo run são worktrees gstack de primeira classe.
-  if (["status", "diff", "accept", "reject"].includes(sub)) {
-    const map = { status: "list", diff: "diff", accept: "accept", reject: "discard" }
-    return worktreeCommand([map[sub], ...args.slice(args.indexOf(sub) + 1)], opts)
-  }
-
+  if (dispatchTaskSub(sub, args, cwd, positional, json, opts)) return
   const request = positional.join(" ").trim()
   if (!request) {
-    if (json) { process.stdout.write(JSON.stringify({ error: "missing request" }) + "\n"); return }
-    section("task")
-    error('Descreva o pedido: task "adicione checkout com Stripe"')
+    if (json) return process.stdout.write(JSON.stringify({ error: "missing request" }) + "\n")
+    section("task"); error('Descreva o pedido: task "adicione checkout com Stripe"')
     return
   }
-
   const hasIndex = existsSync(join(cwd, ".gstack", "context", "context.db"))
   const plan = buildTaskPlan({ request, hasIndex })
-
-  // Persiste (não-destrutivo).
-  const dir = join(tasksDir(cwd), plan.id)
-  mkdirSync(dir, { recursive: true })
-  writeFileSync(join(dir, "task.json"), JSON.stringify(plan, null, 2) + "\n")
-
-  if (json) { process.stdout.write(JSON.stringify({ plan, savedTo: dir }) + "\n"); return }
-
-  section(`task — ${request}`)
-  info(`  Loop escolhido: ${plan.loopPattern}  (${plan.loopReason})`)
-  info("")
-  info("  Plano de feature (comandos reais; nada foi executado):")
-  plan.steps.forEach((s, i) => {
-    const tag = s.requiresConfirmation ? " [requer confirmação]" : s.optional ? " [opcional]" : ""
-    info(`   ${i + 1}. ${s.label}${tag}\n        $ ${s.command.join(" ")}`)
-  })
-  info("")
-  for (const n of plan.notes) info(`  • ${n}`)
-  info("")
-  info(`  Plano salvo em .gstack/tasks/${plan.id}/`)
+  const dir = persistTask(cwd, plan)
+  if (json) return process.stdout.write(JSON.stringify({ plan, savedTo: dir }) + "\n")
+  renderTaskPlan(request, plan)
 }

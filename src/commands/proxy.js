@@ -14,10 +14,12 @@ function renderGuardHuman(st) {
   for (const m of st.matrix) info(`   ${m.preRender ? "▲" : "•"} ${m.harness}: ${m.how}`)
 }
 
+const flagValue = (args, name) => { const i = args.indexOf(name); return i !== -1 && args[i + 1] ? args[i + 1] : null }
+const parsePort = (args) => { const v = flagValue(args, "--port"); return v ? parseInt(v, 10) : DEFAULT_PROXY_PORT }
+
 /** `proxy status [--json]` — cobertura HONESTA do Output Guard (pós-resposta vs pré-render). */
 async function proxyStatus(args, opts) {
-  const pi = args.indexOf("--port")
-  const port = pi !== -1 && args[pi + 1] ? parseInt(args[pi + 1], 10) : DEFAULT_PROXY_PORT
+  const port = parsePort(args)
   const st = await buildGuardStatus({ port, env: opts.env, probe: opts.probe, fetchImpl: opts.fetchImpl })
   if (args.includes("--json")) { process.stdout.write(JSON.stringify(st) + "\n"); return st }
   renderGuardHuman(st)
@@ -31,10 +33,8 @@ async function proxyStatus(args, opts) {
  */
 export async function proxyCommand(args = [], opts = {}) {
   if (args.find((a) => !a.startsWith("-")) === "status") return proxyStatus(args, opts)
-  const pi = args.indexOf("--port")
-  const port = pi !== -1 && args[pi + 1] ? parseInt(args[pi + 1], 10) : DEFAULT_PROXY_PORT
-  const ui = args.indexOf("--upstream")
-  const upstream = ui !== -1 && args[ui + 1] ? args[ui + 1] : "https://api.anthropic.com"
+  const port = parsePort(args)
+  const upstream = flagValue(args, "--upstream") || "https://api.anthropic.com"
 
   section("gstack proxy — redaction pré-output (opt-in, interceptação real)")
   let redactions = 0

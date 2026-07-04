@@ -9,33 +9,48 @@ const repoRoot = path.resolve(import.meta.dirname, "..")
 const installModule = path.join(repoRoot, "src", "printing-press", "install.js")
 const toolsModule = path.join(repoRoot, "src", "commands", "tools.js")
 
+// Predicados/handlers do exec mock (extraídos p/ manter cada função com cc baixo).
+const isGoBin = (file) => file === "go" || /[\\/]go(\.exe)?$/.test(file)
+const isGoInstaller = (file) => file === "winget" || file === "brew" || file === "choco" || file === "tar"
+const isInstall = (cmd, args) => cmd.includes(" install ") || args.includes("install")
+const curlOutArg = (args) => args[args.indexOf("-o") - 1] || args[2]
+function goVersionOut(st) {
+  if (st.goReady) return Buffer.from("go version go1.22")
+  throw new Error("go not found")
+}
+function installGoOut(st, goInstallable) {
+  if (goInstallable) { st.goReady = true; return Buffer.from("installed") }
+  throw new Error("install go failed")
+}
+function curlOut(goInstallable) {
+  if (goInstallable) return Buffer.from("")
+  throw new Error("download failed")
+}
+function installOut(installOk) {
+  if (installOk) return Buffer.from("ok")
+  throw new Error("go install failed")
+}
+function toolVersionOut(file, binOnPath) {
+  if (binOnPath && file.includes("stripe")) return Buffer.from("stripe 1.0")
+  throw new Error("not found")
+}
 // exec mock. hasGo: go responde a --version. goInstallable: winget/brew/tarball ok.
-function makeExec({ hasGo = true, goInstallable = true, installOk = true, binOnPath = true } = {}) {
-  let goReady = hasGo
+function makeExec(cfg = {}) {
+  const c = { hasGo: true, goInstallable: true, installOk: true, binOnPath: true, ...cfg }
+  const st = { goReady: c.hasGo }
+  const routes = [
+    [(file) => isGoBin(file), () => goVersionOut(st)],
+    [(file) => isGoInstaller(file), () => installGoOut(st, c.goInstallable)],
+    [(file) => file === "curl", () => curlOut(c.goInstallable)],
+    [(file, args, cmd) => isInstall(cmd, args), () => installOut(c.installOk)],
+    [(file, args) => args.includes("uninstall"), () => Buffer.from("removed")],
+    [(file, args) => args.includes("--version"), (file) => toolVersionOut(file, c.binOnPath)],
+  ]
   return (file, args) => {
     const cmd = [file, ...args].join(" ")
-    // toolchain Go (qualquer caminho candidato termina em go/go.exe)
-    if (file === "go" || /[\\/]go(\.exe)?$/.test(file)) {
-      if (goReady) return Buffer.from("go version go1.22")
-      throw new Error("go not found")
-    }
-    // instaladores de Go
-    if (file === "winget" || file === "brew" || file === "choco" || file === "tar") {
-      if (goInstallable) { goReady = true; return Buffer.from("installed") }
-      throw new Error("install go failed")
-    }
-    if (file === "curl") { if (goInstallable) return Buffer.from(""); throw new Error("download failed") }
-    if (cmd.includes(" install ") || args.includes("install")) {
-      if (installOk) return Buffer.from("ok")
-      throw new Error("go install failed")
-    }
-    if (args.includes("uninstall")) return Buffer.from("removed")
-    // verificacao do binario da tool
-    if (args.includes("--version")) {
-      if (binOnPath && file.includes("stripe")) return Buffer.from("stripe 1.0")
-      throw new Error("not found")
-    }
-    throw new Error("unexpected: " + cmd)
+    const route = routes.find(([pred]) => pred(file, args, cmd))
+    if (!route) throw new Error("unexpected: " + cmd)
+    return route[1](file)
   }
 }
 
@@ -75,10 +90,11 @@ test("ensureGo Linux: baixa o tarball da arch certa; arch desconhecida nao auto-
     // arm64: deve tentar baixar e instalar
     let urlBaixada = ""
     const execArm = (file, args) => {
-      if (/[\\/]go(\.exe)?$/.test(file) || file === "go") {
-        if (urlBaixada) return Buffer.from("go1.22"); throw new Error("no go")
+      if (isGoBin(file)) {
+        if (urlBaixada) return Buffer.from("go1.22")
+        throw new Error("no go")
       }
-      if (file === "curl") { urlBaixada = args[args.indexOf("-o") - 1] || args[2]; return Buffer.from("") }
+      if (file === "curl") { urlBaixada = curlOutArg(args); return Buffer.from("") }
       if (file === "tar") return Buffer.from("")
       throw new Error("unexpected " + file)
     }
