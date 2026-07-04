@@ -1,8 +1,11 @@
 import { existsSync, readFileSync } from "fs"
-import { join } from "path"
+import { join, dirname } from "path"
 import { homedir } from "os"
+import { fileURLToPath } from "url"
 import { execFileSync } from "child_process"
 import { stripBom } from "../util/json.js"
+
+const INDEXER = join(dirname(fileURLToPath(import.meta.url)), "..", "context-docs", "py", "context_db.py")
 
 /**
  * Tool Readiness como PRODUTO (PRD20 20.3): mede o estado REAL de cada ferramenta
@@ -51,6 +54,18 @@ function defaultProbe(file, args, opts = {}) {
   }
 }
 
+// Como defaultProbe, mas SEM truncar stdout — para saídas JSON (context/fallow audit).
+function runFullDefault(file, args, opts = {}) {
+  const shell = /\.(cmd|bat)$/i.test(file)
+  try {
+    const stdout = execFileSync(file, args, { stdio: ["ignore", "pipe", "pipe"], timeout: 60000, encoding: "utf-8", shell, ...opts })
+    return { ok: true, code: 0, stdout, stderr: "" }
+  } catch (e) {
+    return { ok: false, code: typeof e.status === "number" ? e.status : null, stdout: String(e.stdout || ""), stderr: trunc(e.stderr || e.message) }
+  }
+}
+const pyBin = (probe) => (probe("python3", ["--version"]).ok ? "python3" : "python")
+
 function gitHead(cwd, probe) {
   const r = probe("git", ["rev-parse", "HEAD"], { cwd })
   return r.ok ? r.stdout.trim() : null
@@ -89,28 +104,66 @@ function toolEntry({ status, scope, purpose, command, res, extra }) {
   }
 }
 
-function probeFallow(probe) {
+// Resumo do audit do Fallow. NÃO roda por default (audit é pesado) — só quando um
+// runner `fallowAudit` é injetado (ex.: tools refresh/CI). Senão declara "unknown".
+const auditNum = (v) => (typeof v === "number" ? v : null)
+function parseFallowAudit(json) {
+  const s = json.summary || {}
+  return {
+    verdict: json.verdict || "unknown",
+    deadCode: auditNum(s.dead_code_issues),
+    complexity: auditNum(s.complexity_findings),
+    duplication: auditNum(s.duplication_clone_groups),
+    maxCyclomatic: auditNum(s.max_cyclomatic),
+  }
+}
+function fallowAuditSummary(fallowAudit) {
+  if (typeof fallowAudit !== "function") return { verdict: "unknown", note: "audit não executado (rode `tools refresh` ou `verify`)" }
+  try {
+    const r = fallowAudit()
+    return r && r.ok && r.stdout ? parseFallowAudit(JSON.parse(r.stdout)) : { verdict: "unknown", note: "audit falhou/indisponível" }
+  } catch {
+    return { verdict: "unknown", note: "audit ilegível" }
+  }
+}
+function probeFallow(probe, fallowAudit) {
   const res = probe(npxBin(), ["fallow", "--version"])
-  return toolEntry({ status: classifyProbe(res, false), scope: "project", purpose: "deterministic_quality_gate", command: "npx fallow --version", res })
+  return toolEntry({
+    status: classifyProbe(res, false), scope: "project", purpose: "deterministic_quality_gate",
+    command: "npx fallow --version", res, extra: { auditSummary: fallowAuditSummary(fallowAudit) },
+  })
 }
 
-function readBuiltAtCommit(graphPath) {
-  try { return JSON.parse(stripBom(readFileSync(graphPath, "utf-8"))).built_at_commit || null }
+function readGraph(graphPath) {
+  try { return JSON.parse(stripBom(readFileSync(graphPath, "utf-8"))) }
   catch { return null }
 }
-const unknownFreshness = (builtAt, head) => ({ state: "unknown", builtAtCommit: builtAt || null, head: head || null })
-function graphFreshness(cwd, head) {
+function countCommunities(nodes) {
+  const s = new Set()
+  for (const n of nodes) if (n.community != null) s.add(n.community)
+  return s.size
+}
+function graphMetrics(g) {
+  const nodes = Array.isArray(g.nodes) ? g.nodes : []
+  const links = Array.isArray(g.links) ? g.links : []
+  return { indexedCommit: g.built_at_commit || null, nodes: nodes.length, edges: links.length, communities: countCommunities(nodes) }
+}
+const freshnessState = (builtAt, head) => (!builtAt || !head ? "unknown" : builtAt === head ? "fresh" : "stale")
+// Lê graphify-out/graph.json UMA vez: freshness (vs git HEAD) + métricas (nós/arestas/comunidades).
+function graphInfo(cwd, head) {
   const graphPath = join(cwd, "graphify-out", "graph.json")
-  if (!existsSync(graphPath)) return { state: "absent" }
-  const builtAt = readBuiltAtCommit(graphPath)
-  if (!builtAt || !head) return unknownFreshness(builtAt, head)
-  return { state: builtAt === head ? "fresh" : "stale", builtAtCommit: builtAt, head }
+  if (!existsSync(graphPath)) return { freshness: { state: "absent" }, metrics: null }
+  const g = readGraph(graphPath)
+  if (!g) return { freshness: { state: "unknown", head: head || null }, metrics: null }
+  const m = graphMetrics(g)
+  return { freshness: { state: freshnessState(m.indexedCommit, head), builtAtCommit: m.indexedCommit, head: head || null }, metrics: m }
 }
 function probeGraphify(probe, cwd, head) {
   const res = probe("graphify", ["--version"])
+  const gi = graphInfo(cwd, head)
   return toolEntry({
     status: classifyProbe(res, false), scope: "path", purpose: "code_topology",
-    command: "graphify --version", res, extra: { freshness: graphFreshness(cwd, head) },
+    command: "graphify --version", res, extra: { freshness: gi.freshness, metrics: gi.metrics },
   })
 }
 
@@ -118,12 +171,22 @@ function headroomExe(cwd) {
   const rel = process.platform === "win32" ? ["Scripts", "headroom.exe"] : ["bin", "headroom"]
   return join(cwd, ".gstack", "tools", "headroom-venv", ...rel)
 }
-// Só "routed" se o doctor confirmar proxy rodando E tráfego roteado (nunca assume).
-function headroomRouted(probe, exe) {
+// Roteamento por harness a partir da saída do `headroom doctor` (nunca assume):
+// procura a linha do harness e classifica routed/not_routed. Só conta como global
+// `routed` quando proxy roda E há tráfego roteado.
+function harnessRouted(lower, harness) {
+  const line = (lower.match(new RegExp(`${harness}[^\\n]*`, "i")) || [""])[0]
+  if (!line) return "unknown"
+  const negated = /not|nao|não/.test(line)
+  return line.includes("routed") && !negated ? "routed" : "not_routed"
+}
+function headroomRouting(probe, exe) {
   const doc = probe(exe, ["doctor"])
-  if (!doc.ok) return false
-  const out = doc.stdout.toLowerCase()
-  return out.includes("proxy running") && out.includes("routed")
+  if (!doc.ok) return { proxyRunning: false, byHarness: {}, routed: false }
+  const lower = doc.stdout.toLowerCase()
+  const byHarness = { claude: harnessRouted(lower, "claude"), codex: harnessRouted(lower, "codex"), opencode: harnessRouted(lower, "opencode") }
+  const proxyRunning = lower.includes("proxy running")
+  return { proxyRunning, byHarness, routed: proxyRunning && lower.includes("routed") }
 }
 function probeHeadroom(probe, cwd) {
   const exe = headroomExe(cwd)
@@ -134,22 +197,44 @@ function probeHeadroom(probe, cwd) {
   if (!ver.ok) {
     return toolEntry({ status: "installed_not_callable", scope: "project", purpose: "token_proxy", command: `${exe} --version`, res: ver })
   }
-  const routed = headroomRouted(probe, exe)
+  const routing = headroomRouting(probe, exe)
   return toolEntry({
-    status: routed ? "routed" : "callable_not_routed", scope: "project", purpose: "token_proxy",
-    command: `${exe} doctor`, res: ver, extra: { routed },
+    status: routing.routed ? "routed" : "callable_not_routed", scope: "project", purpose: "token_proxy",
+    command: `${exe} doctor`, res: ver, extra: { routed: routing.routed, routing },
   })
 }
 
-function probeContext(cwd) {
+const num = (v) => (typeof v === "number" ? v : null)
+const SOURCE_KEYS = ["adr", "prd", "plans", "research", "docs", "readme", "repo", "changelog"]
+function bySourceCounts(src) {
+  const out = {}
+  for (const k of SOURCE_KEYS) out[k] = src[k] || 0
+  return out
+}
+function parseContextStatus(json) {
+  return {
+    documents: num(json.documents), chunks: num(json.chunks),
+    entities: num(json.entities), edges: num(json.edges),
+    ftsEnabled: !!json.fts_enabled,
+    bySource: bySourceCounts(json.by_source || {}),
+  }
+}
+// Contagens tipadas do Context DB via `context_db.py status --db --json` (bounded).
+function contextCounts(dbPath, runFull, probe) {
+  const r = runFull(pyBin(probe), [INDEXER, "status", "--db", dbPath, "--json"])
+  if (!r.ok || !r.stdout) return null
+  try { return parseContextStatus(JSON.parse(r.stdout)) } catch { return null }
+}
+function probeContext(cwd, runFull, probe) {
   const dbPath = join(cwd, ".gstack", "context", "context.db")
   const exists = existsSync(dbPath)
   return {
     status: exists ? "callable" : "installed_not_callable",
     scope: "project", purpose: "offline_doc_search",
-    validatedCommand: "node src/index.js context status --json",
+    validatedCommand: "context status --db --json",
     exitCode: null, stdout: "", stderr: "",
     artifact: exists ? dbPath : null,
+    counts: exists ? contextCounts(dbPath, runFull, probe) : null,
   }
 }
 
@@ -166,25 +251,34 @@ function harnessDiscovery(cwd, home) {
  * Constrói o relatório de readiness (READ-ONLY). `probe`/`git`/`now` injetáveis.
  * `--clean-machine` só marca o modo no relatório — a medição continua honesta.
  */
+const STALE_AFTER_SECONDS = 3600 // readiness expira em 1h (freshness declarada, não medida)
+function buildTools(cwd, probe, runFull, head, fallowAudit) {
+  return {
+    fallow: probeFallow(probe, fallowAudit),
+    graphify: probeGraphify(probe, cwd, head),
+    gstackContext: probeContext(cwd, runFull, probe),
+    headroom: probeHeadroom(probe, cwd),
+  }
+}
+const readinessNow = (opts) => opts.now || (() => new Date().toISOString())
+const readinessHead = (opts, cwd, probe) => (opts.git || (() => gitHead(cwd, probe)))()
 export function buildReadiness(opts = {}) {
   const cwd = opts.cwd || process.cwd()
   const home = opts.home || homedir()
   const probe = opts.probe || defaultProbe
-  const now = opts.now || (() => new Date().toISOString())
-  const head = (opts.git || (() => gitHead(cwd, probe)))()
+  const runFull = opts.runFull || runFullDefault
+  const now = readinessNow(opts)
+  const head = readinessHead(opts, cwd, probe)
   return {
     schemaVersion: 2,
     generatedAt: now(),
+    lastUpdated: now(),
+    staleAfterSeconds: STALE_AFTER_SECONDS,
     cleanMachine: opts.cleanMachine === true,
     guardrails: GUARDRAILS,
     statuses: STATUS_DESCRIPTIONS,
     env: readEnv(probe),
-    tools: {
-      fallow: probeFallow(probe),
-      graphify: probeGraphify(probe, cwd, head),
-      gstackContext: probeContext(cwd),
-      headroom: probeHeadroom(probe, cwd),
-    },
+    tools: buildTools(cwd, probe, runFull, head, opts.fallowAudit),
     harnessDiscovery: harnessDiscovery(cwd, home),
   }
 }
