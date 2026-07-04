@@ -38,45 +38,46 @@ const PREFIX_STEPS = [
   ["tools:mcp:enable:", (tool) => ({ label: `Habilitar MCP: ${tool}`, command: [CLI, "tools", "mcp", "enable", tool], required: false })],
 ]
 
+function expandCreate(projectName, template, mode) {
+  const cmd = [CLI, "create", projectName || "meu-app", "--template", template]
+  if (mode === "lite") cmd.push("--lite")
+  return { id: "create", label: `Criar projeto (${template}${mode === "lite" ? ", leve" : ""})`, command: cmd, cwd: ".", required: true }
+}
+// Features futuras / desconhecidos: nunca carregam comando — o executor as pula.
+const pendingStep = (stepId, cwd, label) => ({ id: stepId, label, command: null, cwd, required: false, pendingFeature: true })
 /** Expande um step-id declarativo para um step concreto (comando real ou pendingFeature). */
 export function expandStep(stepId, ctx) {
   const { projectName, template, mode } = ctx
   const cwd = projectCwd(projectName)
-
-  if (stepId === "create") {
-    const cmd = [CLI, "create", projectName || "meu-app", "--template", template]
-    if (mode === "lite") cmd.push("--lite")
-    return { id: "create", label: `Criar projeto (${template}${mode === "lite" ? ", leve" : ""})`, command: cmd, cwd: ".", required: true }
-  }
+  if (stepId === "create") return expandCreate(projectName, template, mode)
   if (FIXED_STEPS[stepId]) return { id: stepId, cwd, ...FIXED_STEPS[stepId]() }
   const prefixed = PREFIX_STEPS.find(([prefix]) => stepId.startsWith(prefix))
   if (prefixed) return { id: stepId, cwd, ...prefixed[1](stepId.slice(prefixed[0].length)) }
-  // Features futuras (dashboard/deploy): fonte única em pending-features.
-  // Nunca carregam comando — o executor as pula.
-  if (isPendingFeature(stepId)) {
-    const pf = getPendingFeature(stepId)
-    return { id: stepId, label: `${pf.label} — ainda não implementado`, command: null, cwd, required: false, pendingFeature: true }
-  }
-  // Desconhecido: marca como pendente (nunca inventa comando).
-  return { id: stepId, label: `Passo não mapeado: ${stepId}`, command: null, cwd, required: false, pendingFeature: true }
+  if (isPendingFeature(stepId)) return pendingStep(stepId, cwd, `${getPendingFeature(stepId).label} — ainda não implementado`)
+  return pendingStep(stepId, cwd, `Passo não mapeado: ${stepId}`)
 }
 
 /**
  * @param {object} opts { objective, projectName?, mode?, recipeId? }
  * @returns {{ plan, validation }}
  */
-export function buildPlan(opts = {}) {
-  const objective = opts.objective || ""
-  const projectName = opts.projectName || ""
-
-  // Recipe: explícita ou classificada.
+// Recipe: explícita ou classificada. Fallback duplo garante recipe sempre válida.
+function resolveRecipe(objective, opts) {
   const cls = classify(objective)
   const recipeId = opts.recipeId || cls.recipeId || DEFAULT_RECIPE_ID
   const recipe = getRecipe(recipeId) || getRecipe(DEFAULT_RECIPE_ID)
+  return { cls, recipe }
+}
+// Modo: explícito (válido) ou recomendado pela recipe.
+const resolveMode = (opts, recipe) => (MODE_IDS.includes(opts.mode) ? opts.mode : recipe.recommendedMode)
+const modeReasonOf = (recipe) => recipe.modeReasons[0] || `modo ${recipe.recommendedMode} recomendado para ${recipe.label}`
 
-  // Modo: explícito (válido) ou recomendado pela recipe.
-  const mode = MODE_IDS.includes(opts.mode) ? opts.mode : recipe.recommendedMode
-  const modeReason = recipe.modeReasons[0] || `modo ${recipe.recommendedMode} recomendado para ${recipe.label}`
+export function buildPlan(opts = {}) {
+  const objective = opts.objective || ""
+  const projectName = opts.projectName || ""
+  const { cls, recipe } = resolveRecipe(objective, opts)
+  const mode = resolveMode(opts, recipe)
+  const modeReason = modeReasonOf(recipe)
 
   const ctx = { projectName, template: recipe.template, mode }
   const steps = recipe.requiredSteps.map((s) => expandStep(s, ctx))
