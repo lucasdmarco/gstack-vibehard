@@ -1,5 +1,17 @@
 # Changelog - gstack-vibehard
 
+## [3.58.0] - 2026-07-04
+
+### Context DB — `.docs/RESEARCH` + regressão `search PRD22` (PRD 24 Sprint 24.4)
+
+Delta sobre o índice (já cobria `.docs/PLANS/ADRS/AUDITS` desde 3.53.0):
+
+- **`DOC_DIRS`** agora inclui **`.docs/RESEARCH`→`research`** (antes só o
+  `docs/research` minúsculo era coberto).
+- Teste e2e (Métrica §11): `.docs/RESEARCH` conta como fonte `research`, `prd22.md`
+  é classificado como `prd`, e `context search "PRD22" --json` retorna **≥1** hit
+  (via backend `fts`). 4 JS + 9 Python context tests verdes. QG CRIT/HIGH **0**.
+
 ## [3.57.0] - 2026-07-04
 
 ### Tool Readiness — campos ricos por ferramenta (PRD 24 Sprint 24.2)
