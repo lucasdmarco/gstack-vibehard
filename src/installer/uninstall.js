@@ -1,11 +1,11 @@
-import { existsSync, readdirSync, unlinkSync, renameSync, rmSync, readFileSync, writeFileSync, copyFileSync } from "fs"
-import { createHash } from "crypto"
+import { existsSync, readdirSync, unlinkSync, renameSync, rmSync, readFileSync, writeFileSync } from "fs"
 import { homedir } from "os"
-import { join, dirname } from "path"
+import { join, dirname, basename } from "path"
 import { fileURLToPath } from "url"
 import { getInstalledComponents, getInstalledScripts, getInstalledSkills } from "./check.js"
 import { stripGstackFromCodexConfig } from "../harness/codex.js"
 import { loadManifest, findItems } from "./manifest.js"
+import { restoreBackupsFromManifest } from "./restore.js"
 import { confirm, success, warn, error, info, section } from "../cli/index.js"
 
 const HOME = homedir()
@@ -88,55 +88,40 @@ function removeHooks(report) {
  * hooks.json (Cursor). Sem isso, o harness tenta executar .py ja deletados e
  * falha em todo turno apos a desinstalacao.
  */
+const GSTACK_HOOK_SCRIPTS = ["pre_tool_use_security.py", "stop.py", "session_start.py", "user_prompt_submit.py"]
+const mentionsGstack = (cmd) =>
+  typeof cmd === "string" && (cmd.includes(".gstack") || GSTACK_HOOK_SCRIPTS.some((s) => cmd.includes(s)))
+const entryCmds = (entry) => (entry?.hooks || []).map((h) => h?.command || "")
+const claudeEntryKept = (entry) => !entryCmds(entry).some(mentionsGstack) // settings.json: entry.hooks[].command
+const cursorEntryKept = (entry) => !mentionsGstack(entry?.command)       // hooks.json: entry.command
+
+// Reescreve hooks.<event> in-place, preservando só as entradas que `keepEntry` aprova.
+function pruneHooksConfig(hooks, keepEntry) {
+  for (const [event, entries] of Object.entries(hooks)) {
+    if (!Array.isArray(entries)) continue
+    const kept = entries.filter(keepEntry)
+    if (kept.length > 0) hooks[event] = kept
+    else delete hooks[event]
+  }
+}
+
+// Remove os registros de hooks gstack de UM arquivo de config (Claude/Cursor).
+function stripHookRegistry(file, keepEntry, label, report) {
+  if (!existsSync(file)) return
+  try {
+    const cfg = JSON.parse(readFileSync(file, "utf-8"))
+    if (!cfg.hooks || typeof cfg.hooks !== "object") return
+    pruneHooksConfig(cfg.hooks, keepEntry)
+    writeFileSync(file, JSON.stringify(cfg, null, 2))
+    report.removed.push(`registro de hooks: ${label}`)
+  } catch (e) {
+    report.errors.push(`${basename(file)}: ${e.message}`)
+  }
+}
+
 function unregisterHooks(report) {
-  const GSTACK_SCRIPTS = [
-    "pre_tool_use_security.py", "stop.py", "session_start.py", "user_prompt_submit.py",
-  ]
-  const mentionsGstack = (cmd) =>
-    typeof cmd === "string" && (cmd.includes(".gstack") || GSTACK_SCRIPTS.some((s) => cmd.includes(s)))
-
-  // Claude: settings.json -> hooks.<Evento>[].hooks[].command
-  const claudeSettings = join(HOME, ".claude", "settings.json")
-  if (existsSync(claudeSettings)) {
-    try {
-      const settings = JSON.parse(readFileSync(claudeSettings, "utf-8"))
-      if (settings.hooks && typeof settings.hooks === "object") {
-        for (const [event, entries] of Object.entries(settings.hooks)) {
-          if (!Array.isArray(entries)) continue
-          const kept = entries.filter((entry) => {
-            const cmds = (entry?.hooks || []).map((h) => h?.command || "")
-            return !cmds.some(mentionsGstack)
-          })
-          if (kept.length > 0) settings.hooks[event] = kept
-          else delete settings.hooks[event]
-        }
-        writeFileSync(claudeSettings, JSON.stringify(settings, null, 2))
-        report.removed.push("registro de hooks: ~/.claude/settings.json")
-      }
-    } catch (e) {
-      report.errors.push(`settings.json: ${e.message}`)
-    }
-  }
-
-  // Cursor: hooks.json -> hooks.<evento>[].command
-  const cursorHooks = join(HOME, ".cursor", "hooks.json")
-  if (existsSync(cursorHooks)) {
-    try {
-      const config = JSON.parse(readFileSync(cursorHooks, "utf-8"))
-      if (config.hooks && typeof config.hooks === "object") {
-        for (const [event, entries] of Object.entries(config.hooks)) {
-          if (!Array.isArray(entries)) continue
-          const kept = entries.filter((entry) => !mentionsGstack(entry?.command))
-          if (kept.length > 0) config.hooks[event] = kept
-          else delete config.hooks[event]
-        }
-        writeFileSync(cursorHooks, JSON.stringify(config, null, 2))
-        report.removed.push("registro de hooks: ~/.cursor/hooks.json")
-      }
-    } catch (e) {
-      report.errors.push(`hooks.json: ${e.message}`)
-    }
-  }
+  stripHookRegistry(join(HOME, ".claude", "settings.json"), claudeEntryKept, "~/.claude/settings.json", report)
+  stripHookRegistry(join(HOME, ".cursor", "hooks.json"), cursorEntryKept, "~/.cursor/hooks.json", report)
 }
 
 function readManifest() {
@@ -198,35 +183,10 @@ function removeSkills(report, opts = {}) {
  * Restaura backups registrados no manifest (versionado: usa item.backup exato).
  * Restaura sempre do backup MAIS ANTIGO disponível (o original do usuário).
  */
-function sha256(buf) { return "sha256:" + createHash("sha256").update(buf).digest("hex") }
-
-function restoreFromManifest(report, { dryRun, resolveDrift } = {}) {
-  const manifest = loadManifest(HOME)
-  const items = findItems(manifest, (x) => x.restoreOnUninstall)
-  for (const it of items) {
-    // Restaura SEMPRE o ORIGINAL do usuário: o primeiro `.gstack_vibehard.bak`
-    // (versionedBackup nunca o sobrescreve). Cai pro item.backup se preciso.
-    const original = it.path + ".gstack_vibehard.bak"
-    const src = existsSync(original) ? original : (it.backup && existsSync(it.backup) ? it.backup : null)
-    if (!src) { report.skipped.push(`restore: sem backup p/ ${it.path}`); continue }
-    // DRIFT-SAFE (AC7): se o arquivo atual difere do que o gstack instalou, o
-    // usuário o editou DEPOIS da instalação — não sobrescrever cegamente.
-    if (it.installedHash && existsSync(it.path) && !resolveDrift) {
-      try {
-        if (sha256(readFileSync(it.path)) !== it.installedHash) {
-          report.skipped.push(`restore PULADO — ${it.path} foi editado após a instalação. Backup preservado em ${src}. Force com \`--resolve-drift\` (ou compare manualmente).`)
-          continue
-        }
-      } catch { /* ilegível → segue conservador e tenta restaurar */ }
-    }
-    if (dryRun) { report.restored.push(`(dry-run) ${it.path} ← ${src}`); continue }
-    try {
-      copyFileSync(src, it.path)
-      report.restored.push(`${it.path} (de ${src})`)
-    } catch (e) {
-      report.errors.push(`restore ${it.path}: ${e.message}`)
-    }
-  }
+// Restore extraído p/ src/installer/restore.js (injetável por home; reusado pelo
+// Clean-Machine Proof Pack). Aqui fixamos home = HOME.
+function restoreFromManifest(report, opts = {}) {
+  return restoreBackupsFromManifest(HOME, report, opts)
 }
 
 /** Monta o plano de rollback a partir do manifest (para --dry-run). */
@@ -252,83 +212,85 @@ function removeScripts(report) {
  * NÃO mexe nos registros `hermes mcp add` (vivem no config do Hermes; os MCP
  * servers apontam para deps globais preservadas).
  */
-function removeHermes(report) {
+function removeHermesSkills(report) {
   const skillsDir = join(HOME, ".hermes", "skills")
-  if (existsSync(skillsDir)) {
-    const count = packageSkillNames().filter((skill) => removeDir(join(skillsDir, skill), report)).length
-    if (count > 0) success(`${count} skills gstack removidas de ~/.hermes/skills/`)
+  if (!existsSync(skillsDir)) return
+  const count = packageSkillNames().filter((skill) => removeDir(join(skillsDir, skill), report)).length
+  if (count > 0) success(`${count} skills gstack removidas de ~/.hermes/skills/`)
+}
+
+// Reescreve o AGENTS.md sem o bloco marcado (ou apaga se ficar vazio). Preserva o resto.
+function writeStrippedAgents(agents, stripped, report) {
+  if (stripped) { writeFileSync(agents, stripped + "\n"); report.removed.push("bloco gstack: ~/.hermes/AGENTS.md") }
+  else { unlinkSync(agents); report.removed.push("~/.hermes/AGENTS.md") }
+}
+function stripHermesAgentsBlock(report) {
+  const agents = join(HOME, ".hermes", "AGENTS.md")
+  if (!existsSync(agents)) return
+  try {
+    const MARKER = "<!-- gstack_vibehard:instrucional -->"
+    const content = readFileSync(agents, "utf-8")
+    if (!content.includes(MARKER)) return
+    const first = content.indexOf(MARKER)
+    const last = content.lastIndexOf(MARKER) + MARKER.length
+    writeStrippedAgents(agents, (content.slice(0, first) + content.slice(last)).trim(), report)
+  } catch (e) {
+    report.errors.push(`hermes AGENTS.md: ${e.message}`)
   }
+}
+
+function removeHermes(report) {
+  removeHermesSkills(report)
   // Snippet de MCP que o gstack gera quando o config.yaml já existia (seguro remover).
   // NUNCA tocamos no ~/.hermes/config.yaml do usuário (pode tê-lo editado / VPS).
   const snippet = join(HOME, ".hermes", "gstack-mcp-servers.yaml")
   if (existsSync(snippet)) removeWithRestore(snippet, report)
-  const agents = join(HOME, ".hermes", "AGENTS.md")
-  if (existsSync(agents)) {
-    try {
-      const MARKER = "<!-- gstack_vibehard:instrucional -->"
-      const content = readFileSync(agents, "utf-8")
-      if (content.includes(MARKER)) {
-        const first = content.indexOf(MARKER)
-        const last = content.lastIndexOf(MARKER) + MARKER.length
-        const stripped = (content.slice(0, first) + content.slice(last)).trim()
-        if (stripped) { writeFileSync(agents, stripped + "\n"); report.removed.push("bloco gstack: ~/.hermes/AGENTS.md") }
-        else { unlinkSync(agents); report.removed.push("~/.hermes/AGENTS.md") }
-      }
-    } catch (e) {
-      report.errors.push(`hermes AGENTS.md: ${e.message}`)
-    }
+  stripHermesAgentsBlock(report)
+}
+
+function parseUninstallFlags(args) {
+  const has = (f) => args.includes(f)
+  return {
+    skipConfirm: has("--yes") || has("-y"),
+    dryRun: has("--dry-run"),
+    restoreOnly: has("--restore-only"),
+    removeVault: has("--remove-vault"),
+    removeDeps: has("--remove-deps"),
+    includeProjects: has("--include-projects"),
+    legacyNameCleanup: has("--legacy-name-cleanup"),
+    resolveDrift: has("--resolve-drift"),
   }
 }
 
-export async function uninstall(args = []) {
-  const hasYesFlag = args.includes("--yes") || args.includes("-y")
-  const dryRun = args.includes("--dry-run")
-  const restoreOnly = args.includes("--restore-only")
-  const removeVault = args.includes("--remove-vault")
-  const removeDeps = args.includes("--remove-deps")
-  const includeProjects = args.includes("--include-projects")
-  const legacyNameCleanup = args.includes("--legacy-name-cleanup")
-  const resolveDrift = args.includes("--resolve-drift")
-  const report = { removed: [], restored: [], skipped: [], errors: [] }
+// --dry-run: mostra o plano de rollback SEM tocar em nada.
+function printDryRunPlan() {
+  section("gstack_vibehard Uninstaller — DRY RUN (nada será alterado)")
+  const plan = buildRollbackPlan()
+  info(`Manifest: ${plan.items} item(ns) registrados`)
+  info("Será RESTAURADO de backup:")
+  plan.restore.forEach((p) => info(`  ~ ${p}`))
+  if (plan.restore.length === 0) info("  (nenhum backup no manifest)")
+  info("Será REMOVIDO (criado pelo gstack):")
+  plan.remove.forEach((p) => info(`  - ${p}`))
+  if (plan.remove.length === 0) info("  (nenhum item exclusivo no manifest — limpeza por padrão)")
+  info("Será PRESERVADO: projetos criados, ~/gstack-vault (salvo --remove-vault), deps globais")
+  info("Rode sem --dry-run para aplicar (com --yes em modo não-interativo).")
+}
 
-  // --dry-run: mostra o plano de rollback SEM tocar em nada.
-  if (dryRun) {
-    section("gstack_vibehard Uninstaller — DRY RUN (nada será alterado)")
-    const plan = buildRollbackPlan()
-    info(`Manifest: ${plan.items} item(ns) registrados`)
-    info("Será RESTAURADO de backup:")
-    plan.restore.forEach((p) => info(`  ~ ${p}`))
-    if (plan.restore.length === 0) info("  (nenhum backup no manifest)")
-    info("Será REMOVIDO (criado pelo gstack):")
-    plan.remove.forEach((p) => info(`  - ${p}`))
-    if (plan.remove.length === 0) info("  (nenhum item exclusivo no manifest — limpeza por padrão)")
-    info("Será PRESERVADO: projetos criados, ~/gstack-vault (salvo --remove-vault), deps globais")
-    info("Rode sem --dry-run para aplicar (com --yes em modo não-interativo).")
-    return report
+async function handleRestoreOnly(flags, report) {
+  section("gstack_vibehard Uninstaller — RESTORE ONLY")
+  if (!flags.skipConfirm) {
+    const ok = await confirm("Restaurar todos os backups do manifest?", false)
+    if (!ok) { info("Cancelado."); return report }
   }
+  restoreFromManifest(report, { dryRun: false, resolveDrift: flags.resolveDrift })
+  info(`Restaurados de backup: ${report.restored.length}`)
+  if (report.errors.length) report.errors.forEach((e) => warn(`  ${e}`))
+  success("Restore concluido.")
+  return report
+}
 
-  // Sem TTY e sem --yes: abortar — remocao silenciosa sem consentimento e inaceitavel
-  if (!process.stdin.isTTY && !hasYesFlag) {
-    error("Modo nao-interativo: confirme explicitamente com --yes")
-    info("  gstack_vibehard uninstall --yes")
-    return report
-  }
-  const skipConfirm = hasYesFlag
-
-  // --restore-only: apenas restaura backups do manifest, sem remover nada.
-  if (restoreOnly) {
-    section("gstack_vibehard Uninstaller — RESTORE ONLY")
-    if (!skipConfirm) {
-      const ok = await confirm("Restaurar todos os backups do manifest?", false)
-      if (!ok) { info("Cancelado."); return report }
-    }
-    restoreFromManifest(report, { dryRun: false, resolveDrift })
-    info(`Restaurados de backup: ${report.restored.length}`)
-    if (report.errors.length) report.errors.forEach((e) => warn(`  ${e}`))
-    success("Restore concluido.")
-    return report
-  }
-
+function printUninstallIntro() {
   section("gstack_vibehard Uninstaller")
   info("Sera removido apenas o que o instalador criou (backups .bak sao restaurados):")
   info("  • hooks Python em ~/.gstack/hooks, ~/.codex/hooks e ~/.claude/hooks")
@@ -339,22 +301,10 @@ export async function uninstall(args = []) {
   info("  • skills gstack + bloco instrucional em ~/.hermes (Hermes)")
   info("  • manifest ~/.gstack_vibehard/")
   info("Nao remove: deps globais (bun, uv, Rust, headroom), ~/gstack-vault, ~/.mcp.json")
+}
 
-  if (!skipConfirm) {
-    const ok = await confirm("Continuar com a remocao?", false)
-    if (!ok) {
-      info("Remocao cancelada.")
-      return report
-    }
-  }
-
-  // RESTAURA os originais (manifest) ANTES de qualquer remoção — o rollback não
-  // pode depender de cobertura por padrão, e o manifest é apagado só no fim.
-  restoreFromManifest(report, { resolveDrift })
-
-  unregisterHooks(report)
-  removeHooks(report)
-  // Codex config.toml: remove apenas as chaves gstack, preservando a config do usuario
+// Codex config.toml: remove apenas as chaves gstack, preservando a config do usuario.
+function removeCodexKeys(report) {
   try {
     const codexConfig = join(HOME, ".codex", "config.toml")
     if (existsSync(codexConfig) && stripGstackFromCodexConfig(codexConfig)) {
@@ -363,32 +313,43 @@ export async function uninstall(args = []) {
   } catch (e) {
     report.errors.push(`config.toml: ${e.message}`)
   }
+}
+
+// RESTAURA os originais (manifest) e remove o que o instalador criou.
+function removeInstalledArtifacts(flags, report) {
+  restoreFromManifest(report, { resolveDrift: flags.resolveDrift })
+  unregisterHooks(report)
+  removeHooks(report)
+  removeCodexKeys(report)
   removeWithRestore(join(HOME, ".claude", "rules", "ultracode.md"), report)
   removeWithRestore(join(HOME, "CLAUDE.md"), report)
   removeGeneratedAgents(report)
-  removeSkills(report, { legacyAllowed: legacyNameCleanup })
+  removeSkills(report, { legacyAllowed: flags.legacyNameCleanup })
   removeScripts(report)
   removeHermes(report)
   removeWithRestore(join(HOME, "gstack_vibehard-install.bat"), report)
   removeWithRestore(join(HOME, "gstack_vibehard-install.sh"), report)
   removeDir(join(HOME, ".gstack_vibehard"), report)
+}
 
-  // Flags opcionais
-  if (removeVault) {
+function handleOptionalFlags(flags, report) {
+  if (flags.removeVault) {
     removeDir(join(HOME, "gstack-vault"), report)
     success("~/gstack-vault removido (--remove-vault)")
   } else {
     report.skipped.push("~/gstack-vault preservado (use --remove-vault para remover)")
   }
-  if (removeDeps) {
+  if (flags.removeDeps) {
     warn("--remove-deps: remoção de deps globais (bun/uv/Rust/headroom) NÃO é automatizada por segurança.")
     info("  Remova manualmente o que não usar mais. O gstack não desinstala binários globais.")
   }
-  if (includeProjects) {
+  if (flags.includeProjects) {
     warn("--include-projects: o uninstall global NÃO apaga projetos criados.")
     info("  Para remover a integração de um projeto, rode dentro dele (escopo separado).")
   }
+}
 
+function printUninstallReport(report) {
   section("Relatorio da Remocao")
   info(`Removidos: ${report.removed.length}`)
   if (report.restored.length > 0) info(`Restaurados de backup: ${report.restored.length}`)
@@ -398,46 +359,77 @@ export async function uninstall(args = []) {
   }
   info("Vault (~/gstack-vault) e deps globais foram preservados intencionalmente.")
   success("Remocao concluida.")
+}
+
+async function confirmUninstall(flags) {
+  if (flags.skipConfirm) return true
+  return confirm("Continuar com a remocao?", false)
+}
+
+export async function uninstall(args = []) {
+  const flags = parseUninstallFlags(args)
+  const report = { removed: [], restored: [], skipped: [], errors: [] }
+
+  if (flags.dryRun) { printDryRunPlan(); return report }
+  // Sem TTY e sem --yes: abortar — remocao silenciosa sem consentimento e inaceitavel.
+  if (!process.stdin.isTTY && !flags.skipConfirm) {
+    error("Modo nao-interativo: confirme explicitamente com --yes")
+    info("  gstack_vibehard uninstall --yes")
+    return report
+  }
+  if (flags.restoreOnly) return handleRestoreOnly(flags, report)
+
+  printUninstallIntro()
+  if (!(await confirmUninstall(flags))) { info("Remocao cancelada."); return report }
+
+  removeInstalledArtifacts(flags, report)
+  handleOptionalFlags(flags, report)
+  printUninstallReport(report)
   return report
 }
 
-export async function list() {
+function listComponents() {
   section("Componentes gstack_vibehard instalados")
-
-  const components = getInstalledComponents()
-  for (const [harnessId, comps] of Object.entries(components)) {
+  for (const [harnessId, comps] of Object.entries(getInstalledComponents())) {
     info(`${harnessId}:`)
     for (const comp of comps) {
       if (comp.present) success(`  ${comp.label}`)
       else info(`  ${comp.label} — ausente`)
     }
   }
+}
 
+function listSkills() {
   const skills = getInstalledSkills()
   info("")
   info(`Skills (~/.agents/skills): ${skills.length}`)
   for (const s of skills.slice(0, 20)) info(`  • ${s}`)
   if (skills.length > 20) info(`  ... e mais ${skills.length - 20}`)
+}
 
+function listScripts() {
   const scripts = getInstalledScripts()
   info("")
   info(`Scripts (~/.agents/scripts): ${scripts.length}`)
   for (const s of scripts) info(`  • ${s}`)
+}
 
-  if (existsSync(MANIFEST_PATH)) {
-    try {
-      const manifest = JSON.parse(readFileSync(MANIFEST_PATH, "utf-8"))
-      info("")
-      info(`Manifest: ${MANIFEST_PATH}`)
-      info(`  Instalado em: ${manifest.installedAt || "desconhecido"}`)
-      for (const [id, dir] of Object.entries(manifest.agentDirectories || {})) {
-        info(`  agentes ${id}: ${dir}`)
-      }
-    } catch (e) {
-      warn(`manifest ilegivel: ${e.message}`)
-    }
-  } else {
-    info("")
-    info("Manifest: nao encontrado (instalacao antiga ou nunca instalado)")
+function listManifest() {
+  info("")
+  if (!existsSync(MANIFEST_PATH)) { info("Manifest: nao encontrado (instalacao antiga ou nunca instalado)"); return }
+  try {
+    const manifest = JSON.parse(readFileSync(MANIFEST_PATH, "utf-8"))
+    info(`Manifest: ${MANIFEST_PATH}`)
+    info(`  Instalado em: ${manifest.installedAt || "desconhecido"}`)
+    for (const [id, dir] of Object.entries(manifest.agentDirectories || {})) info(`  agentes ${id}: ${dir}`)
+  } catch (e) {
+    warn(`manifest ilegivel: ${e.message}`)
   }
+}
+
+export async function list() {
+  listComponents()
+  listSkills()
+  listScripts()
+  listManifest()
 }
