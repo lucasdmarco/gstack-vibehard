@@ -14,6 +14,7 @@ import { npmArgv } from "./deps.js"
 import { buildInstallImpact } from "./impact.js"
 import { buildSupplyChainReport } from "./supply-chain.js"
 import { planOpenCodeFix, applyOpenCodeFix, diagnoseOpenCode } from "./opencode-jsonc.js"
+import { buildOpenCodeDoctorV2 } from "../harness/opencode-doctor.js"
 import { buildConformanceReport } from "../harness/conformance.js"
 import { buildCandidateReport } from "../harness/candidates.js"
 import { buildRufloReport } from "../harness/ruflo.js"
@@ -133,7 +134,6 @@ function emitJson(obj, fail) {
   if (fail) process.exitCode = 1
 }
 const orDash = (v) => v || "—"
-const orAbsent = (has, val) => (has ? val : "(ausente)")
 
 const sevFn = (r) => (r.violations.length ? error : (r.enforcedEvents || []).length ? success : info)
 const enforcedStr = (r) => (r.enforcedEvents || []).join(",") || "nenhum"
@@ -157,22 +157,27 @@ function conformanceRoute(json, strict) {
   ;(conf.ok ? success : error)(conformanceMsg(conf))
 }
 
-/** Corpo humano do `doctor --opencode`. */
-function renderOpencodeDiag(diag) {
-  section("doctor --opencode — diagnóstico (read-only, nada é alterado)")
-  info(`  json: ${orAbsent(diag.hasJson, diag.jsonPath)}`)
-  info(`  jsonc: ${orAbsent(diag.hasJsonc, diag.jsoncPath)}`)
-  if (diag.jsoncSensitiveKeys.length) info(`  chaves sensíveis no jsonc (só nomes): ${diag.jsoncSensitiveKeys.join(", ")}`)
-  if (diag.disabledResidue) warn(`  resíduo de versão anterior: ${diag.disabledResidue} — restaure com \`doctor --fix opencode --restore-jsonc\``)
-  ;(diag.shadowingRisk === "high" ? warn : info)(`  risco de shadowing: ${diag.shadowingRisk}`)
-  info(`  ação recomendada: ${diag.recommendedAction}`)
-  if (diag.parseError) warn(`  parse: ${diag.parseError}`)
+const catFn = (s) => (s === "error" ? error : s === "warn" ? warn : s === "unknown" ? info : success)
+/** Uma linha de categoria do doctor v2 (o helper de cor já prefixa o ícone). */
+function printCategory(name, c) {
+  catFn(c.status)(`  ${name}: ${c.status}`)
 }
-/** `doctor --opencode [--json]` (PRD15 §7.8): diagnóstico READ-ONLY da config OpenCode. */
+/** Corpo humano do `doctor --opencode` (schema v2). */
+function renderOpencodeDiagV2(rep) {
+  section("doctor --opencode v2 — diagnóstico (read-only, config sagrada preservada)")
+  for (const [name, c] of Object.entries(rep.categories)) printCategory(name, c)
+  const cfg = rep.categories.config
+  info(`  autoridade da config: ${cfg.authority}${cfg.hasJsonc ? " · jsonc é fonte de verdade" : ""}`)
+  if (cfg.sensitiveKeys.length) info(`  chaves sensíveis no jsonc (só nomes): ${cfg.sensitiveKeys.join(", ")}`)
+  for (const a of rep.recommendedActions) info(`  ação: ${a.id}${a.requiresFlag ? ` (use ${a.requiresFlag})` : " (não automática)"}`)
+  info(`  enforcement: ${rep.enforcement} · estratégia: ${rep.strategy}`)
+}
+/** `doctor --opencode [--json] [--strict]` (PRD24 24.1): diagnóstico READ-ONLY v2. */
 function opencodeDiagRoute(json, strict) {
-  const diag = diagnoseOpenCode(HOME)
-  if (json) return emitJson(diag, strict && diag.shadowingRisk === "high")
-  renderOpencodeDiag(diag)
+  const rep = buildOpenCodeDoctorV2({ home: HOME, strict })
+  process.exitCode = rep.exitCode // 0 ok · 1 error · 2 warn (JSON.exitCode == process.exitCode)
+  if (json) return process.stdout.write(JSON.stringify(rep) + "\n")
+  renderOpencodeDiagV2(rep)
 }
 
 /** confirmação de aplicação: --yes/--apply ou prompt TTY. */

@@ -39,6 +39,29 @@ test("installOpenCode: só .jsonc → NÃO cria opencode.json; plugins copiados"
   }
 })
 
+test("installOpenCode: .jsonc REAL com provider/model/plugin/OAuth → jsonc byte-for-byte, sem opencode.json (PRD24 24.1)", async () => {
+  const { createHash } = await import("node:crypto")
+  const jsoncText = `{
+  // OpenCode Desktop config (OAuth ativo)
+  "plugin": ["opencode-openai-codex-auth"],
+  "provider": { "openai": { "model": "gpt-5" }, "anthropic": {} },
+  "model": "anthropic/claude",
+  "models": ["gpt-5", "claude"],
+}`
+  const home = await makeHome({ "opencode.jsonc": jsoncText })
+  const jsoncPath = path.join(home, ".config", "opencode", "opencode.jsonc")
+  try {
+    const before = createHash("sha256").update(await readFile(jsoncPath)).digest("hex")
+    const { installOpenCode } = await import(`${pathToFileURL(ocMod)}?t=${Date.now()}`)
+    await installOpenCode({ hooks: true }, freshReport(), { home })
+    assert.equal(existsSync(path.join(home, ".config", "opencode", "opencode.json")), false, "nunca cria opencode.json com jsonc presente")
+    const after = createHash("sha256").update(await readFile(jsoncPath)).digest("hex")
+    assert.equal(after, before, "opencode.jsonc (provider/model/plugin/OAuth) preservado byte-for-byte")
+  } finally {
+    await rm(home, { recursive: true, force: true })
+  }
+})
+
 test("installOpenCode: só .json → merge não-destrutivo preservando chaves do usuário", async () => {
   const home = await makeHome({ "opencode.json": JSON.stringify({ provider: "anthropic", plugin: ["x"] }) })
   try {

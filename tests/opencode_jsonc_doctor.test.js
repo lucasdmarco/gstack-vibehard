@@ -139,6 +139,27 @@ test("CLEAN MACHINE E2E: jsonc com codex-auth+providers+models fica BYTE-FOR-BYT
   } finally { await rm(home, { recursive: true, force: true }) }
 })
 
+test("diagnoseOpenCode.configAuthority: jsonc sensível vence json ao lado; json puro = json; nada = directory_only", async () => {
+  const { diagnoseOpenCode, configAuthority } = await imp()
+  // jsonc sensível + json → autoridade é o jsonc (sacred), não "conflict"
+  const h1 = await ocHome(JSON.stringify({ x: 1 }), `{ "provider": "anthropic" }`)
+  // json puro (sem jsonc) → json
+  const h2 = await ocHome(JSON.stringify({ x: 1 }), null)
+  // nada → directory_only
+  const h3 = await ocHome(null, null)
+  try {
+    assert.equal(diagnoseOpenCode(h1).configAuthority, "jsonc")
+    assert.equal(diagnoseOpenCode(h2).configAuthority, "json")
+    assert.equal(diagnoseOpenCode(h3).configAuthority, "directory_only")
+    // função pura: ambos presentes mas jsonc SEM chaves sensíveis → conflict
+    assert.equal(configAuthority(true, true, 0), "conflict")
+  } finally {
+    await rm(h1, { recursive: true, force: true })
+    await rm(h2, { recursive: true, force: true })
+    await rm(h3, { recursive: true, force: true })
+  }
+})
+
 test("planOpenCodeFix: jsonc malformado de verdade → action manual (não tenta merge)", async () => {
   const home = await ocHome("{}", `{ "x": [1 2 3] }`) // sem vírgulas, inválido mesmo p/ JSONC
   try { const { planOpenCodeFix } = await imp(); const p = planOpenCodeFix(home); assert.equal(p.action, "manual"); assert.ok(p.parseError) }

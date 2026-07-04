@@ -163,6 +163,18 @@ function shadowingRisk(conflict, sensitiveCount) {
 }
 
 /**
+ * Autoridade da config OpenCode (PRD24 §4.2): quem é a FONTE DE VERDADE.
+ * Um `.jsonc` sensível (plugin/provider/model/OAuth) É a autoridade mesmo com um
+ * `.json` ao lado (que fica sombreado) → "jsonc". "conflict" só quando ambos
+ * coexistem e o `.jsonc` NÃO é sensível (autoridade ambígua / mergeável).
+ * jsonc · json · directory_only (nenhum) · conflict.
+ */
+export function configAuthority(hasJson, hasJsonc, sensitiveCount = 0) {
+  if (hasJsonc) return sensitiveCount > 0 || !hasJson ? "jsonc" : "conflict"
+  return hasJson ? "json" : "directory_only"
+}
+
+/**
  * Diagnóstico READ-ONLY para `doctor --opencode --json`: config, chaves sensíveis
  * detectadas (por NOME, nunca valor), risco de shadowing e resíduo disabled.
  */
@@ -176,6 +188,7 @@ export function diagnoseOpenCode(home = homedir()) {
   return {
     schemaVersion: "gstack.opencode.v1",
     jsonPath, jsoncPath, hasJson, hasJsonc, conflict,
+    configAuthority: configAuthority(hasJson, hasJsonc, jsoncSensitive.length),
     jsoncSensitiveKeys: jsoncSensitive, // só nomes
     shadowingRisk: shadowingRisk(conflict, jsoncSensitive.length),
     disabledResidue: hasDisabled ? disabledPath : null,
