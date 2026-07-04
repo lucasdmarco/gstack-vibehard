@@ -39,297 +39,222 @@ function getProjectRoot() {
 
 const PROJECT_ROOT = getProjectRoot()
 
+const dlTmpPath = () => join(tmpdir(), `gstack-dl-${Date.now()}${isWindows() ? ".ps1" : ".sh"}`)
+const rmTmp = (tmp) => { try { unlinkSync(tmp) } catch (e) { console.error("cleanup tmp:", e) } }
+// curl existe nativamente no Windows 10 1803+ ("curl.exe") e em Unix. Args como
+// array — sem interpolacao de shell.
+function fetchScript(url, tmp) {
+  const curlBin = isWindows() ? "curl.exe" : "curl"
+  execFileSync(curlBin, ["-fsSL", url, "-o", tmp], { stdio: "pipe", timeout: 120000, shell: false })
+}
+function runDownloadedScript(tmp) {
+  if (isWindows()) execFileSync("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", tmp], { stdio: "pipe", timeout: 180000, shell: false })
+  else execFileSync("sh", [tmp], { stdio: "pipe", timeout: 180000, shell: false })
+}
 function safeDownloadAndRun(url, label, opts = {}) {
   // POLÍTICA REMOTA (P0.6): por padrão NÃO executa download remoto — só com
   // --allow-remote-downloads (ou GSTACK_ALLOW_REMOTE_DOWNLOADS=1) e origem na allowlist.
   const policy = checkRemoteDownload(url, opts)
-  if (!policy.allowed) {
-    warn(`${label}: download remoto NÃO executado (${policy.reason}). Instale manualmente: ${url}`)
-    return false
-  }
-  const tmp = join(tmpdir(), `gstack-dl-${Date.now()}${isWindows() ? ".ps1" : ".sh"}`)
+  if (!policy.allowed) { warn(`${label}: download remoto NÃO executado (${policy.reason}). Instale manualmente: ${url}`); return false }
+  const tmp = dlTmpPath()
   try {
-    // curl existe nativamente no Windows 10 1803+ ("curl.exe") e em Unix.
-    // Argumentos como array — sem interpolacao de string em shell.
-    const curlBin = isWindows() ? "curl.exe" : "curl"
-    execFileSync(curlBin, ["-fsSL", url, "-o", tmp], { stdio: "pipe", timeout: 120000, shell: false })
+    fetchScript(url, tmp)
     if (!existsSync(tmp)) { warn(`${label}: download falhou`); return false }
     const content = readFileSync(tmp, "utf-8")
     if (content.length < 10) { warn(`${label}: download invalido (${content.length} bytes)`); return false }
-    if (isWindows()) {
-      execFileSync("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", tmp], { stdio: "pipe", timeout: 180000, shell: false })
-    } else {
-      execFileSync("sh", [tmp], { stdio: "pipe", timeout: 180000, shell: false })
-    }
-    try { unlinkSync(tmp) } catch (e) { console.error("cleanup tmp:", e) }
+    runDownloadedScript(tmp)
+    rmTmp(tmp)
     return true
   } catch (e) {
-    try { unlinkSync(tmp) } catch (e2) { console.error("cleanup tmp:", e2) }
+    rmTmp(tmp)
     warn(`${label}: falha no download/execucao segura: ${e.message}`)
     return false
   }
 }
 
+const regPathValue = (out) => ((out || "").match(/REG_\w+\s+(\S.+)/) || [])[1]
+const currentWinPath = () => process.env.Path || process.env.PATH || ""
+function readRegistryPath() {
+  const sys = execFileSync("reg", ["query", "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment", "/v", "Path"], { stdio: "pipe", timeout: 5000, encoding: "utf-8" })
+  const user = execFileSync("reg", ["query", "HKCU\\Environment", "/v", "Path"], { stdio: "pipe", timeout: 5000, encoding: "utf-8" })
+  return [regPathValue(sys), regPathValue(user)].filter(Boolean).join(";")
+}
 function refreshPath() {
   if (!isWindows()) return
   try {
-    const sysResult = execFileSync("reg", ["query", "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment", "/v", "Path"], { stdio: "pipe", timeout: 5000, encoding: "utf-8" })
-    const userResult = execFileSync("reg", ["query", "HKCU\\Environment", "/v", "Path"], { stdio: "pipe", timeout: 5000, encoding: "utf-8" })
-    const sysMatch = (sysResult || "").match(/REG_\w+\s+(\S.+)/)
-    const userMatch = (userResult || "").match(/REG_\w+\s+(\S.+)/)
-    const fromReg = [sysMatch?.[1], userMatch?.[1]].filter(Boolean).join(";")
+    const fromReg = readRegistryPath()
     // MESCLA com o PATH atual e expande %VAR% — substituir cru perdia o System32
     // (cmd.exe) porque o registro guarda `%SystemRoot%\system32` não-expandido.
-    if (fromReg) process.env.Path = mergeWindowsPath(process.env.Path || process.env.PATH || "", fromReg)
+    if (fromReg) process.env.Path = mergeWindowsPath(currentWinPath(), fromReg)
   } catch (e) { console.error("refreshPath (non-critical):", e.message) }
+}
+
+// ── deps globais: um bloco por binário (self-contained, degrada explícito) ───────
+
+function installBun(remoteOpts) {
+  let bunFound = findWorkingBinary(["bun"]) !== ""
+  if (bunFound) return true
+  info("bun: nao encontrado. Instalando (download seguro)...")
+  try {
+    const bunUrl = isWindows() ? "https://bun.sh/install.ps1" : "https://bun.sh/install"
+    if (!safeDownloadAndRun(bunUrl, "Bun", remoteOpts)) { warn("bun: download falhou. Instale manualmente: https://bun.sh"); return false }
+    refreshPath()
+    bunFound = findWorkingBinary(getBunCandidates(HOME, isWindows())) !== ""
+    if (bunFound) success("bun instalado")
+    else warn("bun: instalado mas nao encontrado no PATH")
+  } catch (e) { warn("bun: falha ao instalar. Instale manualmente: https://bun.sh") }
+  return bunFound
+}
+function installGbrain(report, bunFound) {
+  if (!bunFound) { info("gbrain: pulado (bun nao disponivel)"); return trackDegraded(report, "gbrain", "bun não disponível") }
+  try {
+    execFileSync("bun", ["install", "-g", "github:garrytan/gbrain"], { stdio: "pipe", timeout: 120000 })
+    success("gbrain (bun global)")
+  } catch (e) { warn(`gbrain (bun global): ${e.message}`); trackDegraded(report, "gbrain", e.message) }
+}
+
+const uvLabel = () => (isWindows() ? "uv (Windows)" : "uv (Unix)")
+const uvUrl = () => (isWindows() ? "https://astral.sh/uv/install.ps1" : "https://astral.sh/uv/install.sh")
+function installUv(remoteOpts) {
+  const uvCandidates = getUvCandidates(HOME, isWindows())
+  let uvBin = findWorkingBinary(uvCandidates)
+  if (uvBin) return uvBin
+  info("uv: nao encontrado. Instalando (download seguro)...")
+  try {
+    safeDownloadAndRun(uvUrl(), uvLabel(), remoteOpts)
+    refreshPath()
+    uvBin = findWorkingBinary(uvCandidates)
+    if (uvBin) success("uv instalado")
+    else warn("uv: instalado mas nao encontrado. Tente reiniciar o terminal.")
+  } catch { warn("uv: falha ao instalar. Instale manualmente: https://docs.astral.sh/uv/#installation") }
+  return uvBin
+}
+// graphify — indexação AST por commit. O pacote PyPI é `graphifyy` (DOIS "y"; o CLI
+// continua `graphify`). Instala GLOBAL via uv tool (ambiente isolado). Pula se já existe.
+function installGraphify(report, uvBin) {
+  if (findWorkingBinary(["graphify"])) return success("graphify: já instalado")
+  if (!uvBin) { info("graphify: pulado (uv não disponível) — `uv tool install graphifyy` ativa a indexação AST global."); return trackDegraded(report, "graphify", "uv não disponível") }
+  try {
+    execFileSync(uvBin, ["tool", "install", "graphifyy"], { stdio: "pipe", timeout: 180000 })
+    refreshPath()
+    if (findWorkingBinary(["graphify"])) success("graphify instalado (uv tool: graphifyy) — AST global p/ qualquer projeto")
+    else { success("graphify instalado (graphifyy)"); info("  Se `graphify` não aparecer, reinicie o terminal (bin do uv tool no PATH).") }
+    report.added.push("graphify (graphifyy — indexação AST)")
+  } catch (e) { warn(`graphify (uv tool graphifyy): ${e.message}`); trackDegraded(report, "graphify", e.message) }
+}
+// ECC (ecc-universal) — otimizador de harness (binário `ecc`). Full = tudo; gstack
+// consome como BIBLIOTECA (não injeta o perfil do ECC — ver create.js).
+function installEcc(report) {
+  if (findWorkingBinary(["ecc"])) return success("ECC: já instalado (ecc-universal)")
+  try {
+    const { file, argv } = npmArgv(["install", "-g", "ecc-universal"])
+    execFileSync(file, argv, { stdio: "pipe", timeout: 180000 })
+    success("ECC instalado (ecc-universal) — `ecc` / `npx ecc-agentshield scan` on-demand")
+    report.added.push("ECC (ecc-universal)")
+  } catch (e) { warn(`ECC (ecc-universal): ${e.message}`); trackDegraded(report, "ECC", e.message) }
+}
+
+// pytest — hooks Python, QG e Test Gate dependem dele. Tenta uv, depois pip.
+function tryUvPytest(uvBin) {
+  if (!uvBin) return false
+  try { execFileSync(uvBin, ["pip", "install", "--system", "pytest"], { stdio: "pipe", timeout: 120000 }); return true } catch { return false }
+}
+function tryPipPytest() {
+  try {
+    const pip = findWorkingBinary(["pip3", "pip"], { timeout: 5000 }) || "pip"
+    execFileSync(pip, ["install", "--user", "pytest"], { stdio: "pipe", timeout: 120000 })
+    return true
+  } catch (e) { warn(`pytest: falha ao instalar (${e.message}). Instale manualmente: pip install pytest`); return false }
+}
+function installPytest(report, uvBin) {
+  const pytestOk = tryUvPytest(uvBin) || tryPipPytest()
+  if (pytestOk) { success("pytest instalado"); report.added.push("pytest (testes Python)") }
+}
+
+// Rust (rustup) — needed for headroom build.
+const rustupLabel = () => (isMacOS() ? "Rustup (macOS)" : "Rustup (Linux)")
+function installRustWindows() {
+  try {
+    execFileSync("winget", ["install", "Rustlang.Rustup"], { stdio: "pipe", timeout: 120000 })
+  } catch {
+    info("winget falhou. Tentando rustup-init.exe diretamente...")
+    const rustupUrl = "https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe"
+    const rustupTmp = join(tmpdir(), "rustup-init.exe")
+    execFileSync("curl.exe", ["-fsSL", rustupUrl, "-o", rustupTmp], { stdio: "pipe", timeout: 120000, shell: false })
+    execFileSync(rustupTmp, ["-y", "--default-toolchain", "stable", "--profile", "minimal"], { stdio: "pipe", timeout: 180000, shell: false })
+    try { unlinkSync(rustupTmp) } catch (e) { console.error("cleanup rustup-init:", e.message) }
+  }
+}
+function addCargoBinToPath() {
+  const cargoBin = join(HOME, ".cargo", "bin")
+  if (isWindows() && existsSync(cargoBin)) {
+    process.env.Path = cargoBin + ";" + (process.env.Path || "")
+    info("Adicionado ~/.cargo/bin ao PATH")
+  }
+}
+function tryRustGnuToolchain() {
+  info("Rust: MSVC toolchain pode ter falhado. Tentando toolchain GNU...")
+  try {
+    execFileSync("rustup", ["default", "stable-gnu"], { stdio: "pipe", timeout: 30000 })
+    if (findWorkingBinary(["rustc"]) !== "") { success("Rust instalado (toolchain GNU)"); return true }
+  } catch { /* expected */ }
+  return false
+}
+function finalizeRust() {
+  addCargoBinToPath()
+  refreshPath()
+  let rustFound = findWorkingBinary(["rustc"]) !== ""
+  if (rustFound) return success("Rust instalado")
+  if (isWindows()) rustFound = tryRustGnuToolchain()
+  if (!rustFound) warn("Rust: instalado mas `rustc` nao encontrado no PATH")
+}
+function installRust(remoteOpts) {
+  if (findWorkingBinary(["rustc"]) !== "") return success("Rust encontrado")
+  info("Rust: nao encontrado. Instalando rustup...")
+  try {
+    if (isWindows()) installRustWindows()
+    else safeDownloadAndRun("https://sh.rustup.rs", rustupLabel(), remoteOpts)
+    finalizeRust()
+  } catch (e) { warn("Rust: falha ao instalar. Instale manualmente: https://rustup.rs") }
+}
+
+function installPlaywright() {
+  try {
+    const pw = npxArgv(["playwright", "install", "chromium"])
+    execFileSync(pw.file, pw.argv, { stdio: "pipe", timeout: 120000 })
+    const pwDir = isWindows() ? join(HOME, "AppData", "Local", "ms-playwright") : join(HOME, ".cache", "ms-playwright")
+    if (existsSync(pwDir) && readdirSync(pwDir).some((f) => f.startsWith("chromium"))) success("Playwright: chromium instalado")
+    else warn("Playwright: comando executado mas chromium nao encontrado em " + pwDir)
+  } catch (e) { warn(`Playwright: falha ao instalar chromium: ${e.message}`); info("  Rode manualmente: npx playwright install chromium") }
+}
+function installMom() {
+  if (!isMacOS()) return info("MOM: incompativel com este OS (apenas macOS)")
+  try { execFileSync("brew", ["install", "momhq/tap/mom"], { stdio: "pipe", timeout: 120000 }); success("MOM (brew)") }
+  catch (e) { warn(`MOM (brew): ${e.message}`) }
+}
+// Printing Press: catálogo via `@mvanhorn/printing-press-library` compila o gerador
+// Go SOB DEMANDA (`gstack_vibehard tools`). Aqui só sinalizamos, sem forçar ~150MB.
+function reportPrintingPressDep() {
+  if (findWorkingBinary(["cli-printing-press"]) || findWorkingBinary(["printing-press"])) success("Printing Press (gerador de CLIs): já instalado")
+  else info("Printing Press (gerador de CLIs): disponível via `gstack_vibehard tools` (instala sob demanda, compila via Go).")
 }
 
 async function installDeps(warn, success, info, report, harnessIds, allowRemote = false) {
   const remoteOpts = { allowRemote }
   section("deps/ — Instalando dependencias globais")
-
-  // ========================================
-  // bun + gbrain
-  // ========================================
-  let bunFound = findWorkingBinary(["bun"]) !== ""
-
-  if (!bunFound) {
-    info("bun: nao encontrado. Instalando (download seguro)...")
-    try {
-      const bunUrl = isWindows() ? "https://bun.sh/install.ps1" : "https://bun.sh/install"
-      const ok = safeDownloadAndRun(bunUrl, "Bun", remoteOpts)
-      if (ok) {
-        refreshPath()
-        bunFound = findWorkingBinary(getBunCandidates(HOME, isWindows())) !== ""
-        if (bunFound) {
-          success("bun instalado")
-        } else {
-          warn("bun: instalado mas nao encontrado no PATH")
-        }
-      } else {
-        warn("bun: download falhou. Instale manualmente: https://bun.sh")
-      }
-    } catch (e) {
-      warn("bun: falha ao instalar. Instale manualmente: https://bun.sh")
-    }
-  }
-
-  if (bunFound) {
-    try {
-      execFileSync("bun", ["install", "-g", "github:garrytan/gbrain"], { stdio: "pipe", timeout: 120000 })
-      success("gbrain (bun global)")
-    } catch (e) {
-      warn(`gbrain (bun global): ${e.message}`)
-      trackDegraded(report, "gbrain", e.message)
-    }
-  } else {
-    info("gbrain: pulado (bun nao disponivel)")
-    trackDegraded(report, "gbrain", "bun não disponível")
-  }
-
-  // ========================================
-  // uv + graphify
-  // ========================================
-  const uvCandidates = getUvCandidates(HOME, isWindows())
-  let uvBin = findWorkingBinary(uvCandidates)
-
-  if (!uvBin) {
-    info("uv: nao encontrado. Instalando (download seguro)...")
-    try {
-      if (isWindows()) {
-        safeDownloadAndRun("https://astral.sh/uv/install.ps1", "uv (Windows)", remoteOpts)
-      } else {
-        safeDownloadAndRun("https://astral.sh/uv/install.sh", "uv (Unix)", remoteOpts)
-      }
-      refreshPath()
-      uvBin = findWorkingBinary(uvCandidates)
-      if (uvBin) success("uv instalado")
-      else warn("uv: instalado mas nao encontrado. Tente reiniciar o terminal.")
-    } catch {
-      warn("uv: falha ao instalar. Instale manualmente: https://docs.astral.sh/uv/#installation")
-    }
-  }
-
-  // graphify — indexação AST por commit (economiza MUITO token: a IA lê a topologia
-  // do código sem gastar contexto). O pacote PyPI é `graphifyy` (DOIS "y"; o CLI
-  // continua `graphify`) — por isso `uv tool install graphify` dava E404. Instala
-  // GLOBAL via uv tool (ambiente isolado) p/ qualquer projeto. Pula se já existe.
-  if (findWorkingBinary(["graphify"])) {
-    success("graphify: já instalado")
-  } else if (uvBin) {
-    try {
-      execFileSync(uvBin, ["tool", "install", "graphifyy"], { stdio: "pipe", timeout: 180000 })
-      refreshPath()
-      if (findWorkingBinary(["graphify"])) {
-        success("graphify instalado (uv tool: graphifyy) — AST global p/ qualquer projeto")
-      } else {
-        success("graphify instalado (graphifyy)")
-        info("  Se `graphify` não aparecer, reinicie o terminal (bin do uv tool no PATH).")
-      }
-      report.added.push("graphify (graphifyy — indexação AST)")
-    } catch (e) {
-      warn(`graphify (uv tool graphifyy): ${e.message}`)
-      trackDegraded(report, "graphify", e.message)
-    }
-  } else {
-    info("graphify: pulado (uv não disponível) — `uv tool install graphifyy` ativa a indexação AST global.")
-    trackDegraded(report, "graphify", "uv não disponível")
-  }
-
-  // ========================================
-  // ECC (ecc-universal) — otimizador de harness (binário `ecc`). Instala GLOBAL no
-  // install completo (consistência "Full = tudo", como gbrain/graphify/headroom).
-  // gstack consome como BIBLIOTECA (não injeta o perfil do ECC — ver create.js).
-  // ========================================
-  if (findWorkingBinary(["ecc"])) {
-    success("ECC: já instalado (ecc-universal)")
-  } else {
-    try {
-      const { file, argv } = npmArgv(["install", "-g", "ecc-universal"])
-      execFileSync(file, argv, { stdio: "pipe", timeout: 180000 })
-      success("ECC instalado (ecc-universal) — `ecc` / `npx ecc-agentshield scan` on-demand")
-      report.added.push("ECC (ecc-universal)")
-    } catch (e) {
-      warn(`ECC (ecc-universal): ${e.message}`)
-      trackDegraded(report, "ECC", e.message)
-    }
-  }
-
-  // ========================================
-  // pytest — hooks Python, QG e Test Gate dependem dele
-  // ========================================
-  let pytestOk = false
-  if (uvBin) {
-    try {
-      execFileSync(uvBin, ["pip", "install", "--system", "pytest"], { stdio: "pipe", timeout: 120000 })
-      pytestOk = true
-    } catch { /* tenta pip abaixo */ }
-  }
-  if (!pytestOk) {
-    try {
-      const pip = findWorkingBinary(["pip3", "pip"], { timeout: 5000 }) || "pip"
-      execFileSync(pip, ["install", "--user", "pytest"], { stdio: "pipe", timeout: 120000 })
-      pytestOk = true
-    } catch (e) {
-      warn(`pytest: falha ao instalar (${e.message}). Instale manualmente: pip install pytest`)
-    }
-  }
-  if (pytestOk) {
-    success("pytest instalado")
-    report.added.push("pytest (testes Python)")
-  }
-
-  // ========================================
-  // Rust (rustup) — needed for headroom build
-  // ========================================
-  let rustFound = findWorkingBinary(["rustc"]) !== ""
-  if (rustFound) success("Rust encontrado")
-
-  if (!rustFound) {
-    info("Rust: nao encontrado. Instalando rustup...")
-    try {
-      if (isWindows()) {
-        try {
-          execFileSync("winget", ["install", "Rustlang.Rustup"], { stdio: "pipe", timeout: 120000 })
-        } catch {
-          info("winget falhou. Tentando rustup-init.exe diretamente...")
-          const rustupUrl = "https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe"
-          const rustupTmp = join(tmpdir(), "rustup-init.exe")
-          execFileSync("curl.exe", ["-fsSL", rustupUrl, "-o", rustupTmp], { stdio: "pipe", timeout: 120000, shell: false })
-          execFileSync(rustupTmp, ["-y", "--default-toolchain", "stable", "--profile", "minimal"], { stdio: "pipe", timeout: 180000, shell: false })
-          try { unlinkSync(rustupTmp) } catch (e) { console.error("cleanup rustup-init:", e.message) }
-        }
-      } else if (isMacOS()) {
-        safeDownloadAndRun("https://sh.rustup.rs", "Rustup (macOS)", remoteOpts)
-      } else {
-        safeDownloadAndRun("https://sh.rustup.rs", "Rustup (Linux)", remoteOpts)
-      }
-      const cargoBin = join(HOME, ".cargo", "bin")
-      if (isWindows() && existsSync(cargoBin)) {
-        process.env.Path = cargoBin + ";" + (process.env.Path || "")
-        info("Adicionado ~/.cargo/bin ao PATH")
-      }
-      refreshPath()
-      rustFound = findWorkingBinary(["rustc"]) !== ""
-      if (rustFound) {
-        success("Rust instalado")
-      } else {
-        if (isWindows()) {
-          info("Rust: MSVC toolchain pode ter falhado. Tentando toolchain GNU...")
-          try {
-            execFileSync("rustup", ["default", "stable-gnu"], { stdio: "pipe", timeout: 30000 })
-            rustFound = findWorkingBinary(["rustc"]) !== ""
-            if (rustFound) success("Rust instalado (toolchain GNU)")
-          } catch { /* expected */ }
-        }
-        if (!rustFound) warn("Rust: instalado mas `rustc` nao encontrado no PATH")
-      }
-    } catch (e) {
-      warn("Rust: falha ao instalar. Instale manualmente: https://rustup.rs")
-    }
-  }
-
-  // ========================================
-  // Playwright
-  // ========================================
-  try {
-    const pw = npxArgv(["playwright", "install", "chromium"])
-    execFileSync(pw.file, pw.argv, { stdio: "pipe", timeout: 120000 })
-    const pwDir = isWindows()
-      ? join(HOME, "AppData", "Local", "ms-playwright")
-      : join(HOME, ".cache", "ms-playwright")
-    if (existsSync(pwDir) && readdirSync(pwDir).some((f) => f.startsWith("chromium"))) {
-      success("Playwright: chromium instalado")
-    } else {
-      warn("Playwright: comando executado mas chromium nao encontrado em " + pwDir)
-    }
-  } catch (e) {
-    warn(`Playwright: falha ao instalar chromium: ${e.message}`)
-    info("  Rode manualmente: npx playwright install chromium")
-  }
-
-  if (isWindows()) {
-    refreshPath()
-  }
-
-  // ========================================
-  // MOM (macOS only)
-  // ========================================
-  if (isMacOS()) {
-    try {
-      execFileSync("brew", ["install", "momhq/tap/mom"], { stdio: "pipe", timeout: 120000 })
-      success("MOM (brew)")
-    } catch (e) {
-      warn(`MOM (brew): ${e.message}`)
-    }
-  } else {
-    info("MOM: incompativel com este OS (apenas macOS)")
-  }
-
-  // ========================================
-  // Printing Press — gerador de CLIs para agentes
-  // ========================================
-  // NÃO existe pacote `cli-anything-hub` no npm (era nome fantasma → E404). O
-  // recurso real é o Printing Press: catálogo via `@mvanhorn/printing-press-library`
-  // (npm) que compila o gerador Go (`cli-printing-press`) SOB DEMANDA. Integrado no
-  // comando `gstack_vibehard tools` (instala só quando o usuário pede — evita
-  // forçar ~150MB de Go em todo install). Aqui só sinalizamos, sem 404.
-  if (findWorkingBinary(["cli-printing-press"]) || findWorkingBinary(["printing-press"])) {
-    success("Printing Press (gerador de CLIs): já instalado")
-  } else {
-    info("Printing Press (gerador de CLIs): disponível via `gstack_vibehard tools` (instala sob demanda, compila via Go).")
-  }
-
-  // ========================================
-  // Headroom (context compression proxy)
-  // ========================================
-  await installHeadroom({
-    warn,
-    success,
-    info,
-    uvBin,
-    selectedHarnessIds: harnessIds,
-  }, report)
+  const bunFound = installBun(remoteOpts)
+  installGbrain(report, bunFound)
+  const uvBin = installUv(remoteOpts)
+  installGraphify(report, uvBin)
+  installEcc(report)
+  installPytest(report, uvBin)
+  installRust(remoteOpts)
+  installPlaywright()
+  if (isWindows()) refreshPath()
+  installMom()
+  reportPrintingPressDep()
+  // Headroom (context compression proxy).
+  await installHeadroom({ warn, success, info, uvBin, selectedHarnessIds: harnessIds }, report)
   // Full = tudo: se o headroom não ficou disponível, é degradação (não silêncio).
   if (!findWorkingBinary(["headroom"])) trackDegraded(report, "headroom", "binário ausente após instalar (sem uv/permissão?)")
 }
