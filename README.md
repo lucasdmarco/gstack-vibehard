@@ -62,9 +62,25 @@ Detalhes: [guia de caminhos de instalação](docs/guides/install-paths.md).
 - 🌳 **Worktree lifecycle**: `list/diff/accept/discard/cleanup --dry-run` (estados determinísticos)
 - 🔌 **Inventário MCP** multi-harness com secrets redigidos (`tools mcp inventory`)
 - 🤖 **Orquestração v2**: executor em worktree + verifier independente + reviewer LLM plugável (advisory) — **LLM nunca aprova sozinho**
+- 🧪 **Prova de máquina limpa**: `tools clean-machine --json` — 12 cenários offline (OpenCode config-sacred, Lite sem escrita global, uninstall byte-for-byte)
 - 🌐 **Agent Reach** (opt-in): canais de leitura na internet com consentimento por canal
 
 Matriz honesta por harness (hooks reais vs instrucional): [guia](docs/guides/harness-matrix.md) · `agents doctor --json`.
+
+### O que é real, callable, opt-in ou roadmap
+
+Nada de claim inflado: a maturidade de cada capacidade está separada em
+**[capacidades](docs/guides/capabilities.md)** (fonte viva: `tools readiness --json`).
+Destaque de honestidade: o **Headroom não economiza tokens automaticamente** —
+enquanto não estiver `routed`, o estado real é `callable_not_routed`.
+
+### Comece honesto em 3 comandos
+
+```bash
+npx @gstack-vibehard/installer start                                    # trilha guiada
+node src/index.js context scout "como o projeto funciona?" --json       # índice offline
+node src/index.js verify --changed-files --json                         # gate só no que mudou
+```
 
 ---
 
@@ -84,6 +100,7 @@ Tudo que o `install` escreve tem backup + manifest — [guia de reset/uninstall]
 | | |
 |---|---|
 | [Quickstart](docs/guides/quickstart.md) | 5 minutos, termos explicados |
+| [Capacidades: real/callable/opt-in/roadmap](docs/guides/capabilities.md) | o que o produto entrega hoje, sem inflar |
 | [Caminhos de instalação](docs/guides/install-paths.md) | lite vs full, matriz de inclusão/exclusão |
 | [Reset & uninstall](docs/guides/reset-uninstall.md) | desfazer de verdade |
 | [Matriz de harnesses](docs/guides/harness-matrix.md) | enforcement real vs instrucional |

@@ -1,5 +1,26 @@
 # Changelog - gstack-vibehard
 
+## [3.55.0] - 2026-07-04
+
+### Public Claims / Onboarding honesto (PRD 20 Sprint 20.6)
+
+Ajuste da narrativa pública para vender **só o que o produto entrega hoje** —
+fecha o PRD 20.
+
+- **`docs/guides/capabilities.md`** (novo): separa a maturidade de cada capacidade
+  em **real agora** / **callable-manual** / **opt-in** / **roadmap** (fonte viva:
+  `tools readiness --json`). Inclui:
+  - tabela **por harness** (Claude Code, Cursor, OpenCode, Devin = hooks reais;
+    Codex = instrucional; Ruflo/Codebuff/Freebuff = candidatos, não instalados por default);
+  - **Headroom não economiza tokens automaticamente**: enquanto não estiver `routed`,
+    o estado honesto é `callable_not_routed` — sem claim de economia automática;
+  - **caminho de 3 comandos** (`start` → `context scout --json` → `verify --changed-files --json`);
+  - **comparação honesta** (quando usar gstack vs ECC/Ruflo/Codebuff — regra de ouro: não empilhar).
+- **README.md / README.en.md**: seção de maturidade + destaque do Headroom + os 3
+  comandos + link para `capabilities.md`; menção ao `tools clean-machine`.
+
+Sem mudança de código (docs). Suíte completa verde (617), lint+`tsc` ok.
+
 ## [3.54.0] - 2026-07-04
 
 ### Clean-Machine Proof Pack (PRD 20 Sprint 20.5)
