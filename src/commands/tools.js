@@ -10,6 +10,7 @@ import { buildToolCatalog, annotateCatalogEntry, LOCAL_CATALOG } from "../tools/
 import { recordToolProvenance } from "../tools/provenance.js"
 import { buildReadiness } from "../tools/readiness.js"
 import { runCleanMachine } from "../installer/clean-machine.js"
+import { buildToolRefresh } from "../tools/refresh.js"
 import { agentReachCommand } from "./agent-reach.js"
 import { confirm, success, warn, error, info, section } from "../cli/index.js"
 
@@ -319,6 +320,7 @@ function handleToolsHelp() {
   info("  Qualidade:")
   info("    tools readiness [--json] [--write] [--clean-machine]  Estado REAL das ferramentas (Fallow/Graphify/Headroom/context)")
   info("    tools clean-machine [--json] [--no-write] [--keep]    Proof pack offline: OpenCode sacred, backup/restore byte-for-byte, matriz de tools")
+  info("    tools refresh [--changed] [--json] [--strict]         Action close: refresca graphify/context/headroom/fallow (bounded) + report + readiness")
   info("    tools doctor                  Validar binario/auth/MCP das instaladas")
   info("    tools generate                Gerar CLI de cauda-longa via HAR (em breve)")
   info("")
@@ -387,9 +389,27 @@ function handleCleanMachine({ args, cwd }) {
   return rep
 }
 
+const refreshIcon = (s) => (s === "ok" ? "✓" : s === "skipped" ? "·" : s === "error" ? "✗" : "▲")
+const refreshLine = (s) => `  ${refreshIcon(s.status)} ${s.tool}: ${s.status} · ${s.durationMs}ms${s.summary ? " · " + s.summary : ""}`
+function renderRefresh(rep) {
+  section(`tools refresh — action close (${rep.ok ? "ok" : "com falhas"}${rep.strict ? ", strict" : ""})`)
+  for (const s of rep.steps) info(refreshLine(s))
+  if (rep.writtenTo) success(`report: ${rep.writtenTo}`)
+  if (rep.readinessPath) info(`  tool-readiness.json atualizado: ${rep.readinessPath}`)
+}
+// Fecha uma ação da IA: refresca graphify/context/headroom/fallow (bounded/degraded),
+// grava report em .gstack/reports/tool-refresh/<runId>.json e atualiza o readiness.
+function handleRefresh({ args, cwd }) {
+  const rep = buildToolRefresh({ cwd, strict: args.includes("--strict"), changed: args.includes("--changed") })
+  if (args.includes("--json")) return emitTools(rep)
+  renderRefresh(rep)
+  return rep
+}
+
 const TOOLS_HANDLERS = {
   suggested: handleSuggested,
   readiness: handleReadiness,
+  refresh: handleRefresh,
   "clean-machine": handleCleanMachine,
   catalog: handleCatalog,
   list: handleListSearch,

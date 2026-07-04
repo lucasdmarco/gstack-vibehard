@@ -844,6 +844,26 @@ except (subprocess.TimeoutExpired, json.JSONDecodeError, OSError) as e:
     stop_failed = True
     msg_parts.append(f"post_sprint: {e}")
 
+# Action Close Tool Refresh (PRD24 24.3): OPT-IN (GSTACK_TOOL_REFRESH=1) para NÃO
+# adicionar lentidão ao fim de cada sessão. Bounded/best-effort: nunca trava; falha
+# vira nota "degraded". Nunca liga proxy/wrap nem toca config global.
+if os.environ.get("GSTACK_TOOL_REFRESH") == "1":
+    gstack_bin = shutil.which("gstack_vibehard")
+    if gstack_bin:
+        try:
+            tr = subprocess.run(
+                [gstack_bin, "tools", "refresh", "--changed", "--json"],
+                cwd=cwd or None, capture_output=True, text=True, timeout=120
+            )
+            if tr.returncode == 0:
+                td = json.loads(tr.stdout)
+                oks = sum(1 for s in td.get("steps", []) if s.get("status") == "ok")
+                msg_parts.append(f"ToolRefresh: {oks}/{len(td.get('steps', []))} ok")
+            else:
+                msg_parts.append("ToolRefresh: degraded")
+        except (subprocess.TimeoutExpired, json.JSONDecodeError, OSError):
+            msg_parts.append("ToolRefresh: degraded")
+
 if run_security:
     gate = run_security_gate(root) if (root := find_project_root(cwd)) else None
     if gate:
