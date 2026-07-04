@@ -27,6 +27,36 @@ function toolVer(cmd, args = ["--version"]) {
   try { return String(execFileSync(cmd, args, { encoding: "utf-8", stdio: "pipe", timeout: 4000 })).trim() } catch { return null }
 }
 
+/** Caminho dos browsers Playwright (env ou default por SO). */
+function pwBrowsersPath(home) {
+  return process.env.PLAYWRIGHT_BROWSERS_PATH
+    || (isWindows() ? join(home, "AppData", "Local", "ms-playwright") : join(home, ".cache", "ms-playwright"))
+}
+/** true se há chromium instalado; EPERM vira warning (nunca crash). */
+function detectChromium(pwBrowsers, warnings) {
+  if (!existsSync(pwBrowsers)) return false
+  const b = safeReaddir(pwBrowsers)
+  if (b === null) { warnings.push(`Playwright: sem permissão p/ ler ${pwBrowsers} (EPERM/EACCES)`); return false }
+  return b.some((f) => f.startsWith("chromium"))
+}
+/** Resumo compacto de conformance de eventos por harness (PRD18 Sprint 3). */
+function conformanceSummary() {
+  const conf = buildConformanceReport()
+  return {
+    ok: conf.ok,
+    totalViolations: conf.totalViolations,
+    harnesses: Object.fromEntries(Object.entries(conf.harnesses).map(([h, r]) => [h, {
+      enforcement: r.enforcement,
+      enforcedEvents: (r.enforcedEvents || []).length,
+      violations: r.violations.length,
+    }])),
+  }
+}
+
+/** Checks obrigatórios OK: Node+Python presentes e (se há manifest) uninstall seguro. */
+const requiredOk = (node, python, integrity) =>
+  !!node && !!python && (integrity.manifestExists ? integrity.safeToUninstall : true)
+
 /**
  * Coletor estruturado do `doctor` (P0.7) — DETERMINÍSTICO e EPERM-safe. Não imprime
  * nada; retorna o objeto que o `--json` serializa puro. `ok=false` se um check
@@ -40,31 +70,13 @@ export async function collectDoctorJson(home = HOME) {
   const gstackInstalled = checkAlreadyInstalled(detected.map((h) => h.id))
   const hooks = safeReaddir(join(home, ".codex", "hooks"))
   const skills = safeReaddir(join(home, ".agents", "skills"))
-  const pwBrowsers = process.env.PLAYWRIGHT_BROWSERS_PATH
-    || (isWindows() ? join(home, "AppData", "Local", "ms-playwright") : join(home, ".cache", "ms-playwright"))
-  let chromium = false
-  if (existsSync(pwBrowsers)) {
-    const b = safeReaddir(pwBrowsers)
-    if (b === null) warnings.push(`Playwright: sem permissão p/ ler ${pwBrowsers} (EPERM/EACCES)`)
-    else chromium = b.some((f) => f.startsWith("chromium"))
-  }
+  const pwBrowsers = pwBrowsersPath(home)
+  const chromium = detectChromium(pwBrowsers, warnings)
   const integrity = checkInstallIntegrity(home)
   const impact = buildInstallImpact({ home })
   const oc = inspectOpenCodeConfig(home)
-  // Conformance de eventos por harness (PRD18 Sprint 3) — resumo compacto.
-  const conf = buildConformanceReport()
-  const conformance = {
-    ok: conf.ok,
-    totalViolations: conf.totalViolations,
-    harnesses: Object.fromEntries(Object.entries(conf.harnesses).map(([h, r]) => [h, {
-      enforcement: r.enforcement,
-      enforcedEvents: (r.enforcedEvents || []).length,
-      violations: r.violations.length,
-    }])),
-  }
-  const okRequired = !!node && !!python && (integrity.manifestExists ? integrity.safeToUninstall : true)
   return {
-    ok: okRequired,
+    ok: requiredOk(node, python, integrity),
     os: getOSLabel(),
     versions: { node, python },
     harnesses: { detected, gstackInstalled },
@@ -74,7 +86,7 @@ export async function collectDoctorJson(home = HOME) {
     },
     mcpGlobal: existsSync(join(home, ".mcp.json")),
     opencode: { hasJson: oc.hasJson, hasJsonc: oc.hasJsonc, hasConflict: oc.hasConflict },
-    conformance,
+    conformance: conformanceSummary(),
     playwright: { browsersPath: pwBrowsers, chromium },
     deps: { bun: !!toolVer("bun"), rust: !!toolVer("rustc"), gbrain: !!toolVer("gbrain"), graphify: !!toolVer("graphify"), headroom: !!toolVer("headroom") },
     integrity: { manifestExists: integrity.manifestExists, items: integrity.items, drift: integrity.drift, safeToUninstall: integrity.safeToUninstall, issues: integrity.issues },
@@ -113,227 +125,251 @@ function rufloReport(json) {
   warn(`  MCP negadas por default: ${rep.mcpPolicy.deny.join(", ")}`)
 }
 
+// ── Rotas do doctor (cada flag → um handler dedicado; JSON puro preservado) ──────
+
+/** Emite JSON puro no stdout; `fail=true` marca exit≠0 (usado pelos modos --strict). */
+function emitJson(obj, fail) {
+  process.stdout.write(JSON.stringify(obj) + "\n")
+  if (fail) process.exitCode = 1
+}
+const orDash = (v) => v || "—"
+const orAbsent = (has, val) => (has ? val : "(ausente)")
+
+const sevFn = (r) => (r.violations.length ? error : (r.enforcedEvents || []).length ? success : info)
+const enforcedStr = (r) => (r.enforcedEvents || []).join(",") || "nenhum"
+const printViolation = (v) => warn(`      ${v.kind}${v.event ? ` (${v.event})` : ""}: ${v.detail}`)
+const conformanceMsg = (conf) =>
+  conf.ok ? "Sem violações — nenhuma claim falsa de enforcement." : `${conf.totalViolations} violação(ões).`
+
+/** Uma linha de conformance por harness. */
+function printConformanceHarness(r, h) {
+  const icon = r.violations.length ? "✗" : "•"
+  sevFn(r)(`  ${icon} ${h} [${r.enforcement}]: enforced=${enforcedStr(r)}`)
+  for (const v of r.violations) printViolation(v)
+}
+
+/** `doctor --conformance [--json]` (PRD18 S3): eventos por harness + violações. */
+function conformanceRoute(json, strict) {
+  const conf = buildConformanceReport()
+  if (json) return emitJson(conf, strict && !conf.ok)
+  section("doctor --conformance — eventos por harness (contrato honesto)")
+  for (const [h, r] of Object.entries(conf.harnesses)) printConformanceHarness(r, h)
+  ;(conf.ok ? success : error)(conformanceMsg(conf))
+}
+
+/** Corpo humano do `doctor --opencode`. */
+function renderOpencodeDiag(diag) {
+  section("doctor --opencode — diagnóstico (read-only, nada é alterado)")
+  info(`  json: ${orAbsent(diag.hasJson, diag.jsonPath)}`)
+  info(`  jsonc: ${orAbsent(diag.hasJsonc, diag.jsoncPath)}`)
+  if (diag.jsoncSensitiveKeys.length) info(`  chaves sensíveis no jsonc (só nomes): ${diag.jsoncSensitiveKeys.join(", ")}`)
+  if (diag.disabledResidue) warn(`  resíduo de versão anterior: ${diag.disabledResidue} — restaure com \`doctor --fix opencode --restore-jsonc\``)
+  ;(diag.shadowingRisk === "high" ? warn : info)(`  risco de shadowing: ${diag.shadowingRisk}`)
+  info(`  ação recomendada: ${diag.recommendedAction}`)
+  if (diag.parseError) warn(`  parse: ${diag.parseError}`)
+}
+/** `doctor --opencode [--json]` (PRD15 §7.8): diagnóstico READ-ONLY da config OpenCode. */
+function opencodeDiagRoute(json, strict) {
+  const diag = diagnoseOpenCode(HOME)
+  if (json) return emitJson(diag, strict && diag.shadowingRisk === "high")
+  renderOpencodeDiag(diag)
+}
+
+/** confirmação de aplicação: --yes/--apply ou prompt TTY. */
+async function confirmApply(args, question) {
+  return args.includes("--yes") || args.includes("--apply") || (process.stdin.isTTY && await confirm(question, false))
+}
+const mergeUserKeys = (plan) => (plan.userKeysPreserved || []).join(", ") || "—"
+const applyReason = (r) => r.reason || r.hint || "ação não elegível"
+
+/** Rollback de .jsonc.gstack-disabled deixado por versões anteriores. */
+async function restoreJsoncRoute(args) {
+  const diag = diagnoseOpenCode(HOME)
+  if (!diag.disabledResidue) return success("OpenCode: nenhum .jsonc.gstack-disabled para restaurar.")
+  info(`  Vai restaurar ${diag.disabledResidue} → ${diag.jsoncPath} (o .jsonc ativo, se houver, é feito backup).`)
+  if (!(await confirmApply(args, "Restaurar o opencode.jsonc agora?"))) return info("Cancelado (use --apply/--yes em modo não-interativo).")
+  const r = applyOpenCodeFix(HOME, { restoreJsonc: true })
+  if (r.restored) success(`OpenCode: ${r.jsoncPath} restaurado. Reabra o OpenCode e confira provider/OAuth.`)
+  else warn(`Não restaurado: ${r.reason}`)
+}
+/** action === "preserve": .jsonc é fonte de verdade — nada é consolidado. */
+function fixPreserve(plan) {
+  warn("Conflito: opencode.json + opencode.jsonc coexistem, MAS o .jsonc é fonte de verdade.")
+  warn(`  O .jsonc contém: ${plan.sensitiveKeys.join(", ")} (OAuth/provider/model/plugin).`)
+  info("  Config is sacred: o GStack NÃO vai consolidar nem renomear o .jsonc.")
+  info(`  Se quiser remover o shadowing, mova você mesmo ${plan.jsonPath} (com o OpenCode fechado).`)
+}
+/** action === "merge": jsonc SEM chaves sensíveis — merge preservando o do usuário. */
+async function fixMerge(plan, args) {
+  info("Conflito: opencode.json + opencode.jsonc coexistem (jsonc sem chaves sensíveis).")
+  info(`  Plano: merge preservando o que é do usuário (${mergeUserKeys(plan)}).`)
+  info(`  → escreveria o merge em ${plan.jsonPath}; renomearia o .jsonc para .gstack-disabled (reversível).`)
+  if (!args.includes("--apply")) return info("(dry-run é o default: nada foi alterado. Use --apply para consolidar.)")
+  if (!(await confirmApply(args, "Aplicar o merge agora?"))) return info("Cancelado (use --yes em modo não-interativo).")
+  const r = applyOpenCodeFix(HOME, { apply: true })
+  if (r.applied) return success("OpenCode: merge aplicado. Reverta com `doctor --fix opencode --restore-jsonc` se precisar.")
+  warn(`Não aplicado (${applyReason(r)}).`)
+}
+/** `doctor --fix` — correção assistida do drift OpenCode. DRY-RUN é o default. */
+async function fixRoute(args) {
+  section("doctor --fix — OpenCode config (config is sacred)")
+  if (args.includes("--restore-jsonc")) return restoreJsoncRoute(args)
+  const plan = planOpenCodeFix(HOME)
+  if (plan.action === "none") return success("OpenCode: sem conflito json+jsonc — nada a corrigir.")
+  if (plan.action === "manual") { warn("Conflito detectado, mas o parse automático falhou (ajuste manual):"); warn(`  ${plan.parseError}`); return }
+  if (plan.action === "preserve") return fixPreserve(plan)
+  return fixMerge(plan, args)
+}
+
+const supplyFn = (status) => (status === "ok" ? success : status === "critical" ? error : warn)
+const supplyIcon = (status) => (status === "ok" ? "✓" : status === "critical" ? "✗" : "⚠")
+const printSupplyCheck = (c) => supplyFn(c.status)(`  ${supplyIcon(c.status)} ${c.id}: ${c.detail}`)
+
+/** `doctor --supply-chain [--json]` (PRD14 §4.7): cadeia de suprimento, read-only. */
+function supplyChainRoute(json, strict) {
+  const report = buildSupplyChainReport()
+  if (json) return emitJson(report, strict && report.risk === "high")
+  section("doctor --supply-chain — cadeia de suprimento")
+  for (const c of report.checks) printSupplyCheck(c)
+  info("")
+  info(`  Fontes oficiais: npm ${report.officialSources.npm} · GitHub ${report.officialSources.github}`)
+  ;(report.risk === "none" ? success : warn)(`  Risco agregado: ${report.risk}`)
+  if (report.risk === "high") process.exitCode = 1
+}
+
+/** Um componente global ativo (impact). */
+function printImpactCategory(c) {
+  const present = c.items.filter((it) => it.action === "modify")
+  if (c.category === "deps") return
+  if (present.length === 0) { info(`${c.label}: nenhum instalado`); return }
+  const tag = c.category === "mcp-global" || c.category === "harness-config"
+    ? " — AFETA QUALQUER PROJETO deste harness/usuário" : ""
+  warn(`${c.label}: ${present.length} ativo(s)${tag}`)
+  for (const it of present) info(`  • ${it.path}`)
+}
+/** `doctor --impact [--json]`: componentes GLOBAIS ativos nesta máquina. */
+function impactRoute(json) {
+  if (json) { process.stdout.write(JSON.stringify(buildInstallImpact({ home: HOME })) + "\n"); return }
+  section("doctor --impact — componentes globais ativos")
+  for (const c of buildInstallImpact({ home: HOME })) printImpactCategory(c)
+  const ocPlugins = join(HOME, ".config", "opencode", "plugins")
+  info("")
+  info(existsSync(ocPlugins)
+    ? "OpenCode plugins globais ATIVOS: carregam em qualquer sessão OpenCode deste usuário."
+    : "OpenCode plugins globais: nenhum.")
+  info("")
+  info("Output Guard: pós-resposta (auditoria via hooks) — detecção, não prevenção.")
+  info("  Redação EM TRÂNSITO (opt-in): `gstack_vibehard proxy` · estado: `gstack_vibehard proxy status`.")
+  info("Rollback: `gstack_vibehard uninstall --dry-run` · Integridade: `--install-integrity`.")
+}
+
+/** instala o pnpm ausente (opt-in) quando `--fix` e o PM é pnpm sem binário. */
+async function pmFix(r, args) {
+  if (r.state === "missing_binary" && r.pm === "pnpm") {
+    if (!(await confirmApply(args, "Instalar o pnpm agora (`npm install -g pnpm`)?"))) return info("Cancelado (use --yes em modo não-interativo).")
+    try {
+      const { file, argv } = npmArgv(["install", "-g", "pnpm"])
+      execFileSync(file, argv, { stdio: "inherit", timeout: 120000 })
+      success("pnpm instalado. Rode `doctor --package-manager` de novo p/ confirmar.")
+    } catch (e) { warn(`Falha ao instalar pnpm: ${e.message}. Manual: npm install -g pnpm`) }
+    return
+  }
+  info("  (--fix não aplica reparo destrutivo automaticamente: lockfile/node_modules exigem sua confirmação manual — siga o passo acima.)")
+}
+/** `doctor --package-manager|--pm [--json] [--fix]` (PRD12 PR2). */
+async function pmRoute(args, json, strict) {
+  const r = resolvePackageManager(process.cwd())
+  if (json) return emitJson(r, strict && r.state !== "ok")
+  section("doctor --package-manager — resolver do gerenciador do projeto")
+  info(`  ${r.state === "ok" ? "✓" : "⚠"} PM: ${r.pm} · estado: ${r.state}`)
+  info(`    ${r.detail}`)
+  if (r.state === "ok") return success("Package manager OK.")
+  warn(`  Reparo: ${r.repair}`)
+  if (args.includes("--fix")) return pmFix(r, args)
+}
+
+/** uma ação do plano de reparo do manifest. */
+function repairActionTag(action) {
+  if (action === "prune") return "PODAR"
+  if (action === "mark-unrestorable") return "MARCAR não-restaurável"
+  if (action === "migrate") return "MIGRAR schema"
+  return "RELATAR"
+}
+const repairStrictFail = (r) => r.manifestExists && r.mutating > 0 && !r.applied
+/** Corpo humano do `doctor --repair-manifest`. */
+function renderRepair(r, apply) {
+  section("doctor --repair-manifest — limpeza/migração segura do manifest")
+  if (!r.manifestExists) return warn(r.note)
+  if (r.plan.length === 0) return success("Manifest íntegro — nada a reparar.")
+  info(`${r.plan.length} item(ns) no plano (${r.mutating} mutação(ões); restante é só relato):`)
+  for (const a of r.plan) info(`  • [${repairActionTag(a.action)}] ${a.path} — ${a.reason}`)
+  info("Backups do usuário são SEMPRE preservados (nunca apagados).")
+  if (!apply) return info("(--dry-run: nada foi alterado) — para aplicar: `gstack_vibehard doctor --repair-manifest --yes`")
+  if (r.applied) success(`Manifest reparado (${r.before.items} → ${r.after.items} itens). Backup do manifest: ${orDash(r.backup)}`)
+  else info("Nada a aplicar (apenas relatos).")
+}
+/** `doctor --repair-manifest [--json] [--yes]`: limpeza/migração segura do manifest. */
+function repairRoute(args, json, strict) {
+  const apply = args.includes("--yes") && !args.includes("--dry-run")
+  const r = repairManifest(HOME, { dryRun: !apply })
+  if (json) return emitJson(r, strict && repairStrictFail(r))
+  renderRepair(r, apply)
+}
+
+const integrityStrictFail = (r) => r.manifestExists && !r.safeToUninstall
+/** `doctor --install-integrity [--json]`: manifest/backups/hashes + uninstall seguro. */
+function integrityRoute(json, strict) {
+  const r = checkInstallIntegrity(HOME)
+  if (json) return emitJson(r, strict && integrityStrictFail(r))
+  section("Integridade da Instalacao (manifest/backups/hashes)")
+  if (!r.manifestExists) return warn("Manifest ausente — nada a verificar (instale com `gstack_vibehard install`).")
+  success(`Manifest presente — ${r.items} item(ns) registrados`)
+  info(`Backups OK: ${r.backupsOk}`)
+  if (r.drift > 0) warn(`Drift: ${r.drift} arquivo(s) alterado(s) desde a instalacao (editado por voce/outro)`)
+  if (r.issues.length === 0) return success("Sem problemas — uninstall seria SEGURO")
+  error(`${r.issues.length} problema(s):`)
+  r.issues.forEach((i) => warn(`  ${i}`))
+  warn("Rode `gstack_vibehard uninstall --dry-run` para ver o plano de rollback.")
+}
+
+/** `doctor --json` completo (diagnóstico estruturado, JSON puro). */
+async function fullJsonRoute(strict) {
+  const report = await collectDoctorJson(HOME)
+  emitJson(report, strict && !report.ok)
+}
+
+// Flags que têm seu PRÓPRIO --json abaixo → o --json completo não deve capturá-las.
+const SPECIALIZED_FLAGS = ["--impact", "--install-integrity", "--fix", "--repair-manifest", "--package-manager", "--pm", "--supply-chain"]
+function hasSpecializedFlag(args) { return SPECIALIZED_FLAGS.some((f) => args.includes(f)) }
+
+// Ordem PRESERVADA do dispatcher original (precedência entre flags combinadas).
+function doctorRoutes() {
+  return [
+    { match: (a) => a.includes("--conformance"), run: (a, j, s) => conformanceRoute(j, s) },
+    { match: (a) => a.includes("--candidates"), run: (a, j) => candidatesReport(j) },
+    { match: (a) => a.includes("--ruflo"), run: (a, j) => rufloReport(j) },
+    { match: (a) => a.includes("--opencode"), run: (a, j, s) => opencodeDiagRoute(j, s) },
+    { match: (a, j) => j && !hasSpecializedFlag(a), run: (a, j, s) => fullJsonRoute(s) },
+    { match: (a) => a.includes("--fix"), run: (a) => fixRoute(a) },
+    { match: (a) => a.includes("--supply-chain"), run: (a, j, s) => supplyChainRoute(j, s) },
+    { match: (a) => a.includes("--impact"), run: (a, j) => impactRoute(j) },
+    { match: (a) => a.includes("--package-manager") || a.includes("--pm"), run: (a, j, s) => pmRoute(a, j, s) },
+    { match: (a) => a.includes("--repair-manifest"), run: (a, j, s) => repairRoute(a, j, s) },
+    { match: (a) => a.includes("--install-integrity"), run: (a, j, s) => integrityRoute(j, s) },
+  ]
+}
+
 export async function doctor(args = []) {
   const json = args.includes("--json")
   const strict = args.includes("--strict")
-  // `doctor --json` (diagnóstico completo) → JSON PURO. --strict → exit≠0 se check
-  // obrigatório falhar. Não roteia aqui os modos --impact/--install-integrity (têm
-  // seu próprio JSON abaixo) nem --fix (interativo).
-  // `doctor --conformance [--json]` (PRD18 Sprint 3): eventos por harness —
-  // enforced/partial/advisory/unsupported + violações (claim proibida/drift).
-  if (args.includes("--conformance")) {
-    const conf = buildConformanceReport()
-    if (json) { process.stdout.write(JSON.stringify(conf) + "\n"); if (strict && !conf.ok) process.exitCode = 1; return }
-    section("doctor --conformance — eventos por harness (contrato honesto)")
-    for (const [h, r] of Object.entries(conf.harnesses)) {
-      const fn = r.violations.length ? error : (r.enforcedEvents || []).length ? success : info
-      fn(`  ${r.violations.length ? "✗" : "•"} ${h} [${r.enforcement}]: enforced=${(r.enforcedEvents || []).join(",") || "nenhum"}`)
-      for (const v of r.violations) warn(`      ${v.kind}${v.event ? ` (${v.event})` : ""}: ${v.detail}`)
-    }
-    ;(conf.ok ? success : error)(conf.ok ? "Sem violações — nenhuma claim falsa de enforcement." : `${conf.totalViolations} violação(ões).`)
-    return
-  }
-  // `doctor --candidates [--json]` (PRD18 Sprint 5): candidatos externos opt-in
-  // (Codebuff/Freebuff) — READ-ONLY. Reporta presente/ausente, risco (modelos
-  // externos, rede), disclosure e bloqueio de delegate no Windows sem shell.
-  if (args.includes("--candidates")) return candidatesReport(json)
-  // `doctor --ruflo [--json]` (PRD18 Sprint 7): adapter opcional Ruflo — READ-ONLY.
-  // CLI presente, plugin-lite, full init NÃO recomendado, canais + MCP default-deny.
-  if (args.includes("--ruflo")) return rufloReport(json)
-  // `doctor --opencode --json` (PRD15 §7.8): diagnóstico READ-ONLY da config OpenCode.
-  if (args.includes("--opencode")) {
-    const diag = diagnoseOpenCode(HOME)
-    if (json) { process.stdout.write(JSON.stringify(diag) + "\n"); if (strict && diag.shadowingRisk === "high") process.exitCode = 1; return }
-    section("doctor --opencode — diagnóstico (read-only, nada é alterado)")
-    info(`  json: ${diag.hasJson ? diag.jsonPath : "(ausente)"}`)
-    info(`  jsonc: ${diag.hasJsonc ? diag.jsoncPath : "(ausente)"}`)
-    if (diag.jsoncSensitiveKeys.length) info(`  chaves sensíveis no jsonc (só nomes): ${diag.jsoncSensitiveKeys.join(", ")}`)
-    if (diag.disabledResidue) warn(`  resíduo de versão anterior: ${diag.disabledResidue} — restaure com \`doctor --fix opencode --restore-jsonc\``)
-    ;(diag.shadowingRisk === "high" ? warn : info)(`  risco de shadowing: ${diag.shadowingRisk}`)
-    info(`  ação recomendada: ${diag.recommendedAction}`)
-    if (diag.parseError) warn(`  parse: ${diag.parseError}`)
-    return
-  }
-  if (json && !args.includes("--impact") && !args.includes("--install-integrity") && !args.includes("--fix") && !args.includes("--repair-manifest") && !args.includes("--package-manager") && !args.includes("--pm") && !args.includes("--supply-chain")) {
-    const report = await collectDoctorJson(HOME)
-    process.stdout.write(JSON.stringify(report) + "\n")
-    if (strict && !report.ok) process.exitCode = 1
-    return
-  }
-  // Correção assistida do drift OpenCode (json + jsonc). PRD15 §7.8: DRY-RUN é o
-  // DEFAULT; aplicar exige --apply (+ confirmação); .jsonc com OAuth/provider/model
-  // NUNCA é consolidado; --restore-jsonc reverte resíduo de versões antigas.
-  if (args.includes("--fix")) {
-    section("doctor --fix — OpenCode config (config is sacred)")
-    // Rollback seguro de .jsonc.gstack-disabled deixado por versões anteriores.
-    if (args.includes("--restore-jsonc")) {
-      const diag = diagnoseOpenCode(HOME)
-      if (!diag.disabledResidue) { success("OpenCode: nenhum .jsonc.gstack-disabled para restaurar."); return }
-      info(`  Vai restaurar ${diag.disabledResidue} → ${diag.jsoncPath} (o .jsonc ativo, se houver, é feito backup).`)
-      const okr = args.includes("--yes") || args.includes("--apply") || (process.stdin.isTTY && await confirm("Restaurar o opencode.jsonc agora?", false))
-      if (!okr) { info("Cancelado (use --apply/--yes em modo não-interativo)."); return }
-      const r = applyOpenCodeFix(HOME, { restoreJsonc: true })
-      if (r.restored) success(`OpenCode: ${r.jsoncPath} restaurado. Reabra o OpenCode e confira provider/OAuth.`)
-      else warn(`Não restaurado: ${r.reason}`)
-      return
-    }
-    const plan = planOpenCodeFix(HOME)
-    if (plan.action === "none") { success("OpenCode: sem conflito json+jsonc — nada a corrigir."); return }
-    if (plan.action === "manual") {
-      warn("Conflito detectado, mas o parse automático falhou (ajuste manual):")
-      warn(`  ${plan.parseError}`)
-      return
-    }
-    if (plan.action === "preserve") {
-      warn("Conflito: opencode.json + opencode.jsonc coexistem, MAS o .jsonc é fonte de verdade.")
-      warn(`  O .jsonc contém: ${plan.sensitiveKeys.join(", ")} (OAuth/provider/model/plugin).`)
-      info("  Config is sacred: o GStack NÃO vai consolidar nem renomear o .jsonc.")
-      info(`  Se quiser remover o shadowing, mova você mesmo ${plan.jsonPath} (com o OpenCode fechado).`)
-      return
-    }
-    // action === "merge" (jsonc SEM chaves sensíveis)
-    info("Conflito: opencode.json + opencode.jsonc coexistem (jsonc sem chaves sensíveis).")
-    info(`  Plano: merge preservando o que é do usuário (${(plan.userKeysPreserved || []).join(", ") || "—"}).`)
-    info(`  → escreveria o merge em ${plan.jsonPath}; renomearia o .jsonc para .gstack-disabled (reversível).`)
-    const apply = args.includes("--apply")
-    if (!apply) { info("(dry-run é o default: nada foi alterado. Use --apply para consolidar.)"); return }
-    const ok = args.includes("--yes") || (process.stdin.isTTY && await confirm("Aplicar o merge agora?", false))
-    if (!ok) { info("Cancelado (use --yes em modo não-interativo)."); return }
-    const r = applyOpenCodeFix(HOME, { apply: true })
-    if (r.applied) success("OpenCode: merge aplicado. Reverta com `doctor --fix opencode --restore-jsonc` se precisar.")
-    else warn(`Não aplicado (${r.reason || r.hint || "ação não elegível"}).`)
-    return
-  }
-  // Supply Chain Doctor (PRD14 §4.7): registry, binários no PATH, allowlist,
-  // fontes oficiais. Offline-first, read-only, JSON puro com --json.
-  if (args.includes("--supply-chain")) {
-    const report = buildSupplyChainReport()
-    if (json) {
-      process.stdout.write(JSON.stringify(report) + "\n")
-      if (strict && report.risk === "high") process.exitCode = 1
-      return
-    }
-    section("doctor --supply-chain — cadeia de suprimento")
-    for (const c of report.checks) {
-      const fn = c.status === "ok" ? success : c.status === "critical" ? error : warn
-      fn(`  ${c.status === "ok" ? "✓" : c.status === "critical" ? "✗" : "⚠"} ${c.id}: ${c.detail}`)
-    }
-    info("")
-    info(`  Fontes oficiais: npm ${report.officialSources.npm} · GitHub ${report.officialSources.github}`)
-    ;(report.risk === "none" ? success : warn)(`  Risco agregado: ${report.risk}`)
-    if (report.risk === "high") process.exitCode = 1
-    return
-  }
-  // Modo impacto: mostra quais componentes GLOBAIS estão ativos nesta máquina
-  // (o que afeta QUALQUER projeto dos harnesses), por categoria.
-  if (args.includes("--impact")) {
-    if (json) { process.stdout.write(JSON.stringify(buildInstallImpact({ home: HOME })) + "\n"); return }
-    section("doctor --impact — componentes globais ativos")
-    const impact = buildInstallImpact({ home: HOME })
-    for (const c of impact) {
-      const present = c.items.filter((it) => it.action === "modify")
-      if (c.category === "deps") continue
-      if (present.length === 0) { info(`${c.label}: nenhum instalado`); continue }
-      const tag = c.category === "mcp-global" || c.category === "harness-config"
-        ? " — AFETA QUALQUER PROJETO deste harness/usuário" : ""
-      warn(`${c.label}: ${present.length} ativo(s)${tag}`)
-      for (const it of present) info(`  • ${it.path}`)
-    }
-    const ocPlugins = join(HOME, ".config", "opencode", "plugins")
-    info("")
-    info(existsSync(ocPlugins)
-      ? "OpenCode plugins globais ATIVOS: carregam em qualquer sessão OpenCode deste usuário."
-      : "OpenCode plugins globais: nenhum.")
-    // Output Guard honesto (PRD14 §6.6): o guard padrão audita DEPOIS da resposta.
-    // Prevenção em trânsito é opt-in via proxy — nunca prometida como universal.
-    info("")
-    info("Output Guard: pós-resposta (auditoria via hooks) — detecção, não prevenção.")
-    info("  Redação EM TRÂNSITO (opt-in): `gstack_vibehard proxy` · estado: `gstack_vibehard proxy status`.")
-    info("Rollback: `gstack_vibehard uninstall --dry-run` · Integridade: `--install-integrity`.")
-    return
-  }
-  // Modo package-manager (PRD 12 PR2): resolve o PM do projeto e reporta estado +
-  // reparo seguro. `--fix` instala o pnpm ausente (sem apagar lock/node_modules).
-  if (args.includes("--package-manager") || args.includes("--pm")) {
-    const cwd = process.cwd()
-    const r = resolvePackageManager(cwd)
-    if (json) {
-      process.stdout.write(JSON.stringify(r) + "\n")
-      if (strict && r.state !== "ok") process.exitCode = 1
-      return
-    }
-    section("doctor --package-manager — resolver do gerenciador do projeto")
-    const icon = r.state === "ok" ? "✓" : "⚠"
-    info(`  ${icon} PM: ${r.pm} · estado: ${r.state}`)
-    info(`    ${r.detail}`)
-    if (r.state === "ok") { success("Package manager OK."); return }
-    warn(`  Reparo: ${r.repair}`)
-    if (args.includes("--fix") && r.state === "missing_binary" && r.pm === "pnpm") {
-      const ok = args.includes("--yes") || (process.stdin.isTTY && await confirm("Instalar o pnpm agora (`npm install -g pnpm`)?", false))
-      if (!ok) { info("Cancelado (use --yes em modo não-interativo)."); return }
-      try {
-        const { file, argv } = npmArgv(["install", "-g", "pnpm"])
-        execFileSync(file, argv, { stdio: "inherit", timeout: 120000 })
-        success("pnpm instalado. Rode `doctor --package-manager` de novo p/ confirmar.")
-      } catch (e) { warn(`Falha ao instalar pnpm: ${e.message}. Manual: npm install -g pnpm`) }
-    } else if (args.includes("--fix")) {
-      info("  (--fix não aplica reparo destrutivo automaticamente: lockfile/node_modules exigem sua confirmação manual — siga o passo acima.)")
-    }
-    return
-  }
+  for (const r of doctorRoutes()) if (r.match(args, json)) return r.run(args, json, strict)
+  return doctorEnvReport()
+}
 
-  // Modo reparo: limpa/migra um manifest inseguro SEM destruir backups do usuário.
-  // Default = --dry-run (só mostra o plano); --yes aplica (faz backup do manifest).
-  if (args.includes("--repair-manifest")) {
-    const apply = args.includes("--yes") && !args.includes("--dry-run")
-    const r = repairManifest(HOME, { dryRun: !apply })
-    if (json) {
-      process.stdout.write(JSON.stringify(r) + "\n")
-      if (strict && r.manifestExists && r.mutating > 0 && !r.applied) process.exitCode = 1
-      return
-    }
-    section("doctor --repair-manifest — limpeza/migração segura do manifest")
-    if (!r.manifestExists) { warn(r.note); return }
-    if (r.plan.length === 0) { success("Manifest íntegro — nada a reparar."); return }
-    info(`${r.plan.length} item(ns) no plano (${r.mutating} mutação(ões); restante é só relato):`)
-    for (const a of r.plan) {
-      const tag = a.action === "prune" ? "PODAR" : a.action === "mark-unrestorable" ? "MARCAR não-restaurável"
-        : a.action === "migrate" ? "MIGRAR schema" : "RELATAR"
-      info(`  • [${tag}] ${a.path} — ${a.reason}`)
-    }
-    info("Backups do usuário são SEMPRE preservados (nunca apagados).")
-    if (!apply) {
-      info("(--dry-run: nada foi alterado) — para aplicar: `gstack_vibehard doctor --repair-manifest --yes`")
-      return
-    }
-    if (r.applied) success(`Manifest reparado (${r.before.items} → ${r.after.items} itens). Backup do manifest: ${r.backup || "—"}`)
-    else info("Nada a aplicar (apenas relatos).")
-    return
-  }
+// ── Relatório humano do ambiente (default, sem flags) ────────────────────────────
 
-  // Modo integridade: valida manifest/backups/hashes/configs e se uninstall é seguro.
-  if (args.includes("--install-integrity")) {
-    const r = checkInstallIntegrity(HOME)
-    if (json) { process.stdout.write(JSON.stringify(r) + "\n"); if (strict && r.manifestExists && !r.safeToUninstall) process.exitCode = 1; return }
-    section("Integridade da Instalacao (manifest/backups/hashes)")
-    if (!r.manifestExists) { warn("Manifest ausente — nada a verificar (instale com `gstack_vibehard install`)."); return }
-    success(`Manifest presente — ${r.items} item(ns) registrados`)
-    info(`Backups OK: ${r.backupsOk}`)
-    if (r.drift > 0) warn(`Drift: ${r.drift} arquivo(s) alterado(s) desde a instalacao (editado por voce/outro)`)
-    if (r.issues.length === 0) success("Sem problemas — uninstall seria SEGURO")
-    else {
-      error(`${r.issues.length} problema(s):`)
-      r.issues.forEach((i) => warn(`  ${i}`))
-      warn("Rode `gstack_vibehard uninstall --dry-run` para ver o plano de rollback.")
-    }
-    return
-  }
-
-  section("Diagnostico do Ambiente")
-
-  info(`Sistema: ${getOSLabel()}`)
-
-  // Version checks (parallel)
+/** Node/Python em paralelo. Retorna a versão do Python (usada no check do pytest). */
+async function reportVersions() {
   const [nodeVer, pyVer] = await Promise.all([
     new Promise((r) => execFile("node", ["--version"], { timeout: 5000 }, (e, stdout) => r(e ? null : stdout.trim()))),
     new Promise((r) => {
@@ -347,231 +383,204 @@ export async function doctor(args = []) {
   else error("Node.js: NAO ENCONTRADO")
   if (pyVer) success(`Python: ${pyVer}`)
   else warn("Python: NAO ENCONTRADO (necessario para hooks)")
+  return pyVer
+}
 
-  // Harnesses
-  section("Harnesses Detectados")
-
+function reportCodex() {
   const codexConfig = join(HOME, ".codex", "config.toml")
   const codexHooks = join(HOME, ".codex", "hooks")
-  if (existsSync(codexConfig) || existsSync(codexHooks)) {
-    success("Codex CLI — detectado")
-    info(`  Config: ${codexConfig}`)
-    info(`  Hooks: ${codexHooks}`)
-  } else {
-    warn("Codex CLI — nao detectado")
-  }
-
+  if (!existsSync(codexConfig) && !existsSync(codexHooks)) return warn("Codex CLI — nao detectado")
+  success("Codex CLI — detectado")
+  info(`  Config: ${codexConfig}`)
+  info(`  Hooks: ${codexHooks}`)
+}
+function reportClaude() {
   const claudeSettings = join(HOME, ".claude", "settings.json")
   const claudeMd = join(HOME, "CLAUDE.md")
-  if (existsSync(claudeSettings) || existsSync(claudeMd)) {
-    success("Claude Code — detectado")
-    info(`  Settings: ${claudeSettings}`)
-    if (existsSync(claudeMd)) info("  CLAUDE.md: presente")
-  } else {
-    warn("Claude Code — nao detectado")
+  if (!existsSync(claudeSettings) && !existsSync(claudeMd)) return warn("Claude Code — nao detectado")
+  success("Claude Code — detectado")
+  info(`  Settings: ${claudeSettings}`)
+  if (existsSync(claudeMd)) info("  CLAUDE.md: presente")
+}
+function reportOpenCodeConfigPresent(oc) {
+  success("OpenCode CLI — detectado")
+  if (oc.hasJson) info(`  Config JSON:  ${oc.jsonPath}`)
+  if (oc.hasJsonc) info(`  Config JSONC: ${oc.jsoncPath}`)
+  if (oc.hasConflict) {
+    warn("  Conflito: opencode.json E opencode.jsonc coexistem (config SUA, pre-existente).")
+    warn("  Pode sombrear plugins/OAuth do Desktop. O gstack NAO altera esses arquivos.")
+    info("  Remedio em 1 comando (com o OpenCode fechado): `gstack_vibehard doctor --fix`")
+    info("    → merge assistido preservando OAuth/provider/plugins, com backup de ambos. `--dry-run` mostra o plano.")
   }
-
+  const ocPlugins = join(HOME, ".config", "opencode", "plugins")
+  const gstackPlugins = ["gstack-security.js", "gstack-session.js", "gstack-prompt.js"].filter((f) => existsSync(join(ocPlugins, f)))
+  if (gstackPlugins.length > 0) success(`  Plugins gstack: ${gstackPlugins.length} (auto-load)`)
+  else info("  Plugins gstack: nenhum (rode `gstack_vibehard install`)")
+}
+function reportOpenCodeHarness() {
   const oc = inspectOpenCodeConfig(HOME)
-  if (oc.hasJson || oc.hasJsonc) {
-    success("OpenCode CLI — detectado")
-    if (oc.hasJson) info(`  Config JSON:  ${oc.jsonPath}`)
-    if (oc.hasJsonc) info(`  Config JSONC: ${oc.jsoncPath}`)
-    if (oc.hasConflict) {
-      warn("  Conflito: opencode.json E opencode.jsonc coexistem (config SUA, pre-existente).")
-      warn("  Pode sombrear plugins/OAuth do Desktop. O gstack NAO altera esses arquivos.")
-      info("  Remedio em 1 comando (com o OpenCode fechado): `gstack_vibehard doctor --fix`")
-      info("    → merge assistido preservando OAuth/provider/plugins, com backup de ambos. `--dry-run` mostra o plano.")
-    }
-    const ocPlugins = join(HOME, ".config", "opencode", "plugins")
-    const gstackPlugins = ["gstack-security.js", "gstack-session.js", "gstack-prompt.js"]
-      .filter((f) => existsSync(join(ocPlugins, f)))
-    if (gstackPlugins.length > 0) success(`  Plugins gstack: ${gstackPlugins.length} (auto-load)`)
-    else info("  Plugins gstack: nenhum (rode `gstack_vibehard install`)")
-  } else {
-    try {
-      const ver = execFileSync("opencode", ["--version"], { encoding: "utf-8", timeout: 3000 }).trim()
-      success(`OpenCode CLI — detectado (v${ver}, sem config — integracao por plugins/skills)`)
-    } catch {
-      warn("OpenCode CLI — nao detectado")
-    }
-  }
-
-  // Todos os harnesses detectados (inclui Cursor, Windsurf, Gemini, Kiro, Zed,
-  // Copilot CLI, Droid, KiloCLI, Kimi, VS Code) com nivel de integracao
-  const detected = detectHarnesses()
-  const HOOKS_HARNESSES = new Set(["claude", "cursor", "opencode"])
+  if (oc.hasJson || oc.hasJsonc) return reportOpenCodeConfigPresent(oc)
+  try {
+    const ver = execFileSync("opencode", ["--version"], { encoding: "utf-8", timeout: 3000 }).trim()
+    success(`OpenCode CLI — detectado (v${ver}, sem config — integracao por plugins/skills)`)
+  } catch { warn("OpenCode CLI — nao detectado") }
+}
+function harnessLevel(id, instructionFile) {
+  if (new Set(["claude", "cursor", "opencode"]).has(id)) return "hooks reais"
+  return instructionFile ? "instrucional" : "deteccao apenas"
+}
+function reportOtherHarnesses(detected) {
   const otherDetected = detected.filter((h) => !["codex", "claude", "opencode"].includes(h.id))
-  if (otherDetected.length > 0) {
-    info("Outros harnesses detectados:")
-    for (const h of otherDetected) {
-      const level = HOOKS_HARNESSES.has(h.id)
-        ? "hooks reais"
-        : (h.instructionFile ? "instrucional" : "deteccao apenas")
-      info(`  ${h.label} — ${level}`)
-    }
-  }
+  if (otherDetected.length === 0) return
+  info("Outros harnesses detectados:")
+  for (const h of otherDetected) info(`  ${h.label} — ${harnessLevel(h.id, h.instructionFile)}`)
+}
+function reportGstackStatus(detected) {
+  const gstackInstalled = checkAlreadyInstalled(detected.map((h) => h.id))
+  if (gstackInstalled.length > 0) success(`gstack_vibehard instalado: ${gstackInstalled.join(", ")}`)
+  else info("gstack_vibehard: nao instalado em nenhum harness")
+}
+function reportHarnesses() {
+  section("Harnesses Detectados")
+  reportCodex()
+  reportClaude()
+  reportOpenCodeHarness()
+  const detected = detectHarnesses()
+  reportOtherHarnesses(detected)
+  reportGstackStatus(detected)
+}
 
-  // gstack_vibehard status per harness
-  const ids = detected.map((h) => h.id)
-  const gstackInstalled = checkAlreadyInstalled(ids)
-  if (gstackInstalled.length > 0) {
-    success(`gstack_vibehard instalado: ${gstackInstalled.join(", ")}`)
-  } else {
-    info("gstack_vibehard: nao instalado em nenhum harness")
-  }
-
-  // gstack_vibehard components
+/** Conta entradas de um diretório com um filtro; null se ausente/ilegível. */
+function countDir(dir, filter) {
+  if (!existsSync(dir)) return null
+  return (safeReaddir(dir) || []).filter(filter)
+}
+function reportHooks() {
+  const files = countDir(join(HOME, ".codex", "hooks"), (f) => f.endsWith(".py"))
+  if (!files) return warn("Nenhum hook gstack_vibehard instalado")
+  success(`${files.length} hooks Python instalados`)
+  info(`  ${files.join(", ")}`)
+}
+function reportSkills() {
+  const skills = countDir(join(HOME, ".agents", "skills"), (f) => f !== "." && f !== "..")
+  if (!skills) return warn("Nenhuma skill gstack_vibehard instalada")
+  success(`${skills.length} skills instaladas`)
+}
+function reportChronicle() {
+  const primary = join(HOME, ".gstack", "chronicle")
+  const dir = existsSync(primary) ? primary : join(HOME, ".codex", "chronicle")
+  const sessions = countDir(dir, (f) => f.endsWith(".md"))
+  if (!sessions) return info("Chronicle: nenhuma sessao (primeira sessao cria)")
+  success(`Chronicle: ${sessions.length} sessoes registradas`)
+}
+function reportScripts() {
+  const scripts = countDir(join(HOME, ".agents", "scripts"), (f) => f.endsWith(".ps1"))
+  if (!scripts) return info("Setup scripts: nao instalados")
+  success(`${scripts.length} setup scripts em ~/.agents/scripts/`)
+}
+function reportComponents() {
   section("Componentes gstack_vibehard")
+  reportHooks()
+  reportSkills()
+  reportChronicle()
+  reportScripts()
+}
 
-  const hooks = join(HOME, ".codex", "hooks")
-  if (existsSync(hooks)) {
-    const fs = await import("fs")
-    const hookFiles = fs.readdirSync(hooks).filter((f) => f.endsWith(".py"))
-    success(`${hookFiles.length} hooks Python instalados`)
-    info(`  ${hookFiles.join(", ")}`)
-  } else {
-    warn("Nenhum hook gstack_vibehard instalado")
-  }
-
-  const skillsDir = join(HOME, ".agents", "skills")
-  if (existsSync(skillsDir)) {
-    const fs = await import("fs")
-    const skills = fs.readdirSync(skillsDir).filter((f) => f !== "." && f !== "..")
-    success(`${skills.length} skills instaladas`)
-  } else {
-    warn("Nenhuma skill gstack_vibehard instalada")
-  }
-
-  const chronicleDir = (() => {
-    const primary = join(HOME, ".gstack", "chronicle")
-    if (existsSync(primary)) return primary
-    return join(HOME, ".codex", "chronicle")
-  })()
-  if (existsSync(chronicleDir)) {
-    const fs = await import("fs")
-    const sessions = fs.readdirSync(chronicleDir).filter((f) => f.endsWith(".md"))
-    success(`Chronicle: ${sessions.length} sessoes registradas`)
-  } else {
-    info("Chronicle: nenhuma sessao (primeira sessao cria)")
-  }
-
-  // Scripts
-  const scriptsDir2 = join(HOME, ".agents", "scripts")
-  if (existsSync(scriptsDir2)) {
-    const fs = await import("fs")
-    const scripts = fs.readdirSync(scriptsDir2).filter((f) => f.endsWith(".ps1"))
-    success(`${scripts.length} setup scripts em ~/.agents/scripts/`)
-  } else {
-    info("Setup scripts: nao instalados")
-  }
-
-  // MCP
+function reportMcp() {
   section("MCP Servers")
-  const mcp = join(HOME, ".mcp.json")
-  if (existsSync(mcp)) {
-    success(".mcp.json presente")
-  } else {
-    info(".mcp.json: nao configurado")
-  }
+  if (existsSync(join(HOME, ".mcp.json"))) success(".mcp.json presente")
+  else info(".mcp.json: nao configurado")
+}
 
-  // Integracoes — dupla via (Composio nuvem + Printing Press local)
-  section("Integracoes (Composio + Printing Press)")
-  // Composio (nuvem): auth/escrita
+function reportComposio() {
   const composioEnv = process.env.COMPOSIO_API_KEY || process.env.COMPOSIO_TOKEN
-  let composioCli = false
-  try { execFileSync("composio", ["--version"], { stdio: "pipe", timeout: 3000 }); composioCli = true } catch { /* opcional */ }
+  let cli = false
+  try { execFileSync("composio", ["--version"], { stdio: "pipe", timeout: 3000 }); cli = true } catch { /* opcional */ }
   if (composioEnv) success("Composio (nuvem): token presente — escrita/OAuth disponivel")
-  else if (composioCli) info("Composio (nuvem): CLI presente, sem token (rode `composio login`)")
+  else if (cli) info("Composio (nuvem): CLI presente, sem token (rode `composio login`)")
   else info("Composio (nuvem): nao configurado (opcional — para acoes de escrita/OAuth)")
-  // Printing Press (local): leitura/cauda-longa
+}
+function reportPrintingPress() {
   let goOk = false
   try { execFileSync("go", ["version"], { stdio: "pipe", timeout: 3000 }); goOk = true } catch { /* opcional */ }
   if (goOk) success("Printing Press (local): Go presente — `tools install` disponivel")
   else info("Printing Press (local): Go ausente — discovery funciona; `tools install` instala Go sob demanda")
   info("Por projeto: veja .gstack/integrations.json e `gstack_vibehard tools`")
+}
+function reportIntegrations() {
+  section("Integracoes (Composio + Printing Press)")
+  reportComposio()
+  reportPrintingPress()
+}
 
-  // Playwright
-  section("Playwright (browser testing)")
-  const pwBrowsers = process.env.PLAYWRIGHT_BROWSERS_PATH
-    || (isWindows()
-      ? join(HOME, "AppData", "Local", "ms-playwright")
-      : join(HOME, ".cache", "ms-playwright"))
+function reportPlaywrightCli() {
   try {
     const pwd = npxArgv(["playwright", "--version"])
     const pwVer = execFileSync(pwd.file, pwd.argv, { encoding: "utf-8", stdio: "pipe", timeout: 10000 }).trim()
     success(`Playwright CLI: ${pwVer}`)
-  } catch {
-    warn("Playwright CLI: nao disponivel (rode: npx playwright install chromium)")
-  }
-  if (existsSync(pwBrowsers)) {
-    const entries = safeReaddir(pwBrowsers)
-    if (entries === null) {
-      warn(`Playwright: sem permissao p/ ler ${pwBrowsers} (EPERM) — ignorado, sem crash`)
-    } else {
-      const browsers = entries.filter((f) => f.startsWith("chromium"))
-      if (browsers.length > 0) success(`Playwright: chromium instalado (${browsers.join(", ")})`)
-      else warn("Playwright: chromium nao encontrado. Rode: npx playwright install chromium")
-    }
-  } else {
-    warn("Playwright: browsers nao instalados. Rode: npx playwright install chromium")
-  }
+  } catch { warn("Playwright CLI: nao disponivel (rode: npx playwright install chromium)") }
+}
+function reportPlaywrightBrowsers(pwBrowsers) {
+  if (!existsSync(pwBrowsers)) return warn("Playwright: browsers nao instalados. Rode: npx playwright install chromium")
+  const entries = safeReaddir(pwBrowsers)
+  if (entries === null) return warn(`Playwright: sem permissao p/ ler ${pwBrowsers} (EPERM) — ignorado, sem crash`)
+  const browsers = entries.filter((f) => f.startsWith("chromium"))
+  if (browsers.length > 0) success(`Playwright: chromium instalado (${browsers.join(", ")})`)
+  else warn("Playwright: chromium nao encontrado. Rode: npx playwright install chromium")
+}
+function reportPlaywright() {
+  section("Playwright (browser testing)")
+  reportPlaywrightCli()
+  reportPlaywrightBrowsers(pwBrowsersPath(HOME))
+}
 
-  // Dependencias globais
+/** Um binário global: sucesso com versão, ou warning + push opcional no faltantes. */
+function checkDep(cmd, label, missing, missLabel) {
+  try {
+    const v = execFileSync(cmd, ["--version"], { encoding: "utf-8", stdio: "pipe", timeout: 5000 }).trim()
+    success(`${label}: ${v}`)
+  } catch { warn(`${label}: nao instalado`); if (missLabel) missing.push(missLabel) }
+}
+function reportMom() {
+  if (!isMacOS()) return info("MOM: apenas macOS")
+  try { execFileSync("which", ["mom"], { stdio: "pipe", timeout: 5000 }); success("MOM: instalado") }
+  catch { warn("MOM: nao instalado") }
+}
+function reportPytest(pyVer, missing) {
+  const pyBin = pyVer && pyVer.toLowerCase().includes("python 3") ? "python" : "python3"
+  try { execFileSync(pyBin, ["-m", "pytest", "--version"], { stdio: "pipe", timeout: 5000 }); return success("pytest: instalado") }
+  catch { /* tenta python3 abaixo */ }
+  try { execFileSync("python3", ["-m", "pytest", "--version"], { stdio: "pipe", timeout: 5000 }); success("pytest: instalado") }
+  catch { warn("pytest: nao instalado"); missing.push("pytest") }
+}
+function reportGlobalDeps(pyVer) {
   section("Dependencias Globais")
-  const missingDeps = []
-
-  try {
-    const bunVer = execFileSync("bun", ["--version"], { encoding: "utf-8", stdio: "pipe", timeout: 5000 }).trim()
-    success(`bun: ${bunVer}`)
-  } catch { warn("bun: nao instalado"); missingDeps.push("bun + gbrain") }
-
-  try {
-    const gbrainVer = execFileSync("gbrain", ["--version"], { encoding: "utf-8", stdio: "pipe", timeout: 5000 }).trim()
-    success(`gbrain: ${gbrainVer}`)
-  } catch { warn("gbrain: nao instalado") }
-
-  try {
-    const graphifyVer = execFileSync("graphify", ["--version"], { encoding: "utf-8", stdio: "pipe", timeout: 5000 }).trim()
-    success(`graphify: ${graphifyVer}`)
-  } catch { warn("graphify: nao instalado"); if (!missingDeps.includes("graphify")) missingDeps.push("graphify") }
-
-  try {
-    const rustVer = execFileSync("rustc", ["--version"], { encoding: "utf-8", stdio: "pipe", timeout: 5000 }).trim()
-    success(`Rust: ${rustVer}`)
-  } catch { warn("Rust: nao instalado"); missingDeps.push("Rust") }
-
-  try {
-    const headroomVer = execFileSync("headroom", ["--version"], { encoding: "utf-8", stdio: "pipe", timeout: 5000 }).trim()
-    success(`headroom: ${headroomVer}`)
-  } catch { warn("headroom: nao instalado"); missingDeps.push("headroom") }
-
-  if (isMacOS()) {
-    try {
-      execFileSync("which", ["mom"], { stdio: "pipe", timeout: 5000 })
-      success("MOM: instalado")
-    } catch { warn("MOM: nao instalado") }
-  } else {
-    info("MOM: apenas macOS")
-  }
-
-  // pytest — necessario para hooks Python, QG e Test Gate
-  try {
-    const pyBin = pyVer && pyVer.toLowerCase().includes("python 3") ? "python" : "python3"
-    execFileSync(pyBin, ["-m", "pytest", "--version"], { stdio: "pipe", timeout: 5000 })
-    success("pytest: instalado")
-  } catch {
-    try {
-      execFileSync("python3", ["-m", "pytest", "--version"], { stdio: "pipe", timeout: 5000 })
-      success("pytest: instalado")
-    } catch { warn("pytest: nao instalado"); missingDeps.push("pytest") }
-  }
-
-  if (missingDeps.length > 0) {
+  const missing = []
+  checkDep("bun", "bun", missing, "bun + gbrain")
+  checkDep("gbrain", "gbrain", missing, null)
+  checkDep("graphify", "graphify", missing, "graphify")
+  checkDep("rustc", "Rust", missing, "Rust")
+  checkDep("headroom", "headroom", missing, "headroom")
+  reportMom()
+  reportPytest(pyVer, missing)
+  if (missing.length > 0) {
     section("Acoes Corretivas")
-    info(`Dependencias faltando: ${missingDeps.join(", ")}`)
+    info(`Dependencias faltando: ${missing.join(", ")}`)
     info("  Rode: gstack_vibehard install")
     info("  O instalador agora instala todas as deps automaticamente.")
   }
+}
 
+/** `doctor` (sem flags): diagnóstico humano completo do ambiente. */
+async function doctorEnvReport() {
+  section("Diagnostico do Ambiente")
+  info(`Sistema: ${getOSLabel()}`)
+  const pyVer = await reportVersions()
+  reportHarnesses()
+  reportComponents()
+  reportMcp()
+  reportIntegrations()
+  reportPlaywright()
+  reportGlobalDeps(pyVer)
   section("Diagnostico concluido")
 }
