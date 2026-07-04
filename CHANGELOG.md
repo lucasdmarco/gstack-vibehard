@@ -1,5 +1,32 @@
 # Changelog - gstack-vibehard
 
+## [3.52.0] - 2026-07-04
+
+### Tool Readiness como Produto (PRD 20 Sprint 20.3)
+
+`.gstack/tool-readiness.json` deixa de ser arquivo mantido à mão e vira **comando
+oficial verificável**: `gstack_vibehard tools readiness [--json] [--write]
+[--clean-machine]`. Mede o estado REAL de cada ferramenta local — não uma
+declaração estática.
+
+- **`src/tools/readiness.js`** (novo, PURO/injetável — `probe`/`git`/`now`): sem
+  side-effect, nunca lança. Status por ferramenta: `missing` ·
+  `installed_not_callable` · `callable` · `callable_not_routed` · `routed`.
+- **Headroom honesto**: `--version` funcionando ⇒ `callable_not_routed`. Só vira
+  `routed` se `headroom doctor` confirmar **proxy rodando E tráfego roteado** —
+  nunca vende economia automática que não existe.
+- **Graphify freshness**: compara `built_at_commit` do `graphify-out/graph.json` com
+  `git rev-parse HEAD` → `fresh` / `stale` / `unknown` / `absent`.
+- **Campos**: OS/Node/npm/Python/PATH resumido, comando validado + exit code +
+  stdout/stderr resumidos, artefatos, harness discovery (Codex/Claude/OpenCode,
+  instrucional), `guardrails` (nunca `.env*`, nunca config global, project-scoped).
+- **Cross-platform**: o probe usa `shell` para shims `.cmd`/`.bat` (Node ≥20 recusa
+  spawnar `npm`/`npx` sem shell — CVE-2024-27980).
+- **Escrita**: `--write` grava SÓ `.gstack/tool-readiness.json` (project-scoped);
+  **default é read-only** (nada em disco). `--json` puro (write silencioso).
+- Teste: `tool_readiness` (fallow callable, headroom callable_not_routed vs routed,
+  graphify fresh/stale/absent, missing, `--json` puro + `--write`/no-write). QG 0.
+
 ## [3.51.0] - 2026-07-04
 
 ### QG Debt Burn-Down (PRD 20 Sprint 20.2)
