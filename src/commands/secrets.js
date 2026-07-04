@@ -33,36 +33,39 @@ export async function secretsCommand(args = [], opts = {}) {
   const sub = args.find((a) => !a.startsWith("-")) || "doctor"
   const json = args.includes("--json")
   const status = brokerStatus(opts)
-
-  if (sub === "doctor") return doctorSecrets(cwd, status, json, opts)
-  if (sub === "list") return listSecrets(cwd, json)
-  if (sub === "set") return setCmd(cwd, args, status, opts)
-  if (sub === "delete" || sub === "rm") return deleteCmd(cwd, args, opts)
-  if (sub === "import") return importCmd(cwd, args, status, opts)
-  if (sub === "run") return runCmd(cwd, args, status, opts)
+  const handler = SECRETS_SUBS[sub]
+  if (handler) return handler(cwd, args, status, json, opts)
   warn(`Subcomando desconhecido: ${sub}`)
   info("  Use: secrets <doctor|list|set|delete|import|run>")
 }
 
-function doctorSecrets(cwd, status, json, opts) {
+function buildSecretsReport(cwd, status) {
   const schema = loadSecretsSchema(cwd)
   const required = allRequiredNames(schema)
   const stored = new Set(listSecretNames(cwd).map((s) => s.name))
   const missing = required.filter((n) => !stored.has(n))
-  const report = {
+  return {
     provider: status.provider, available: status.available,
     required, stored: [...stored], missing,
     ok: status.available && missing.length === 0,
   }
-  if (json) { process.stdout.write(JSON.stringify(report) + "\n"); return report }
+}
+const secretLine = (n, stored) => `  ${stored.has(n) ? "✓" : "•"} ${n}: ${stored.has(n) ? "guardado" : "FALTANDO — `secrets set " + n + "`"}`
+function renderRequiredSecrets(required, stored) {
+  if (required.length === 0) { info("  Nenhum segredo requerido pelo schema."); return }
+  for (const n of required) (stored.has(n) ? success : warn)(secretLine(n, stored))
+}
+function renderSecretsDoctor(report) {
   section("secrets doctor")
-  info(`  Provider: ${status.provider || "(nenhum keychain disponível)"} ${status.available ? "✓" : "✗"}`)
-  if (!status.available) warn("  Sem keychain — no Full o broker é obrigatório; no Lite só ok se não houver segredo requerido.")
-  if (required.length === 0) info("  Nenhum segredo requerido pelo schema.")
-  else {
-    for (const n of required) (stored.has(n) ? success : warn)(`  ${stored.has(n) ? "✓" : "•"} ${n}: ${stored.has(n) ? "guardado" : "FALTANDO — `secrets set " + n + "`"}`)
-  }
+  info(`  Provider: ${report.provider || "(nenhum keychain disponível)"} ${report.available ? "✓" : "✗"}`)
+  if (!report.available) warn("  Sem keychain — no Full o broker é obrigatório; no Lite só ok se não houver segredo requerido.")
+  renderRequiredSecrets(report.required, new Set(report.stored))
   ;(report.ok ? success : warn)(report.ok ? "Broker pronto." : "Broker incompleto (veja acima).")
+}
+function doctorSecrets(cwd, status, json, opts) {
+  const report = buildSecretsReport(cwd, status)
+  if (json) { process.stdout.write(JSON.stringify(report) + "\n"); return report }
+  renderSecretsDoctor(report)
   return report
 }
 
@@ -96,19 +99,25 @@ function deleteCmd(cwd, args, opts) {
   success(`Removido ${name} (keychain + índice).`)
 }
 
+const importPreflight = (file, status) =>
+  (!existsSync(file) ? `Arquivo não encontrado: ${file}` : !status.available ? "Sem keychain — não importo segredo em claro." : null)
+// PRD: .env lido uma vez, com confirmação antes de apagar/renomear.
+async function maybeRenameEnv(file, opts) {
+  if (!(await askYesNo(`Renomear ${file} para ${file}.imported (remove o segredo em claro)?`, opts))) {
+    return info("  Mantido. Lembre: `.env` rastreado bloqueia delegação.")
+  }
+  try { renameSync(file, `${file}.imported`); info(`  ${file} → ${file}.imported`) } catch (e) { warn(`Não renomeei: ${e.message}`) }
+}
 async function importCmd(cwd, args, status, opts) {
   const file = args.filter((a) => !a.startsWith("-"))[1] || join(cwd, ".env")
-  if (!existsSync(file)) { error(`Arquivo não encontrado: ${file}`); return }
-  if (!status.available) { error("Sem keychain — não importo segredo em claro."); return }
+  const err = importPreflight(file, status)
+  if (err) return error(err)
   const pairs = parseDotEnv(readFileSync(file, "utf-8"))
   const keys = Object.keys(pairs)
-  if (keys.length === 0) { warn("Nenhuma variável encontrada no arquivo."); return }
+  if (keys.length === 0) return warn("Nenhuma variável encontrada no arquivo.")
   section(`secrets import — ${keys.length} variável(is) de ${file}`)
   for (const k of keys) { setSecret(cwd, k, pairs[k], opts); success(`  ✓ ${k} → keychain`) } // valores nunca impressos
-  // PRD: .env lido uma vez, com confirmação antes de apagar/renomear
-  if (await askYesNo(`Renomear ${file} para ${file}.imported (remove o segredo em claro)?`, opts)) {
-    try { renameSync(file, `${file}.imported`); info(`  ${file} → ${file}.imported`) } catch (e) { warn(`Não renomeei: ${e.message}`) }
-  } else info("  Mantido. Lembre: `.env` rastreado bloqueia delegação.")
+  await maybeRenameEnv(file, opts)
 }
 
 /**
@@ -136,6 +145,17 @@ function runCmd(cwd, args, status, opts) {
   })
   child.on("error", (e) => error(`Falha ao executar: ${e.code || e.message}`))
   child.on("exit", (code) => { if (code) process.exitCode = code })
+}
+
+// Dispatch (definido após os handlers; secretsCommand só o lê em runtime).
+const SECRETS_SUBS = {
+  doctor: (cwd, args, status, json, opts) => doctorSecrets(cwd, status, json, opts),
+  list: (cwd, args, status, json, opts) => listSecrets(cwd, json),
+  set: (cwd, args, status, json, opts) => setCmd(cwd, args, status, opts),
+  delete: (cwd, args, status, json, opts) => deleteCmd(cwd, args, opts),
+  rm: (cwd, args, status, json, opts) => deleteCmd(cwd, args, opts),
+  import: (cwd, args, status, json, opts) => importCmd(cwd, args, status, opts),
+  run: (cwd, args, status, json, opts) => runCmd(cwd, args, status, opts),
 }
 
 export { promptHidden, requiredSecretsForService }
