@@ -29,6 +29,7 @@ SCHEMA_VERSION = 1
 # .docs/AUDITS) antes era IGNORADO: o índice via só README+CHANGELOG (PRD20 §P0).
 DOC_DIRS = [
     (".docs/PLANS", "plans"), (".docs/ADRS", "adr"), (".docs/AUDITS", "audits"),
+    (".docs/RESEARCH", "research"),
     ("docs/adr", "adr"), ("docs/prd", "prd"), ("docs/plans", "plans"),
     ("docs/research", "research"), ("docs/guides", "docs"),
 ]

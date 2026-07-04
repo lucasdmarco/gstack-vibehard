@@ -31,6 +31,30 @@ function captureStdout() {
   return { restore: () => { process.stdout.write = orig }, get: () => buf }
 }
 
+test("PRD24 24.4: .docs/RESEARCH indexa como 'research' e `search PRD22` acha o doc", async () => {
+  const cwd = await mkdtemp(path.join(tmpdir(), "gstack-cidx24-"))
+  try {
+    await mkdir(path.join(cwd, ".docs", "PLANS"), { recursive: true })
+    await mkdir(path.join(cwd, ".docs", "RESEARCH"), { recursive: true })
+    await writeFile(path.join(cwd, ".docs", "PLANS", "prd22.md"), "# PRD22\n\nPRD22 sobre economia real de tokens.\n")
+    await writeFile(path.join(cwd, ".docs", "RESEARCH", "registry.md"), "# Registry\nrepositorios comparados AIDD.\n")
+    const { contextCommand } = await imp()
+    await contextCommand(["index", "--reindex"], { cwd })
+
+    const s = captureStdout()
+    try { await contextCommand(["status", "--db"], { cwd }) } finally { s.restore() }
+    assert.match(s.get(), /research=1/, ".docs/RESEARCH conta como fonte research")
+    assert.match(s.get(), /prd=1/, "prd22.md classificado como prd")
+
+    const q = captureStdout()
+    try { await contextCommand(["search", "PRD22", "--json"], { cwd }) } finally { q.restore() }
+    const parsed = JSON.parse(q.get().trim())
+    const hits = parsed.results || parsed
+    assert.ok(Array.isArray(hits) && hits.length >= 1, "search PRD22 retorna ≥1 (Métrica §11)")
+    assert.ok(hits.some((r) => /prd22\.md$/.test(String(r.path).replace(/\\/g, "/"))))
+  } finally { await rm(cwd, { recursive: true, force: true }) }
+})
+
 test("context index cobre .docs/PLANS/.docs/ADRS + raiz; status --db conta por fonte", async () => {
   const cwd = await seedProject()
   try {
