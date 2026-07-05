@@ -100,6 +100,7 @@ Tudo que o `install` escreve tem backup + manifest — [guia de reset/uninstall]
 | | |
 |---|---|
 | [Quickstart](docs/guides/quickstart.md) | 5 minutos, termos explicados |
+| [Trilha AI-Driven Dev](.docs/TRAILS/ai-driven-dev/01-nova-stack-do-dev.md) | 5 aulas com comandos reais; onboarding — **nada é instalado** |
 | [Capacidades: real/callable/opt-in/roadmap](docs/guides/capabilities.md) | o que o produto entrega hoje, sem inflar |
 | [Caminhos de instalação](docs/guides/install-paths.md) | lite vs full, matriz de inclusão/exclusão |
 | [Reset & uninstall](docs/guides/reset-uninstall.md) | desfazer de verdade |

@@ -33,4 +33,6 @@ cd meu-app && gstack_vibehard dev                            # sobe o runtime (s
 - **MCP**: servidores de ferramentas dos harnesses — inventário: `tools mcp inventory`
 - **Headroom/Graphify/Fallow**: compressão de contexto · AST cache · auditoria estática (Rust)
 
-Próximo: [caminhos de instalação](install-paths.md)
+Próximo: [caminhos de instalação](install-paths.md) · Aprender AI-driven dev na prática:
+[Trilha AI-Driven Dev](../../.docs/TRAILS/ai-driven-dev/01-nova-stack-do-dev.md) (5 aulas,
+comandos reais, **nada é instalado**).
