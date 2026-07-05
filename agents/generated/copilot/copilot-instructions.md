@@ -130,6 +130,12 @@ CLI-only deploy specialist for GitHub repository creation, Vercel production dep
 
 - Source: knowledge/deployer.md
 
+### gstack-aidd-guided-delivery
+
+Loop AI-driven do GStack — entender contexto, planejar, executar com gates e verificar de forma determinística.
+
+- Source: agent-packs/gstack-aidd/skills/guided-delivery/SKILL.md
+
 ## GStack Execution Contract
 
 Use the minimum project context needed.

@@ -1,5 +1,26 @@
 # Changelog - gstack-vibehard
 
+## [3.64.0] - 2026-07-05
+
+### Skill Packs — evolui o Agent Factory (PRD 23 §6.5 · PRD21 §4.3 / Sprint D) — fecha a camada AIDD
+
+Empacotamento de skills no padrão AIDD **sem duplicar** o Agent Factory: `agent-packs/`
+é uma **fonte adicional** compilada para os MESMOS `agents/generated/` (claude/codex/
+cursor/copilot/gemini), com Execution Contract + scanner/AgentShield + drift guard.
+
+- **`agent-packs/gstack-aidd/`** (novo pack real): `PACK.md`/`CATALOG.md`/`CHANGELOG.md` +
+  skill `guided-delivery` com `SKILL.md` (roteador) e actions `01-plan`/`02-execute`/
+  `03-verify`. **Nenhuma action promete gate por LLM** — o gate é sempre determinístico.
+- **`scripts/scripts/build_agents.js`**: `loadPacks`/`loadPackSkills`/`readPackSkill`/
+  `readPackActions`/`appendPacks` (todos cc≤6). Cada skill vira agente `<pack>-<skill>`
+  compilado em todos os adapters. A **fonte dos packs entra no hash** do manifest
+  (editar um pack ⇒ `agents build --check` acusa drift) e é **escaneada ANTES** de gerar
+  (builtin + AgentShield). Aditivo: sem packs, o build é idêntico ao anterior.
+- **`agents/generated/`** regenerado: +1 agente (`gstack-aidd-guided-delivery`), 22 no total.
+- Testes: `agent_packs` (3 — estrutura, actions, invariante "nenhum gate por LLM") +
+  `build_agents` estendido (compila pack nos adapters, Execution Contract, drift ao
+  editar a fonte do pack). QG CRIT/HIGH ciclomático **0**, lint+`tsc` verdes.
+
 ## [3.63.0] - 2026-07-05
 
 ### Trilha AI-Driven Dev (PRD 23 §6.4 · PRD21 §4.5 / Sprint C)

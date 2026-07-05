@@ -202,6 +202,73 @@ async function loadAgents(root) {
   return agents
 }
 
+function slugId(value) {
+  return String(value).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+}
+
+/** Concatena as actions (01-plan/02-execute/03-verify) de uma skill, em ordem. */
+async function readPackActions(skillDir) {
+  const dir = path.join(skillDir, "actions")
+  if (!existsSync(dir)) return ""
+  const parts = []
+  for (const f of await listMarkdownFiles(dir)) parts.push(`### Action: ${path.basename(f, ".md")}\n\n${(await readText(f)).trim()}`)
+  return parts.join("\n\n")
+}
+
+/** Uma skill de pack vira um "agente" compilável (mesmo shape de loadAgents). */
+async function readPackSkill(skillDir, packId, skillName) {
+  const skillMd = path.join(skillDir, "SKILL.md")
+  if (!existsSync(skillMd)) return null
+  const parsed = parseFrontmatter(await readText(skillMd))
+  const id = `${packId}-${slugId(skillName)}`
+  const actions = await readPackActions(skillDir)
+  return {
+    id,
+    file: skillMd,
+    meta: parsed.meta,
+    description: asString(parsed.meta.description, `Skill ${id} (pack ${packId})`),
+    body: `${parsed.body}\n\n${actions}`.trim(),
+    tools: normalizeList(parsed.meta.tools || "Read, Grep, Glob"),
+    skills: normalizeList(parsed.meta.skills),
+    model: asString(parsed.meta.model, "inherit"),
+  }
+}
+
+/** Skills de um pack (agent-packs/<pack>/skills/<skill>/SKILL.md). */
+async function loadPackSkills(skillsRoot, packId) {
+  if (!existsSync(skillsRoot)) return []
+  const out = []
+  for (const s of (await fs.readdir(skillsRoot, { withFileTypes: true })).filter((e) => e.isDirectory())) {
+    const skill = await readPackSkill(path.join(skillsRoot, s.name), packId, s.name)
+    if (skill) out.push(skill)
+  }
+  return out
+}
+
+/**
+ * Skill Packs (PRD21 §4.3, PRD23 §6.5): fonte ADICIONAL `agent-packs/`. EVOLUI o
+ * Agent Factory — as skills compilam para os MESMOS adapters em agents/generated/
+ * (Execution Contract + scanner). Aditivo: sem packs, o build é idêntico ao anterior.
+ */
+async function loadPacks(root) {
+  const packsRoot = path.join(root, "agent-packs")
+  if (!existsSync(packsRoot)) return []
+  const out = []
+  for (const p of (await fs.readdir(packsRoot, { withFileTypes: true })).filter((e) => e.isDirectory())) {
+    out.push(...await loadPackSkills(path.join(packsRoot, p.name, "skills"), slugId(p.name)))
+  }
+  return out
+}
+
+/** Anexa as skills dos packs à lista de agentes (sem colidir com ids existentes). */
+async function appendPacks(agents, existingIds, root) {
+  for (const skill of await loadPacks(root)) {
+    if (existingIds.has(skill.id)) continue
+    agents.push(skill)
+    existingIds.add(skill.id)
+  }
+}
+
 function knowledgeAgentToAgent(block) {
   const id = asString(block.meta.name || block.meta.id, block.id).toLowerCase().replace(/[^a-z0-9-]+/g, "-")
   return {
@@ -364,7 +431,7 @@ async function collectScanFiles(root, subdirs) {
 
 /** Sumário de segurança DETERMINÍSTICO sobre a FONTE (igual em build e --check). */
 async function builtinSecuritySummary(root) {
-  const files = await collectScanFiles(root, [["core"], ["knowledge"], ["agents", "agents"]])
+  const files = await collectScanFiles(root, [["core"], ["knowledge"], ["agents", "agents"], ["agent-packs"]])
   const g = evaluateScan(scanFiles(files), { strict: false })
   return { scanner: "agentshield+builtin", verdict: g.critical > 0 ? "fail" : "pass", critical: g.critical, high: g.high }
 }
@@ -382,6 +449,8 @@ async function generate(options) {
     agents.push(agent)
     existingIds.add(agent.id)
   }
+  // Skill Packs (agent-packs/) — fonte adicional compilada nos mesmos adapters.
+  await appendPacks(agents, existingIds, root)
 
   if (!options.dryRun && !options.check) {
     await fs.rm(generatedRoot, { recursive: true, force: true })
@@ -433,8 +502,10 @@ async function generate(options) {
   const coreFiles = await collectSourceFiles(root, path.join(root, "core"))
   const knowledgeFiles = await collectSourceFiles(root, path.join(root, "knowledge"))
   const agentFiles = await collectSourceFiles(root, path.join(root, "agents", "agents"))
+  // Fonte dos packs entra no hash de agentes: editar um pack ⇒ --check acusa drift.
+  const packFiles = await collectSourceFiles(root, path.join(root, "agent-packs"))
   const security = await builtinSecuritySummary(root)
-  const manifest = buildManifestV2({ compilerVersion, coreFiles, knowledgeFiles, agentFiles, agentsCount: agents.length, adapters: adapterFiles, security })
+  const manifest = buildManifestV2({ compilerVersion, coreFiles, knowledgeFiles, agentFiles: [...agentFiles, ...packFiles], agentsCount: agents.length, adapters: adapterFiles, security })
   // Manifest com tratamento especial no --check: `compilerVersion` é INFORMATIVO
   // (versão do package) e NÃO conta como drift — senão todo bump de versão quebraria
   // o --check sem mudar a fonte. Compara o resto por igualdade.
@@ -459,7 +530,7 @@ async function securityScanGenerated(root, generatedRoot, options) {
 
   // Escopo §9.1: fonte + gerado + skills. O scanner BUILTIN roda SEMPRE (build E
   // --check) — uma injeção commitada NÃO passa pelo gate do CI.
-  const files = await collectScanFiles(root, [["core"], ["knowledge"], ["agents", "agents"], ["skills", "skills"]])
+  const files = await collectScanFiles(root, [["core"], ["knowledge"], ["agents", "agents"], ["skills", "skills"], ["agent-packs"]])
   if (existsSync(generatedRoot)) {
     for (const file of await listMarkdownFiles(generatedRoot)) files.push({ rel: rel(root, file), content: await readText(file) })
   }

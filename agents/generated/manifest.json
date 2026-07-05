@@ -1,12 +1,12 @@
 {
   "schemaVersion": 2,
   "generatedBy": "gstack_vibehard agents build",
-  "compilerVersion": "3.12.0",
-  "agents": 21,
+  "compilerVersion": "3.64.0",
+  "agents": 22,
   "source": {
     "coreHash": "sha256:8c97845ab37a81d191671c8d90f4831442261de077dc01fd946d4948fc11aeb9",
     "knowledgeHash": "sha256:965344454b2b59df6d31ed62302b457ec41b8997ded2d49e4f1dada8eac63d44",
-    "agentsHash": "sha256:6ae6b271c37874dc653d486100c64e9b47fb0e3ec44c30cc978e09961587b1cf"
+    "agentsHash": "sha256:5ec2be47dc176b7a20fd7859074209f46008250b40005ae3669c60999bd50750"
   },
   "adapters": {
     "claude": {
@@ -33,7 +33,8 @@
         "agents/generated/claude/security-auditor/SKILL.md",
         "agents/generated/claude/seo-specialist/SKILL.md",
         "agents/generated/claude/test-engineer/SKILL.md",
-        "agents/generated/claude/deployer/SKILL.md"
+        "agents/generated/claude/deployer/SKILL.md",
+        "agents/generated/claude/gstack-aidd-guided-delivery/SKILL.md"
       ]
     },
     "codex": {
@@ -60,7 +61,8 @@
         "agents/generated/codex/security-auditor.toml",
         "agents/generated/codex/seo-specialist.toml",
         "agents/generated/codex/test-engineer.toml",
-        "agents/generated/codex/deployer.toml"
+        "agents/generated/codex/deployer.toml",
+        "agents/generated/codex/gstack-aidd-guided-delivery.toml"
       ]
     },
     "cursor": {
@@ -88,6 +90,7 @@
         "agents/generated/cursor/rules/seo-specialist.mdc",
         "agents/generated/cursor/rules/test-engineer.mdc",
         "agents/generated/cursor/rules/deployer.mdc",
+        "agents/generated/cursor/rules/gstack-aidd-guided-delivery.mdc",
         "agents/generated/cursor/AGENTS.md"
       ]
     },
