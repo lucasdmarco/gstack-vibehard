@@ -149,3 +149,10 @@ CLI-only deploy specialist for GitHub repository creation, Vercel production dep
 
 - Cursor rule: rules/deployer.mdc
 - Source: knowledge/deployer.md
+
+## gstack-aidd-guided-delivery
+
+Loop AI-driven do GStack — entender contexto, planejar, executar com gates e verificar de forma determinística.
+
+- Cursor rule: rules/gstack-aidd-guided-delivery.mdc
+- Source: agent-packs/gstack-aidd/skills/guided-delivery/SKILL.md
