@@ -1,5 +1,28 @@
 # Changelog - gstack-vibehard
 
+## [3.62.0] - 2026-07-05
+
+### Instruções project-scoped + firewall Knowledge/Execution (PRD 23 §6.3 · PRD22 §4.3 / Sprint B)
+
+Barreira metodológica AIDD declarada de forma **máquina-legível** e instruções
+project-scoped que exigem o registry antes de comparações externas. **Sem** editar config
+global — só `AGENTS.md`/`CLAUDE.md` do projeto.
+
+- **`src/meta/command-layers.js`** (novo): classificação `KNOWLEDGE` (read-only:
+  `context`/`consult`/`challenge`/`plan` + diagnósticos) × `EXECUTION` (gated:
+  `task`/`workflow`/`delegate`/`dev`/`verify`/`publish-guard` + mutadores) × `NEUTRAL`
+  (`help`). Conjuntos **disjuntos**; `layerOf`/`isReadOnly` como fonte única. **Não é gate
+  em runtime** — é classificação para docs/testes/revisão.
+- **`AGENTS.md` + `CLAUDE.md`**: bloco "Research registry" (ler
+  `repository-registry.json` antes de comparar; batch AIDD obrigatório p/ metodologia/
+  skills/onboarding/marketplace/cross-harness; `archived_reference` = histórico; nunca
+  vira dependência runtime) + bloco "Knowledge vs Execution".
+- **`.docs/ADRS/adr-knowledge-execution-firewall.md`** (local): formaliza a invariante.
+- Testes: `knowledge_execution_firewall` (3 — inclui guard de que **todo** comando do
+  `DISPATCH` está classificado) + `comparison_gate` (3 — docs marcados
+  `gstack-comparison-doc` devem citar o registry; instruções project-scoped presentes).
+- QG CRIT/HIGH ciclomático **0**, lint+`tsc` verdes.
+
 ## [3.61.0] - 2026-07-05
 
 ### Registry de pesquisa AIDD (PRD 23 §6.2 · PRD21 §4.1 / Sprint A da camada AIDD)
