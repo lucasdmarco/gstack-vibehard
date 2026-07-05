@@ -1,5 +1,25 @@
 # Changelog - gstack-vibehard
 
+## [3.61.0] - 2026-07-05
+
+### Registry de pesquisa AIDD (PRD 23 §6.2 · PRD21 §4.1 / Sprint A da camada AIDD)
+
+Fonte única versionada dos repositórios de referência comparados pelo GStack. Abre a
+camada de metodologia AIDD (PRD21/22 consolidados no PRD23) **sem** instalar nada:
+referência metodológica **nunca** vira dependência runtime.
+
+- **`.docs/RESEARCH/repository-registry.json`** (novo): `schemaVersion: 1`,
+  `batch-6-aidd-methodology` obrigatório para `cross-harness`/`skills`/`onboarding`/
+  `methodology`/`market-comparison`, com os 6 repos AIDD — lgsreal `learning_track`,
+  framework `plugin_marketplace_and_sdlc`, manifest `product_manifesto`
+  (`active_reference`); prompts/rules/community (`archived_reference`).
+- **`.docs/RESEARCH/comparison-template.md`** (novo): template obrigatório para docs de
+  comparação (marcador `gstack-comparison-doc: v1`) — contexto, batches obrigatórios
+  (inclui AIDD), tabela adotar/adaptar/rejeitar, invariantes, "nunca vira dependência
+  runtime". Ambos entram no Context DB via o indexer `.docs/RESEARCH`→`research` (24.4).
+- Testes `repository_registry` (3) + `research_comparison_docs` (3). QG CRIT/HIGH
+  ciclomático **0**, lint+`tsc` verdes.
+
 ## [3.60.0] - 2026-07-04
 
 ### Headroom Routing seguro e opt-in (PRD 24 Sprint 24.7) — fecha a trilha PRD24
