@@ -5,6 +5,7 @@ import { installTool, uninstallTool } from "../printing-press/install.js"
 import { enableMcp, disableMcp, listMcp } from "../printing-press/mcp.js"
 import { doctorAll } from "../printing-press/doctor.js"
 import { buildMcpInventory, renderInventoryHuman } from "../mcp/inventory.js"
+import { registerRuntimeMcp, unregisterRuntimeMcp, readRuntimeMcp } from "../mcp/scope.js"
 import { buildRufloReport } from "../harness/ruflo.js"
 import { buildToolCatalog, annotateCatalogEntry, LOCAL_CATALOG } from "../tools/catalog.js"
 import { recordToolProvenance } from "../tools/provenance.js"
@@ -244,17 +245,41 @@ function mcpDisable(cwd, tool) {
     writeRegistry(cwd, reg)
   }
 }
+// ── MCP runtime-injected project-scoped (PRD24 24.5) ─────────────────────────
+function mcpRuntimeAction(sub, name, args, cwd) {
+  if (sub === "register") {
+    return registerRuntimeMcp({ cwd, name, allowDestructive: args.includes("--allow-destructive"), write: !args.includes("--dry-run") })
+  }
+  if (sub === "unregister") return unregisterRuntimeMcp({ cwd, name })
+  return readRuntimeMcp({ cwd }) // list
+}
+function mcpRuntime({ args, cwd }) {
+  const sub = args[2]
+  const name = args[3]
+  const result = mcpRuntimeAction(sub, name, args, cwd)
+  if (args.includes("--json")) { emitTools(result); return result }
+  section(`tools mcp runtime ${sub || "list"}`)
+  if (result.refused) return warn(`  recusado: ${result.reason}`)
+  if (result.registered) return success(`  ${result.note}`)
+  if (result.unregistered) return success(`  runtime MCP '${result.name}' removido do run context.`)
+  if (result.reason) return info(`  ${result.reason}`)
+  const names = (result.servers || []).map((s) => s.name)
+  info(names.length ? `  runtime-injected: ${names.join(", ")}` : "  (nenhum MCP runtime-injected neste projeto)")
+  return result
+}
+
 const mcpBanner = (action, tool) => `tools mcp ${action || ""} ${tool || ""}`
 function handleMcp(ctx) {
   const { args, opts, cwd } = ctx
   const action = args[1]
   const tool = args[2]
   if (action === "inventory") return mcpInventory(ctx)
+  if (action === "runtime") return mcpRuntime(ctx)
   section(mcpBanner(action, tool))
   if (action === "list") return mcpList(cwd)
   if (action === "enable") return mcpEnable(cwd, tool, opts)
   if (action === "disable") return mcpDisable(cwd, tool)
-  info("Uso: tools mcp enable|disable|list <tool> · tools mcp inventory [--json] [--fragmented]")
+  info("Uso: tools mcp enable|disable|list <tool> · tools mcp inventory [--json] · tools mcp runtime register|unregister|list [name] [--allow-destructive]")
 }
 
 function handleEnablePP({ cwd }) {

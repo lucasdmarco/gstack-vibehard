@@ -4,6 +4,7 @@ import { join } from "path"
 import { execFileSync } from "child_process"
 import { diagnoseOpenCode } from "../installer/opencode-jsonc.js"
 import { inspectOpenCodeConfig } from "./opencode-config.js"
+import { readRuntimeMcp } from "../mcp/scope.js"
 
 /**
  * OpenCode Doctor v2 (PRD24 Sprint 24.1) — inspirado no doctor do oh-my-openagent,
@@ -65,6 +66,18 @@ function residueCategory(diag) {
 // models: sem lista não-interativa segura no OpenCode → honesto "unknown".
 const MODELS_CATEGORY = Object.freeze({ status: "unknown", reason: "no safe non-interactive OpenCode model list available" })
 
+// ── categoria: mcp (runtime-injected vs global ausente) — PRD24 24.5 ─────────
+// Diferencia "MCP global ausente" de "MCP runtime-injected" (do run context do
+// GStack, que NÃO aparece em `opencode mcp list`). Read-only; nunca toca ~/.mcp.json.
+function mcpCategory(cwd) {
+  const runtime = readRuntimeMcp({ cwd })
+  const injected = runtime.servers.map((s) => s.name)
+  const note = injected.length > 0
+    ? "MCP runtime-injected presente no run context — NÃO aparece em `opencode mcp list` (é project-scoped, não global)."
+    : "Nenhum MCP runtime-injected. Ausência em `opencode mcp list` significa MCP global ausente, não runtime-injected."
+  return { status: "ok", runtimeInjected: injected, globalAbsentIsDistinct: true, note }
+}
+
 // ── recommendedActions: derivadas da autoridade/estado (nunca automáticas) ───
 function recommendedActions(diag) {
   const actions = []
@@ -94,6 +107,7 @@ export function buildOpenCodeDoctorV2(opts = {}) {
   const pluginDir = opts.pluginDir || join(home, ".config", "opencode", "plugins")
   const pluginNames = opts.pluginNames || MANAGED_PLUGINS
   const strict = opts.strict === true
+  const cwd = opts.cwd || process.cwd()
   const diag = diagnoseOpenCode(home)
   const plugins = pluginsCategory(pluginDir, pluginNames)
   const categories = {
@@ -102,6 +116,7 @@ export function buildOpenCodeDoctorV2(opts = {}) {
     plugins,
     skills: { status: "ok", dir: join(home, ".config", "opencode", "skills") },
     models: MODELS_CATEGORY,
+    mcp: mcpCategory(cwd),
     residue: residueCategory(diag),
   }
   const exitCode = aggregateExit(categories)

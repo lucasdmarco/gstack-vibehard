@@ -1,5 +1,28 @@
 # Changelog - gstack-vibehard
 
+## [3.65.0] - 2026-07-05
+
+### MCP project-scoped / runtime-injected (PRD 24 Sprint 24.5)
+
+Adapta "MCP sob demanda" do oh-my-openagent **sem MCP global**: um MCP/tool
+project-scoped é registrado SÓ no run context do GStack (`.gstack/mcp/runtime.json`) —
+**nunca** em `~/.mcp.json` nem config global. readiness/doctor então distinguem
+`runtime_injected` × `project_local` × `global`.
+
+- **`src/mcp/scope.js`** (novo): `classifyScope` (pela fonte, sem tocar disco),
+  `isDestructive` (**deny-default** — server destrutivo exige `--allow-destructive`),
+  `registerRuntimeMcp`/`unregisterRuntimeMcp` (escrevem SÓ dentro do projeto, reversível),
+  `readRuntimeMcp` (reader do inventário), `summarizeScopes`.
+- **`src/tools/readiness.js`**: bloco `mcp.byScope` {runtime_injected, project_local,
+  global} + `hasRuntimeInjected`, incluindo o run context como fonte (injetável via
+  `mcpInventory`). Nunca lê/escreve config global.
+- **`src/harness/opencode-doctor.js`**: categoria `mcp` que **diferencia** "MCP global
+  ausente" de "MCP runtime-injected" e nota que runtime-injected **não aparece em
+  `opencode mcp list`** (read-only; nunca toca `~/.mcp.json`).
+- **`tools mcp runtime register|unregister|list [name] [--allow-destructive] [--json]`**.
+- Testes `mcp_scope` (5) + `mcp_scope_integration` (2, readiness+doctor). QG CRIT/HIGH
+  ciclomático **0**, lint+`tsc` verdes.
+
 ## [3.64.0] - 2026-07-05
 
 ### Skill Packs — evolui o Agent Factory (PRD 23 §6.5 · PRD21 §4.3 / Sprint D) — fecha a camada AIDD
