@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs"
-import { join } from "path"
+import { join, resolve as resolvePath } from "path"
 import { ppList, ppSearch, PrintingPressError } from "../printing-press/cli.js"
 import { installTool, uninstallTool } from "../printing-press/install.js"
 import { enableMcp, disableMcp, listMcp } from "../printing-press/mcp.js"
@@ -13,6 +13,7 @@ import { buildReadiness } from "../tools/readiness.js"
 import { runCleanMachine } from "../installer/clean-machine.js"
 import { buildToolRefresh } from "../tools/refresh.js"
 import { enableRouting, disableRouting } from "../tools/headroom-route.js"
+import { makeAnchor, validateAnchor } from "../tools/edit-guard.js"
 import { agentReachCommand } from "./agent-reach.js"
 import { confirm, success, warn, error, info, section } from "../cli/index.js"
 
@@ -462,11 +463,45 @@ function handleHeadroom({ args, cwd, opts }) {
   return headroomDoctorCmd(args, cwd, opts)
 }
 
+// ── Hash-Anchored Edit Guard (PRD24 24.6) ────────────────────────────────────
+function readFileForGuard(cwd, file) {
+  const full = resolvePath(cwd, file)
+  if (!existsSync(full)) return null
+  return readFileSync(full, "utf-8")
+}
+function editGuardAnchor(cwd, args) {
+  const content = readFileForGuard(cwd, args[2])
+  if (content == null) return { error: `arquivo não encontrado: ${args[2]}` }
+  return makeAnchor(content, Number(args[3]), Number(args[4]))
+}
+function editGuardCheck(cwd, args) {
+  const content = readFileForGuard(cwd, args[2])
+  if (content == null) return { error: `arquivo não encontrado: ${args[2]}` }
+  const anchor = { lineStart: Number(args[3]), lineEnd: Number(args[4]), hash: String(args[5] || "") }
+  return validateAnchor(content, anchor)
+}
+function renderEditGuard(sub, r) {
+  if (r.error) return error(`  ${r.error}`)
+  if (sub === "anchor") return success(`  âncora L${r.lineStart}-${r.lineEnd} hash=${r.hash}`)
+  if (r.ok) return success("  âncora válida — trecho inalterado, seguro editar.")
+  warn(`  STALE: ${r.reason}`)
+}
+function handleEditGuard({ args, cwd }) {
+  const sub = args[1]
+  const r = sub === "anchor" ? editGuardAnchor(cwd, args) : editGuardCheck(cwd, args)
+  if (args.includes("--json")) { emitTools(r); if (r.stale) process.exitCode = 1; return r }
+  section(`tools edit-guard ${sub || "check"}`)
+  renderEditGuard(sub, r)
+  if (r.stale) process.exitCode = 1
+  return r
+}
+
 const TOOLS_HANDLERS = {
   suggested: handleSuggested,
   readiness: handleReadiness,
   refresh: handleRefresh,
   headroom: handleHeadroom,
+  "edit-guard": handleEditGuard,
   "clean-machine": handleCleanMachine,
   catalog: handleCatalog,
   list: handleListSearch,

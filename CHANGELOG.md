@@ -1,5 +1,25 @@
 # Changelog - gstack-vibehard
 
+## [3.66.0] - 2026-07-05
+
+### Hash-Anchored Edit Guard (PRD 24 Sprint 24.6)
+
+Reduz erro de edição *stale-line* (inspirado no hashline do oh-my-openagent): ao **ler**
+um arquivo para editar, gera um hash curto do trecho (âncora); **antes** de aplicar o
+patch, revalida que o trecho ainda bate. Se stale, **aborta de forma recuperável** (peça
+nova leitura) e registra no provenance.
+
+- **`src/tools/edit-guard.js`** (novo, PURO/injetável): `anchorHash` (12 hex, estável a
+  CRLF), `excerpt` (linhas 1-indexed inclusivo), `makeAnchor`, `validateAnchor`
+  (`{ok, stale, reason, expected, actual}`), `guardedEdit` (só aplica se bate; se stale
+  não lança e sinaliza reler) + `provenanceRecorder` (opt-in, best-effort, grava recibo
+  via `recordAction`).
+- **`tools edit-guard anchor <file> <start> <end>` / `check <file> <start> <end> <hash>`**
+  (`--json`); `check` sai com **exitCode 1** quando o trecho está stale.
+- Testes `edit_guard` (6): hash determinístico/CRLF, excerpt, validate ok×stale,
+  guardedEdit aplica×aborta, provenance gravado, CLI anchor→check com exit 1 em stale.
+  QG CRIT/HIGH ciclomático **0**, lint+`tsc` verdes.
+
 ## [3.65.0] - 2026-07-05
 
 ### MCP project-scoped / runtime-injected (PRD 24 Sprint 24.5)
