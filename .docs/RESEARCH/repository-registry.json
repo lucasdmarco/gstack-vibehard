@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Fonte unica versionada dos repositorios de referencia comparados pelo GStack. Consultar ANTES de qualquer comparacao com projetos externos. Referencia metodologica NUNCA vira dependencia runtime do GStack.",
+  "usage": "Antes de comparar o GStack com um repo externo, leia este arquivo. Se o tema envolver metodologia, skills, onboarding, marketplace, cross-harness ou AI-driven dev, o batch-6-aidd-methodology e obrigatorio na comparacao. Documentos de comparacao devem usar .docs/RESEARCH/comparison-template.md e citar este registry.",
+  "statusLegend": {
+    "active_reference": "Referencia viva; consultar para comparacoes e decisoes de metodologia/onboarding.",
+    "archived_reference": "Referencia historica; ler apenas como contexto de origem, nao como fonte atual."
+  },
+  "mandatoryBatches": [
+    {
+      "id": "batch-6-aidd-methodology",
+      "label": "AI-Driven Development Methodology & Plugin Marketplaces",
+      "mandatoryFor": ["cross-harness", "skills", "onboarding", "methodology", "market-comparison"],
+      "repos": [
+        {
+          "url": "https://github.com/lgsreal/ai-driven-dev",
+          "status": "active_reference",
+          "role": "learning_track"
+        },
+        {
+          "url": "https://github.com/ai-driven-dev/framework",
+          "status": "active_reference",
+          "role": "plugin_marketplace_and_sdlc"
+        },
+        {
+          "url": "https://github.com/ai-driven-dev/manifest",
+          "status": "active_reference",
+          "role": "product_manifesto"
+        },
+        {
+          "url": "https://github.com/ai-driven-dev/prompts",
+          "status": "archived_reference",
+          "role": "prompt_template_history"
+        },
+        {
+          "url": "https://github.com/ai-driven-dev/rules",
+          "status": "archived_reference",
+          "role": "short_rules_history"
+        },
+        {
+          "url": "https://github.com/ai-driven-dev/ai-driven-dev-community",
+          "status": "archived_reference",
+          "role": "community_catalog_history"
+        }
+      ]
+    }
+  ]
+}
