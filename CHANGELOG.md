@@ -1,5 +1,24 @@
 # Changelog - gstack-vibehard
 
+## [3.63.0] - 2026-07-05
+
+### Trilha AI-Driven Dev (PRD 23 §6.4 · PRD21 §4.5 / Sprint C)
+
+Trilha de onboarding com **5 aulas** que ensinam AI-driven dev usando **comandos reais**
+do GStack. Inspirada em `lgsreal/ai-driven-dev` (referência metodológica, **nunca**
+dependência runtime). **Ler a trilha não instala nada.**
+
+- **`.docs/TRAILS/ai-driven-dev/01..05.md`** (novos): nova stack · IDEs agentic/harnesses ·
+  AI no pipeline/DevSecOps · modernização/refactoring · GStack na prática. Cada aula tem
+  as 7 seções do PRD21 §4.5 (objetivo, comandos reais, erros comuns, checklist, exercício,
+  validar com `verify`, rollback). Aula 05 traz o mapa **AIDD→GStack** (PRD21 §4.4).
+- **README.md + `docs/guides/quickstart.md`**: apontam para a trilha (onboarding).
+- **`src/context-docs/py/context_db.py`**: `DOC_DIRS` ganhou `.docs/TRAILS`→`trail`, então
+  as aulas entram no Context DB (indexadas via `rglob`; 5 aulas buscáveis por FTS).
+- Teste `trail_docs` (3): 5 aulas × 7 seções; **cruza os comandos citados com
+  `command-layers.js`** (falha se citar comando inexistente); mapa AIDD na aula 05.
+- QG CRIT/HIGH ciclomático **0**, lint+`tsc` verdes.
+
 ## [3.62.0] - 2026-07-05
 
 ### Instruções project-scoped + firewall Knowledge/Execution (PRD 23 §6.3 · PRD22 §4.3 / Sprint B)
