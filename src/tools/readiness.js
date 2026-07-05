@@ -4,6 +4,15 @@ import { homedir } from "os"
 import { fileURLToPath } from "url"
 import { execFileSync } from "child_process"
 import { stripBom } from "../util/json.js"
+import { buildMcpInventory } from "../mcp/inventory.js"
+import { readRuntimeMcp, summarizeScopes } from "../mcp/scope.js"
+import { readClaudeMcp } from "../mcp/readers/claude.js"
+import { readCodexMcp } from "../mcp/readers/codex.js"
+import { readOpenCodeMcp } from "../mcp/readers/opencode.js"
+import { readProjectMcp } from "../mcp/readers/project.js"
+
+// Readers do inventário + o run context do GStack (runtime-injected).
+const mcpReaders = () => [readClaudeMcp, readCodexMcp, readOpenCodeMcp, readProjectMcp, readRuntimeMcp]
 
 const INDEXER = join(dirname(fileURLToPath(import.meta.url)), "..", "context-docs", "py", "context_db.py")
 
@@ -238,6 +247,19 @@ function probeContext(cwd, runFull, probe) {
   }
 }
 
+// MCP por ESCOPO (PRD24 24.5): distingue runtime_injected × project_local × global.
+// Inclui o run context do GStack como fonte (nunca lê/escreve config global).
+function buildMcpScope(cwd, home, inventoryFn) {
+  const inv = (inventoryFn || buildMcpInventory)({ cwd, home, readers: mcpReaders() })
+  const scopes = summarizeScopes(inv.servers, { cwd })
+  return {
+    byScope: scopes.byScope,
+    total: scopes.total,
+    hasRuntimeInjected: scopes.hasRuntimeInjected,
+    note: "runtime_injected é do run context (.gstack/mcp/runtime.json) e NÃO aparece em `opencode mcp list`.",
+  }
+}
+
 const harnessInfo = (present, file) => ({ present, instructionFile: file, enforcement: "instructional" })
 function harnessDiscovery(cwd, home) {
   return {
@@ -279,6 +301,7 @@ export function buildReadiness(opts = {}) {
     statuses: STATUS_DESCRIPTIONS,
     env: readEnv(probe),
     tools: buildTools(cwd, probe, runFull, head, opts.fallowAudit),
+    mcp: buildMcpScope(cwd, home, opts.mcpInventory),
     harnessDiscovery: harnessDiscovery(cwd, home),
   }
 }

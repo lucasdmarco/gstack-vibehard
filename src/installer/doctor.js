@@ -171,6 +171,7 @@ function renderOpencodeDiagV2(rep) {
   if (cfg.sensitiveKeys.length) info(`  chaves sensíveis no jsonc (só nomes): ${cfg.sensitiveKeys.join(", ")}`)
   for (const a of rep.recommendedActions) info(`  ação: ${a.id}${a.requiresFlag ? ` (use ${a.requiresFlag})` : " (não automática)"}`)
   info(`  enforcement: ${rep.enforcement} · estratégia: ${rep.strategy}`)
+  if (rep.categories.mcp) info(`  mcp: ${rep.categories.mcp.note}`)
 }
 /** `doctor --opencode [--json] [--strict]` (PRD24 24.1): diagnóstico READ-ONLY v2. */
 function opencodeDiagRoute(json, strict) {
