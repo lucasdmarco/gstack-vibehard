@@ -108,11 +108,21 @@ test("dream audit --json: JSON puro com summary", async () => {
   assert.ok(out.summary && Array.isArray(out.claims))
 })
 
-test("dream improve: honesto (not_implemented), não finge executar", async () => {
+// PRD25 25.4: `improve` saiu de not_implemented — agora é fluxo isolado real.
+// (O teste completo vive em tests/dream_improve.test.js; aqui só o contrato do audit.)
+test("audit: auto-dream vira REAL com o runner de improve shipado", async () => {
+  const { audit } = await imp(audMod)
+  const r = audit({ root: repoRoot })
+  const ad = r.claims.find((c) => c.id === "auto-dream")
+  assert.equal(ad.status, "REAL", "src/dream/runner.js + subcomando improve ⇒ REAL")
+  assert.deepEqual(ad.missing, [])
+})
+
+test("dream inspect segue honesto (not_implemented), não finge executar", async () => {
   const { dreamCommand } = await imp(cmdMod)
   let buf = ""
   const orig = process.stdout.write.bind(process.stdout)
   process.stdout.write = (s) => { buf += String(s); return true }
-  try { await dreamCommand(["improve", "--json"], {}) } finally { process.stdout.write = orig }
+  try { await dreamCommand(["inspect", "--json"], {}) } finally { process.stdout.write = orig }
   assert.equal(JSON.parse(buf.trim()).error, "not_implemented")
 })

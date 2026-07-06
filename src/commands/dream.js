@@ -1,6 +1,7 @@
 import { audit } from "../dream/auditor.js"
 import { HARNESS_CAPABILITIES } from "../dream/capabilities.js"
 import { createProposal, promoteProposal, rejectProposal, listProposals, learningSummary } from "../dream/learning.js"
+import { dreamImprove } from "../dream/runner.js"
 import { success, warn, error, info, section } from "../cli/index.js"
 
 /**
@@ -81,11 +82,25 @@ function proposalsCmd(ctx) {
 }
 
 function notImplementedCmd(ctx) {
-  const payload = { error: "not_implemented", subcommand: ctx.sub, note: "improve isolado em worktree é a próxima fatia; learn/promote/reject já existem" }
+  const payload = { error: "not_implemented", subcommand: ctx.sub, note: "learn/promote/reject/improve já existem; este subcomando ainda é roadmap" }
   return emit(ctx.json, payload, () => {
     section(`dream ${ctx.sub}`)
-    warn("Ainda não implementado (honesto). Já existem: audit, learn, propose-skill, promote --reviewed, reject, proposals, status.")
+    warn("Ainda não implementado (honesto). Já existem: audit, learn, propose-skill, promote --reviewed, reject, proposals, improve, status.")
   })
+}
+
+// `dream improve` (PRD25 25.4): fluxo ISOLADO — worktree, proposta revisável,
+// verify como gate, NUNCA auto-merge. --dry-run gera plano sem escrever nada.
+function renderImprove(r) {
+  section("dream improve — isolado, revisável, sem auto-merge")
+  if (r.mode === "dry-run") { info(`  Plano (${r.plan.items.length} item(ns)) — nada foi escrito.`); r.plan.items.slice(0, 8).forEach((i) => info(`    • [${i.kind}] ${i.action}`)); return }
+  if (r.mode === "proposal") { success(`  Proposta gravada: ${r.file}`); warn(`  ${r.note}`); return }
+  success(`  Executado em worktree (branch ${r.branch}) — verify: ${r.verify.status}`)
+  warn(`  ${r.note}`)
+}
+function improveCmd(ctx) {
+  const r = dreamImprove({ cwd: ctx.cwd, dryRun: ctx.args.includes("--dry-run"), deps: ctx.improveDeps || {} })
+  return emit(ctx.json, r, () => renderImprove(r))
 }
 
 function trustLabel(level) {
@@ -97,7 +112,7 @@ function statusCmd(ctx) {
   const payload = { audit: r.summary, harnesses: HARNESS_CAPABILITIES, learning: learningSummary(ctx.cwd) }
   return emit(ctx.json, payload, () => {
     section("dream status")
-    info("  Modo: AUDIT + LEARNING (proposta→review→staging) · improve isolado em worktree ainda no roadmap")
+    info("  Modo: AUDIT + LEARNING + IMPROVE (proposta→review→staging · improve isolado em worktree, sem auto-merge)")
     info(`  Audit: ${Object.entries(r.summary).map(([k, v]) => `${k}:${v}`).join(" · ")}`)
     info(`  Learning: ${Object.entries(payload.learning).map(([k, v]) => `${k}:${v}`).join(" · ")}`)
     info("  Confiança por harness (matriz de capacidades):")
@@ -115,7 +130,7 @@ const SUBCOMMANDS = {
   reject: rejectCmd,
   proposals: proposalsCmd,
   plan: notImplementedCmd,
-  improve: notImplementedCmd,
+  improve: improveCmd,
   inspect: notImplementedCmd,
   accept: notImplementedCmd,
   status: statusCmd,
@@ -123,6 +138,6 @@ const SUBCOMMANDS = {
 
 export async function dreamCommand(args = [], opts = {}) {
   const sub = args.find((a) => !a.startsWith("--")) || "status"
-  const ctx = { sub, args, json: args.includes("--json"), root: opts.root, cwd: opts.cwd || process.cwd() }
+  const ctx = { sub, args, json: args.includes("--json"), root: opts.root, cwd: opts.cwd || process.cwd(), improveDeps: opts.improveDeps }
   return (SUBCOMMANDS[sub] || statusCmd)(ctx)
 }
