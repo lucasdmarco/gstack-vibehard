@@ -51,12 +51,19 @@ const npmBin = () => (process.platform === "win32" ? "npm.cmd" : "npm")
 const npxBin = () => (process.platform === "win32" ? "npx.cmd" : "npx")
 
 // Probe padrão: roda o comando, captura stdout/stderr resumidos e NUNCA lança.
-// Node ≥20 recusa spawnar `.cmd`/`.bat` sem shell (CVE-2024-27980) — args são
-// literais fixos (npx/npm), então shell:true aqui é seguro e não injeta input.
+// Node ≥20 recusa spawnar `.cmd`/`.bat` sem shell (CVE-2024-27980). E shell:true
+// COM array de args emite DEP0190 (concatenação sem escape) — então, quando o
+// shell é necessário, montamos a string EXPLÍCITA com quoting. Args são literais
+// fixos do produto (nunca input do usuário) — sem superfície de injeção.
+const quoteArg = (a) => (/[\s"]/.test(String(a)) ? `"${String(a).replace(/"/g, '""')}"` : String(a))
+const shellCommand = (file, args) => [quoteArg(file), ...(args || []).map(quoteArg)].join(" ")
 function defaultProbe(file, args, opts = {}) {
   const shell = /\.(cmd|bat)$/i.test(file)
+  const common = { stdio: ["ignore", "pipe", "pipe"], timeout: 15000, encoding: "utf-8", ...opts }
   try {
-    const stdout = execFileSync(file, args, { stdio: ["ignore", "pipe", "pipe"], timeout: 15000, encoding: "utf-8", shell, ...opts })
+    const stdout = shell
+      ? execFileSync(shellCommand(file, args), { ...common, shell: true })
+      : execFileSync(file, args, common)
     return { ok: true, code: 0, stdout: trunc(stdout), stderr: "" }
   } catch (e) {
     return { ok: false, code: typeof e.status === "number" ? e.status : null, stdout: trunc(e.stdout), stderr: trunc(e.stderr || e.message) }
