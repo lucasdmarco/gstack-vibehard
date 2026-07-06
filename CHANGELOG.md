@@ -1,5 +1,24 @@
 # Changelog - gstack-vibehard
 
+## [3.79.0] - 2026-07-06
+
+### Fechamento do produto para o usuário final (PRD 26 Sprint 26.C)
+
+Docs públicas alinhadas ao caminho de usuário: **start → dev → proof → uninstall**.
+
+- **`docs/guides/quickstart.md`**: `proof --json` como passo 3 ("está pronto?" em um
+  comando); `context scout` como caminho recomendado de economia de contexto; termos
+  novos no glossário inline — **routed × callable** e **enforced × advisory** (nunca
+  vendido como Zero-Trust).
+- **`README.md`**: passo 5 do começo-sem-medo é o `proof`; seção de verificação separa
+  o veredito do USUÁRIO (`gstack_vibehard proof`) da prova do DESENVOLVEDOR
+  (`npm run proof`).
+- **`docs/guides/capabilities.md`**: `proof` na camada real; `clean-machine` documenta
+  `mode: simulated_offline`.
+- Fecha o escopo ENTRA do PRD26 (26.A instalador + 26.B proof/readiness + 26.C docs);
+  o backlog consciente (26.2-auto, 26.3, 26.5, 26.6, 26.7, 26.9) fica registrado como
+  pós-fechamento. QG strict **0 blocking**, lint+typechecks verdes.
+
 ## [3.78.0] - 2026-07-06
 
 ### `gstack_vibehard proof` — o veredito único de produto (PRD 26 Sprint 26.B)

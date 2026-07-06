@@ -16,7 +16,15 @@ gstack_vibehard start
 gstack_vibehard consult "quero um SaaS com login e Stripe"   # recomendação read-only
 gstack_vibehard create meu-app                               # lite: escreve SÓ ./meu-app
 cd meu-app && gstack_vibehard dev                            # sobe o runtime (stop/logs/open)
+
+# 3) A pergunta que importa — "está pronto?" em UM comando:
+gstack_vibehard proof --json     # verify + dream audit + readiness + graphify + git
+                                 # ready:true = todos os gates determinísticos verdes
 ```
+
+**Economia de contexto (recomendado antes de mexer em código):** peça ao agente para
+rodar `gstack_vibehard context scout "<tema>" --json` — retorna arquivos/linhas
+relevantes (read-only, com estimativa de tokens evitados) em vez de abrir 40 arquivos.
 
 ## O que cada comando promete
 
@@ -28,6 +36,8 @@ cd meu-app && gstack_vibehard dev                            # sobe o runtime (s
 
 - **harness**: o agente/IDE de IA (Claude Code, Cursor, OpenCode, Codex...) — [matriz honesta](harness-matrix.md)
 - **QG (Quality Gate)**: auditoria determinística (Fallow) que decide "pronto" — LLM nunca aprova sozinho
+- **routed × callable**: `callable` = a ferramenta responde quando chamada; `routed` = o tráfego do harness passa por ela DE FATO (Headroom só "economiza" quando routed — e isso é opt-in)
+- **enforced × advisory/instrucional**: `enforced` = hook real bloqueia ANTES da ação; `advisory`/`instrucional` = orientação que o agente pode ignorar — nunca vendido como Zero-Trust
 - **manifest**: registro de toda escrita global — é o que torna o `uninstall` restaurativo
 - **worktree**: cópia isolada do repo onde agentes trabalham sem tocar seu branch
 - **MCP**: servidores de ferramentas dos harnesses — inventário: `tools mcp inventory`

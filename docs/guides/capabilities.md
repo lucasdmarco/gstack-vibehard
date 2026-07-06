@@ -25,7 +25,8 @@ níveis estão explicados em texto.
 - **Orquestração v2**: executor em worktree + verifier independente + reviewer LLM **advisory** — o LLM **nunca** aprova sozinho.
 - **Safe install + rollback**: tudo que o `install` escreve tem **backup + manifest**; `uninstall` restaura o que você tinha, byte-for-byte quando aplicável.
 - **Release gate observável**: `verify --profile release --json` com progresso por etapa, timeout por etapa e status distintos (`--dry-run` lista sem executar).
-- **Prova de máquina limpa**: `tools clean-machine --json` roda 12 cenários offline (OpenCode config-sacred byte-for-byte, Lite sem escrita global, Full com Safe Write, uninstall restaura, matriz de ferramentas).
+- **Prova de máquina limpa**: `tools clean-machine --json` roda 12 cenários offline (OpenCode config-sacred byte-for-byte, Lite sem escrita global, Full com Safe Write, uninstall restaura, matriz de ferramentas). O JSON declara `mode: "simulated_offline"` — o estado REAL da máquina é o `tools readiness`.
+- **Veredito único de release**: `proof [--profile release] --json` (`gstack.proof.v1`) — agrega verify + dream audit + readiness + graphify freshness + headroom claim + git tree; `ready:true` só com TODOS os gates determinísticos verdes (exit 0/1).
 
 ## Callable / manual (roda sob demanda; **não** roteia tráfego sozinho)
 
