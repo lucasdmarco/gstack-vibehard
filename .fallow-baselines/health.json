@@ -1,0 +1,1185 @@
+{
+  "finding_counts": {
+    "agents/skills/brainstorming/scripts/helper.js": {
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "agents/skills/brainstorming/scripts/server.cjs": {
+      "crap_high": {
+        "count": 3
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "agents/skills/writing-skills/render-graphs.js": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "kits/agentsantigravity/agentsantigravity/skills/brainstorming/scripts/helper.js": {
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "kits/agentsantigravity/agentsantigravity/skills/brainstorming/scripts/server.cjs": {
+      "crap_high": {
+        "count": 3
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "kits/agentsantigravity/agentsantigravity/skills/writing-skills/render-graphs.js": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "scripts/clean-pkg.mjs": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "scripts/lint.mjs": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "scripts/scripts/build_agents.js": {
+      "complexity_critical": {
+        "count": 2
+      },
+      "crap_critical": {
+        "count": 2
+      },
+      "crap_high": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 4
+      }
+    },
+    "scripts/sync-qg-version.mjs": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "scripts/test-e2e-lifecycle.mjs": {
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "skills/skills/superpowers/brainstorming/scripts/helper.js": {
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "skills/skills/superpowers/brainstorming/scripts/server.cjs": {
+      "crap_high": {
+        "count": 3
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "skills/skills/superpowers/writing-skills/render-graphs.js": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/agents/factory.js": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 2
+      }
+    },
+    "src/agents/scanner.js": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/cli/create.js": {
+      "crap_moderate": {
+        "count": 8
+      }
+    },
+    "src/cli/index.js": {
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/commands/activate.js": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/commands/agent-reach.js": {
+      "crap_moderate": {
+        "count": 7
+      }
+    },
+    "src/commands/agents.js": {
+      "crap_moderate": {
+        "count": 5
+      }
+    },
+    "src/commands/audit.js": {
+      "crap_moderate": {
+        "count": 5
+      }
+    },
+    "src/commands/challenge.js": {
+      "crap_moderate": {
+        "count": 4
+      }
+    },
+    "src/commands/consult.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/commands/context.js": {
+      "crap_moderate": {
+        "count": 11
+      }
+    },
+    "src/commands/delegate.js": {
+      "crap_moderate": {
+        "count": 6
+      }
+    },
+    "src/commands/init.js": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/commands/monitor.js": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/commands/orchestrate.js": {
+      "crap_moderate": {
+        "count": 7
+      }
+    },
+    "src/commands/plan.js": {
+      "crap_moderate": {
+        "count": 6
+      }
+    },
+    "src/commands/policy.js": {
+      "crap_moderate": {
+        "count": 3
+      }
+    },
+    "src/commands/proxy.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/commands/publish-guard.js": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/commands/qa.js": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/commands/runtime-supervisor.js": {
+      "crap_moderate": {
+        "count": 9
+      }
+    },
+    "src/commands/runtime.js": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/commands/secrets.js": {
+      "crap_moderate": {
+        "count": 4
+      }
+    },
+    "src/commands/sprint.js": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/commands/start.js": {
+      "crap_moderate": {
+        "count": 3
+      }
+    },
+    "src/commands/state.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/commands/task-run.js": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/commands/task.js": {
+      "crap_moderate": {
+        "count": 3
+      }
+    },
+    "src/commands/tools.js": {
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 15
+      }
+    },
+    "src/commands/update.js": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/commands/verify.js": {
+      "crap_moderate": {
+        "count": 7
+      }
+    },
+    "src/commands/workflow.js": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/commands/worktree.js": {
+      "crap_moderate": {
+        "count": 6
+      }
+    },
+    "src/context-docs/obsidian.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/context-docs/scout.js": {
+      "crap_moderate": {
+        "count": 7
+      }
+    },
+    "src/delegation/devin.js": {
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/delegation/opencode.js": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 2
+      }
+    },
+    "src/delegation/worktree.js": {
+      "crap_moderate": {
+        "count": 3
+      }
+    },
+    "src/dream/auditor.js": {
+      "crap_moderate": {
+        "count": 6
+      }
+    },
+    "src/dream/learning.js": {
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/harness/candidate-bridge.js": {
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/harness/candidates.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/harness/claude.js": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/harness/codex.js": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/harness/conformance.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/harness/cursor.js": {
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/harness/detector.js": {
+      "crap_moderate": {
+        "count": 3
+      }
+    },
+    "src/harness/devin.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/harness/events.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/harness/headroom.js": {
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/harness/hermes.js": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/harness/instructional.js": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/harness/opencode-config.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/harness/opencode-doctor.js": {
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/harness/opencode.js": {
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/installer/agent-distribution.js": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 2
+      }
+    },
+    "src/installer/check.js": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/installer/deps.js": {
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/installer/doctor.js": {
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 13
+      }
+    },
+    "src/installer/full-contract.js": {
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/installer/impact.js": {
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/installer/install.js": {
+      "crap_moderate": {
+        "count": 13
+      }
+    },
+    "src/installer/integrity.js": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/installer/manifest.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/installer/merge.js": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/installer/opencode-jsonc.js": {
+      "crap_moderate": {
+        "count": 4
+      }
+    },
+    "src/installer/package-manager.js": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/installer/repair-manifest.js": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/installer/restore.js": {
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/installer/safe-write.js": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/installer/supply-chain.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/installer/uninstall.js": {
+      "crap_moderate": {
+        "count": 5
+      }
+    },
+    "src/loop-budget/policy.js": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/mcp/inventory.js": {
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/mcp/readers/shared.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/mcp/scope.js": {
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/meta/orchestrator.js": {
+      "crap_moderate": {
+        "count": 6
+      }
+    },
+    "src/meta/reviewers.js": {
+      "crap_moderate": {
+        "count": 3
+      }
+    },
+    "src/model-policy/index.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/model-policy/schema.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/plugins/opencode/gstack-prompt.js": {
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/plugins/opencode/gstack-security.js": {
+      "crap_high": {
+        "count": 2
+      }
+    },
+    "src/plugins/opencode/gstack-session.js": {
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/policy/layers.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/policy/schema.js": {
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/printing-press/cli.js": {
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/printing-press/doctor.js": {
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/printing-press/install.js": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/printing-press/mcp.js": {
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/project-plan/changed-files.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/project-plan/detect-profile.js": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/project-plan/diff-hygiene.js": {
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/project-plan/evidence-loop.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/project-plan/executor.js": {
+      "crap_moderate": {
+        "count": 3
+      }
+    },
+    "src/project-plan/loop-classifier.js": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/project-plan/planner.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/project-plan/publish-guard.js": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/project-plan/qa-lenses.js": {
+      "crap_high": {
+        "count": 2
+      }
+    },
+    "src/project-plan/recipes.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/project-plan/run-loop.js": {
+      "crap_moderate": {
+        "count": 7
+      }
+    },
+    "src/project-plan/schema.js": {
+      "complexity_critical": {
+        "count": 2
+      },
+      "crap_critical": {
+        "count": 2
+      },
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "src/project-plan/stopping-rules.js": {
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/project-plan/task-loop.js": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/project-plan/task-planner.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/project-plan/verify-runner.js": {
+      "crap_moderate": {
+        "count": 14
+      }
+    },
+    "src/project-plan/wizard.js": {
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/runtime/manifest.js": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 3
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/runtime/ports.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/runtime/supervisor.js": {
+      "crap_moderate": {
+        "count": 6
+      }
+    },
+    "src/secrets/broker.js": {
+      "crap_moderate": {
+        "count": 5
+      }
+    },
+    "src/secrets/providers.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/secrets/schema.js": {
+      "crap_high": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/security/guard-status.js": {
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/security/redact-proxy.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/state/schema.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/tools/agent-reach/catalog.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/tools/catalog.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/tools/edit-guard.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/tools/headroom-route.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/tools/readiness.js": {
+      "crap_moderate": {
+        "count": 5
+      }
+    },
+    "src/tools/refresh.js": {
+      "crap_moderate": {
+        "count": 3
+      }
+    },
+    "src/tools/skill-scanner.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/util/exec-step.js": {
+      "crap_moderate": {
+        "count": 3
+      }
+    },
+    "src/vfa/attestation.js": {
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/vfa/challenge.js": {
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/vfa/pretool.js": {
+      "crap_moderate": {
+        "count": 3
+      }
+    },
+    "src/vfa/provenance.js": {
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "src/workflow-graph/journal.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/workflow-graph/runner.js": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "src/workflow-graph/schema.js": {
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "src/worktree/lifecycle.js": {
+      "crap_moderate": {
+        "count": 3
+      }
+    },
+    "templates/templates/fullstack-monorepo/apps/api-fastify/src/index.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "templates/templates/fullstack-monorepo/apps/api/src/middleware/validate.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "templates/templates/fullstack-monorepo/apps/web/src/components/patterns/heroes/hero-section.tsx": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "templates/templates/fullstack-monorepo/packages/db-turso/src/test-utils.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "templates/templates/fullstack-monorepo/packages/db/src/test-utils.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "tests/agent_packs.test.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "tests/b3_typecheck.test.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "tests/build_agents.test.js": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "tests/cli_firstrun.test.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "tests/comparison_gate.test.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "tests/e2e/dev_terminal.e2e.test.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "tests/e2e/safe-install.e2e.test.js": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "tests/harness_events.test.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "tests/harness_freebuff.test.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "tests/loop_patterns.test.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "tests/opencode_delegation.test.js": {
+      "crap_critical": {
+        "count": 2
+      }
+    },
+    "tests/opencode_doctor_categories.test.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "tests/opencode_worktree.test.js": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 2
+      },
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "tests/printing_press_doctor.test.js": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "tests/printing_press_install.test.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "tests/publish_guard.test.js": {
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "tests/publish_guard_command.test.js": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "tests/remote_policy.test.js": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "tests/runtime_e2e.test.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "tests/uninstall_unregister.test.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "tests/verification_profiles.test.js": {
+      "crap_moderate": {
+        "count": 1
+      }
+    }
+  },
+  "runtime_coverage_findings": [],
+  "target_keys": [
+    "src/project-plan/schema.js:untested risk",
+    "src/state/migrations.js:dead code",
+    "src/model-policy/schema.js:dead code",
+    "src/meta/command-layers.js:dead code",
+    "src/commands/runtime.js:complexity",
+    "src/commands/publish-guard.js:circular dependency",
+    "src/tools/readiness.js:high impact",
+    "src/commands/secrets.js:dead code",
+    "src/cli/index.js:circular dependency",
+    "src/installer/opencode-jsonc.js:high impact",
+    "src/project-plan/planner.js:high impact",
+    "src/installer/integrity.js:complexity",
+    "src/meta/orchestrator.js:dead code",
+    "src/project-plan/verify-runner.js:high impact",
+    "src/mcp/inventory.js:dead code",
+    "src/commands/agent-reach.js:dead code",
+    "src/context-docs/scout.js:dead code",
+    "src/commands/policy.js:untested risk",
+    "src/installer/supply-chain.js:dead code",
+    "src/delegation/opencode.js:high impact",
+    "src/harness/candidate-bridge.js:dead code",
+    "src/project-plan/run-loop.js:dead code",
+    "src/project-plan/changed-files.js:dead code",
+    "src/secrets/broker.js:untested risk",
+    "src/plugins/opencode/gstack-session.js:untested risk",
+    "src/policy/schema.js:high impact",
+    "src/vfa/attestation.js:dead code",
+    "src/installer/doctor.js:untested risk",
+    "src/runtime/manifest.js:high impact",
+    "src/harness/candidates.js:dead code",
+    "src/agents/factory.js:high impact",
+    "agents/skills/brainstorming/scripts/helper.js:untested risk",
+    "kits/agentsantigravity/agentsantigravity/skills/brainstorming/scripts/helper.js:untested risk",
+    "skills/skills/superpowers/brainstorming/scripts/helper.js:untested risk",
+    "src/mcp/scope.js:high impact",
+    "src/workflow-graph/schema.js:dead code",
+    "src/delegation/devin.js:untested risk",
+    "src/tools/skill-scanner.js:dead code",
+    "src/worktree/lifecycle.js:dead code",
+    "src/harness/codex.js:dead code",
+    "src/harness/ruflo.js:dead code",
+    "src/model-policy/index.js:dead code",
+    "src/loop-budget/policy.js:dead code",
+    "src/secrets/schema.js:untested risk",
+    "src/project-plan/journal.js:dead code",
+    "src/policy/compiler.js:dead code",
+    "src/util/exec-step.js:dead code",
+    "src/vfa/pretool.js:untested risk",
+    "src/tools/refresh.js:untested risk",
+    "src/commands/orchestrate.js:untested risk",
+    "src/secrets/providers.js:dead code",
+    "src/commands/context.js:untested risk",
+    "agents/skills/brainstorming/scripts/server.cjs:dead code",
+    "kits/agentsantigravity/agentsantigravity/skills/brainstorming/scripts/server.cjs:dead code",
+    "skills/skills/superpowers/brainstorming/scripts/server.cjs:dead code",
+    "src/installer/full-contract.js:untested risk",
+    "src/commands/plan.js:untested risk",
+    "src/commands/delegate.js:untested risk",
+    "src/runtime/supervisor.js:high impact",
+    "src/tools/edit-guard.js:dead code",
+    "src/installer/remote-policy.js:dead code",
+    "src/dream/learning.js:dead code",
+    "src/project-plan/qa-lenses.js:dead code",
+    "src/commands/challenge.js:untested risk",
+    "src/harness/devin.js:dead code",
+    "src/commands/verify.js:untested risk",
+    "src/commands/qa.js:circular dependency",
+    "src/security/guard-status.js:dead code",
+    "src/commands/start.js:untested risk",
+    "src/printing-press/install.js:dead code",
+    "agents/skills/systematic-debugging/condition-based-waiting-example.ts:dead code",
+    "kits/agentsantigravity/agentsantigravity/skills/systematic-debugging/condition-based-waiting-example.ts:dead code",
+    "skills/skills/superpowers/systematic-debugging/condition-based-waiting-example.ts:dead code",
+    "src/installer/check.js:high impact",
+    "src/project-plan/evidence-ledger.js:high impact",
+    "src/tools/catalog.js:dead code",
+    "src/cli/create.js:dead code",
+    "src/meta/reviewers.js:dead code",
+    "src/commands/worktree.js:untested risk",
+    "src/commands/task.js:untested risk",
+    "src/vfa/challenge.js:untested risk",
+    "src/commands/tools.js:untested risk",
+    "src/commands/consult.js:circular dependency",
+    "src/harness/claude.js:complexity",
+    "src/installer/merge.js:high impact",
+    "src/commands/dream.js:circular dependency",
+    "src/commands/workflow.js:complexity",
+    "src/installer/uninstall.js:untested risk",
+    "src/installer/install.js:untested risk",
+    "src/installer/impact.js:high impact",
+    "src/project-plan/task-loop.js:complexity",
+    "src/commands/runtime-supervisor.js:untested risk",
+    "src/vfa/provenance.js:high impact",
+    "src/project-plan/diff-hygiene.js:high impact",
+    "src/commands/sprint.js:circular dependency",
+    "src/commands/task-run.js:complexity",
+    "src/delegation/worktree.js:high impact",
+    "src/commands/proxy.js:circular dependency",
+    "src/dream/auditor.js:untested risk",
+    "src/commands/audit.js:untested risk",
+    "src/commands/update.js:untested risk",
+    "src/installer/restore.js:untested risk",
+    "src/commands/agents.js:untested risk",
+    "src/commands/a2a.js:circular dependency",
+    "src/harness/detector.js:high impact",
+    "src/workflow-graph/runner.js:complexity",
+    "src/installer/repair-manifest.js:complexity",
+    "tests/opencode_worktree.test.js:untested risk",
+    "src/project-plan/publish-guard.js:complexity",
+    "src/commands/activate.js:circular dependency",
+    "src/commands/monitor.js:complexity",
+    "tests/opencode_delegation.test.js:untested risk",
+    "src/commands/init.js:complexity"
+  ]
+}

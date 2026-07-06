@@ -1,0 +1,22 @@
+{
+  // Fallow config — release gate por REGRESSÃO (PRD24 pós-hardening).
+  //
+  // Contexto honesto: o verdict completo do Fallow falhava por débito majoritariamente
+  // ARQUITETURAL, não por dead-code deletável:
+  //  - ~90 "unused exports/files" são FALSOS-POSITIVOS do padrão de teste deste repo
+  //    (os testes carregam módulos por dynamic import `imp("path")`, que a análise
+  //    estática do Fallow não rastreia) — o código É usado, só não por import estático.
+  //  - 20 circular dependencies + ~290 complexity findings são débito legado.
+  //
+  // Solução sancionada pelo próprio Fallow: BASELINE do estado atual. O gate passa a
+  // FALHAR só em REGRESSÃO nova (dead-code/dupes/complexity introduzidos ALÉM da linha
+  // de base). NÃO é "zero findings" — é "sem débito NOVO". Regenerar as baselines com:
+  //   npx fallow dead-code --save-baseline .fallow-baselines/dead-code.json
+  //   npx fallow dupes     --save-baseline .fallow-baselines/dupes.json
+  //   npx fallow health    --save-baseline .fallow-baselines/health.json
+  "audit": {
+    "deadCodeBaseline": ".fallow-baselines/dead-code.json",
+    "dupesBaseline": ".fallow-baselines/dupes.json",
+    "healthBaseline": ".fallow-baselines/health.json"
+  }
+}
