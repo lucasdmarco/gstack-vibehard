@@ -254,18 +254,23 @@ function mcpRuntimeAction(sub, name, args, cwd) {
   if (sub === "unregister") return unregisterRuntimeMcp({ cwd, name })
   return readRuntimeMcp({ cwd }) // list
 }
-function mcpRuntime({ args, cwd }) {
-  const sub = args[2]
-  const name = args[3]
-  const result = mcpRuntimeAction(sub, name, args, cwd)
-  if (args.includes("--json")) { emitTools(result); return result }
-  section(`tools mcp runtime ${sub || "list"}`)
+function renderMcpRuntimeList(result) {
+  const names = (result.servers || []).map((s) => s.name)
+  info(names.length ? `  runtime-injected: ${names.join(", ")}` : "  (nenhum MCP runtime-injected neste projeto)")
+}
+function renderMcpRuntime(result) {
   if (result.refused) return warn(`  recusado: ${result.reason}`)
   if (result.registered) return success(`  ${result.note}`)
   if (result.unregistered) return success(`  runtime MCP '${result.name}' removido do run context.`)
   if (result.reason) return info(`  ${result.reason}`)
-  const names = (result.servers || []).map((s) => s.name)
-  info(names.length ? `  runtime-injected: ${names.join(", ")}` : "  (nenhum MCP runtime-injected neste projeto)")
+  renderMcpRuntimeList(result)
+}
+function mcpRuntime({ args, cwd }) {
+  const sub = args[2]
+  const result = mcpRuntimeAction(sub, args[3], args, cwd)
+  if (args.includes("--json")) { emitTools(result); return result }
+  section(`tools mcp runtime ${sub || "list"}`)
+  renderMcpRuntime(result)
   return result
 }
 

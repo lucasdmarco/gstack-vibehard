@@ -1,5 +1,18 @@
 # Changelog - gstack-vibehard
 
+## [3.72.1] - 2026-07-06
+
+### Gate final do PRD25: qg-l1/qg-l2 strict verdes (decomposição CRAP)
+
+O gate final (`verify --profile release`) bloqueou em `qg-l1`/`qg-l2` (modo `--strict`)
+por complexidade real trazida ao diff-scope: `mcpRuntime` (cc 9, HIGH) e
+`claimVfaProvenance` (CRAP 30 no limiar). **Causa corrigida, não mascarada**:
+
+- **`src/commands/tools.js`**: `mcpRuntime` decomposto em `renderMcpRuntime` +
+  `renderMcpRuntimeList` (cc≤6 cada; comportamento preservado — 7 testes mcp verdes).
+- **`src/dream/auditor.js`**: `hasVfaProvenance` extraído (CRAP < 30).
+- `qg --level 1 --strict` e `--level 2 --strict` → **exit 0, blocking 0**.
+
 ## [3.72.0] - 2026-07-06
 
 ### Cross-harness trust: claims públicos honestos (PRD 25 Sprint 25.5) — fecha o PRD25
