@@ -43,14 +43,20 @@ function claimAutoDream(has, read) {
     missing: hasImprove ? [] : ["dream improve isolado", "accept/reject", "harness adapters"],
   }
 }
-// 2. Output Guard Zero-Trust — só pós-resposta (Stop hook); sem intercept pré-render.
+// 2. Output Guard — pós-resposta (Stop hook) SEMPRE; pre-render existe como rota
+// OPT-IN real (proxy de redaction + base-URL custom) onde o harness permite (PRD25
+// 25.3). REAL exige capability E o proxy shipado; a nota impede vender Zero-Trust
+// universal (harness sem base-URL segue só auditoria pós-resposta).
 function claimOutputGuard(has) {
   const preOutput = Object.values(HARNESS_CAPABILITIES).some((c) => c.supportsPreOutputInterception)
+  const proxyShipped = has("src/security/redact-proxy.js") && has("src/security/guard-status.js")
+  const real = preOutput && proxyShipped
   return {
     id: "output-guard", claim: "Output Guard / Zero-Trust de saída",
-    status: preOutput ? "REAL" : "RISK", severity: "P1",
-    evidence: ["hooks/hooks/_output_guard.py", "hooks/hooks/stop.py"].filter(has),
-    missing: preOutput ? [] : ["redaction pré-render (Stop hook é auditoria posterior)"],
+    status: real ? "REAL" : "RISK", severity: "P1",
+    evidence: ["hooks/hooks/_output_guard.py", "hooks/hooks/stop.py", "src/security/redact-proxy.js", "src/security/guard-status.js"].filter(has),
+    missing: real ? [] : ["redaction pré-render (Stop hook é auditoria posterior)"],
+    note: real ? "pre-render é OPT-IN via `gstack_vibehard proxy` + base-URL custom (claude/codex/opencode); cursor/instrucionais seguem auditoria pós-resposta — NÃO é Zero-Trust universal" : undefined,
   }
 }
 // 3. verify delivery gates — REAL (comando + runner shipado).
