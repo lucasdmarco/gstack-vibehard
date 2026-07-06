@@ -1,5 +1,27 @@
 # Changelog - gstack-vibehard
 
+## [3.70.0] - 2026-07-06
+
+### Output Guard: matriz reconciliada com o proxy pre-render REAL (PRD 25 Sprint 25.3)
+
+O `dream audit` marcava `output-guard: RISK` porque `capabilities.js` declarava
+`supportsPreOutputInterception: false` para todos — **dessincronizado** da implementação
+que JÁ EXISTIA: `src/security/redact-proxy.js` (redaction em trânsito), comando
+`gstack_vibehard proxy` e a matriz honesta em `guard-status.js`. Reconciliação, não
+feature nova.
+
+- **`src/dream/capabilities.js`**: claude/codex/opencode → `supportsPreOutputInterception:
+  true` (rota REAL via proxy **OPT-IN** + base-URL custom); cursor/instrucionais seguem
+  `false` (só auditoria pós-resposta).
+- **`src/dream/auditor.js`**: `output-guard` REAL exige capability **E** o proxy shipado
+  (`redact-proxy.js` + `guard-status.js` como evidência), com **nota** que impede
+  overclaim: "opt-in… NÃO é Zero-Trust universal".
+- **`tests/dream_audit.test.js`** atualizado deliberadamente (pre-render = exatamente
+  claude/codex/opencode; REAL com nota; instrucional nunca pre-render).
+- **`docs/guides/capabilities.md`**: claim público honesto do proxy.
+- **Resultado: `dream audit` = 19 REAL / 2 PARTIAL / 0 PLACEBO / 0 RISK** (era 1 RISK).
+  QG CRIT/HIGH **0**, lint+`typecheck`+`typecheck:ts` verdes.
+
 ## [3.69.0] - 2026-07-06
 
 ### Tool Freshness antes de claims (PRD 25 Sprint 25.2)

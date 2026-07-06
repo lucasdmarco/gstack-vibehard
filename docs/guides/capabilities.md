@@ -38,7 +38,7 @@ níveis estão explicados em texto.
 
 - **Agent Reach** — canais de leitura na internet, consentimento por canal.
 - **MCP global** — `install` registra MCP global com opt-out `--no-global-mcp`.
-- **proxy** — redação em trânsito, só onde o harness aceita base-URL custom.
+- **proxy** — redação de segredos **pré-render** (em trânsito), via `gstack_vibehard proxy` + base-URL custom (`ANTHROPIC_BASE_URL`/`OPENAI_BASE_URL`/provider.baseURL). Rota REAL só em Claude/Codex/OpenCode; Cursor e harnesses instrucionais têm apenas auditoria **pós-resposta** (Stop hook). **Não é Zero-Trust universal** — é uma defesa opt-in a mais.
 - **Cloud handoff (Devin)** — nunca default.
 - **tools install `<tool>`** — baixa/instala de fonte remota, exige `--yes` em modo não-interativo.
 

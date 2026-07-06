@@ -12,11 +12,19 @@ const capMod = path.join(repoRoot, "src", "dream", "capabilities.js")
 const cmdMod = path.join(repoRoot, "src", "commands", "dream.js")
 const imp = (m) => import(`${pathToFileURL(m)}?t=${Date.now()}`)
 
-test("capabilities: nenhum harness intercepta o render (pré-output false); trust honesto", async () => {
+// PRD25 25.3: atualizado DELIBERADAMENTE — pre-render OPT-IN existe de verdade
+// (src/security/redact-proxy.js + comando `proxy` + base-URL custom). A capability
+// reflete a matriz honesta do guard-status.js: SÓ claude/codex/opencode; cursor e
+// instrucionais seguem pós-resposta.
+test("capabilities: pre-render OPT-IN só onde há base-URL custom; trust honesto", async () => {
   const { HARNESS_CAPABILITIES, getCapability, isStrongTrust } = await imp(capMod)
+  const preRenderIds = Object.values(HARNESS_CAPABILITIES).filter((c) => c.supportsPreOutputInterception).map((c) => c.id).sort()
+  assert.deepEqual(preRenderIds, ["claude", "codex", "opencode"], "exatamente os 3 com base-URL custom")
   for (const c of Object.values(HARNESS_CAPABILITIES)) {
-    assert.equal(c.supportsPreOutputInterception, false, `${c.id}: CLI não intercepta render`)
     assert.ok(["strong", "partial", "best_effort"].includes(c.trustLevel))
+    if (c.mode === "instructional" || c.mode === "detection") {
+      assert.equal(c.supportsPreOutputInterception, false, `${c.id}: sem base-URL → sem pre-render`)
+    }
   }
   assert.equal(isStrongTrust("claude"), true)
   assert.equal(isStrongTrust("hermes"), false, "hermes é best-effort, não forte")
@@ -32,8 +40,13 @@ test("audit: classifica claims, é determinístico e read-only (todas têm statu
     assert.ok(valid.has(c.status), `${c.id} tem status válido`)
     assert.ok(c.severity && c.claim)
   }
-  // Output Guard é RISK (pós-resposta, sem intercept pré-render)
-  assert.equal(r.claims.find((c) => c.id === "output-guard").status, "RISK")
+  // Output Guard REAL (PRD25 25.3): proxy pre-render shipado + capability, com nota
+  // honesta — opt-in, NUNCA Zero-Trust universal.
+  const og = r.claims.find((c) => c.id === "output-guard")
+  assert.equal(og.status, "REAL")
+  assert.ok(og.evidence.includes("src/security/redact-proxy.js"), "evidência é o proxy real")
+  assert.match(og.note, /OPT-IN/i, "nota declara opt-in")
+  assert.match(og.note, /NÃO é Zero-Trust universal/, "nota impede overclaim")
   // verify e rollback são REAL (já entregues)
   assert.equal(r.claims.find((c) => c.id === "verify").status, "REAL")
   assert.equal(r.claims.find((c) => c.id === "rollback").status, "REAL")
