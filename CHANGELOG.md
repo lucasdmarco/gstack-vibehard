@@ -1,5 +1,25 @@
 # Changelog - gstack-vibehard
 
+## [3.72.0] - 2026-07-06
+
+### Cross-harness trust: claims públicos honestos (PRD 25 Sprint 25.5) — fecha o PRD25
+
+A separação **enforced** (hooks reais) vs **advisory/instructional** (best-effort) é
+deliberada e permanente — declarada como tal, impossível de vender como Zero-Trust
+universal.
+
+- **`src/dream/auditor.js`**: claim `cross-harness-trust` ganha **nota**: "PARTIAL por
+  design… Zero-Trust universal não é um claim possível nem prometido" — impede tanto o
+  overclaim quanto tratar o PARTIAL como bug.
+- **`docs/guides/capabilities.md`**: bloco "Claim honesto (PRD25)" na matriz por
+  harness — gates determinísticos valem como comando em qualquer harness; verificação
+  ao vivo via `agents doctor --json` · `doctor --conformance --strict --json`.
+- **Evidência medida**: `doctor --conformance --strict --json` → 10 harnesses, **0**
+  instrucional com enforced, exit 0; `agents doctor --json` → ok. Testes
+  `dream_audit` (+1 nota), `doctor_harness_matrix`/`policy_dsl` já garantiam
+  instrucional ≠ enforced. QG CRIT/HIGH **0** (1 MEDIO pré-existente documentado),
+  lint+`typecheck`+`typecheck:ts` verdes.
+
 ## [3.71.0] - 2026-07-06
 
 ### `dream improve` isolado (PRD 25 Sprint 25.4) — auto-dream REAL

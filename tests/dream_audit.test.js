@@ -118,6 +118,18 @@ test("audit: auto-dream vira REAL com o runner de improve shipado", async () => 
   assert.deepEqual(ad.missing, [])
 })
 
+// PRD25 25.5: cross-harness-trust é PARTIAL POR DESIGN — a nota impede tanto o
+// overclaim ("Zero-Trust universal") quanto o falso-negativo (tratar como bug).
+test("audit: cross-harness-trust PARTIAL por design, com nota anti-overclaim", async () => {
+  const { audit } = await imp(audMod)
+  const r = audit({ root: repoRoot })
+  const ct = r.claims.find((c) => c.id === "cross-harness-trust")
+  assert.equal(ct.status, "PARTIAL", "instrucionais existem ⇒ PARTIAL é o estado honesto")
+  assert.match(ct.note, /por design/i, "nota explica que é deliberado")
+  assert.match(ct.note, /Zero-Trust universal não é um claim/i, "nota impede overclaim")
+  assert.match(ct.missing[0], /best-effort/, "lista os harness que não impõem gates")
+})
+
 test("dream inspect segue honesto (not_implemented), não finge executar", async () => {
   const { dreamCommand } = await imp(cmdMod)
   let buf = ""
