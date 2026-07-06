@@ -30,6 +30,7 @@ const INDEXER = join(dirname(fileURLToPath(import.meta.url)), "..", "context-doc
 export const STATUS_DESCRIPTIONS = Object.freeze({
   missing: "Tool is not installed or cannot be found.",
   installed_not_callable: "Files appear to exist, but the command failed from this project.",
+  timeout_degraded: "The probe timed out twice — the tool may be installed but slow/cold; NOT the same as missing. Retry or run the tool directly.",
   callable: "The command was verified from this project and can be called manually by agents.",
   callable_not_routed: "The command works, but no harness traffic is routed through it automatically.",
   routed: "Harness traffic is verified to pass through the tool.",
@@ -57,6 +58,10 @@ const npxBin = () => (process.platform === "win32" ? "npx.cmd" : "npx")
 // fixos do produto (nunca input do usuário) — sem superfície de injeção.
 const quoteArg = (a) => (/[\s"]/.test(String(a)) ? `"${String(a).replace(/"/g, '""')}"` : String(a))
 const shellCommand = (file, args) => [quoteArg(file), ...(args || []).map(quoteArg)].join(" ")
+// Timeout é sinal DIFERENTE de ausência (PRD26 26.B): npx frio no Windows pode
+// estourar 15s com a ferramenta INSTALADA. `timedOut` viaja no resultado e o
+// chamador re-tenta uma vez antes de classificar.
+const isTimeoutErr = (e) => e.code === "ETIMEDOUT" || e.killed === true || /ETIMEDOUT/i.test(String(e.message || ""))
 function defaultProbe(file, args, opts = {}) {
   const shell = /\.(cmd|bat)$/i.test(file)
   const common = { stdio: ["ignore", "pipe", "pipe"], timeout: 15000, encoding: "utf-8", ...opts }
@@ -66,8 +71,15 @@ function defaultProbe(file, args, opts = {}) {
       : execFileSync(file, args, common)
     return { ok: true, code: 0, stdout: trunc(stdout), stderr: "" }
   } catch (e) {
-    return { ok: false, code: typeof e.status === "number" ? e.status : null, stdout: trunc(e.stdout), stderr: trunc(e.stderr || e.message) }
+    return { ok: false, code: typeof e.status === "number" ? e.status : null, timedOut: isTimeoutErr(e), stdout: trunc(e.stdout), stderr: trunc(e.stderr || e.message) }
   }
+}
+// 1 retry curto SÓ em timeout (cold-start de npx/AV); segunda falha vale.
+function probeRetryTimeout(probe, file, args, opts) {
+  const first = probe(file, args, opts)
+  if (!first.timedOut) return first
+  const second = probe(file, args, opts)
+  return { ...second, retried: true, timedOut: second.timedOut === true }
 }
 
 // Como defaultProbe, mas SEM truncar stdout — para saídas JSON (context/fallow audit).
@@ -107,8 +119,14 @@ function readEnv(probe) {
   }
 }
 
-// classifica um probe simples (sem noção de routing): callable / not_callable / missing.
-const classifyProbe = (res, filesExist) => (res.ok ? "callable" : filesExist ? "installed_not_callable" : "missing")
+// classifica um probe simples (sem noção de routing): callable / not_callable /
+// timeout_degraded / missing. TIMEOUT NUNCA vira `missing` (falso negativo que a
+// revisão do PRD26 mediu): a ferramenta pode estar instalada e o probe frio/lento.
+const classifyProbe = (res, filesExist) => {
+  if (res.ok) return "callable"
+  if (res.timedOut) return "timeout_degraded"
+  return filesExist ? "installed_not_callable" : "missing"
+}
 function toolEntry({ status, scope, purpose, command, res, extra }) {
   return {
     status, scope, purpose,
@@ -143,7 +161,8 @@ function fallowAuditSummary(fallowAudit) {
   }
 }
 function probeFallow(probe, fallowAudit) {
-  const res = probe(npxBin(), ["fallow", "--version"])
+  // npx frio no Windows já estourou 15s com fallow INSTALADO — retry só em timeout.
+  const res = probeRetryTimeout(probe, npxBin(), ["fallow", "--version"])
   return toolEntry({
     status: classifyProbe(res, false), scope: "project", purpose: "deterministic_quality_gate",
     command: "npx fallow --version", res, extra: { auditSummary: fallowAuditSummary(fallowAudit) },

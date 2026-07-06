@@ -22,7 +22,7 @@ export const KNOWLEDGE = Object.freeze([
 
 // Explícitos do PRD22 §4.3 + tudo que muta repo/config/estado (via gates).
 export const EXECUTION = Object.freeze([
-  "task", "workflow", "delegate", "dev", "verify", "publish-guard", // PRD22 §4.3 (gated)
+  "task", "workflow", "delegate", "dev", "verify", "publish-guard", "proof", // proof roda os gates (spawna suítes), como verify
   "start", "orchestrate", "sprint", "runtime", "stop", "open", // execução/runtime
   "install", "create", "init", "uninstall", "enable", "disable", // instalação/ativação
   "secrets", "agents", "policy", "worktree", "update", "dream", "proxy", // infra que escreve

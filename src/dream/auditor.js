@@ -263,9 +263,23 @@ function tallySummary(claims) {
   for (const c of claims) summary[c.status] = (summary[c.status] || 0) + 1
   return summary
 }
+// CM-08 (PRD26): declara O QUE está sendo auditado — o PACOTE gstack (instalado ou
+// repo-fonte) vs um diretório qualquer. Auditar de `C:\Users\x>` audita o pacote
+// instalado, não um projeto local; o `scope` torna isso explícito no JSON.
+function auditScope(root) {
+  let pkgName = null
+  try { pkgName = JSON.parse(readFileSync(join(root, "package.json"), "utf-8")).name || null } catch { /* sem package.json */ }
+  return {
+    root: String(root),
+    target: pkgName === "@gstack-vibehard/installer" ? "gstack_package" : "directory",
+    packageName: pkgName,
+    note: "as evidências (src/..., hooks/...) são relativas ao root auditado",
+  }
+}
+
 export function audit(opts = {}) {
   const root = opts.root || DEFAULT_ROOT
   const { has, read } = reader(root)
   const claims = CLAIM_BUILDERS.map((build) => build(has, read))
-  return { generatedAt: new Date().toISOString(), root: ".", claims, summary: tallySummary(claims) }
+  return { generatedAt: new Date().toISOString(), root: ".", scope: auditScope(root), claims, summary: tallySummary(claims) }
 }
