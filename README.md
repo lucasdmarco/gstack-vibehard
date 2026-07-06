@@ -62,7 +62,11 @@ Detalhes: [guia de caminhos de instalação](docs/guides/install-paths.md).
 - 🌳 **Worktree lifecycle**: `list/diff/accept/discard/cleanup --dry-run` (estados determinísticos)
 - 🔌 **Inventário MCP** multi-harness com secrets redigidos (`tools mcp inventory`)
 - 🤖 **Orquestração v2**: executor em worktree + verifier independente + reviewer LLM plugável (advisory) — **LLM nunca aprova sozinho**
-- 🧪 **Prova de máquina limpa**: `tools clean-machine --json` — 12 cenários offline (OpenCode config-sacred, Lite sem escrita global, uninstall byte-for-byte)
+- 💭 **Auto-dream com `dream improve`**: plano determinístico → execução isolada em worktree → proposta revisável — **nunca auto-merge**; `dream audit` mede promessa vs evidência (hoje: 20 REAL / 1 PARTIAL / 0 RISK)
+- 🔏 **Edit guard hash-anchored** (`tools edit-guard`): valida o trecho antes do patch; stale aborta recuperável com provenance
+- 🧩 **MCP runtime-injected project-scoped** (`tools mcp runtime`): registro só no run context, deny-default para destrutivos — nunca `~/.mcp.json` nem config global
+- 🕶️ **Redaction pré-render opt-in** (`gstack_vibehard proxy`): segredo mascarado ANTES da tela onde o harness aceita base-URL custom (Claude/Codex/OpenCode) — **não é Zero-Trust universal**
+- 🧪 **Prova de máquina limpa**: `npm run proof` — 15 etapas com placar (stress EBUSY 12×, suítes, gates com validação de conteúdo, `verify --profile release`, tarball, `tools clean-machine`)
 - 🌐 **Agent Reach** (opt-in): canais de leitura na internet com consentimento por canal
 
 Matriz honesta por harness (hooks reais vs instrucional): [guia](docs/guides/harness-matrix.md) · `agents doctor --json`.
@@ -111,7 +115,14 @@ Tudo que o `install` escreve tem backup + manifest — [guia de reset/uninstall]
 
 ## 📦 Verificação & qualidade
 
-`npm test` · `npm run test:py` · `npm run lint` · `npm run typecheck:ts` (TS baseline real) · `npm run test:pack` · CI em **Linux + Windows + macOS**.
+**Um comando:** `npm run proof` — a prova de máquina limpa inteira (15 etapas, placar
+PASS/FAIL, relatório JSON; em falha salva o log completo da etapa).
+
+Individuais: `npm test` (680+ testes) · `npm run test:py` · `npm run lint` ·
+`npm run typecheck:ts` (TS baseline real) · `npm run test:pack` (tarball real) ·
+`node src/index.js verify --profile release --json` (release gate determinístico) ·
+Fallow com **gate por regressão** (baselines commitadas — débito novo reprova) ·
+CI em **Linux + Windows + macOS**.
 
 Histórico em **[CHANGELOG.md](CHANGELOG.md)**. Licença **MIT**.
 
