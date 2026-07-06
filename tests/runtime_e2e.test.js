@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { mkdtemp, rm, writeFile, mkdir, readFile, readdir } from "node:fs/promises"
+import { mkdtemp, rm, writeFile, mkdir, readFile, readdir, rename } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
@@ -9,20 +9,49 @@ import { readAllState, isAlive, waitPidsExit } from "../src/runtime/supervisor.j
 const repoRoot = path.resolve(import.meta.dirname, "..")
 const cmdMod = path.join(repoRoot, "src", "commands", "runtime-supervisor.js")
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
 /** rm recursivo com retry/backoff próprio; retorna o último erro (null = sucesso). */
 async function rmWithBackoff(dir, attempts = 8) {
   let lastErr = null
   for (let i = 0; i < attempts; i++) {
     try { await rm(dir, { recursive: true, force: true, maxRetries: 3 }); return null }
-    catch (e) { lastErr = e; await new Promise((r) => setTimeout(r, 200 * (i + 1))) }
+    catch (e) { lastErr = e; await sleep(200 * (i + 1)) }
   }
   return lastErr
 }
 
 /**
+ * Espera DETERMINÍSTICA de liberação de handle (Windows): rename só funciona
+ * quando nenhum processo segura o arquivo — probe muito mais confiável que sleep
+ * cego. Após o taskkill/exit, o SO (ou antivírus) pode reter o handle do log do
+ * filho por um instante; aqui esperamos a liberação REAL, com orçamento limitado.
+ */
+async function waitLogsReleased(dir, budgetMs = 6000) {
+  const logsDir = path.join(dir, ".gstack", "runtime", "logs")
+  const files = await readdir(logsDir).catch(() => [])
+  const deadline = Date.now() + budgetMs
+  for (const name of files) {
+    const file = path.join(logsDir, name)
+    const probe = `${file}.probe`
+    for (;;) {
+      try { await rename(file, probe); await rename(probe, file); break } // liberado
+      catch (e) {
+        if (e.code === "ENOENT") break // já removido/renomeado — nada a esperar
+        if (Date.now() > deadline) break // orçamento estourou — o rm diagnostica
+        await sleep(150)
+      }
+    }
+  }
+}
+
+/**
  * Cleanup à prova de EBUSY (Windows): para o runtime, espera os pids morrerem DE
- * VERDADE (taskkill retorna antes de o SO soltar os handles do filho) e remove o
- * diretório com retry/backoff próprio. Na última falha, diagnostica o que sobrou.
+ * VERDADE (taskkill retorna antes de o SO soltar os handles do filho), espera os
+ * handles de LOG serem liberados (probe de rename, determinístico) e só então
+ * remove o diretório com retry/backoff. Na última falha, diagnostica o que sobrou.
+ * NADA disso enfraquece as asserções — o teste continua exigindo pids mortos e
+ * remoção sem EBUSY; só a espera virou baseada em estado real, não em sorte.
  */
 async function cleanupProject(dir, stopCommand) {
   try { await stopCommand([], { cwd: dir }) } catch { /* idempotente */ }
@@ -30,6 +59,7 @@ async function cleanupProject(dir, stopCommand) {
   try {
     await waitPidsExit(readAllState(dir).map((s) => s.pid).filter((p) => p && isAlive(p)), { timeoutMs: 5000 })
   } catch { /* state ausente/ilegível = nada vivo a esperar */ }
+  await waitLogsReleased(dir)
   const lastErr = await rmWithBackoff(dir)
   if (!lastErr) return
   // Diagnóstico do arquivo preso — sem isso o CI só mostra "EBUSY: <dir>".

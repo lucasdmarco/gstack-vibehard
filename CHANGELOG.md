@@ -1,5 +1,37 @@
 # Changelog - gstack-vibehard
 
+## [3.73.0] - 2026-07-06
+
+### Rodada de hardening de produção (revisão pós-PRD25) — 4 fixes confirmados + 1 causa raiz descoberta
+
+Revisão externa apontou 7 achados; cada um foi **verificado empiricamente** antes de
+agir. Confirmados e corrigidos:
+
+- **`test:py` (drift de contrato, era tido como "ambiental")**: o fixture fakeava só o
+  `npx`, mas `qg.py::_resolve_fallow` prefere binário `fallow` local/global — rodando
+  via npm, o fallow REAL era achado antes do fake. `_write_fake_launchers` agora fakeia
+  **npx E fallow** (ordem de resolução real sob teste). **Python 67/67** (era 62+2 fail).
+- **Stop hook Unicode-safe**: `safe_write_text` (UTF-8 `errors="replace"`) nos writes de
+  chronicle (`stop.py:522/817`) — surrogate solto no transcript não derruba mais o hook
+  nem perde memória. Teste novo `test_stop_unicode_safe` (3, com guard anti-regressão).
+- **DEP0190 eliminado**: probes de `readiness.js`/`refresh.js` não passam mais array de
+  args com `shell:true` — para shims `.cmd`/`.bat` a string de comando é montada
+  **explicitamente com quoting** (args são literais fixos). `tools readiness` roda
+  **sem warning de segurança**.
+- **runtime_e2e resiliente a EBUSY**: além do retry existente, `waitLogsReleased` —
+  espera **determinística** de liberação de handle (probe de rename por arquivo de log,
+  orçamento 6s) antes do rm. Asserções intactas (pids mortos, remoção sem EBUSY).
+  **8×8 PASS** no loop.
+- **BÔNUS (causa raiz da intermitência do gate)**: `subprocess.run(text=True)` sem
+  `encoding=` decodifica com **cp1252** no Windows — byte 0x8d do output UTF-8 do
+  fallow matava o reader thread e o QG virava `tool_missing` intermitente. TODOS os
+  `text=True` de `qg.py` (2) e `stop.py` (18) agora usam `encoding="utf-8",
+  errors="replace"`. `qg --strict` **3×3 determinístico, stderr zero**.
+
+Não-reproduzíveis (medidos): `verify release` = `ready`; QG com **1 finding MEDIO**
+(não 19). Já entregue: Headroom routing opt-in (v3.60). By design: cross-harness
+PARTIAL (documentado).
+
 ## [3.72.1] - 2026-07-06
 
 ### Gate final do PRD25: qg-l1/qg-l2 strict verdes (decomposição CRAP)

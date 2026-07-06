@@ -39,6 +39,14 @@ def find_project_root(cwd: str) -> Path | None:
     return None
 
 
+def safe_write_text(path: Path, text: str) -> None:
+    """Grava UTF-8 tolerando surrogates soltos (transcript pode trazer UTF-16
+    malformado). Sem isto o hook de Stop morria com UnicodeEncodeError
+    ('surrogates not allowed') e a memória era PERDIDA — hook de parada não pode
+    cuspir traceback por caractere inválido (revisão pós-PRD25 P1)."""
+    path.write_text(text, encoding="utf-8", errors="replace")
+
+
 def play_audio_cue(kind: str) -> None:
     """Best-effort audio cue without writing to stdout or blocking hook JSON."""
     try:
@@ -100,7 +108,7 @@ def run_sandbox(cwd: str) -> dict:
         try:
             docker_info = subprocess.run(
                 ["docker", "info", "--format", "{{json .Runtimes}}"],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10,
             )
             if docker_info.returncode == 0 and "runsc" in docker_info.stdout:
                 gvisor_available = True
@@ -114,7 +122,7 @@ def run_sandbox(cwd: str) -> dict:
         result = subprocess.run(
             [openhands_bin, "--headless", *runtime_args, "-t", "Validar entrega e executar testes", "--path", str(root)],
             capture_output=True,
-            text=True,
+            text=True, encoding="utf-8", errors="replace",
             timeout=600,
         )
     except FileNotFoundError:
@@ -519,7 +527,7 @@ elif sandbox_result.get("status") == "failed":
         note_lines.append(str(sandbox_result["stderr"])[-4000:])
     note_lines.append("")
     chronicle_file = chronicle_dir_path / f"{project_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
-    chronicle_file.write_text("\n".join(note_lines), encoding="utf-8")
+    safe_write_text(chronicle_file, "\n".join(note_lines))
     play_audio_cue("error")
     output = {
         "systemMessage": f"Memorias salvas em {chronicle_file.name} + Sandbox OpenHands: FALHOU ({sandbox_result.get('returncode', 'N/A')})",
@@ -587,7 +595,7 @@ def run_test_gate(cwd: str) -> dict:
     timeout_s = int(os.environ.get("GSTACK_TEST_TIMEOUT", "300"))
     try:
         result = subprocess.run(
-            argv, cwd=root, capture_output=True, text=True, timeout=timeout_s,
+            argv, cwd=root, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout_s,
         )
     except (OSError, FileNotFoundError) as e:
         return {"status": "skipped", "summary": f"test runner indisponivel: {e}"}
@@ -651,7 +659,7 @@ def run_fallow_audit(cwd: str) -> dict:
     try:
         result = subprocess.run(
             ["npx", "fallow", "audit", "--format", "json"],
-            capture_output=True, text=True, timeout=60, cwd=cwd,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60, cwd=cwd,
         )
     except FileNotFoundError:
         return {"status": "skipped", "summary": "npx/fallow not found"}
@@ -722,7 +730,7 @@ if _stop_audit_on and qg_path.exists() and cwd:
         args = [sys.executable, str(qg_path), "--path", cwd, "--level", str(qg_level)]
         if qg_log_only:
             args.append("--log-only")
-        result = subprocess.run(args, capture_output=True, text=True, timeout=60)
+        result = subprocess.run(args, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
         if result.returncode == 0 or qg_log_only:
             try:
                 qg_data = json.loads(result.stdout)
@@ -814,7 +822,7 @@ if _budget == "minimal":
     msg_parts = ["Memorias: puladas (tokenBudget=minimal)"]
 else:
     chronicle_file = chronicle_dir_path / f"{project_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
-    chronicle_file.write_text(note, encoding="utf-8")
+    safe_write_text(chronicle_file, note)
     msg_parts = [f"Memorias salvas em {chronicle_file.name}"]
 if _stop_audit_on:
     msg_parts[0] += " + QG executado"
@@ -829,7 +837,7 @@ elif sandbox_result and sandbox_result.get("status") == "failed":
 try:
     post_sprint = subprocess.run(
         [sys.executable, str(hook_support_path("post_sprint.py"))],
-        input=json.dumps(inp), capture_output=True, text=True, timeout=30
+        input=json.dumps(inp), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30
     )
     if post_sprint.returncode == 0:
         ps_data = json.loads(post_sprint.stdout)
@@ -853,7 +861,7 @@ if os.environ.get("GSTACK_TOOL_REFRESH") == "1":
         try:
             tr = subprocess.run(
                 [gstack_bin, "tools", "refresh", "--changed", "--json"],
-                cwd=cwd or None, capture_output=True, text=True, timeout=120
+                cwd=cwd or None, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120
             )
             if tr.returncode == 0:
                 td = json.loads(tr.stdout)
@@ -876,7 +884,7 @@ try:
         subprocess.run(
             [sys.executable, str(wt_script)],
             env={**os.environ, "GSTACK_CWD": cwd or ""},
-            capture_output=True, text=True, timeout=30
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30
         )
 except (OSError, subprocess.TimeoutExpired) as e:
     sys.stderr.write(f"[worktree-autosave] {e}\n")
@@ -885,7 +893,7 @@ except (OSError, subprocess.TimeoutExpired) as e:
 try:
     tmux_result = subprocess.run(
         ["tmux", "list-sessions", "-F", "#{session_name}"],
-        capture_output=True, text=True, timeout=5
+        capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5
     )
     if tmux_result.returncode == 0:
         for session in tmux_result.stdout.splitlines():
@@ -893,7 +901,7 @@ try:
             if session.startswith("claude-team-"):
                 subprocess.run(
                     ["tmux", "kill-session", "-t", session],
-                    capture_output=True, text=True, timeout=5
+                    capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5
                 )
                 sys.stderr.write(f"[tmux-cleanup] killed zombie session: {session}\n")
 except (OSError, subprocess.TimeoutExpired):
@@ -1028,7 +1036,7 @@ if mom_bin:
         subprocess.run(
             [mom_bin, "record"],
             input=session_jsonl,
-            capture_output=True, text=True, timeout=15
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15
         )
         # Mom draft — non-blocking, best-effort
         subprocess.run(
@@ -1047,7 +1055,7 @@ def gitops_available() -> bool:
     try:
         subprocess.run(
             [gh_bin, "repo", "view", "--json", "name"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10,
         )
         return True
     except (OSError, subprocess.TimeoutExpired):
@@ -1155,7 +1163,7 @@ def gitops_issue_create(fallow: dict, instincts_path: Path) -> Optional[str]:
              "--title", title,
              "--body", body_text,
              "--label", "gstack-automation,bug"],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30,
         )
         if result.returncode == 0:
             url = result.stdout.strip()
@@ -1201,9 +1209,9 @@ def gitops_pr_create(summary_text: str, root: Optional[Path]) -> Optional[str]:
     try:
         # Create branch and local commit only — no automatic push or PR
         subprocess.run(["git", "checkout", "-b", branch_name],
-                       cwd=str(root), capture_output=True, text=True, timeout=15)
+                       cwd=str(root), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15)
         subprocess.run(["git", "add", "--", "*.md", "docs/", "wiki/"],
-                       cwd=str(root), capture_output=True, text=True, timeout=15)
+                       cwd=str(root), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15)
         # Redige segredo do summary antes do commit (defesa — commit pode virar push).
         _safe_summary, _commit_events = redact_secrets(summary_text or "")
         if _commit_events:
@@ -1215,7 +1223,7 @@ def gitops_pr_create(summary_text: str, root: Optional[Path]) -> Optional[str]:
             commit_cmd.append("--no-verify")
             sys.stderr.write("[gitops] GSTACK_ALLOW_DIRTY_COMMIT=1 — hooks de pre-commit ignorados\n")
         subprocess.run(commit_cmd,
-                       cwd=str(root), capture_output=True, text=True, timeout=30)
+                       cwd=str(root), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
         sys.stderr.write(f"[gitops] Commit local criado no branch '{branch_name}'.\n")
         sys.stderr.write(f"[gitops]  Revise e push manualmente: git push origin {branch_name}\n")
         sys.stderr.write(f"[gitops]  Depois crie PR: gh pr create --title \"{summary_text[:80]}\"\n")

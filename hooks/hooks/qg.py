@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any
 
 
-QG_VERSION = "3.72.1"
+QG_VERSION = "3.73.0"
 FALLOW_ARGS = ["audit", "--format", "json"]
 # Contrato historico: o JSON expoe `command` como `npx fallow ...` (o caminho de
 # fallback). A resolucao REAL prefere binario local/global (ver _resolve_fallow).
@@ -285,7 +285,7 @@ def run_fallow(root: Path, timeout: int) -> tuple[Any, subprocess.CompletedProce
         kwargs["start_new_session"] = True
     proc = subprocess.Popen(
         cmd, cwd=str(root),
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, **kwargs,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace", **kwargs,
     )
     try:
         stdout, _stderr = proc.communicate(timeout=timeout)
@@ -318,7 +318,7 @@ def run_typecheck(root: Path) -> dict:
     try:
         result = subprocess.run(
             [npx, "tsc", "--noEmit"],
-            cwd=root, capture_output=True, text=True, timeout=120
+            cwd=root, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120
         )
         if result.returncode == 0:
             return {"status": "passed", "summary": "TypeScript: no type errors"}

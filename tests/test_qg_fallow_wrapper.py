@@ -14,6 +14,33 @@ QG = REPO_ROOT / "hooks" / "hooks" / "qg.py"
 EXPECTED_QG_VERSION = json.loads((REPO_ROOT / "package.json").read_text(encoding="utf-8"))["version"]
 
 
+def _write_fake_launchers(fake_bin, fake_runner):
+    """Cria launchers fake de `npx` E `fallow` apontando para o runner.
+
+    CONTRATO REAL do qg.py (_resolve_fallow): binário `fallow` local/global vence
+    `npx`. Rodando via npm, `node_modules/.bin` entra no PATH e o fallow REAL era
+    achado antes do npx fake — o teste não testava o que achava (drift pego na
+    revisão pós-PRD25). Fakear os DOIS mantém a ordem de resolução sob teste.
+    """
+    for name in ("npx", "fallow"):
+        if os.name == "nt":
+            launcher = fake_bin / f"{name}.cmd"
+            launcher.write_text(
+                "@echo off\r\n"
+                f"\"{sys.executable}\" \"{fake_runner}\" %*\r\n"
+                "exit /b %ERRORLEVEL%\r\n",
+                encoding="utf-8",
+            )
+        else:
+            launcher = fake_bin / name
+            launcher.write_text(
+                "#!/usr/bin/env sh\n"
+                f"exec \"{sys.executable}\" \"{fake_runner}\" \"$@\"\n",
+                encoding="utf-8",
+            )
+            launcher.chmod(0o755)
+
+
 class FallowWrapperTest(unittest.TestCase):
     def test_filters_auto_fixable_findings_and_exits_one_on_failed_verdict(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -49,22 +76,7 @@ class FallowWrapperTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            if os.name == "nt":
-                fake_npx = fake_bin / "npx.cmd"
-                fake_npx.write_text(
-                    "@echo off\r\n"
-                    f"\"{sys.executable}\" \"{fake_runner}\" %*\r\n"
-                    "exit /b %ERRORLEVEL%\r\n",
-                    encoding="utf-8",
-                )
-            else:
-                fake_npx = fake_bin / "npx"
-                fake_npx.write_text(
-                    "#!/usr/bin/env sh\n"
-                    f"exec \"{sys.executable}\" \"{fake_runner}\" \"$@\"\n",
-                    encoding="utf-8",
-                )
-                fake_npx.chmod(0o755)
+            _write_fake_launchers(fake_bin, fake_runner)
 
             env = os.environ.copy()
             env["PATH"] = str(fake_bin) + os.pathsep + env.get("PATH", "")
@@ -100,22 +112,7 @@ class FallowWrapperTest(unittest.TestCase):
             f"sys.exit({exit_code})\n",
             encoding="utf-8",
         )
-        if os.name == "nt":
-            fake_npx = fake_bin / "npx.cmd"
-            fake_npx.write_text(
-                "@echo off\r\n"
-                f"\"{sys.executable}\" \"{fake_runner}\" %*\r\n"
-                "exit /b %ERRORLEVEL%\r\n",
-                encoding="utf-8",
-            )
-        else:
-            fake_npx = fake_bin / "npx"
-            fake_npx.write_text(
-                "#!/usr/bin/env sh\n"
-                f"exec \"{sys.executable}\" \"{fake_runner}\" \"$@\"\n",
-                encoding="utf-8",
-            )
-            fake_npx.chmod(0o755)
+        _write_fake_launchers(fake_bin, fake_runner)
         env = os.environ.copy()
         env["PATH"] = str(fake_bin) + os.pathsep + env.get("PATH", "")
         return subprocess.run(

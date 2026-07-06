@@ -22,10 +22,17 @@ const RELEVANT = /\.(js|ts|jsx|tsx|mjs|cjs|py)$/i
 const nowStamp = () => new Date().toISOString().replace(/[:.]/g, "-")
 const trunc = (s) => String(s == null ? "" : s).replace(/\s+/g, " ").trim().slice(0, 300)
 
+// DEP0190: shell:true com array de args é deprecado — para shims .cmd/.bat a
+// string de comando é montada EXPLICITAMENTE com quoting (args são literais fixos).
+const quoteArg = (a) => (/[\s"]/.test(String(a)) ? `"${String(a).replace(/"/g, '""')}"` : String(a))
+const shellCommand = (file, args) => [quoteArg(file), ...(args || []).map(quoteArg)].join(" ")
 function boundedRun(file, args, opts = {}) {
   const shell = /\.(cmd|bat)$/i.test(file)
+  const common = { stdio: ["ignore", "pipe", "pipe"], timeout: opts.timeout || 90000, encoding: "utf-8", cwd: opts.cwd }
   try {
-    const stdout = execFileSync(file, args, { stdio: ["ignore", "pipe", "pipe"], timeout: opts.timeout || 90000, encoding: "utf-8", cwd: opts.cwd, shell })
+    const stdout = shell
+      ? execFileSync(shellCommand(file, args), { ...common, shell: true })
+      : execFileSync(file, args, common)
     return { ok: true, code: 0, summary: trunc(stdout), raw: stdout }
   } catch (e) {
     return { ok: false, code: typeof e.status === "number" ? e.status : null, summary: trunc(e.stderr || e.message), raw: "" }
