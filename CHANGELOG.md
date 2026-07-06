@@ -1,5 +1,30 @@
 # Changelog - gstack-vibehard
 
+## [3.71.0] - 2026-07-06
+
+### `dream improve` isolado (PRD 25 Sprint 25.4) — auto-dream REAL
+
+Fecha o gap real do `dream audit` (`auto-dream: PARTIAL`): `improve` sai de
+`not_implemented` e vira **fluxo isolado, revisável, nunca auto-merge**.
+
+- **`src/dream/runner.js`** (novo, puro/injetável): `dreamImprove` — plano
+  **determinístico** (claims não-REAL do audit + propostas em staging; sem LLM);
+  `--dry-run` gera plano **sem escrever nada**; **sem executor configurado** grava
+  proposta e explica (não falha opaco; GStack **não embute** executor — opt-in via
+  injeção); com executor: **worktree** (`gstack/dream-improve-*`) → executor NA
+  worktree → commit → **`verify` como gate** → proposta revisável com `merged: false`
+  e **branch preservado** para review humano; cleanup da worktree mesmo em falha;
+  provenance best-effort (`dream:improve:*`).
+- **`src/commands/dream.js`**: `improve` ligado (`--dry-run/--json`), `status`
+  atualizado; `inspect`/`accept`/`plan` seguem honestamente `not_implemented`.
+- **`src/dream/auditor.js`** (critério já existente): `auto-dream` → **REAL**.
+  **`dream audit` = 20 REAL / 1 PARTIAL / 0 PLACEBO / 0 RISK.**
+- Testes `dream_improve` (6: dry-run puro, proposta sem executor, ordem
+  worktree→executor→commit→verify→remove com `keepBranch`, cleanup em falha, CLI JSON,
+  staging no plano) + `dream_audit` atualizado. QG CRIT/HIGH **0** (1 MEDIO
+  não-bloqueante: FP conhecido de export consumido por teste via dynamic import),
+  lint+`typecheck`+`typecheck:ts` verdes.
+
 ## [3.70.0] - 2026-07-06
 
 ### Output Guard: matriz reconciliada com o proxy pre-render REAL (PRD 25 Sprint 25.3)
