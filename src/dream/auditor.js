@@ -197,9 +197,10 @@ function claimQaMultiLens(has, read) {
   }
 }
 // 17. VFA Provenance (PRD 13 PR13.4) — REAL: recibos com hash-chain; audit verify pega adulteração.
+const hasVfaProvenance = (has, read) =>
+  has("src/vfa/attestation.js") && has("src/vfa/provenance.js") && cliHasCommand(read, "audit")
 function claimVfaProvenance(has, read) {
-  const ok = has("src/vfa/attestation.js") && has("src/vfa/provenance.js") &&
-    cliHasCommand(read, "audit")
+  const ok = hasVfaProvenance(has, read)
   return {
     id: "vfa-provenance", claim: "VFA: provenance hash-chain + attestation (audit verify pega adulteração)",
     status: ok ? "REAL" : "PARTIAL", severity: "P1",
