@@ -1,5 +1,29 @@
 # Changelog - gstack-vibehard
 
+## [3.77.0] - 2026-07-06
+
+### Instalador de usuário final (PRD 26 Sprint 26.A — fecha CM-01/04/05/07/09)
+
+- **[CM-04] Fim do mojibake no Windows**: o transcript real provou que o `chcp` por
+  subprocesso "dava certo" (exit 0) mas o PS 5.1 seguia renderizando `â•”` e
+  `InstalaÃ§Ã£o`. Agora a codepage efetiva é **verificada de volta** (só confia em
+  unicode com 65001 CONFIRMADO) e, no fallback, **`asciiSafe`** translitera TODO o
+  output centralmente via `color()` — box→`+`, `✓`→`OK`, `⚠`→`!`, acentos→letras base
+  (`Instalação`→`Instalacao`). Nenhum caminho de print escapa.
+- **[CM-01] Preflight-first para deps obrigatórias do Full**: antes, o install
+  confirmava, ESCREVIA global e só no fim reprovava o contrato. Agora
+  `predictFullDegradations` sonda os toolchains (bun/uv/pip/python) **antes do
+  confirm** — se algo degradaria, exige `--allow-degraded` (ou aponta `--skip-deps`/
+  `--project-only`) **com zero escrita**. Falha TARDIA imprevista declara
+  `partial_with_restore_available` e aponta **`uninstall --restore-only`**.
+- **[CM-05] Estado por harness legível**: sumário final com razão única por harness
+  (`hooks reais / instrucional / plugins / detecção / já instalado (ATUALIZADOS) /
+  pulado`) — install e doctor param de se contradizer.
+- **[CM-07] Printing Press declarado on-demand** (fora do contrato Full) no preflight.
+- **[CM-09] `tools clean-machine` reporta `mode: "simulated_offline"`** + nota
+  apontando `tools readiness` como o estado real da máquina.
+- Testes `install_enduser_round` (7). QG strict **0 blocking**, lint+typechecks verdes.
+
 ## [3.76.0] - 2026-07-06
 
 ### 3 achados do install na máquina limpa REAL (upgrade 3.21.1→3.75.0)

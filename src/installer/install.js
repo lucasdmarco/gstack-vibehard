@@ -511,11 +511,49 @@ function printMcpPreflight(flags) {
     ? "  • MCP servers do gstack (gateway): SERÃO escritos em `~/.mcp.json` (modo completo; `--no-global-mcp` p/ pular)"
     : "  • MCP servers do gstack (gateway): NÃO serão escritos (project-only)")
 }
+// ── CM-01 (máquina limpa): preflight-first para deps OBRIGATÓRIAS do Full ────
+// Antes: o install confirmava, ESCREVIA global e só no fim descobria que o contrato
+// Full falhou. Agora o preflight SONDA os toolchains das deps obrigatórias e, se
+// alguma degradaria, exige a decisão (--allow-degraded) ANTES de qualquer escrita.
+const MANDATORY_DEP_PROBES = [
+  { component: "gbrain", needs: "bun", probe: () => findWorkingBinary(["bun", ...getBunCandidates(HOME, isWindows())]) !== "" },
+  { component: "graphify", needs: "uv", probe: () => !!(findWorkingBinary(["graphify"]) || findWorkingBinary(getUvCandidates(HOME, isWindows()))) },
+  { component: "headroom", needs: "uv ou pip", probe: () => !!(findWorkingBinary(["headroom"]) || findWorkingBinary(getUvCandidates(HOME, isWindows())) || findWorkingBinary(["pip"])) },
+  { component: "pytest", needs: "python", probe: () => findWorkingBinary(["python", "python3"]) !== "" },
+]
+export function predictFullDegradations(probes = MANDATORY_DEP_PROBES) {
+  return probes
+    .filter((d) => { try { return !d.probe() } catch { return true } })
+    .map(({ component, needs }) => ({ component, needs }))
+}
+const isFullMode = (flags) => !flags.projectOnly && !flags.auditOnly && !flags.skipDeps
+function printPredictedDegradations(predicted) {
+  section("Preflight — componentes obrigatórios do Full que DEGRADARIAM")
+  for (const p of predicted) warn(`  ✗ ${p.component}: toolchain ausente (${p.needs})`)
+}
+function blockBeforeAnyWrite() {
+  error("Full não pode prosseguir: os componentes acima falhariam DEPOIS das escritas globais.")
+  info("  Opções: instale o toolchain ausente, ou rode com `--allow-degraded`,")
+  info("  `--skip-deps` (sem deps globais) ou `--project-only` (impacto mínimo).")
+  info("  NADA foi escrito — nenhuma config global foi tocada.")
+  return false
+}
+function preflightMandatoryGate(flags) {
+  if (!isFullMode(flags)) return true
+  const predicted = predictFullDegradations()
+  if (predicted.length === 0) return true
+  printPredictedDegradations(predicted)
+  if (flags.allowDegraded) { warn("  Prosseguindo DEGRADADO (--allow-degraded explícito)."); return true }
+  return blockBeforeAnyWrite()
+}
+
 function printPreflightImpact(allHarnessIds, flags) {
   const impact = buildInstallImpact({ home: HOME, harnessIds: allHarnessIds, withDeps: !flags.skipDeps, withMcp: flags.globalMcp, projectOnly: flags.projectOnly })
   section("Impacto desta instalação (preflight)")
   for (const c of impact) info(`  • ${c.label}${c.optional ? " (opcional)" : ""}: ${c.items.length} item(ns)`)
   printMcpPreflight(flags)
+  // CM-07: Printing Press é ON-DEMAND — fora do contrato Full (Go instala sob demanda).
+  info("  • Printing Press (geração de CLIs): on-demand via `tools install` — FORA do contrato Full")
   info("")
   info("Detalhe completo sem instalar: `gstack_vibehard install --audit-only`.")
 }
@@ -534,6 +572,8 @@ async function confirmGlobalWrite(flags) {
 }
 async function preflightAndConfirm(allHarnessIds, flags) {
   printPreflightImpact(allHarnessIds, flags)
+  // CM-01: gate de deps obrigatórias ANTES do confirm — nada é escrito se bloquear.
+  if (!preflightMandatoryGate(flags)) return false
   return confirmGlobalWrite(flags)
 }
 
@@ -596,10 +636,16 @@ async function resolveSelected(harnesses, flags, report, allHarnessIds) {
   if (flags.reinstall) info("Modo --reinstall: reaplicando tudo (hooks/config) com backup + manifest.")
   printDiagnosis(harnesses, alreadyInstalled)
   refreshInstalledHarnessArtifacts(alreadyInstalled, report)
-  if (availableHarnessIds.length === 0) { await refreshAlreadyConfigured(allHarnessIds, report); return { done: true } }
+  if (availableHarnessIds.length === 0) {
+    report.harnessPlan = { all: allHarnessIds, alreadyInstalled, selected: [] }
+    await refreshAlreadyConfigured(allHarnessIds, report)
+    return { done: true }
+  }
   const selected = await chooseHarnesses(harnesses, availableHarnessIds, flags)
   if (selected.length === 0) { error("Nenhum harness selecionado. Instalacao cancelada."); process.exit(1) }
   info(`Harnesses selecionados: ${selected.join(", ")}`)
+  // CM-05: plano rastreável do começo ao fim (impresso no sumário final).
+  report.harnessPlan = { all: allHarnessIds, alreadyInstalled, selected }
   return { selected }
 }
 
@@ -770,10 +816,31 @@ async function handleObsidianChoice(args, flags, report) {
   if (!process.stdin.isTTY) return info("Obsidian detectado, mas modo nao-interativo — rode `gstack_vibehard context obsidian set <pasta>`.")
   await chooseObsidianVault(report)
 }
+// ── CM-05 (máquina limpa): estado por harness legível de ponta a ponta ───────
+// O transcript mostrou install configurando uns, pulando outros e o doctor dizendo
+// coisa diferente. Uma linha por harness com RAZÃO única elimina a contradição.
+const HARNESS_KIND = Object.freeze({
+  claude: "hooks reais", cursor: "hooks reais", opencode: "plugins (config sagrada, nunca reescrita)",
+  codex: "instrucional (AGENTS.md; sem bloqueio por API)", windsurf: "instrucional", gemini: "instrucional",
+  kiro: "instrucional", devin: "condicional (hooks se o Devin os carregar)", vscode: "detecção apenas", hermes: "instrucional",
+})
+function harnessStateLine(id, plan) {
+  if (plan.alreadyInstalled.includes(id)) return `já instalado — artefatos gerenciados ATUALIZADOS (use --reinstall p/ reaplicar tudo)`
+  if (plan.selected.includes(id)) return `configurado — ${HARNESS_KIND[id] || "integração"}`
+  return "pulado (não selecionado nesta execução)"
+}
+function printHarnessStateSummary(report) {
+  const plan = report.harnessPlan
+  if (!plan) return
+  section("Estado por harness (o doctor vai bater com isto)")
+  for (const id of plan.all) info(`  ${id}: ${harnessStateLine(id, plan)}`)
+}
+
 const warnDegradedFull = (contract, report, flags) => contract.isFull && report.degraded.length && flags.allowDegraded
 // "Full = tudo" não pode concluir com degradação silenciosa. Bloqueia (exit 1) a
 // menos de --allow-degraded. Retorna { blocked }.
 function finalizeContract(report, flags) {
+  printHarnessStateSummary(report)
   printInstallReport(report)
   const contract = evaluateFullContract({ degraded: report.degraded, projectOnly: flags.projectOnly, auditOnly: flags.auditOnly, skipDeps: flags.skipDeps, allowDegraded: flags.allowDegraded })
   if (report.degraded.length) {
@@ -782,7 +849,13 @@ function finalizeContract(report, flags) {
   }
   if (contract.block) {
     error(contract.message)
-    info("  Conserte os componentes acima, ou rode novamente com `--allow-degraded` para aceitar o estado parcial.")
+    // CM-01: falha TARDIA (imprevista pelo preflight) — o estado é recuperável:
+    // tudo que foi escrito tem backup+manifest; um comando restaura.
+    report.state = "partial_with_restore_available"
+    warn("  Estado: partial_with_restore_available — as escritas têm backup + manifest.")
+    info("  Reverter AGORA (restaura configs preexistentes byte-for-byte):")
+    info("      gstack_vibehard uninstall --restore-only")
+    info("  Ou: conserte os componentes acima e rode de novo, ou aceite com `--allow-degraded`.")
     report.blocked = true
     process.exitCode = 1
     return { blocked: true }
