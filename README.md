@@ -37,6 +37,9 @@ cd meu-app && gstack_vibehard dev      # sobe o runtime · stop / logs / open
 # 4) Antes de integrar globalmente, veja o impacto SEM escrever:
 npx @gstack-vibehard/installer consult "quero um SaaS com login e Stripe"
 npx @gstack-vibehard/installer install --audit-only
+
+# 5) "Está pronto?" — o veredito único, determinístico (LLM nunca decide):
+gstack_vibehard proof --json    # verify + dream audit + readiness + graphify + git
 ```
 
 ## ☝️ Pick one path only (não empilhe instalações)
@@ -115,8 +118,12 @@ Tudo que o `install` escreve tem backup + manifest — [guia de reset/uninstall]
 
 ## 📦 Verificação & qualidade
 
-**Um comando:** `npm run proof` — a prova de máquina limpa inteira (15 etapas, placar
-PASS/FAIL, relatório JSON; em falha salva o log completo da etapa).
+**Para o usuário:** `gstack_vibehard proof --json` — o veredito único "posso
+publicar/entregar?" (`gstack.proof.v1`): verify + dream audit + readiness + graphify
+freshness + git tree, `ready:true` só com todos os gates determinísticos verdes.
+
+**Para o desenvolvedor do repo:** `npm run proof` — a prova de máquina limpa inteira
+(15 etapas, placar PASS/FAIL, relatório JSON; em falha salva o log completo da etapa).
 
 Individuais: `npm test` (680+ testes) · `npm run test:py` · `npm run lint` ·
 `npm run typecheck:ts` (TS baseline real) · `npm run test:pack` (tarball real) ·
