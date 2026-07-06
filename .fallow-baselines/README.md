@@ -1,5 +1,11 @@
 # Fallow baselines — release gate por REGRESSÃO (honesto)
 
+> **Última regeneração: 2026-07-06 (v3.74.0, pós-PRD25 + hardening).** Contexto: o QG
+> passava com 0 blockers mas reportava ~27 achados não-bloqueantes soltos (MODERATE
+> cc5-6 + sugestões de cobertura). A revisão pediu "backlog consciente, não ruído" —
+> as baselines foram regeneradas para registrar formalmente o débito aceito; o gate
+> reporta 0 achados para código inalterado e falha só em débito NOVO.
+
 Estes arquivos definem a **linha de base** do Fallow. O gate (`npx fallow audit`, usado
 por `hooks/hooks/qg.py` e `stop.py`) passa a **falhar só em regressão nova** — dead-code,
 duplicação ou complexidade **introduzidos além** desta linha de base.

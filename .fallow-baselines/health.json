@@ -274,11 +274,8 @@
       }
     },
     "src/commands/tools.js": {
-      "crap_high": {
-        "count": 1
-      },
       "crap_moderate": {
-        "count": 15
+        "count": 17
       }
     },
     "src/commands/update.js": {
@@ -355,6 +352,11 @@
     "src/dream/learning.js": {
       "crap_moderate": {
         "count": 2
+      }
+    },
+    "src/dream/runner.js": {
+      "crap_moderate": {
+        "count": 1
       }
     },
     "src/harness/candidate-bridge.js": {
@@ -859,7 +861,7 @@
     },
     "src/tools/readiness.js": {
       "crap_moderate": {
-        "count": 5
+        "count": 6
       }
     },
     "src/tools/refresh.js": {
@@ -1052,7 +1054,7 @@
     },
     "tests/runtime_e2e.test.js": {
       "crap_moderate": {
-        "count": 1
+        "count": 2
       }
     },
     "tests/uninstall_unregister.test.js": {
@@ -1073,8 +1075,8 @@
     "src/model-policy/schema.js:dead code",
     "src/meta/command-layers.js:dead code",
     "src/commands/runtime.js:complexity",
-    "src/commands/publish-guard.js:circular dependency",
     "src/tools/readiness.js:high impact",
+    "src/commands/publish-guard.js:circular dependency",
     "src/commands/secrets.js:dead code",
     "src/cli/index.js:circular dependency",
     "src/installer/opencode-jsonc.js:high impact",
@@ -1113,10 +1115,11 @@
     "src/loop-budget/policy.js:dead code",
     "src/secrets/schema.js:untested risk",
     "src/project-plan/journal.js:dead code",
+    "src/dream/runner.js:dead code",
+    "src/tools/refresh.js:untested risk",
     "src/policy/compiler.js:dead code",
     "src/util/exec-step.js:dead code",
     "src/vfa/pretool.js:untested risk",
-    "src/tools/refresh.js:untested risk",
     "src/commands/orchestrate.js:untested risk",
     "src/secrets/providers.js:dead code",
     "src/commands/context.js:untested risk",
@@ -1129,7 +1132,6 @@
     "src/runtime/supervisor.js:high impact",
     "src/tools/edit-guard.js:dead code",
     "src/installer/remote-policy.js:dead code",
-    "src/dream/learning.js:dead code",
     "src/project-plan/qa-lenses.js:dead code",
     "src/commands/challenge.js:untested risk",
     "src/harness/devin.js:dead code",
@@ -1145,15 +1147,17 @@
     "src/project-plan/evidence-ledger.js:high impact",
     "src/tools/catalog.js:dead code",
     "src/cli/create.js:dead code",
+    "src/commands/dream.js:circular dependency",
+    "src/dream/auditor.js:untested risk",
     "src/meta/reviewers.js:dead code",
+    "src/commands/tools.js:untested risk",
     "src/commands/worktree.js:untested risk",
     "src/commands/task.js:untested risk",
     "src/vfa/challenge.js:untested risk",
-    "src/commands/tools.js:untested risk",
     "src/commands/consult.js:circular dependency",
+    "src/project-plan/publish-guard.js:complexity",
     "src/harness/claude.js:complexity",
     "src/installer/merge.js:high impact",
-    "src/commands/dream.js:circular dependency",
     "src/commands/workflow.js:complexity",
     "src/installer/uninstall.js:untested risk",
     "src/installer/install.js:untested risk",
@@ -1166,7 +1170,6 @@
     "src/commands/task-run.js:complexity",
     "src/delegation/worktree.js:high impact",
     "src/commands/proxy.js:circular dependency",
-    "src/dream/auditor.js:untested risk",
     "src/commands/audit.js:untested risk",
     "src/commands/update.js:untested risk",
     "src/installer/restore.js:untested risk",
@@ -1176,7 +1179,6 @@
     "src/workflow-graph/runner.js:complexity",
     "src/installer/repair-manifest.js:complexity",
     "tests/opencode_worktree.test.js:untested risk",
-    "src/project-plan/publish-guard.js:complexity",
     "src/commands/activate.js:circular dependency",
     "src/commands/monitor.js:complexity",
     "tests/opencode_delegation.test.js:untested risk",
