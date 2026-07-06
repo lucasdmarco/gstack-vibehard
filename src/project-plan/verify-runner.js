@@ -82,8 +82,17 @@ function findQgHook(home) {
 }
 
 // Timeout POR ETAPA (PRD20 20.1) — o release nunca mais fica mudo por 10 min.
-const STEP_TIMEOUT_MS = { deps: 300000, test: 300000, build: 300000, "qg-l1": 120000, "qg-l2": 180000 }
-function stepTimeout(id) { return STEP_TIMEOUT_MS[id] || 60000 }
+// `test` = 900s: a suíte completa (680+ testes com E2Es que spawnam processos reais)
+// passa de 300s em máquina fria/lenta — 300s reprovava suíte VERDE por duração
+// (revisão pós-PRD25). Não mascara falha: asserção quebrada falha rápido; só um
+// hang real chega ao teto. Override p/ máquinas extremas: GSTACK_VERIFY_TEST_TIMEOUT_MS.
+const STEP_TIMEOUT_MS = { deps: 300000, test: 900000, build: 300000, "qg-l1": 120000, "qg-l2": 180000 }
+function envTimeout(id) {
+  if (id !== "test") return null
+  const v = Number(process.env.GSTACK_VERIFY_TEST_TIMEOUT_MS)
+  return Number.isFinite(v) && v > 0 ? v : null
+}
+function stepTimeout(id) { return envTimeout(id) || STEP_TIMEOUT_MS[id] || 60000 }
 
 // Package manager REAL do projeto (PR2/PR5): packageManager field → lockfile → npm.
 function pmFromLock(cwd) {
