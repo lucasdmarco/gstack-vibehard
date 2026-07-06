@@ -7,7 +7,7 @@ import { execFileSync } from "child_process"
 import { detectHarnesses, getHarness, isWindows, isMacOS, isLinux } from "../harness/detector.js"
 import { installCodex } from "../harness/codex.js"
 import { installClaude } from "../harness/claude.js"
-import { installOpenCode } from "../harness/opencode.js"
+import { installOpenCode, refreshOpenCodePlugins } from "../harness/opencode.js"
 import { installCursor } from "../harness/cursor.js"
 import { installHermes } from "../harness/hermes.js"
 import { generateDevinAssets } from "../harness/devin.js"
@@ -549,9 +549,17 @@ function printDiagnosis(harnesses, alreadyInstalled) {
   info("")
   info("Diagnostico:")
   for (const h of harnesses) {
-    if (alreadyInstalled.includes(h.id)) info(`  ${h.label} — ja instalado (pulado)`)
+    if (alreadyInstalled.includes(h.id)) info(`  ${h.label} — ja instalado (artefatos gerenciados serao atualizados; --reinstall reaplica tudo)`)
     else info(`  ${h.label} — disponivel`)
   }
+}
+// P2 (máquina limpa): harness "já instalado" era PULADO por inteiro e os plugins
+// gerenciados ficavam na versão antiga (doctor: "Plugins gstack: nenhum" mesmo após
+// upgrade). Agora os artefatos MANIFEST-OWNED atualizam sempre — como o refreshHooks.
+function refreshInstalledHarnessArtifacts(alreadyInstalled, report) {
+  if (!alreadyInstalled.includes("opencode")) return
+  const n = refreshOpenCodePlugins({}, report)
+  if (n > 0) info(`  OpenCode: ${n} plugin(s) gerenciado(s) atualizados (config .json/.jsonc intocada)`)
 }
 // Nada novo p/ configurar: ainda assim ATUALIZA hooks (idempotente) — substitui
 // hooks obsoletos (ex.: qg.py antigo) ao re-rodar `install`.
@@ -587,6 +595,7 @@ async function resolveSelected(harnesses, flags, report, allHarnessIds) {
   const availableHarnessIds = allHarnessIds.filter((h) => !alreadyInstalled.includes(h))
   if (flags.reinstall) info("Modo --reinstall: reaplicando tudo (hooks/config) com backup + manifest.")
   printDiagnosis(harnesses, alreadyInstalled)
+  refreshInstalledHarnessArtifacts(alreadyInstalled, report)
   if (availableHarnessIds.length === 0) { await refreshAlreadyConfigured(allHarnessIds, report); return { done: true } }
   const selected = await chooseHarnesses(harnesses, availableHarnessIds, flags)
   if (selected.length === 0) { error("Nenhum harness selecionado. Instalacao cancelada."); process.exit(1) }
@@ -744,7 +753,7 @@ function installObsidianApp(args, flags, report) {
   const wantApp = !flags.projectOnly && !args.includes("--no-obsidian")
   if (wantApp && tryInstallObsidianApp(report)) return success("Obsidian app instalado (vault em ~/gstack-vault).")
   info("Obsidian app: nao instalado nesta maquina (degraded/opcional — o vault e markdown). Manual: `winget install Obsidian.Obsidian` / `brew install --cask obsidian`.")
-  if (wantApp) trackDegraded(report, "obsidian-app", "winget/brew indisponível ou falhou (vault markdown segue funcional)")
+  if (wantApp) trackDegraded(report, "obsidian-app", "winget/brew indisponível ou falhou (vault markdown segue funcional)", { optional: true })
 }
 async function chooseObsidianVault(report) {
   const chosen = await chooseObsidian({ select, prompt })

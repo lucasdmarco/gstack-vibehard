@@ -69,23 +69,13 @@ export async function installHeadroom(deps, report) {
     warn(`headroom: instalado mas --version falhou (${e.message || e})`)
   }
 
-  // headroom wrap for supported harnesses
-  for (const harnessId of deps.selectedHarnessIds) {
-    try {
-      switch (harnessId) {
-        case "claude":
-          execFileSync("headroom", ["wrap", "claude"], { stdio: "pipe", timeout: 30000, shell: false })
-          success("headroom wrap claude")
-          break
-        case "codex":
-          execFileSync("headroom", ["wrap", "codex"], { stdio: "pipe", timeout: 30000, shell: false })
-          success("headroom wrap codex")
-          break
-      }
-    } catch (e) {
-      info(`headroom wrap ${harnessId}: pulado (${e.message || e})`)
-    }
-  }
+  // NUNCA `headroom wrap` (removido na v3.76.0 — achado P1 da máquina limpa):
+  // o wrap muda config de harness FORA do manifest do gstack (o instalador rtk do
+  // headroom chegou a registrar hooks no Claude Code antes de falhar — escrita
+  // global não rastreada, uninstall não restauraria). Routing é EXCLUSIVAMENTE
+  // opt-in e project-scoped: `gstack_vibehard tools headroom enable --harness
+  // codex|claude --project-only` (reversível com `disable --restore`).
+  info("headroom: routing NÃO configurado automaticamente (opt-in: `gstack_vibehard tools headroom enable --harness codex|claude --project-only`)")
 
   // Add headroom to MCP servers (evitar duplicacao)
   const existing = readJsonFile(MCP_CONFIG)
