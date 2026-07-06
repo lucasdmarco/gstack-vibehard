@@ -83,6 +83,10 @@ function claimCrossHarnessTrust(has) {
     status: "PARTIAL", severity: "P1",
     evidence: ["src/dream/capabilities.js", "src/harness/instructional.js"].filter(has),
     missing: [`harness best-effort não impõem gates: ${weak.join(", ")}`],
+    // PRD25 25.5: PARTIAL aqui é o estado HONESTO por design — harness sem API de
+    // hooks só recebe instrução best-effort. A separação enforced/advisory É a
+    // feature; nunca vender "Zero-Trust universal". Docs/doctor refletem a matriz.
+    note: "PARTIAL por design: enforced (hooks reais) vs advisory/instructional (best-effort) é separação deliberada — Zero-Trust universal não é um claim possível nem prometido",
   }
 }
 // 6. OpenCode safe — REAL (conservador); merge assistido JSONC ainda ROADMAP.

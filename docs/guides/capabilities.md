@@ -79,6 +79,13 @@ roteado**. Sem isso, trate qualquer número de "economia" como não comprovado.
 
 Detalhe completo e níveis intermediários: [matriz de harnesses](harness-matrix.md).
 
+> **Claim honesto (PRD25):** a separação **enforced** (hooks reais) vs
+> **advisory/instructional** (best-effort) é deliberada e permanente — harness sem API
+> de hooks não pode ser forçado. O GStack **não promete Zero-Trust universal**; os
+> gates determinísticos (`verify`, QG, `publish-guard`) continuam valendo como comando
+> em qualquer harness. Verifique ao vivo: `agents doctor --json` ·
+> `doctor --conformance --strict --json`.
+
 ---
 
 ## Começo honesto em 3 comandos
