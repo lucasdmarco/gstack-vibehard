@@ -22,49 +22,53 @@ async function rmWithBackoff(dir, attempts = 8) {
 }
 
 /**
- * Espera DETERMINÍSTICA de liberação de handle (Windows): rename só funciona
- * quando nenhum processo segura o arquivo — probe muito mais confiável que sleep
- * cego. Após o taskkill/exit, o SO (ou antivírus) pode reter o handle do log do
- * filho por um instante; aqui esperamos a liberação REAL, com orçamento limitado.
+ * Espera DETERMINÍSTICA de liberação do DIRETÓRIO inteiro (Windows): renomear um
+ * diretório falha enquanto QUALQUER handle estiver aberto em qualquer ponto da
+ * árvore — inclusive o CWD de um filho/neto ainda em teardown, que probe por
+ * ARQUIVO de log não detecta (evidência da revisão: rm falhou na raiz do temp com
+ * "logs presos: nenhum listável"). Quando o rename do próprio dir funciona, o rm
+ * funciona. Orçamento limitado; na falha, o rm diagnostica.
  */
-async function waitLogsReleased(dir, budgetMs = 6000) {
-  const logsDir = path.join(dir, ".gstack", "runtime", "logs")
-  const files = await readdir(logsDir).catch(() => [])
+async function waitDirRenameable(dir, budgetMs = 8000) {
+  const probe = `${dir}.probe`
   const deadline = Date.now() + budgetMs
-  for (const name of files) {
-    const file = path.join(logsDir, name)
-    const probe = `${file}.probe`
-    for (;;) {
-      try { await rename(file, probe); await rename(probe, file); break } // liberado
-      catch (e) {
-        if (e.code === "ENOENT") break // já removido/renomeado — nada a esperar
-        if (Date.now() > deadline) break // orçamento estourou — o rm diagnostica
-        await sleep(150)
-      }
+  for (;;) {
+    try { await rename(dir, probe); await rename(probe, dir); return true }
+    catch (e) {
+      if (e.code === "ENOENT") return true // já removido — nada a esperar
+      if (Date.now() > deadline) return false
+      await sleep(150)
     }
   }
 }
 
 /**
- * Cleanup à prova de EBUSY (Windows): para o runtime, espera os pids morrerem DE
- * VERDADE (taskkill retorna antes de o SO soltar os handles do filho), espera os
- * handles de LOG serem liberados (probe de rename, determinístico) e só então
- * remove o diretório com retry/backoff. Na última falha, diagnostica o que sobrou.
- * NADA disso enfraquece as asserções — o teste continua exigindo pids mortos e
- * remoção sem EBUSY; só a espera virou baseada em estado real, não em sorte.
+ * Cleanup à prova de EBUSY (Windows), em 4 passos determinísticos:
+ *  1. captura os PIDs ANTES do stop — o stop limpa o state; ler depois esperava
+ *     em lista VAZIA (bug pego na revisão pós-v3.74);
+ *  2. stop + waitPidsExit nos pids capturados (taskkill retorna antes do teardown);
+ *  3. espera o DIRETÓRIO inteiro ficar renomeável (detecta handle de cwd/AV que
+ *     probe por arquivo não vê);
+ *  4. rm com retry/backoff. Na falha, diagnostica pids vivos + sobras.
+ * NADA disso enfraquece as asserções — pids mortos e remoção sem EBUSY continuam
+ * exigidos; só a espera é baseada em estado real, não em sorte.
  */
 async function cleanupProject(dir, stopCommand) {
+  let pids = []
+  try { pids = readAllState(dir).map((s) => s.pid).filter(Boolean) } catch { /* sem state */ }
   try { await stopCommand([], { cwd: dir }) } catch { /* idempotente */ }
-  // cinto e suspensório: qualquer pid remanescente no state (stop pode ter pulado)
-  try {
-    await waitPidsExit(readAllState(dir).map((s) => s.pid).filter((p) => p && isAlive(p)), { timeoutMs: 5000 })
-  } catch { /* state ausente/ilegível = nada vivo a esperar */ }
-  await waitLogsReleased(dir)
+  const stillAlive = await waitPidsExit(pids, { timeoutMs: 8000 }).catch(() => [])
+  await waitDirRenameable(dir)
   const lastErr = await rmWithBackoff(dir)
   if (!lastErr) return
-  // Diagnóstico do arquivo preso — sem isso o CI só mostra "EBUSY: <dir>".
+  // Diagnóstico completo — sem isso o CI só mostra "EBUSY: <dir>".
   const leftover = await readdir(path.join(dir, ".gstack", "runtime", "logs")).catch(() => [])
-  throw new Error(`cleanup falhou (${lastErr.code}): ${lastErr.path} — logs presos: ${leftover.join(", ") || "(nenhum listável)"}`)
+  const alive = pids.filter((p) => isAlive(p))
+  throw new Error(
+    `cleanup falhou (${lastErr.code}): ${lastErr.path} — pids capturados: [${pids.join(", ")}]` +
+    ` · vivos pós-wait: [${stillAlive.join(", ")}] · vivos agora: [${alive.join(", ")}]` +
+    ` · logs presos: ${leftover.join(", ") || "(nenhum listável)"}`,
+  )
 }
 
 // Servidor http mínimo: prova que o supervisor sobe um processo REAL, sem shell,
