@@ -292,7 +292,9 @@ export function runCleanMachine(opts = {}) {
   try {
     const scenarios = runScenarios(root)
     const artifacts = buildArtifacts(root, scenarios, runId)
-    return { runId, ...summarize(scenarios), scenarios, artifacts, writtenTo: maybeWrite(opts, runId, artifacts) }
+    // CM-09: isto é um SIMULADOR offline (fixture homes isoladas), não a prova do
+    // estado instalado real — `mode` torna impossível confundir os dois.
+    return { runId, mode: "simulated_offline", note: "cenários em fixture homes isoladas; o estado REAL da máquina é `tools readiness --json`", ...summarize(scenarios), scenarios, artifacts, writtenTo: maybeWrite(opts, runId, artifacts) }
   } finally {
     cleanupRoot(root, opts.keep)
   }

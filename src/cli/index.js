@@ -76,13 +76,38 @@ function ensureReadableConsole() {
   if (_consoleFixed) return
   _consoleFixed = true
   if (!isLegacyWinConsole()) return
-  try { execSync("chcp 65001", { stdio: "ignore", windowsHide: true }) }
-  catch { asciiMode = true } // não deu p/ trocar a codepage → cai no banner ASCII
+  // CM-04 (máquina limpa v3.75): o chcp por subprocesso "deu certo" (exit 0) mas o
+  // PS 5.1 REAL continuou renderizando mojibake (`â•”`, `InstalaÃ§Ã£o`). Agora
+  // VERIFICAMOS a codepage efetiva — só confiamos em unicode com 65001 CONFIRMADO;
+  // qualquer outra coisa cai para ASCII+transliteração (legível sempre > bonito).
+  try {
+    execSync("chcp 65001", { stdio: "ignore", windowsHide: true })
+    const active = execSync("chcp", { encoding: "utf-8", windowsHide: true })
+    if (!/65001/.test(String(active))) asciiMode = true
+  } catch { asciiMode = true } // não deu p/ trocar/verificar → ASCII seguro
 }
 
+// Transliteração ASCII central (CM-04): símbolos unicode → ASCII e acentos →
+// letras base. Aplicada em TODO output (via `color()`) quando asciiMode está on —
+// nenhum caminho de print escapa, então não existe mojibake parcial.
+const ASCII_SYMBOLS = [
+  [/[✓✔]/g, "OK"], [/[✗✖]/g, "X"], [/⚠/g, "!"], [/[•·]/g, "*"], [/[▸▶►]/g, ">"],
+  [/[→⇒]/g, "->"], [/[—–]/g, "-"], [/[─═]/g, "-"], [/[║│]/g, "|"],
+  [/[╔╗╚╝┌┐└┘]/g, "+"], [/[▲]/g, "^"], [/…/g, "..."], [/≠/g, "!="], [/[«»]/g, '"'],
+]
+export function asciiSafe(text) {
+  let s = String(text)
+  for (const [re, rep] of ASCII_SYMBOLS) s = s.replace(re, rep)
+  // acentos → base (Instalação → Instalacao); remove o que sobrar fora do ASCII.
+  s = s.normalize("NFD").replace(/[̀-ͯ]/g, "")
+  return s.replace(/[^\x00-\x7F]/g, "?")
+}
+export function setAsciiMode(v) { asciiMode = !!v }
+
 function color(text, ...codes) {
-  if (noColor) return text
-  return codes.join("") + text + COLORS.reset
+  const t = asciiMode ? asciiSafe(text) : text
+  if (noColor) return t
+  return codes.join("") + t + COLORS.reset
 }
 
 function logo() {
