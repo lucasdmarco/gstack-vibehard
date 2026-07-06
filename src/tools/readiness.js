@@ -158,14 +158,20 @@ function graphMetrics(g) {
   return { indexedCommit: g.built_at_commit || null, nodes: nodes.length, edges: links.length, communities: countCommunities(nodes) }
 }
 const freshnessState = (builtAt, head) => (!builtAt || !head ? "unknown" : builtAt === head ? "fresh" : "stale")
+// Ação recomendada IMPOSSÍVEL de confundir (PRD25 25.2): stale/absent ⇒ como sanar.
+const FRESHNESS_ACTIONS = Object.freeze({
+  stale: "tools refresh --changed (ou `graphify update .`)",
+  absent: "graphify index . (gera graphify-out/graph.json)",
+})
+const withAction = (freshness) => ({ ...freshness, recommendedAction: FRESHNESS_ACTIONS[freshness.state] || null })
 // Lê graphify-out/graph.json UMA vez: freshness (vs git HEAD) + métricas (nós/arestas/comunidades).
 function graphInfo(cwd, head) {
   const graphPath = join(cwd, "graphify-out", "graph.json")
-  if (!existsSync(graphPath)) return { freshness: { state: "absent" }, metrics: null }
+  if (!existsSync(graphPath)) return { freshness: withAction({ state: "absent" }), metrics: null }
   const g = readGraph(graphPath)
-  if (!g) return { freshness: { state: "unknown", head: head || null }, metrics: null }
+  if (!g) return { freshness: withAction({ state: "unknown", head: head || null }), metrics: null }
   const m = graphMetrics(g)
-  return { freshness: { state: freshnessState(m.indexedCommit, head), builtAtCommit: m.indexedCommit, head: head || null }, metrics: m }
+  return { freshness: withAction({ state: freshnessState(m.indexedCommit, head), builtAtCommit: m.indexedCommit, head: head || null }), metrics: m }
 }
 function probeGraphify(probe, cwd, head) {
   const res = probe("graphify", ["--version"])

@@ -1,5 +1,23 @@
 # Changelog - gstack-vibehard
 
+## [3.69.0] - 2026-07-06
+
+### Tool Freshness antes de claims (PRD 25 Sprint 25.2)
+
+Freshness do Graphify **impossível de confundir**: `stale`/`absent` agora vêm com ação
+recomendada explícita, no JSON e no render humano.
+
+- **`src/tools/readiness.js`**: `freshness.recommendedAction` — `stale` ⇒
+  `tools refresh --changed (ou graphify update .)`; `absent` ⇒ `graphify index .`;
+  `fresh` ⇒ `null` (acceptance literal do PRD25 25.2).
+- **`src/commands/tools.js`**: render de `tools readiness` destaca em warning
+  `graph stale → <ação>`.
+- **`docs/guides/capabilities.md`**: claim honesto (stale é warning visível; checar
+  freshness antes de claims de topologia). Grafo real do repo atualizado via
+  `tools refresh` (stale → **fresh**; nada global tocado, Headroom intocado).
+- Teste `tool_readiness` estendido (recommendedAction por estado). QG CRIT/HIGH **0**,
+  lint+`typecheck`+`typecheck:ts` verdes.
+
 ## [3.68.0] - 2026-07-06
 
 ### Release gate verde no Windows — evidência + tree-clean acionável (PRD 25 Sprint 25.1)

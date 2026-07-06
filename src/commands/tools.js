@@ -366,6 +366,8 @@ const routingNote = (t) => (t.routing && t.routing.proxyRunning ? " · proxy on"
 function renderReadinessTool(name, t) {
   const extra = freshnessNote(t.freshness) + metricsNote(t) + verdictNote(t) + countsNote(t) + routingNote(t)
   info(`  ${readyIcon(t.status)} ${name}: ${t.status}${extra}`)
+  // freshness IMPOSSÍVEL de confundir (PRD25 25.2): stale/absent vem com ação recomendada.
+  if (t.freshness && t.freshness.recommendedAction) warn(`      graph ${t.freshness.state} → ${t.freshness.recommendedAction}`)
   if (t.exitCode !== null && t.exitCode !== 0 && t.stderr) info(`      exit ${t.exitCode} · ${t.stderr}`)
 }
 function renderReadiness(report) {

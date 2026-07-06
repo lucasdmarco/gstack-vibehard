@@ -67,17 +67,21 @@ test("buildReadiness: graphify freshness fresh vs stale vs absent (built_at_comm
   const cwd = await mkdtemp(path.join(tmpdir(), "gstack-ready-"))
   try {
     const probe = makeProbe({ "graphify --version": { ok: true, code: 0, stdout: "graphify 0.8.0", stderr: "" } })
-    // sem graph.json → absent
+    // sem graph.json → absent (com ação recomendada — PRD25 25.2)
     let r = buildReadiness({ cwd, home: cwd, probe, git: () => "HEAD1" })
     assert.equal(r.tools.graphify.freshness.state, "absent")
+    assert.match(r.tools.graphify.freshness.recommendedAction, /graphify index/)
 
     await mkdir(path.join(cwd, "graphify-out"), { recursive: true })
     await writeFile(path.join(cwd, "graphify-out", "graph.json"), JSON.stringify({ built_at_commit: "HEAD1", nodes: [] }))
     r = buildReadiness({ cwd, home: cwd, probe, git: () => "HEAD1" })
     assert.equal(r.tools.graphify.freshness.state, "fresh")
+    assert.equal(r.tools.graphify.freshness.recommendedAction, null, "fresh não recomenda ação")
 
     r = buildReadiness({ cwd, home: cwd, probe, git: () => "HEAD2" })
     assert.equal(r.tools.graphify.freshness.state, "stale")
+    // acceptance literal do PRD25 25.2: stale ⇒ ação `tools refresh --changed`
+    assert.match(r.tools.graphify.freshness.recommendedAction, /tools refresh --changed/)
   } finally { await rm(cwd, { recursive: true, force: true }) }
 })
 
