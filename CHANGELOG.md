@@ -1,5 +1,19 @@
 # Changelog - gstack-vibehard
 
+## [3.75.0] - 2026-07-06
+
+### `npm run proof` — prova de máquina limpa em um comando
+
+Script executável para o teste de aceite em máquina limpa (`scripts/clean-machine-proof.mjs`):
+roda TODAS as 15 etapas em ordem (stress EBUSY 12×, suíte JS, test:py, lint, typechecks,
+qg strict com validação de conteúdo, dream audit 0-RISK, readiness, conformance strict,
+agents --check, **verify release READY**, test:pack, clean-machine, uninstall dry-run),
+imprime placar PASS/FAIL e grava `.gstack/reports/clean-machine-proof.json`. Exit 0 só
+com tudo verde — nenhuma etapa vira skip silencioso. Em falha, salva o **log completo**
+da etapa (`proof-fail-<etapa>.log`) e extrai as linhas relevantes (not ok/Error/EBUSY),
+não a última linha qualquer. Config: `GSTACK_PROOF_E2E_ROUNDS`,
+`GSTACK_VERIFY_TEST_TIMEOUT_MS`.
+
 ## [3.74.1] - 2026-07-06
 
 ### Determinismo EBUSY no Windows — 2 bugs reais no cleanup (3ª revisão externa)
