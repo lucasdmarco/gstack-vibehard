@@ -30,7 +30,7 @@ níveis estão explicados em texto.
 ## Callable / manual (roda sob demanda; **não** roteia tráfego sozinho)
 
 - **Fallow** — quality gate determinístico (`npx fallow`); é chamado pelos comandos de verificação, não intercepta o harness.
-- **Graphify** — topologia de código; `tools readiness` declara se o grafo está `fresh`/`stale` vs `git HEAD`.
+- **Graphify** — topologia de código; `tools readiness` declara se o grafo está `fresh`/`stale`/`absent` vs `git HEAD` **e, quando não-fresh, traz `recommendedAction`** (`tools refresh --changed` para stale; `graphify index .` para absent). Grafo `stale` é warning visível — cheque freshness antes de claims baseados em topologia.
 - **gstack context** — busca de docs offline (precisa do índice construído).
 - **Printing Press / MCP inventory** — catálogo e inventário read-only por harness.
 
