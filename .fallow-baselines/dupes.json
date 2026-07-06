@@ -1,0 +1,30 @@
+{
+  "clone_groups": [
+    "agents/skills/brainstorming/scripts/server.cjs:8-354|kits/agentsantigravity/agentsantigravity/skills/brainstorming/scripts/server.cjs:8-354|skills/skills/superpowers/brainstorming/scripts/server.cjs:8-354",
+    "agents/skills/systematic-debugging/condition-based-waiting-example.ts:20-135|kits/agentsantigravity/agentsantigravity/skills/systematic-debugging/condition-based-waiting-example.ts:20-135|skills/skills/superpowers/systematic-debugging/condition-based-waiting-example.ts:20-135",
+    "agents/skills/writing-skills/render-graphs.js:20-168|kits/agentsantigravity/agentsantigravity/skills/writing-skills/render-graphs.js:20-168|skills/skills/superpowers/writing-skills/render-graphs.js:20-168",
+    "scripts/test-e2e-lifecycle.mjs:17-21|scripts/test-pack.mjs:11-15",
+    "scripts/test-e2e-lifecycle.mjs:59-68|scripts/test-pack.mjs:27-37",
+    "scripts/test-e2e-lifecycle.mjs:60-145|scripts/test-pack.mjs:28-73",
+    "scripts/test-e2e-lifecycle.mjs:66-72|scripts/test-pack.mjs:40-47",
+    "scripts/test-e2e-lifecycle.mjs:141-145|scripts/test-pack.mjs:69-73|scripts/test-templates.mjs:61-65",
+    "src/commands/dream.js:17-37|src/commands/policy.js:20-37",
+    "src/commands/init.js:11-22|src/installer/install.js:30-42|src/installer/uninstall.js:13-24",
+    "src/commands/orchestrate.js:160-164|src/commands/task-run.js:22-26",
+    "src/commands/qa.js:9-13|src/project-plan/diff-hygiene.js:56-60",
+    "src/commands/update.js:21-28|src/project-plan/publish-guard.js:110-119",
+    "src/delegation/devin.js:20-27|src/delegation/opencode.js:173-182",
+    "src/harness/events.js:135-139|src/project-plan/evidence-ledger.js:60-64|src/project-plan/journal.js:22-28",
+    "src/harness/events.js:135-138|src/project-plan/evidence-ledger.js:60-63|src/project-plan/journal.js:22-27|src/vfa/provenance.js:18-21",
+    "src/installer/install.js:28-42|src/installer/uninstall.js:11-24",
+    "src/project-plan/evidence-ledger.js:60-72|src/project-plan/journal.js:22-38",
+    "templates/templates/fullstack-monorepo/apps/api-hono/src/index.ts:33-62|templates/templates/fullstack-monorepo/apps/api/src/openapi.ts:4-33",
+    "templates/templates/fullstack-monorepo/apps/api-hono/src/routes/users.ts:14-20|templates/templates/fullstack-monorepo/apps/api/src/routes/users.ts:18-24",
+    "templates/templates/fullstack-monorepo/apps/api-fastify/src/routes/users.ts:21-24|templates/templates/fullstack-monorepo/apps/api-hono/src/routes/users.ts:24-27|templates/templates/fullstack-monorepo/apps/api/src/routes/users.ts:29-33",
+    "templates/templates/fullstack-monorepo/apps/api-fastify/src/routes/users.ts:20-29|templates/templates/fullstack-monorepo/apps/api-hono/src/routes/users.ts:23-32",
+    "templates/templates/fullstack-monorepo/apps/api-fastify/src/routes/users.ts:32-39|templates/templates/fullstack-monorepo/apps/api-fastify/src/routes/users.ts:87-94",
+    "templates/templates/fullstack-monorepo/packages/db-turso/src/index.ts:5-12|templates/templates/fullstack-monorepo/packages/db/src/index.ts:6-13",
+    "templates/templates/fullstack-monorepo/packages/db-turso/src/seed.ts:9-26|templates/templates/fullstack-monorepo/packages/db/src/seed.ts:8-21",
+    "templates/templates/fullstack-monorepo/packages/db-turso/src/test-utils.ts:4-17|templates/templates/fullstack-monorepo/packages/db/src/test-utils.ts:4-17"
+  ]
+}

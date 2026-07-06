@@ -1,5 +1,27 @@
 # Changelog - gstack-vibehard
 
+## [3.67.0] - 2026-07-05
+
+### Fallow release gate por regressão (baselines) — limpeza dead-code/dup
+
+O verdict completo do `fallow audit` passa a **PASS**, gateando só **regressão nova**.
+
+Diagnóstico honesto do `fail` anterior: era débito **majoritariamente arquitetural**, não
+dead-code deletável. Dos 160 "unused exports" + 4 "unused files", **~90 são
+falsos-positivos** do padrão de teste deste repo — os testes carregam módulos por
+**dynamic import** (`imp("path")`), que a análise estática do Fallow não rastreia (o
+código É usado; deletar quebraria a suíte). Somam-se 20 circular deps + ~290 complexity
+(legado). Deleção **não** alcançaria verde e quebraria testes.
+
+- **`.fallowrc.jsonc`** (novo) + **`.fallow-baselines/{dead-code,dupes,health}.json`**
+  (novos): mecanismo **sancionado pelo Fallow** — baseline do débito atual; o gate
+  (`npx fallow audit`, usado por `qg.py`/`stop.py`) falha só em dead-code/dupes/
+  complexity **introduzidos além da linha de base**. Provado: baseline → `pass`; novo
+  export não usado → `fail` (exit 1). **Não é "zero findings" — é "sem débito novo"**
+  (`.fallow-baselines/README.md` documenta a honestidade; não afirmar "Fallow 100% limpo").
+- Guard `fallow_baseline_config` (2): impede desabilitar o gate silenciosamente (config +
+  baselines presentes). QG CRIT/HIGH ciclomático **0**, lint+`tsc` verdes.
+
 ## [3.66.0] - 2026-07-05
 
 ### Hash-Anchored Edit Guard (PRD 24 Sprint 24.6)
