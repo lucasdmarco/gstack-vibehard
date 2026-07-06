@@ -1,5 +1,23 @@
 # Changelog - gstack-vibehard
 
+## [3.78.0] - 2026-07-06
+
+### `gstack_vibehard proof` — o veredito único de produto (PRD 26 Sprint 26.B)
+
+- **`proof [--profile release|full|quick] [--json]`** (novo comando): a resposta única
+  para "pode publicar/entregar?" — agrega os gates que JÁ existem (verify, dream audit,
+  tool readiness, graphify freshness, headroom claim, git tree) num veredito
+  `gstack.proof.v1` `{ready, blockers[], warnings[], checks{}}`. Não reimplementa
+  nenhum gate — compõe e decide; exit 0 só com `ready:true`. Classificado como
+  EXECUTION no firewall (spawna suítes, como o verify).
+- **Timeout ≠ missing no readiness** (falso negativo medido pela revisão do PRD26):
+  probe com `ETIMEDOUT` re-tenta **1×**; persistindo, o status é **`timeout_degraded`**
+  (nunca `missing`) com descrição acionável. O `proof` converte em warning explícito.
+- **CM-08**: `dream audit` ganha `scope` (`target: gstack_package|directory`,
+  `packageName`) — auditar o pacote instalado ≠ auditar um projeto local, declarado.
+- Testes `proof_release` (6: verde/stale/timeout/blocked+CLI/readiness-retry/scope).
+  QG strict **0 blocking**, lint+typechecks verdes.
+
 ## [3.77.0] - 2026-07-06
 
 ### Instalador de usuário final (PRD 26 Sprint 26.A — fecha CM-01/04/05/07/09)
