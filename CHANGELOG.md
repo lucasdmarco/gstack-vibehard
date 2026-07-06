@@ -1,5 +1,24 @@
 # Changelog - gstack-vibehard
 
+## [3.68.0] - 2026-07-06
+
+### Release gate verde no Windows — evidência + tree-clean acionável (PRD 25 Sprint 25.1)
+
+Reconciliação honesta do P0 do PRD25: o claim "npm test falha em runtime_e2e por EBUSY"
+estava **desatualizado** — reproduzido agora: `runtime_e2e` isolado **3/3** e em loop
+**5×5 PASS, zero EBUSY**; `npm test` completo **675/675, exit 0** (hardening EBUSY veio
+na v3.23.0). **Nenhum fix inventado** — evidência registrada.
+
+- Bloqueio REAL do `verify --profile release` era `publish-guard: tree-clean` por um
+  arquivo untracked do usuário na raiz (movido para `.docs/PLANS/` com autorização do
+  plano; **nada apagado**).
+- **`src/project-plan/publish-guard.js`**: detail do `tree-clean` agora **lista os
+  arquivos** (até 5, `+N` além) com orientação "commit, mova ou ignore; nada é apagado"
+  — acionável, sem enfraquecer o gate (segue HARD).
+- Testes `publish_guard` (+2: lista arquivos; resumo >5). QG CRIT/HIGH **0**, lint+
+  `typecheck`+`typecheck:ts` verdes. Após o commit deste sprint, `verify --profile
+  release` fica **não-blocked** (única pendência era a árvore suja).
+
 ## [3.67.0] - 2026-07-05
 
 ### Fallow release gate por regressão (baselines) — limpeza dead-code/dup

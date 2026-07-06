@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any
 
 
-QG_VERSION = "3.67.0"
+QG_VERSION = "3.68.0"
 FALLOW_ARGS = ["audit", "--format", "json"]
 # Contrato historico: o JSON expoe `command` como `npx fallow ...` (o caminho de
 # fallback). A resolucao REAL prefere binario local/global (ver _resolve_fallow).

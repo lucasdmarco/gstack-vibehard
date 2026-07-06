@@ -36,7 +36,7 @@ export function publishGuard(opts = {}) {
   const porcelain = git("status", "--porcelain")
   if (porcelain === null) add("tree-clean", "not_applicable", "não é repositório git")
   else if (porcelain === "") add("tree-clean", "passed", "working tree limpa")
-  else add("tree-clean", "failed", `working tree suja (${porcelain.split("\n").filter(Boolean).length} arquivo(s) não commitado(s))`)
+  else add("tree-clean", "failed", treeDirtyDetail(porcelain))
 
   // 2. versão bumpada vs última tag semver
   const tags = (git("tag", "--list") || "").split("\n").map((t) => t.trim()).filter(Boolean)
@@ -91,6 +91,17 @@ export function publishGuard(opts = {}) {
 }
 
 const HARD = new Set(["package-version", "tree-clean", "version-bump", "changelog-entry", "qg-version"])
+
+/**
+ * Detalhe ACIONÁVEL do tree-clean: lista OS ARQUIVOS (até 5) em vez de só contar
+ * (PRD25 25.1 — reportar estado; NUNCA apagar arquivo do usuário). Gate segue HARD.
+ */
+function treeDirtyDetail(porcelain) {
+  const lines = porcelain.split("\n").filter(Boolean)
+  const shown = lines.slice(0, 5).map((l) => l.trim()).join(", ")
+  const more = lines.length > 5 ? ` (+${lines.length - 5})` : ""
+  return `working tree suja (${lines.length} arquivo(s) não commitado(s)): ${shown}${more} — commit, mova ou ignore; nada é apagado`
+}
 
 /** Lê QG_VERSION de hooks/hooks/qg.py (label do Quality Gate). null se ausente. */
 function readQgVersion(cwd) {
