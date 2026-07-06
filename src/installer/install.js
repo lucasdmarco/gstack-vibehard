@@ -460,6 +460,15 @@ function saveAuditReport(impact, harnesses) {
 }
 function runAuditOnly(harnesses, flags, args, report) {
   const impact = buildInstallImpact({ home: HOME, harnessIds: harnesses.map((h) => h.id), withDeps: !flags.skipDeps, projectOnly: flags.projectOnly })
+  // `--json` = contrato de automação: JSON PURO (impacto + degradações previstas +
+  // supply chain), zero banner/section (gate final do PRD26 pegou a violação).
+  if (args.includes("--json")) {
+    let supplyChain = null
+    try { supplyChain = buildSupplyChainReport() } catch { /* preflight nunca quebra */ }
+    const payload = { schemaVersion: "gstack.install-audit.v1", readOnly: true, impact, predictedDegradations: predictFullDegradations(), supplyChain }
+    process.stdout.write(JSON.stringify(payload) + "\n")
+    return report
+  }
   printAuditImpact(impact)
   printSupplyChainPreflight()
   // READ-ONLY por padrão (P0.3): só grava com --save-report.
@@ -895,10 +904,20 @@ function printSuccessBanner(selectedHarnessIds, projectOnly) {
   console.log()
 }
 
+// `--json` = stdout PURO (contrato de automação) — banner só no modo humano.
+const printInstallBanner = (args) => { if (!args.includes("--json")) section("gstack_vibehard Installer") }
+async function runFullInstall(selected, args, flags, report) {
+  await installComponents(selected, report)
+  await configureHarnesses(selected, flags, report)
+  await installCrossHarnessLayer(selected, report)
+  installLauncher(report)
+  setupVault(flags, report)
+  await handleObsidianChoice(args, flags, report)
+}
 export async function install(args = []) {
   const flags = parseInstallFlags(args)
   const report = { added: [], updated: [], skipped: [], errors: [], degraded: [] }
-  section("gstack_vibehard Installer")
+  printInstallBanner(args)
   const harnesses = resolveHarnesses(flags)
   if (flags.auditOnly) return runAuditOnly(harnesses, flags, args, report)
   if (!ensureHarnesses(harnesses, flags)) return report
@@ -907,14 +926,8 @@ export async function install(args = []) {
   await maybeInstallDeps(flags, report, allHarnessIds)
   const sel = await resolveSelected(harnesses, flags, report, allHarnessIds)
   if (sel.done) return report
-  const selected = sel.selected
-  await installComponents(selected, report)
-  await configureHarnesses(selected, flags, report)
-  await installCrossHarnessLayer(selected, report)
-  installLauncher(report)
-  setupVault(flags, report)
-  await handleObsidianChoice(args, flags, report)
+  await runFullInstall(sel.selected, args, flags, report)
   if (finalizeContract(report, flags).blocked) return report
-  printSuccessBanner(selected, flags.projectOnly)
+  printSuccessBanner(sel.selected, flags.projectOnly)
   return report
 }

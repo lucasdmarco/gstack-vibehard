@@ -71,6 +71,22 @@ test("CM-05: harnessStateLine dá razão única por estado (fonte + contrato)", 
   assert.match(src, /report\.harnessPlan = \{ all: allHarnessIds, alreadyInstalled, selected/, "plano rastreável no report")
 })
 
+// ── Gate PRD26 §10: `install --audit-only --json` = JSON PURO ────────────────
+test("install --audit-only --json emite JSON puro (schema install-audit.v1)", async () => {
+  const { install } = await imp("src/installer/install.js")
+  const orig = process.stdout.write.bind(process.stdout)
+  let buf = ""
+  process.stdout.write = (s) => { buf += String(s); return true }
+  const origLog = console.log
+  console.log = (s = "") => { buf += String(s) + "\n" }
+  try { await install(["--audit-only", "--json"]) } finally { process.stdout.write = orig; console.log = origLog }
+  const j = JSON.parse(buf.trim()) // lança se tiver banner/section antes
+  assert.equal(j.schemaVersion, "gstack.install-audit.v1")
+  assert.equal(j.readOnly, true)
+  assert.ok(Array.isArray(j.impact) && j.impact.length > 0)
+  assert.ok(Array.isArray(j.predictedDegradations), "degradações previstas no contrato (CM-01)")
+})
+
 // ── CM-09: clean-machine declara que é simulação ─────────────────────────────
 test("CM-09: runCleanMachine reporta mode simulated_offline", async () => {
   const { runCleanMachine } = await imp("src/installer/clean-machine.js")
