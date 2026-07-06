@@ -35,6 +35,22 @@ test("evaluateFullContract: Lite/project-only/audit-only TOLERAM degradação", 
   assert.equal(evaluateFullContract({ degraded: d, projectOnly: true }).isFull, false)
 })
 
+// P3 (máquina limpa): componente OPCIONAL degradado (ex.: obsidian-app — vault
+// markdown segue funcional) não pode reprovar o contrato Full inteiro.
+test("evaluateFullContract: opcional degradado → warning, NÃO bloqueia o Full", async () => {
+  const { evaluateFullContract, trackDegraded } = await imp()
+  const report = {}
+  trackDegraded(report, "obsidian-app", "winget falhou", { optional: true })
+  const r = evaluateFullContract({ degraded: report.degraded, projectOnly: false, auditOnly: false, skipDeps: false, allowDegraded: false })
+  assert.equal(r.block, false, "opcional degradado não bloqueia")
+  assert.match(r.message, /opcional/i, "warning explícito no message")
+  // obrigatório degradado JUNTO com opcional → ainda bloqueia (o opcional não dilui)
+  trackDegraded(report, "gbrain", "bun ausente")
+  const r2 = evaluateFullContract({ degraded: report.degraded, projectOnly: false, auditOnly: false, skipDeps: false, allowDegraded: false })
+  assert.equal(r2.block, true, "obrigatório continua bloqueando")
+  assert.match(r2.message, /1 componente\(s\) obrigatório/)
+})
+
 test("trackDegraded: inicializa o array e DEDUPLICA por componente", async () => {
   const { trackDegraded } = await imp()
   const report = { added: [] }

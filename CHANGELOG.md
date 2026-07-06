@@ -1,5 +1,31 @@
 # Changelog - gstack-vibehard
 
+## [3.76.0] - 2026-07-06
+
+### 3 achados do install na máquina limpa REAL (upgrade 3.21.1→3.75.0)
+
+O teste de usuário real expôs 3 problemas no `install` completo — todos corrigidos:
+
+- **[P1] `headroom wrap` REMOVIDO do install**: o wrap muda config de harness FORA do
+  manifest do gstack (na máquina limpa, o instalador rtk do headroom chegou a registrar
+  hooks no Claude Code do usuário antes de falhar — escrita global não rastreada que o
+  uninstall não restauraria). Routing agora é EXCLUSIVAMENTE opt-in e project-scoped:
+  `tools headroom enable --harness codex|claude --project-only` (reversível). Guard de
+  fonte no teste impede regressão.
+- **[P2] Harness "já instalado" agora atualiza artefatos gerenciados**: os plugins
+  OpenCode ficavam na versão antiga para sempre (doctor: "Plugins gstack: nenhum"
+  mesmo após upgrade — o harness era pulado por inteiro e nem aparecia no menu).
+  Novo `refreshOpenCodePlugins` (manifest-owned, idempotente, NUNCA toca
+  `opencode.json`/`.jsonc`) roda em todo install/upgrade; diagnóstico aponta
+  `--reinstall` para reaplicar tudo.
+- **[P3] Componente OPCIONAL degradado não reprova o contrato Full**: o install
+  inteiro terminava com `✗ Contrato Full NÃO cumprido` porque o `winget install
+  Obsidian` falhou — sendo o vault markdown funcional e o componente opcional.
+  `trackDegraded(..., { optional: true })` → warning explícito; componentes
+  obrigatórios continuam bloqueando (e opcional não dilui obrigatório).
+- Testes `install_findings_round` (4) + `full_contract` (+1) + regressões opencode
+  verdes. QG strict **0 blocking** (installOpenCode decomposto cc≤6).
+
 ## [3.75.0] - 2026-07-06
 
 ### `npm run proof` — prova de máquina limpa em um comando
