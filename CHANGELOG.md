@@ -1,5 +1,16 @@
 # Changelog - gstack-vibehard
 
+## [3.79.1] - 2026-07-06
+
+### Gate final PRD26: `install --audit-only --json` vira JSON PURO
+
+O gate final (§10 do PRD26: "JSON puro em comandos --json") pegou a violação: o
+audit-only imprimia banner/sections antes do payload. Agora `--json` emite **apenas**
+`gstack.install-audit.v1` `{readOnly, impact[], predictedDegradations[], supplyChain}`
+— o plano completo de escrita ANTES de instalar, consumível por automação (era o
+pedido do CM-01 §26.0 "expor plano --json"). `install()` decomposto (cc≤6).
+Teste no `install_enduser_round` (+1).
+
 ## [3.79.0] - 2026-07-06
 
 ### Fechamento do produto para o usuário final (PRD 26 Sprint 26.C)
