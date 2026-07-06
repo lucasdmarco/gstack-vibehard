@@ -41,7 +41,8 @@ async function restartAlive(alive, json) {
   const onWin = process.platform === "win32"
   const killed = stopAll(alive, onWin ? { exec: (f, a) => execFileSync(f, a, { stdio: "ignore" }) } : {})
   if (!json) killed.forEach((r) => info(`  • reiniciando — parei o antigo ${r.name}: ${r.status}`))
-  await waitPidsExit(killed.filter((r) => r.status === "stopped").map((r) => r.pid))
+  // TODOS os pids (não só "stopped"): "already-gone" pode estar em teardown de handles.
+  await waitPidsExit(killed.map((r) => r.pid))
 }
 // idempotência: se já há runtime VIVO, NÃO relança sem --force (senão órfã os
 // antigos). Retorna false → o `dev` deve abortar.
@@ -199,8 +200,10 @@ export async function stopCommand(args = [], opts = {}) {
   if (state.length === 0) return stopNothing(json)
   const results = stopAll(state, stopExecOpts(opts))
   // `stop` só reporta "parado" quando os processos MORRERAM de verdade (senão remover
-  // o dir do projeto logo após dá EBUSY no Windows — PRD14 §4.14).
-  const stillAlive = await waitPidsExit(results.filter((r) => r.status === "stopped").map((r) => r.pid), { timeoutMs: opts.waitTimeoutMs || 5000 })
+  // o dir do projeto logo após dá EBUSY no Windows — PRD14 §4.14). Espera TODOS os
+  // pids do state, não só status "stopped": um "already-gone" pode ainda estar em
+  // teardown de handles (cwd/log) — isAlive filtra os já mortos de graça.
+  const stillAlive = await waitPidsExit(results.map((r) => r.pid), { timeoutMs: opts.waitTimeoutMs || 5000 })
   clearState(cwd)
   if (json) return process.stdout.write(JSON.stringify({ stopped: results, stillAlive }) + "\n")
   renderStop(results, stillAlive, opts)

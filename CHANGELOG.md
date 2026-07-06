@@ -1,5 +1,28 @@
 # Changelog - gstack-vibehard
 
+## [3.74.1] - 2026-07-06
+
+### Determinismo EBUSY no Windows — 2 bugs reais no cleanup (3ª revisão externa)
+
+O EBUSY reapareceu no `verify release` do revisor com diagnóstico "logs presos:
+(nenhum listável)" — que expôs **dois bugs de verdade** no hardening anterior:
+
+1. **PIDs lidos DEPOIS do stop**: `stopCommand` limpa o state; o cinto-e-suspensório
+   do cleanup lia `readAllState` após o stop e o `waitPidsExit` esperava em **lista
+   vazia**. Agora os PIDs são **capturados ANTES** do stop e esperados de verdade.
+2. **Probe por arquivo de log não detecta handle de DIRETÓRIO**: o handle preso era
+   cwd de filho/AV na árvore, não um log listável. `waitDirRenameable` — renomear o
+   **diretório inteiro** só funciona quando NENHUM handle está aberto em qualquer
+   ponto da árvore (detector determinístico mais forte do Windows) — substitui o
+   probe por arquivo.
+3. **Produto (`runtime-supervisor.js`)**: `stop` e `dev --force` agora esperam
+   **TODOS** os pids do state, não só status `"stopped"` — um `already-gone` pode
+   ainda estar em teardown de handles (isAlive filtra os mortos de graça).
+
+Diagnóstico de falha enriquecido (pids capturados/vivos pós-wait/vivos agora +
+sobras). Asserções intactas. Stress: `runtime_e2e` **12×12 PASS, zero EBUSY**;
+supervisor 18/18; QG strict 0 findings.
+
 ## [3.74.0] - 2026-07-06
 
 ### Prova operacional fechada (revisão 9.2/10) — verify calibrado, dívida baselineada, test:py limpo
