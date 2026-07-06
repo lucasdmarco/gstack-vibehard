@@ -46,6 +46,23 @@ test("publish-guard: working tree suja → fail", async () => {
     const r = publishGuard({ cwd, exec: gitExec({ tags: ["v2.28.1"], porcelain: " M src/a.js\n?? b.js" }) })
     assert.equal(r.status, "fail")
     assert.ok(r.failed.includes("tree-clean"))
+    // PRD25 25.1: detalhe ACIONÁVEL — lista os arquivos, não só a contagem
+    const detail = r.checks.find((c) => c.id === "tree-clean").detail
+    assert.match(detail, /M src\/a\.js/, "lista o arquivo modificado")
+    assert.match(detail, /\?\? b\.js/, "lista o untracked")
+    assert.match(detail, /nada é apagado/, "reporta estado sem ameaçar apagar")
+  } finally { await rm(cwd, { recursive: true, force: true }) }
+})
+
+test("publish-guard: tree suja com >5 arquivos → lista 5 e resume o resto", async () => {
+  const cwd = await repo("2.29.0", "## [2.29.0]")
+  try {
+    const { publishGuard } = await imp()
+    const many = Array.from({ length: 7 }, (_, i) => `?? f${i}.js`).join("\n")
+    const r = publishGuard({ cwd, exec: gitExec({ tags: ["v2.28.1"], porcelain: many }) })
+    const detail = r.checks.find((c) => c.id === "tree-clean").detail
+    assert.match(detail, /7 arquivo/)
+    assert.match(detail, /\(\+2\)/, "resume os 2 além dos 5 listados")
   } finally { await rm(cwd, { recursive: true, force: true }) }
 })
 
