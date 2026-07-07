@@ -182,10 +182,15 @@ function scHeadroomMatrix(root) {
   const absent = join(root, "hr-absent")
   const present = join(root, "hr-present"); put(headroomExePath(present), "#!/bin/sh\n")
   const routed = join(root, "hr-routed"); put(headroomExePath(routed), "#!/bin/sh\n")
+  // v3.79.2: sem venv do projeto, o probe tenta `headroom` global no PATH — o
+  // fixture "ausente" declara os DOIS ausentes; "global" prova o fallback honesto.
+  const nowhere = { "headroom --version": failRes("não encontrado") }
+  const globalOnly = { "headroom --version": okRes("headroom 0.22.4") }
   const notRouted = { "headroom --version": okRes("headroom 1.0"), "headroom doctor": okRes("proxy stopped") }
   const isRouted = { "headroom --version": okRes("headroom 1.0"), "headroom doctor": okRes("proxy running · traffic routed") }
-  return scenario("headroom-matrix", "Headroom: ausente / presente-não-roteado / roteado", [
-    check("ausente = missing", headroomStatus(absent, {}) === "missing"),
+  return scenario("headroom-matrix", "Headroom: ausente / global-PATH / presente-não-roteado / roteado", [
+    check("ausente (nem venv nem PATH) = missing", headroomStatus(absent, nowhere) === "missing"),
+    check("sem venv mas global no PATH = callable_not_routed", headroomStatus(absent, globalOnly) === "callable_not_routed"),
     check("presente sem proxy = callable_not_routed", headroomStatus(present, notRouted) === "callable_not_routed"),
     check("proxy+routed = routed", headroomStatus(routed, isRouted) === "routed"),
   ], {})

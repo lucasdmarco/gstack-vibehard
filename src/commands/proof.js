@@ -31,16 +31,25 @@ function checkVerify(deps, cwd, profile) {
   const ok = v.status === "ready"
   return { ok, status: v.status, failed, timedOut: v.timedOut || [], blocker: ok ? null : verifyBlockerMsg(profile, v, failed) }
 }
-function checkDream(deps, cwd) {
-  const d = (deps.dream || audit)({ root: cwd })
+function checkDream(deps) {
+  // O dream audit do proof mede O PRODUTO (package root do gstack), não o cwd —
+  // rodar `proof` em C:\Users\x auditava o HOME e dava 0 REAL (pego na máquina
+  // limpa real). O `scope` no resultado declara o root auditado.
+  const d = (deps.dream || audit)({})
   const s = d.summary
   const ok = s.RISK === 0 && s.PLACEBO === 0
   return { ok, summary: s, scope: d.scope, blocker: ok ? null : `dream audit: ${s.RISK} RISK / ${s.PLACEBO} PLACEBO` }
 }
+// fresh=ok · stale=BLOQUEIA (grafo existe e mentiria) · absent/unknown=WARNING com
+// ação (fora de projeto/sem grafo é estado honesto, não falha — máquina limpa real).
+const graphifyResult = (state, action) => ({
+  fresh: { ok: true, state, recommendedAction: null, blocker: null, warning: null },
+  stale: { ok: false, state, recommendedAction: action, blocker: `graphify stale — ${action}`, warning: null },
+}[state] || { ok: true, state, recommendedAction: action, blocker: null, warning: `graphify ${state} — ${action}` })
 function graphifyCheck(tools) {
   const f = tools.graphify.freshness || {}
-  const ok = f.state === "fresh"
-  return { ok, state: f.state, recommendedAction: f.recommendedAction || null, blocker: ok ? null : `graphify ${f.state} — ${f.recommendedAction || "rode `tools refresh --changed`"}` }
+  const action = f.recommendedAction || "rode `tools refresh --changed`"
+  return graphifyResult(f.state || "unknown", action)
 }
 function toolsWarnings(tools) {
   const out = []
@@ -73,17 +82,18 @@ export function buildProof(opts = {}) {
   const profile = opts.profile || "release"
   const deps = opts.deps || {}
   const verify = checkVerify(deps, cwd, profile)
-  const dream = checkDream(deps, cwd)
+  const dream = checkDream(deps)
   const readiness = checkReadiness(deps, cwd)
   const gitTree = checkGitTree(deps, cwd)
   const blockers = [verify.blocker, dream.blocker, readiness.graphify.blocker, gitTree.blocker].filter(Boolean)
+  const warnings = [...readiness.warnings, readiness.graphify.warning].filter(Boolean)
   return {
     schemaVersion: PROOF_SCHEMA,
     profile,
     generatedAt: new Date().toISOString(),
     ready: blockers.length === 0,
     blockers,
-    warnings: readiness.warnings,
+    warnings,
     checks: { verify, dreamAudit: dream, toolReadiness: readiness.tools, graphifyFreshness: readiness.graphify, headroomRouting: readiness.headroom, gitTree },
   }
 }

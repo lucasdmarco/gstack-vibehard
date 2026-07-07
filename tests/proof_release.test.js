@@ -41,6 +41,31 @@ test("proof: graphify stale → ready:false com recommendedAction (acceptance PR
   assert.match(p.checks.graphifyFreshness.recommendedAction, /tools refresh --changed/)
 })
 
+// Máquina limpa real (v3.79.1): rodar proof em C:\Users\x não pode reprovar por
+// "graphify absent" (fora de projeto é estado honesto) nem auditar o HOME.
+test("proof: graphify ABSENT → warning com ação, NÃO bloqueia (só stale bloqueia)", async () => {
+  const { buildProof } = await imp("src/commands/proof.js")
+  const deps = greenDeps()
+  deps.readiness = () => ({ tools: {
+    fallow: { status: "callable" },
+    graphify: { status: "callable", freshness: { state: "absent", recommendedAction: "graphify index . (gera graphify-out/graph.json)" } },
+    gstackContext: { status: "installed_not_callable" }, headroom: { status: "callable_not_routed" },
+  } })
+  const p = buildProof({ cwd: "/x", deps })
+  assert.equal(p.ready, true, "absent não bloqueia")
+  assert.match(p.warnings.join(" | "), /graphify absent.*graphify index/)
+})
+
+test("proof: dream audit mede O PRODUTO (package root), não o cwd", async () => {
+  const { buildProof } = await imp("src/commands/proof.js")
+  let receivedArgs = null
+  const deps = greenDeps()
+  deps.dream = (args) => { receivedArgs = args; return { summary: { REAL: 20, PARTIAL: 1, PLACEBO: 0, ROADMAP: 0, RISK: 0 }, scope: { target: "gstack_package" } } }
+  const p = buildProof({ cwd: "C:/Users/alguem", deps })
+  assert.deepEqual(receivedArgs, {}, "sem root=cwd — o auditor usa o package root default")
+  assert.equal(p.checks.dreamAudit.scope.target, "gstack_package")
+})
+
 test("proof: timeout_degraded vira WARNING acionável, nunca 'missing' silencioso", async () => {
   const { buildProof } = await imp("src/commands/proof.js")
   const deps = greenDeps()
