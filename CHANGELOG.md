@@ -1,5 +1,32 @@
 # Changelog - gstack-vibehard
 
+## [3.80.0] - 2026-07-07
+
+### Trilha do usuário leigo: CWD guard + Node/npm health (PRD28 Sprint 28.0)
+
+Correção da causa raiz do teste real de máquina limpa: o usuário caiu em
+`npm install` / `npm install react` / `npm run dev` em `C:\Users\Windows`
+porque nada classificou ONDE ele estava antes de orientar.
+
+- **Workspace classifier** (`src/runtime/workspace.js`): `home_or_wrong_cwd` |
+  `empty_git_repo` | `gstack_project` | `node_app` | `empty_dir` | `unknown` —
+  cada estado com próximas ações GStack (**nunca** npm cru).
+- **`start` com guard interativo**: no home pergunta criar/abrir/diagnosticar;
+  em repo Git vazio pergunta scaffold-aqui/nova-pasta; pasta neutra e projeto
+  existente seguem direto (zero fricção nova).
+- **`dev` fora de projeto**: diagnóstico acionável pelo classifier (o que o
+  diretório é + trilha correta) em vez de um aviso seco.
+- **`doctor node [--json]`** (`src/installer/node-health.js`): Node presente NÃO
+  significa npm saudável — trio node/npm/npx + **smoke test em tempdir**
+  (nunca cria package.json no home), registry como degraded (não blocker),
+  `npm.cmd`/`npx.cmd` via cmd.exe no Windows (imune a ExecutionPolicy do npm.ps1).
+- **Install preflight**: `runtime npm`/`runtime npx` entram nas deps obrigatórias
+  do Full (probe leve; smoke completo vive no doctor).
+- **Tradutor de erros npm**: ENOENT package.json, missing script, npm.ps1
+  bloqueado, rede/timeout → diagnóstico + próxima ação de produto.
+- **Next-step contract**: `create` grava `.gstack/NEXT_STEPS.md` e a mensagem
+  final aponta `gstack_vibehard dev` (não mais `pnpm dev` cru).
+
 ## [3.79.3] - 2026-07-07
 
 ### CI cross-OS verde de verdade + motivo do Obsidian não é mais engolido
