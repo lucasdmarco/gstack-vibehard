@@ -1,5 +1,26 @@
 # Changelog - gstack-vibehard
 
+## [3.81.0] - 2026-07-07
+
+### README dual-core: leigo primeiro, engenheiro depois (PRD30 Sprints 30.1+30.2)
+
+O README raiz virou porta de entrada de produto (inspiração: organização de
+superfície do ECC — não a engenharia dele):
+
+- **Primeiras 40 linhas 100% sem jargão**: "Em uma frase" + "Comece sem medo"
+  com comando seguro acima da dobra e frase de desfazer.
+- **"Se você é iniciante"**: tabela Quero→Rode→O que acontece (6 trilhas, cada
+  uma com efeito declarado); `doctor node` como resposta a problema de npm.
+- **"O que o GStack nunca faz sem você pedir"**: bloco de confiança explícito.
+- **"Tradução sem jargão"**: gate/harness/worktree/MCP/proof explicados antes
+  de qualquer uso técnico.
+- Seções dev (6 comandos da trilha) e engenheiro (capacidades reais + links)
+  DEPOIS da parte leiga — honestidade preservada (Headroom callable_not_routed,
+  enforcement real vs instrucional, "não elimina alucinação").
+- **Bug corrigido**: a seção "Comece honesto em 3 comandos" mandava o usuário
+  rodar `node src/index.js ...` (comando de dev do repo) — removida.
+- 162 linhas (limite do PRD: 220).
+
 ## [3.80.0] - 2026-07-07
 
 ### Trilha do usuário leigo: CWD guard + Node/npm health (PRD28 Sprint 28.0)
