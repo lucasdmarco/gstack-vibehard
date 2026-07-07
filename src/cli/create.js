@@ -20,6 +20,7 @@ import { deepMerge } from "../installer/merge.js"
 import { checkRemoteDownload } from "../installer/remote-policy.js"
 import { npxArgv, npmArgv } from "../installer/deps.js"
 import { buildRuntimeManifest } from "../runtime/manifest.js"
+import { nextStepsContent } from "../runtime/workspace.js"
 import { buildIntegrationsRegistry } from "../printing-press/registry.js"
 import { buildContextRegistry, DOC_SOURCES as CONTEXT_DOC_SOURCES } from "../context-docs/registry.js"
 import { DEFAULT_LOOP_BUDGET } from "../loop-budget/policy.js"
@@ -1520,7 +1521,22 @@ function printCreateSummary(c, projectDir, phases, vaultProjectDir) {
   if (vaultProjectDir) logger.info(`  Vault: ${vaultProjectDir}`)
   else logger.info(`  Modo lite: projeto isolado em ./${projectName} (sem escrita global). Use --full ou --vault para o vault Obsidian.`)
   logger.info(`  Quality gate: npx fallow audit --format json`)
-  logger.info(`  Dev: cd ${projectName} && pnpm dev`)
+  // PRD28 28.0: a trilha principal do usuário é `gstack_vibehard dev` (supervisor,
+  // logs, readiness) — npm/pnpm cru não é a primeira instrução do produto.
+  logger.info("")
+  logger.info("  Próximos comandos:")
+  logger.info(`    1. cd ${projectName}`)
+  logger.info("    2. gstack_vibehard dev              # sobe o runtime")
+  logger.info("    3. gstack_vibehard proof --json     # está pronto?")
+  logger.info(`  (trilha completa em ${projectName}/.gstack/NEXT_STEPS.md)`)
+}
+
+// Next-step contract (PRD28 §11.3): o projeto criado carrega a própria trilha.
+function writeNextSteps(projectDir, projectName, logger) {
+  try {
+    mkdirSync(join(projectDir, ".gstack"), { recursive: true })
+    writeFileSync(join(projectDir, ".gstack", "NEXT_STEPS.md"), nextStepsContent(projectName))
+  } catch (e) { logger.warn(`NEXT_STEPS.md: ${e.message} (non-blocking)`) }
 }
 
 export async function createProject(options = {}) {
@@ -1538,6 +1554,7 @@ export async function createProject(options = {}) {
   scaffoldTemplate(c, projectDir)
   await scaffoldOrchestration(c, projectDir)
   const vaultProjectDir = setupVault(c, projectDir)
+  writeNextSteps(projectDir, c.projectName, c.logger)
   printCreateSummary(c, projectDir, phases, vaultProjectDir)
   return { projectDir, phases, vaultDir: vaultProjectDir, template: c.templateName }
 }

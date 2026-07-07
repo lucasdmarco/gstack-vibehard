@@ -8,6 +8,7 @@ import { modeWizardText } from "../project-plan/modes.js"
 import { buildConsult, renderConsultHuman } from "./consult.js"
 import { printPlanHuman } from "./plan.js"
 import { prompt, select, confirm, success, error, info, section, warn } from "../cli/index.js"
+import { classifyWorkspace } from "../runtime/workspace.js"
 
 /**
  * `start` — entrada Replit-like (PRD18 Sprint 1). Orquestra o wizard (objetivo →
@@ -154,10 +155,43 @@ function resolveStartCtx(args, opts) {
 // start é interativo: sem TTY e sem entradas injetadas/posicionais → orienta `plan`.
 const startNeedsHelp = (objective, opts) => !process.stdin.isTTY && !(objective !== undefined || opts.prompt)
 
+// ── Workspace guard (PRD28 28.0) ─────────────────────────────────────────────────
+// O bug real: usuário leigo em C:\Users\Windows caiu em `npm install` cru porque
+// nada perguntou ONDE ele estava. Antes do wizard, classifica o diretório e pergunta
+// a trilha — NUNCA orienta npm manual. gstack_project/node_app/unknown seguem direto.
+const GUARD_QUESTIONS = {
+  home_or_wrong_cwd: {
+    intro: (ws) => `Você está em uma pasta sem projeto (${ws.description}). NÃO rode npm install aqui.`,
+    choices: ["Criar um novo projeto GStack agora (continua o assistente)", "Entrar em um projeto existente (te mostro como)", "Apenas diagnosticar esta pasta"],
+  },
+  empty_git_repo: {
+    intro: () => "Encontrei um repositório Git, mas ainda não há app executável.",
+    choices: ["Criar scaffold GStack neste diretório (continua o assistente)", "Criar novo projeto em outra pasta (te mostro como)", "Cancelar e mostrar diagnóstico"],
+  },
+}
+function renderGuardExit(ws, choiceIdx) {
+  if (choiceIdx === 1) { info("  Trilha:"); info("    cd <caminho-do-projeto>"); info("    gstack_vibehard dev"); return }
+  info("  Diagnóstico read-only desta pasta:")
+  ws.actions.forEach((a) => info(`    • ${a}`))
+}
+/** true = seguir para o wizard; false = usuário escolheu sair (já orientado). */
+async function workspaceGuard(cwd, opts) {
+  const ws = (opts.classify || classifyWorkspace)(cwd)
+  const q = GUARD_QUESTIONS[ws.state]
+  if (!q) return true
+  warn(q.intro(ws))
+  const doSelect = opts.select || select
+  const choice = await doSelect("O que você quer fazer?", q.choices, 0)
+  if (choice === 0) return true
+  renderGuardExit(ws, choice)
+  return false
+}
+
 export async function startCommand(args = [], opts = {}) {
   const { flags, objective, cwd, json } = resolveStartCtx(args, opts)
   if (flags.dryRun) return handleDryRun(flags, objective, json, cwd)
   if (startNeedsHelp(objective, opts)) return printNonInteractiveHelp()
+  if (!(await workspaceGuard(cwd, opts))) return { executed: false, guarded: true }
   const res = await collectPlan(flags, opts, objective, json, cwd)
   if (!res) return
   return confirmAndRunPipeline(res.plan, flags, opts, json, cwd)

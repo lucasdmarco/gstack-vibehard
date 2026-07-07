@@ -179,7 +179,7 @@ const COMMANDS = [
   { name: "status", group: "common", desc: "Ver se o gstack está ativo neste projeto", usage: "gstack_vibehard status" },
   { name: "enable", group: "common", desc: "Ativar o gstack neste projeto (novo já vem ativo)", usage: "gstack_vibehard enable" },
   { name: "disable", group: "common", desc: "Desativar neste projeto (preserva dados)", usage: "gstack_vibehard disable" },
-  { name: "doctor", group: "common", desc: "Diagnosticar ambiente", usage: "gstack_vibehard doctor [--json [--strict]] [--impact] [--conformance] [--candidates] [--ruflo] [--opencode] [--fix opencode [--dry-run|--apply|--restore-jsonc]] [--supply-chain] [--install-integrity] [--repair-manifest [--yes]] [--package-manager [--fix]]" },
+  { name: "doctor", group: "common", desc: "Diagnosticar ambiente", usage: "gstack_vibehard doctor [node] [--json [--strict]] [--impact] [--conformance] [--candidates] [--ruflo] [--opencode] [--fix opencode [--dry-run|--apply|--restore-jsonc]] [--supply-chain] [--install-integrity] [--repair-manifest [--yes]] [--package-manager [--fix]]" },
   { name: "verify", group: "common", desc: "Delivery gates por arquétipo", usage: "gstack_vibehard verify [--quick] [--profile full|release] [--agentshield] [--json]" },
   { name: "proof", group: "common", desc: "Veredito único: pode publicar/entregar? (verify+dream+readiness+git)", usage: "gstack_vibehard proof [--profile release|full|quick] [--json]" },
   { name: "install", group: "common", desc: "Instalar no ambiente (preflight-first; pede confirmação)", usage: "gstack_vibehard install [--audit-only [--save-report]] [--project-only] [--harness <id>] [--no-global-mcp] [--no-obsidian] [--allow-degraded] [--yes]" },

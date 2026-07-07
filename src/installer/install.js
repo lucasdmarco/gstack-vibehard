@@ -20,6 +20,7 @@ import { buildSupplyChainReport } from "./supply-chain.js"
 import { checkRemoteDownload } from "./remote-policy.js"
 import { safeCopyDir, safeCopyFile, safeWriteFile, safeAppendBlock } from "./safe-write.js"
 import { findWorkingBinary, getUvCandidates, getBunCandidates, npxArgv, npmArgv, mergeWindowsPath } from "./deps.js"
+import { probeNpmNpx } from "./node-health.js"
 import { checkAlreadyInstalled } from "./check.js"
 import { installGeneratedAgentLayer, installGraphifyGitHooks } from "./agent-distribution.js"
 import { multiSelect, select, prompt, confirm, success, warn, error, info, section } from "../cli/index.js"
@@ -530,6 +531,11 @@ function printMcpPreflight(flags) {
 // Full falhou. Agora o preflight SONDA os toolchains das deps obrigatórias e, se
 // alguma degradaria, exige a decisão (--allow-degraded) ANTES de qualquer escrita.
 const MANDATORY_DEP_PROBES = [
+  // PRD28 28.0: Node presente NÃO significa npm/npx saudáveis (shim npm.ps1 pode
+  // estar bloqueado; npx quebra Fallow/skills). Probe leve aqui; smoke completo
+  // em tempdir vive no `doctor node` (nunca cria package.json no home).
+  { component: "runtime npm", needs: "npm funcional (npm.cmd no Windows)", probe: () => probeNpmNpx().npmOk },
+  { component: "runtime npx", needs: "npx funcional (Fallow/skills dependem)", probe: () => probeNpmNpx().npxOk },
   { component: "gbrain", needs: "bun", probe: () => findWorkingBinary(["bun", ...getBunCandidates(HOME, isWindows())]) !== "" },
   { component: "graphify", needs: "uv", probe: () => !!(findWorkingBinary(["graphify"]) || findWorkingBinary(getUvCandidates(HOME, isWindows()))) },
   { component: "headroom", needs: "uv ou pip", probe: () => !!(findWorkingBinary(["headroom"]) || findWorkingBinary(getUvCandidates(HOME, isWindows())) || findWorkingBinary(["pip"])) },
