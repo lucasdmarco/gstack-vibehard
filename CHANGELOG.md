@@ -1,5 +1,24 @@
 # Changelog - gstack-vibehard
 
+## [3.82.0] - 2026-07-07
+
+### Skill Catalog determinístico (PRD29 Sprint 29.0)
+
+Fundação da camada Skill Gates: as skills versionadas viram inventário
+máquina-legível — a contagem é MEDIDA (213 hoje), nunca assumida.
+
+- **`gstack_vibehard skills catalog [--json]`** → `.gstack/skills/catalog.{json,md}`
+  (`gstack.skill-catalog.v1`): hash sha256/provenance por skill, pack derivado
+  do caminho (skills/, agent-packs/<p>, agents, agents-generated/<harness>),
+  frontmatter ausente detectado (10 hoje), classificação inicial pelas 10 fases
+  do SDLC, sinais de risco por conteúdo (nunca executa nada).
+- **`gstack_vibehard skills doctor [--strict]`**: frontmatter ausente/descrição
+  vazia (warning), id duplicado no mesmo pack (problem, ok:false), comandos de
+  risco (info). `--strict` reprova com warnings.
+- **Firewall**: `skills` é camada KNOWLEDGE — nunca edita fonte; grava só
+  artefatos `.gstack/` (mesmo padrão do context index). Scanner lê SOMENTE
+  SKILL.md — teste com armadilha prova que `.env*` jamais é aberto.
+
 ## [3.81.0] - 2026-07-07
 
 ### README dual-core: leigo primeiro, engenheiro depois (PRD30 Sprints 30.1+30.2)
