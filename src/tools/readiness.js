@@ -232,6 +232,13 @@ function headroomRouting(probe, exe) {
 function probeHeadroom(probe, cwd) {
   const exe = headroomExe(cwd)
   if (!existsSync(exe)) {
+    // Sem venv do projeto, o headroom pode estar no PATH (install global) — a
+    // máquina limpa reportava "missing" com headroom 0.22.4 instalado. Honesto:
+    // global e chamável ⇒ callable_not_routed (routing continua opt-in).
+    const globalVer = probe("headroom", ["--version"])
+    if (globalVer.ok) {
+      return toolEntry({ status: "callable_not_routed", scope: "global", purpose: "token_proxy", command: "headroom --version", res: globalVer, extra: { routed: false } })
+    }
     return toolEntry({ status: "missing", scope: "project", purpose: "token_proxy", command: `${exe} --version`, res: { code: null, stdout: "", stderr: "não instalado" } })
   }
   const ver = probe(exe, ["--version"])

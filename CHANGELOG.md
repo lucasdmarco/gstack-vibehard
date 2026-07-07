@@ -1,5 +1,25 @@
 # Changelog - gstack-vibehard
 
+## [3.79.2] - 2026-07-07
+
+### `proof` calibrado pela máquina limpa REAL (transcript v3.79.1 do usuário)
+
+O transcript confirmou TODOS os fixes do 26.A (zero mojibake, sem wrap, plugins
+OpenCode atualizados, estado por harness, Obsidian como warning + "Instalacao
+Concluida!"). O `proof` em `C:\Users\Windows` expôs 3 calibrações:
+
+- **dream audit do proof media o CWD, não o produto**: rodar `proof` no HOME auditava
+  `C:\Users\Windows` (0 REAL / 1 RISK falso). Agora audita o **package root** do gstack
+  (default do auditor), com `scope` declarando o alvo. Resultado na máquina do usuário:
+  20 REAL / 1 PARTIAL / 0 RISK.
+- **`graphify absent` não bloqueia mais**: fora de projeto/sem grafo é estado honesto —
+  vira **warning com ação** (`graphify index .`); `stale` continua **blocker** (grafo
+  existente e desatualizado mentiria).
+- **Headroom global reconhecido**: sem venv do projeto, o probe agora tenta `headroom`
+  no PATH — instalado globalmente ⇒ `callable_not_routed` (scope global), não mais
+  `missing` falso.
+- Testes `proof_release` (+2: absent=warning, dream=package root). QG strict **0**.
+
 ## [3.79.1] - 2026-07-06
 
 ### Gate final PRD26: `install --audit-only --json` vira JSON PURO
