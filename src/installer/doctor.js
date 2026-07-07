@@ -348,9 +348,21 @@ async function fullJsonRoute(strict) {
 const SPECIALIZED_FLAGS = ["--impact", "--install-integrity", "--fix", "--repair-manifest", "--package-manager", "--pm", "--supply-chain"]
 function hasSpecializedFlag(args) { return SPECIALIZED_FLAGS.some((f) => args.includes(f)) }
 
+// `doctor node [--json [--strict]]` — health gate node/npm/npx + smoke em tempdir
+// (PRD28 28.0): Node presente NÃO significa npm saudável; smoke NUNCA toca o home.
+async function nodeHealthRoute(json, strict) {
+  const { checkNodeHealth, renderNodeHealth } = await import("./node-health.js")
+  const h = checkNodeHealth()
+  if (json) return emitJson(h, strict && !h.ok)
+  section("doctor node — Node/npm/npx health")
+  renderNodeHealth(h, { success, warn, error, info })
+  if (!h.ok) process.exitCode = 1
+}
+
 // Ordem PRESERVADA do dispatcher original (precedência entre flags combinadas).
 function doctorRoutes() {
   return [
+    { match: (a) => a.includes("node"), run: (a, j, s) => nodeHealthRoute(j, s) },
     { match: (a) => a.includes("--conformance"), run: (a, j, s) => conformanceRoute(j, s) },
     { match: (a) => a.includes("--candidates"), run: (a, j) => candidatesReport(j) },
     { match: (a) => a.includes("--ruflo"), run: (a, j) => rufloReport(j) },
