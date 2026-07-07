@@ -2,6 +2,7 @@ import { spawn, execFileSync } from "child_process"
 import { openSync, closeSync, mkdirSync, existsSync, readFileSync } from "fs"
 import { join } from "path"
 import { loadRuntimeManifest, validateRuntimeManifest } from "../runtime/manifest.js"
+import { classifyWorkspace } from "../runtime/workspace.js"
 import {
   planStart, stopAll, pollReadiness, killTreeCommand, isAlive, waitPidsExit,
   writeServiceState, readAllState, clearState, logsDir,
@@ -28,9 +29,22 @@ function openUrl(url) {
   } catch { return false }
 }
 
+// Sem manifest: diagnóstico acionável pelo workspace classifier (PRD28 28.0) —
+// explica O QUE o diretório é e a trilha GStack correta. NUNCA sugere npm cru
+// (o bug real: usuário leigo instalou pacotes soltos no home p/ "consertar").
+function explainNoManifest(cwd) {
+  const ws = classifyWorkspace(cwd)
+  warn(`Sem runtime executável aqui — ${ws.description}.`)
+  if (ws.state === "node_app") {
+    const scripts = ws.signals.scripts
+    info(scripts.length ? `  Este app tem scripts próprios (${scripts.join(", ")}), mas não é um runtime GStack.` : "  Este package.json não tem script de dev.")
+  }
+  info("  O que fazer:")
+  ws.actions.forEach((a) => info(`    • ${a}`))
+}
 function loadValidDevManifest(cwd) {
   const m = loadRuntimeManifest(cwd)
-  if (!m) { warn("Sem manifest de runtime — rode dentro de um projeto `gstack_vibehard create`."); return null }
+  if (!m) { explainNoManifest(cwd); return null }
   const v = validateRuntimeManifest(m)
   if (!v.valid) { v.errors.forEach((e) => warn(`  ✗ ${e}`)); error("Runtime manifest inválido — corrija antes do `dev`."); return null }
   return m
