@@ -98,6 +98,27 @@ test("proof: verify blocked ou tree sujo → blockers específicos, exit 1 no CL
   process.exitCode = 0
 })
 
+test("proof: render humano cobre placar/avisos/bloqueios (sem --json)", async () => {
+  const { proofCommand } = await imp("src/commands/proof.js")
+  const deps = greenDeps()
+  deps.readiness = () => ({ tools: {
+    fallow: { status: "timeout_degraded" },
+    graphify: { status: "callable", freshness: { state: "absent", recommendedAction: "graphify index ." } },
+    gstackContext: { status: "callable" }, headroom: { status: "callable_not_routed" },
+  } })
+  const orig = process.stdout.write.bind(process.stdout)
+  const origLog = console.log
+  let buf = ""
+  process.stdout.write = (s) => { buf += String(s); return true }
+  console.log = (s = "") => { buf += String(s) + "\n" }
+  try { await proofCommand([], { cwd: "/x", deps }) } finally { process.stdout.write = orig; console.log = origLog }
+  assert.match(buf, /verify: ok/)
+  assert.match(buf, /headroom: callable_not_routed/)
+  assert.match(buf, /aviso:.*timeout/i)
+  assert.match(buf, /PRONTO/, "veredito final impresso")
+  process.exitCode = 0
+})
+
 test("readiness: probe com timeout classifica timeout_degraded (nunca missing) e re-tenta 1x", async () => {
   const { buildReadiness, STATUS_DESCRIPTIONS } = await imp("src/tools/readiness.js")
   assert.ok(STATUS_DESCRIPTIONS.timeout_degraded, "status documentado")

@@ -94,12 +94,16 @@ try {
   try { JSON.parse(call(["doctor", "--json"])); ok("doctor --json é JSON puro") }
   catch { bad("doctor --json não é JSON puro") }
 
-  // 5) GUARD do fix v3.21.1, cross-OS: truth contract no TARBALL == repo
+  // 5) GUARD do fix v3.21.1, cross-OS: truth contract no TARBALL == repo.
+  // Expectativa DINÂMICA (o CI quebrou com REAL===18 hardcoded quando o score real
+  // evoluiu p/ 20): o contrato é igualdade tarball==repo + zero PLACEBO, não um número.
   try {
     const audit = JSON.parse(call(["dream", "audit", "--json"]))
     const s = audit.summary || {}
-    if (s.PLACEBO === 0 && s.REAL === 18) ok(`dream audit no tarball: REAL=${s.REAL} PLACEBO=0 (== repo)`)
-    else bad(`dream audit no tarball divergiu: REAL=${s.REAL} PARTIAL=${s.PARTIAL} PLACEBO=${s.PLACEBO}`)
+    const repoAudit = JSON.parse(execFileSync(process.execPath, [join(repoRoot, "src", "index.js"), "dream", "audit", "--json"], { encoding: "utf8", timeout: 60000 }))
+    const r = repoAudit.summary || {}
+    if (s.PLACEBO === 0 && s.REAL === r.REAL && s.PARTIAL === r.PARTIAL) ok(`dream audit no tarball: REAL=${s.REAL} PLACEBO=0 (== repo)`)
+    else bad(`dream audit no tarball divergiu: tarball REAL=${s.REAL}/PARTIAL=${s.PARTIAL}/PLACEBO=${s.PLACEBO} vs repo REAL=${r.REAL}/PARTIAL=${r.PARTIAL}`)
   } catch (e) { bad(`dream audit --json falhou no tarball: ${(e.message || "").slice(0, 80)}`) }
 
   // ...até aqui tudo deve ser READ-ONLY: nenhum artefato gstack no HOME.
