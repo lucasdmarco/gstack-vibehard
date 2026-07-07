@@ -18,6 +18,7 @@
 export const KNOWLEDGE = Object.freeze([
   "context", "consult", "challenge", "plan", // PRD22 §4.3 (read-only)
   "audit", "qa", "doctor", "status", "list", "monitor", "logs", "state", // diagnóstico/leitura
+  "skills", // PRD29: inventário/diagnóstico de skills — nunca edita fonte (artefatos .gstack como o context)
 ])
 
 // Explícitos do PRD22 §4.3 + tudo que muta repo/config/estado (via gates).
