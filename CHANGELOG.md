@@ -1,5 +1,26 @@
 # Changelog - gstack-vibehard
 
+## [3.83.0] - 2026-07-07
+
+### Skill Gate Compiler (PRD29 Sprint 29.1)
+
+A skill aconselha; o gate decide. A matriz de gates por fase agora é compilada
+e validada contra o catálogo real (29.0):
+
+- **`gstack_vibehard skills gates show [--phase <fase>] [--json]`** →
+  `.gstack/skills/gate-matrix.{json,md}` (`gstack.skill-gate-matrix.v1`).
+- **Mapa manual dos 12 gates P0/P1** (classificador automático só sugere):
+  cwd-health, plan-before-code, existing-model-intake, design-system,
+  visual-validation, secret-deny, db-migration, rls, worktree-required,
+  context-pack-required, verify-proof, skill-route (advisory até o wiring 29.2).
+  Gates já implementados apontam `implementedBy` (workspace classifier v3.80,
+  proof v3.78, delegate --worktree).
+- **Precondições machine-checkable** (`caminho in valorA|valorB`); **conflito**
+  (mesmo path, conjuntos disjuntos, mesma fase) reprova a compilação (exit 1).
+- Skill citada que não existe no catálogo = warning (não bloqueia). Verifier
+  SEMPRE determinístico — teste garante que nenhum gate usa LLM como decisor.
+- Alias de fase (`frontend`→`design-ui`, `db`→`data-auth-api`, `ship`→`ship-closeout`).
+
 ## [3.82.0] - 2026-07-07
 
 ### Skill Catalog determinístico (PRD29 Sprint 29.0)
