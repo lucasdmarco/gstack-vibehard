@@ -1,5 +1,25 @@
 # Changelog - gstack-vibehard
 
+## [3.79.3] - 2026-07-07
+
+### CI cross-OS verde de verdade + motivo do Obsidian não é mais engolido
+
+Auditoria "o prometido foi entregue?" achou o workflow **Test falhando no GitHub
+desde o primeiro push** (local sempre verde — era drift de expectativa do CI):
+
+- **`agent-packs/` entrou no `files` do package**: a fonte dos Skill Packs não viajava
+  no tarball → `agents check` acusava drift DENTRO do pacote publicado (e2e cross-OS).
+- **e2e-lifecycle com expectativa dinâmica**: comparava `REAL === 18` hardcoded (score
+  real evoluiu para 20); agora o contrato é o verdadeiro — **tarball == repo** + zero
+  PLACEBO.
+- **coverage functions 71.96% < 72%** no runner: +2 testes de render (proof humano,
+  audit-only humano) → **72.61%**.
+- **Obsidian: motivo da falha reportado** (era `catch {}` mudo): agora o degraded diz
+  se foi `winget/brew não encontrado no PATH` ou `exit N: <stderr>` — diagnóstico real
+  para o usuário (achado da máquina limpa). MOM segue macOS-only por design (upstream
+  só distribui via Homebrew tap).
+- Validado local: e2e lifecycle 12/12 ✓ (tarball com packs, sem drift), coverage exit 0.
+
 ## [3.79.2] - 2026-07-07
 
 ### `proof` calibrado pela máquina limpa REAL (transcript v3.79.1 do usuário)

@@ -71,6 +71,18 @@ test("CM-05: harnessStateLine dá razão única por estado (fonte + contrato)", 
   assert.match(src, /report\.harnessPlan = \{ all: allHarnessIds, alreadyInstalled, selected/, "plano rastreável no report")
 })
 
+test("install --audit-only humano: imprime impacto+supply-chain (read-only, cobre o render)", async () => {
+  const { install } = await imp("src/installer/install.js")
+  const orig = process.stdout.write.bind(process.stdout)
+  const origLog = console.log
+  let buf = ""
+  process.stdout.write = (s) => { buf += String(s); return true }
+  console.log = (s = "") => { buf += String(s) + "\n" }
+  try { await install(["--audit-only"]) } finally { process.stdout.write = orig; console.log = origLog }
+  assert.match(buf, /audit-only.*preflight/i, "banner do audit-only")
+  assert.match(buf, /READ-ONLY: nada foi escrito/i)
+})
+
 // ── Gate PRD26 §10: `install --audit-only --json` = JSON PURO ────────────────
 test("install --audit-only --json emite JSON puro (schema install-audit.v1)", async () => {
   const { install } = await imp("src/installer/install.js")

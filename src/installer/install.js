@@ -262,19 +262,24 @@ async function installDeps(warn, success, info, report, harnessIds, allowRemote 
 // Full = tudo: tenta instalar o app Obsidian (winget no Windows / brew no mac).
 // Retorna true se o comando rodou sem erro; false (degraded) se não houver
 // gerenciador/permissão. NÃO bloqueia — o vault markdown funciona sem o app.
+// O MOTIVO da falha viaja no retorno (antes era engolido — o usuário via só
+// "winget/brew indisponível ou falhou" sem saber se faltava winget, admin ou rede).
+const obsidianFailReason = (e) => (e.code === "ENOENT"
+  ? "winget/brew não encontrado no PATH"
+  : `exit ${e.status ?? "?"}: ${String(e.stderr || e.message || "").trim().split("\n")[0].slice(0, 120)}`)
 function tryInstallObsidianApp(report) {
   try {
     if (isWindows()) {
-      execFileSync("winget", ["install", "-e", "--id", "Obsidian.Obsidian", "--silent", "--accept-source-agreements", "--accept-package-agreements"], { stdio: "pipe", timeout: 240000 })
+      execFileSync("winget", ["install", "-e", "--id", "Obsidian.Obsidian", "--silent", "--accept-source-agreements", "--accept-package-agreements"], { stdio: "pipe", timeout: 240000, encoding: "utf-8" })
     } else if (isMacOS()) {
-      execFileSync("brew", ["install", "--cask", "obsidian"], { stdio: "pipe", timeout: 240000 })
+      execFileSync("brew", ["install", "--cask", "obsidian"], { stdio: "pipe", timeout: 240000, encoding: "utf-8" })
     } else {
-      return false
+      return { ok: false, reason: "sem instalador de app para este OS (vault markdown segue funcional)" }
     }
     report.added.push("Obsidian app (instalado)")
-    return true
-  } catch {
-    return false
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, reason: obsidianFailReason(e) }
   }
 }
 
@@ -806,9 +811,10 @@ function setupVault(flags, report) {
 // (o VAULT já existe em markdown). Opt-out: --no-obsidian.
 function installObsidianApp(args, flags, report) {
   const wantApp = !flags.projectOnly && !args.includes("--no-obsidian")
-  if (wantApp && tryInstallObsidianApp(report)) return success("Obsidian app instalado (vault em ~/gstack-vault).")
-  info("Obsidian app: nao instalado nesta maquina (degraded/opcional — o vault e markdown). Manual: `winget install Obsidian.Obsidian` / `brew install --cask obsidian`.")
-  if (wantApp) trackDegraded(report, "obsidian-app", "winget/brew indisponível ou falhou (vault markdown segue funcional)", { optional: true })
+  const attempt = wantApp ? tryInstallObsidianApp(report) : { ok: false, reason: "pulado (--no-obsidian/project-only)" }
+  if (wantApp && attempt.ok) return success("Obsidian app instalado (vault em ~/gstack-vault).")
+  info(`Obsidian app: nao instalado — ${attempt.reason}. O vault markdown segue funcional. Manual: \`winget install Obsidian.Obsidian\` / \`brew install --cask obsidian\`.`)
+  if (wantApp) trackDegraded(report, "obsidian-app", `${attempt.reason} (vault markdown segue funcional)`, { optional: true })
 }
 async function chooseObsidianVault(report) {
   const chosen = await chooseObsidian({ select, prompt })
