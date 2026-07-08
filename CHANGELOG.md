@@ -1,5 +1,25 @@
 # Changelog - gstack-vibehard
 
+## [3.86.0] - 2026-07-08
+
+### Loop Router — start classifica o modo de execução (PRD34 F2-C / PRD32 §14)
+
+O leigo não sabe se o pedido é "um app", "um fluxo com fases", "uma tarefa
+iterativa" ou "vários agentes em paralelo". O `start` agora infere:
+
+- **`src/skills/loop-router.js`** (`gstack.loop-decision.v1`): classifica a intenção
+  em 6 modos — `knowledge_only` · `replit_pipeline` · `workflow_graph` ·
+  `task_worktree_loop` · `meta_harness_parallel` · `delegate_single_harness` —
+  cada um mapeado ao comando GStack que o implementa. PURO/testável.
+- **Prioridade honesta**: flag `--loop <mode>` > sinais da intenção > palpite
+  default. `confidence` (high/medium/none) e `alternatives` no registro.
+- **Nunca chuta**: em contexto NÃO-interativo AMBÍGUO (palpite, sem flag),
+  `resolveLoopDecision` devolve `needs_user_confirmation` + JSON acionável com os
+  6 modos reais — não escolhe por conta própria.
+- **Loop Decision Record** persistido em `plans/<id>/loop-decision.json` e
+  `runs/<runId>/loop-decision.json` (+ evento no journal). `start` é o
+  `replit_pipeline`; quando a intenção casa melhor com outro modo, sugere o comando.
+
 ## [3.85.0] - 2026-07-08
 
 ### Design System Gate universal + pre-write skill gates (PRD29 29.3 + PRD28 28.11 + PRD34 F2-B)
