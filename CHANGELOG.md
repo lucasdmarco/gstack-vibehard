@@ -1,5 +1,22 @@
 # Changelog - gstack-vibehard
 
+## [3.95.0] - 2026-07-08
+
+### Harness Skill Gate Projection (PRD34 F5-C / PRD29 29.6)
+
+- **`src/skills/harness-projection.js`** (`gstack.harness-gate-projection.v1`):
+  `gateEvent` (fallback → `ship`/`pre-write`), `projectGate` (nível REAL de
+  enforcement por harness), `buildHarnessProjection` (matriz gate × harness),
+  `projectionSummary`, `renderHarnessProjectionMarkdown`. **Honestidade de
+  enforcement:** gate `advisory` é sempre advisory; gate `blocking` em evento SHIP
+  é `enforced` em todo harness (a CLI roda verify/proof); gate `blocking` em evento
+  PRE-WRITE só é `enforced` onde o harness intercepta a escrita (hook pre-tool) —
+  hoje só o Claude; nos demais é `advisory` (nunca finge que bloqueia); harness
+  desconhecido é `unsupported`. PURO/testável.
+- **`skills harness [--harness <nome>] [--json]`**: projeta os `SKILL_GATES` reais
+  e grava `.gstack/skills/harness-projection.{json,md}` (project-scoped). Mostra o
+  enforcement REAL, não o prometido.
+
 ## [3.94.0] - 2026-07-08
 
 ### Contrato canônico de agentes (PRD34 F5-B / PRD29 29.9)
