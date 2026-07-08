@@ -25,7 +25,7 @@ import { resolveLoopDecision, LOOP_MODES } from "../skills/loop-router.js"
 
 // Flags do start: valor (consomem o próximo token) e booleanas (tabela → cc baixa).
 const VALUE_FLAGS = { "--name": "projectName", "--mode": "mode", "--skills": "skills", "--design-system": "designSystem", "--loop": "loop" }
-const BOOL_FLAGS = { "--dry-run": "dryRun", "--json": "json", "--yes": "yes", "-y": "yes", "--assume-no-existing-model": "assumeNoExistingModel" }
+const BOOL_FLAGS = { "--dry-run": "dryRun", "--json": "json", "--yes": "yes", "-y": "yes", "--assume-no-existing-model": "assumeNoExistingModel", "--proof": "proof" }
 
 function parseStartArgs(args) {
   const out = { _: [] }
@@ -213,6 +213,14 @@ function declareLoopDecision(plan, flags, opts, json, planDir) {
   return decision
 }
 
+// Proof no fim do start (F3-C): runner injetável (testes) ou o proof real (release).
+async function runStartProof(cwd, json, opts) {
+  if (opts.proofRunner) return opts.proofRunner(cwd)
+  if (!json) info("Rodando proof determinístico (--profile release)…")
+  const { proofCommand } = await import("./proof.js")
+  return proofCommand(["--profile", "release", ...(json ? ["--json"] : [])], { cwd })
+}
+
 /** Persiste, confirma e roda o pipeline. Retorna o contrato público do start. */
 async function confirmAndRunPipeline(plan, flags, opts, json, cwd) {
   const planDir = persistPlanArtifacts(cwd, plan)
@@ -248,9 +256,15 @@ async function confirmAndRunPipeline(plan, flags, opts, json, cwd) {
     maxAttempts: opts.maxAttempts,
   })
 
-  if (json) process.stdout.write(JSON.stringify({ ok: pipeline.status === "done", runId: pipeline.runId, status: pipeline.status, stages: pipeline.stages, planId: plan.id, skillRoute: { selectedSkills: skillRoute.selectedSkills, modelIntake: skillRoute.modelIntake.status } }) + "\n")
+  return emitAndProof(plan, pipeline, { skillRoute, loopDecision }, flags, opts, json, cwd)
+}
+
+// Emite o resultado + proof offer (F3-C / 28.5). Extraído p/ manter cc baixa.
+async function emitAndProof(plan, pipeline, decl, flags, opts, json, cwd) {
+  if (json) process.stdout.write(JSON.stringify({ ok: pipeline.status === "done", runId: pipeline.runId, status: pipeline.status, stages: pipeline.stages, planId: plan.id, skillRoute: { selectedSkills: decl.skillRoute.selectedSkills, modelIntake: decl.skillRoute.modelIntake.status } }) + "\n")
   else renderPipelineHuman(pipeline, plan)
-  return { plan, result: pipeline.execResult, pipeline, executed: true, skillRoute, loopDecision }
+  const proof = flags.proof ? await runStartProof(cwd, json, opts) : null
+  return { plan, result: pipeline.execResult, pipeline, executed: true, skillRoute: decl.skillRoute, loopDecision: decl.loopDecision, ...(proof ? { proof } : {}) }
 }
 
 function resolveStartCtx(args, opts) {
