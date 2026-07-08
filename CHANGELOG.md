@@ -1,5 +1,20 @@
 # Changelog - gstack-vibehard
 
+## [3.87.0] - 2026-07-08
+
+### Context Pack compartilhado + guard no-double-context (PRD34 F3-A / PRD28 28.2+28.6)
+
+- **`src/skills/context-pack.js`** (`gstack.context-pack.v1`): `buildContextPack`
+  (exclui secrets via `isSecretPath` — .env/secrets/pem/key/id_rsa/token adjacente
+  a separador; token accounting `isEstimate:true`), `contextPackState`
+  (missing/stale/fresh por mtime vs grafo), `evaluateDoubleContextGuard`,
+  `generateSharedPack`. PURO/testável.
+- **Pack por run**: cada run grava `runs/<runId>/context-pack.json` (contexto
+  compartilhado p/ subtarefas — evento no journal).
+- **Guard no-double-context em `orchestrate --parallel`**: paralelizar sem pack
+  fresco faz cada subtarefa re-extrair o mundo. Fallback `generate_or_block`: gera
+  o pack compartilhado do grafo e segue; sem como gerar, bloqueia com ação.
+
 ## [3.86.0] - 2026-07-08
 
 ### Loop Router — start classifica o modo de execução (PRD34 F2-C / PRD32 §14)
