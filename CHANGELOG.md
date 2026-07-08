@@ -1,5 +1,38 @@
 # Changelog - gstack-vibehard
 
+## [3.84.0] - 2026-07-08
+
+### Intent→Skill Route no start + 2 bugs reais de UX (PRD29 29.2 + PRD28 28.10 + PRD34 §2)
+
+O `start` agora DECLARA a rota de skills antes de confirmar:
+
+- **Detectores de capacidade** (`src/skills/route.js`): touchesFrontend/Data/
+  Secrets/Deploy/ExternalApi/Parallel sobre objetivo+template+intent;
+  `gstack.skill-route.v1` com selectedSkills (dos gates aplicáveis da matriz),
+  blockingGates, requiredQuestions e modelIntake.
+- **Pergunta de modelo existente** (interativo, quando frontend): screenshot/
+  Figma/template/planilha/schema/OpenAPI/brand/app existente — registrada como
+  `modelIntake.sources`; `--yes`/`--assume-no-existing-model` = `explicitly_skipped`
+  com autor do skip. Flags `--skills a,b` têm precedência total (`user_flag`).
+- **Persistência**: `plans/<id>/skill-route.json` + `runs/<runId>/skill-route.json`
+  (+ evento `skill_route_declared` no journal) — `skillsUsed` não depende mais da
+  memória do agente.
+- **BUG FIX (real em TTY)**: `select()` retorna a STRING da opção, não índice —
+  o workspace guard do v3.80.0 comparava com índice e a opção "Criar novo projeto"
+  não continuava o wizard. Normalização `choiceIndex` + testes agora usam o
+  CONTRATO REAL (fakes numéricos só como retrocompat explícita).
+- **BUG FIX (hang real)**: `start "obj" --yes` ainda perguntava o MODO via select
+  interativo (contradiz `--yes`; pendurava sem TTY). Agora `--yes` = zero
+  perguntas: usa o modo recomendado do recipe.
+- **BUG FIX (hang não-TTY)**: a pergunta de modelo/intake (e o workspace guard)
+  chamavam `select` real quando frontend + interativo sem `--yes`; num contexto
+  sem TTY (CI/pipe/background) e sem `select` injetado isso pendurava no stdin
+  para sempre (0% CPU). Helper `canPromptSelect` degrada honesto — `modelIntake`
+  vira `explicitly_skipped(non_interactive)` e o guard segue para o wizard em vez
+  de travar. Só pergunta quando há como responder (TTY real OU select do chamador).
+- **Catálogo lê o PACOTE** (lição CM-08): default root das skills = raiz do
+  pacote (skills vêm com o produto); cwd vazio do usuário dava rota vazia.
+
 ## [3.83.0] - 2026-07-07
 
 ### Skill Gate Compiler (PRD29 Sprint 29.1)
