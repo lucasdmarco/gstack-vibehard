@@ -10,6 +10,7 @@ import { readAllState } from "../runtime/supervisor.js"
 import { scout } from "../context-docs/scout.js"
 import { recordEvidence, writeTaskMd } from "./evidence-ledger.js"
 import { buildContextPack } from "../skills/context-pack.js"
+import { runCloseoutSync } from "../skills/closeout.js"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const CLI_ENTRY = join(__dirname, "..", "index.js")
@@ -300,6 +301,8 @@ function finishPipeline(ctx, stages, status, failedStage) {
   appendRunEvent(ctx.runDir, { event: "pipeline_ended", status, failedStage: failedStage || null, attempts: ctx.attempts })
   writeRunStatus(ctx.runDir, { runId: ctx.runId, planId: ctx.plan.id, status, stages, attempts: ctx.attempts })
   try { writePipelineEvidence(ctx, stages) } catch { /* evidence best-effort — não derruba o run */ }
+  // Run Closeout Sync (F4-A): fechamento unificado do run. best-effort, não derruba.
+  try { runCloseoutSync({ cwd: ctx.cwd, runId: ctx.runId, command: "start", status }) } catch { /* closeout best-effort */ }
   return { runId: ctx.runId, status, stages, attempts: ctx.attempts, execResult: ctx.execResult, ...(handoffPath ? { handoffPath } : {}) }
 }
 
