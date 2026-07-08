@@ -1,5 +1,18 @@
 # Changelog - gstack-vibehard
 
+## [3.89.0] - 2026-07-08
+
+### Parallel preflight + proof offer no start (PRD34 F3-C / PRD28 28.3+28.5)
+
+- **`src/skills/parallel-preflight.js`** (`gstack.parallel-preflight.v1`):
+  `analyzeParallelSafety` (Kahn p/ ciclo) classifica em `parallel_safe` ·
+  `mixed_waves` · `sequential_required` · `cycle_error`. Frase honesta —
+  não promete paralelismo total quando há `dependsOn`.
+- **`orchestrate --parallel`**: nota honesta do que o paralelismo REALMENTE fará;
+  ciclo de dependência bloqueia com ação.
+- **`start --proof`**: roda o proof determinístico (`--profile release`) no fim do
+  pipeline (runner injetável), anexando o resultado ao contrato do start.
+
 ## [3.88.0] - 2026-07-08
 
 ### Delegate guiado + preflight model/quota/budget (PRD34 F3-B / PRD28 28.1+28.4)

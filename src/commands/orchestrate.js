@@ -8,6 +8,7 @@ import { diffHygiene } from "../project-plan/diff-hygiene.js"
 import { recordAction } from "../vfa/provenance.js"
 import { stripBom } from "../util/json.js"
 import { evaluateDoubleContextGuard, generateSharedPack } from "../skills/context-pack.js"
+import { analyzeParallelSafety, parallelPreflightNote } from "../skills/parallel-preflight.js"
 import { section, success, warn, error, info } from "../cli/index.js"
 
 const DEFAULT_MATRIX = { claude: ["implementation", "refactor", "large-context"], codex: ["code-review", "patches", "tests"], opencode: ["isolated-task"] }
@@ -74,6 +75,18 @@ function generateAndVerifyPack(cwd, plan, jsonMode) {
   const after = evaluateDoubleContextGuard({ root: cwd, parallel: true })
   if (after.ok && !jsonMode) info("Context Pack compartilhado gerado (evita re-extração por subtarefa).")
   return after
+}
+// Preflight de paralelismo (F3-C): diz a VERDADE do que --parallel fará e bloqueia ciclo.
+function noteParallelPlan(plan, a) {
+  if (a.concurrency <= 1) return true
+  const analysis = analyzeParallelSafety(plan.steps || [])
+  if (!a.json) info(`  Paralelismo: ${parallelPreflightNote(analysis)}`)
+  if (analysis.recommendation === "cycle_error") { error("Ciclo de dependência (dependsOn) — não orquestro."); return false }
+  return true
+}
+// Gates de paralelismo (F3-A + F3-C): nota honesta + ciclo + pack compartilhado fresco.
+function parallelGates(cwd, plan, a, opts) {
+  return noteParallelPlan(plan, a) && ensureSharedContextPack(cwd, plan, a, opts)
 }
 function ensureSharedContextPack(cwd, plan, a, opts) {
   if (opts.executeStep || a.concurrency <= 1) return true
@@ -166,7 +179,7 @@ export async function orchestrateCommand(args = [], opts = {}) {
   const plan = loadOrchestratePlan(cwd, a)
   if (!plan) return
   if (orchestrateBlocked(cwd, a, opts)) return
-  if (!ensureSharedContextPack(cwd, plan, a, opts)) return
+  if (!parallelGates(cwd, plan, a, opts)) return
   const exec = opts.exec || defaultExec
   const wts = new Map()
   const reviewer = resolveReviewer(opts, a)
