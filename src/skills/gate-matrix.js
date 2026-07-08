@@ -188,7 +188,7 @@ function findConflicts(gates) {
  * Compila a matriz: gates manuais + validação contra o catálogo real.
  * `ok:false` SOMENTE com conflito de precondição (skill desconhecida = warning).
  */
-export function buildGateMatrix({ root = process.cwd(), catalog, gates = SKILL_GATES } = {}) {
+export function buildGateMatrix({ root, catalog, gates = SKILL_GATES } = {}) {
   const cat = catalog || buildSkillCatalog({ root })
   const knownIds = new Set(cat.skills.map((s) => s.id))
   const warnings = unknownSkillWarnings(gates, knownIds)

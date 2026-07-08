@@ -140,13 +140,14 @@ test("node-health: no Windows npm/npx via cmd.exe (npm.ps1 bloqueado não derrub
 })
 
 // ── start: workspace guard ───────────────────────────────────────────────────────
+// PRD34 §2.1: o select REAL retorna a STRING da opção — os fakes imitam isso.
 test("start no home: pergunta criar/abrir/diagnosticar e NÃO segue quando usuário sai", async () => {
   const { startCommand } = await imp("src/commands/start.js")
   const asked = []
   const r = await startCommand([], {
     cwd: "C:/Users/Windows",
     classify: () => ({ state: "home_or_wrong_cwd", description: "home", signals: {}, actions: ["gstack_vibehard start"] }),
-    select: async (q, choices) => { asked.push({ q, choices }); return 2 }, // "apenas diagnosticar"
+    select: async (q, choices) => { asked.push({ q, choices }); return choices.find((c) => /diagnosticar/i.test(c)) }, // contrato real: string
     prompt: async () => { throw new Error("wizard NÃO deve rodar") },
   })
   assert.equal(r.guarded, true)
@@ -155,16 +156,28 @@ test("start no home: pergunta criar/abrir/diagnosticar e NÃO segue quando usuá
   assert.ok(asked[0].choices.some((c) => /diagnosticar/i.test(c)))
 })
 
-test("start em repo git vazio: escolha 'scaffold aqui' segue para o wizard", async () => {
+test("start em repo git vazio: escolha 'scaffold aqui' (STRING do select real) segue para o wizard", async () => {
   const { startCommand } = await imp("src/commands/start.js")
   let wizardRan = false
   await startCommand([], {
     cwd: "C:/dev/produto",
     classify: () => ({ state: "empty_git_repo", description: "git sem app", signals: {}, actions: [] }),
-    select: async () => 0, // "criar scaffold neste diretório"
+    select: async (q, choices) => choices[0], // "criar scaffold neste diretório" — string, como o select real
     prompt: async () => { wizardRan = true; return "" }, // wizard pede objetivo → cancela vazio
   })
-  assert.equal(wizardRan, true, "guard liberou o wizard")
+  assert.equal(wizardRan, true, "guard liberou o wizard — era o BUG do contrato índice (v3.80)")
+})
+
+test("guard retrocompat: fake numérico legado (índice) continua aceito", async () => {
+  const { startCommand } = await imp("src/commands/start.js")
+  let wizardRan = false
+  await startCommand([], {
+    cwd: "C:/dev/produto2",
+    classify: () => ({ state: "empty_git_repo", description: "git sem app", signals: {}, actions: [] }),
+    select: async () => 0, // índice numérico (legado) — choiceIndex normaliza
+    prompt: async () => { wizardRan = true; return "" },
+  })
+  assert.equal(wizardRan, true)
 })
 
 test("start em projeto gstack/pasta neutra: guard NÃO interrompe (zero perguntas extra)", async () => {

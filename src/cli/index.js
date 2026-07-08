@@ -173,7 +173,7 @@ export async function multiSelect(question, options) {
 
 // Registro de comandos — fonte única para help curto, avançado e por-comando.
 const COMMANDS = [
-  { name: "start", group: "common", desc: "Assistente guiado: objetivo → consult → plano → execução", usage: "gstack_vibehard start" },
+  { name: "start", group: "common", desc: "Assistente guiado: objetivo → consult → plano → skill route → execução", usage: "gstack_vibehard start [\"objetivo\"] [--skills a,b] [--assume-no-existing-model] [--yes] [--dry-run --json]" },
   { name: "consult", group: "common", desc: "Recomendação READ-ONLY: caminho único, preview e rollback (nada é escrito)", usage: "gstack_vibehard consult \"<objetivo>\" [--json]" },
   { name: "create", group: "common", desc: "Criar um app (LITE por padrão, escreve só ./<nome>)", usage: "gstack_vibehard create <nome> [--full] [--vault] [--dry-run --json]" },
   { name: "init", group: "common", desc: "Criar projeto com estrutura completa", usage: "gstack_vibehard init <nome>" },

@@ -25,6 +25,9 @@ export async function runWizard(ui = {}, opts = {}) {
   const recommended = recipe.recommendedMode
 
   let mode = opts.mode
+  // --yes / não-interativo: ZERO perguntas extras — usa o modo recomendado
+  // (PRD34 §2: com --yes o select real penduraria esperando stdin).
+  if (!mode && opts.nonInteractive) mode = recommended
   if (!mode) {
     const choice = await choose(
       `Modo (recomendado: ${recommended} — ${recipe.modeReasons[0] || recipe.label})`,
