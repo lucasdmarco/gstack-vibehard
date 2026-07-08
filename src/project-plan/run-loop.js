@@ -51,6 +51,10 @@ function persistRunDeclarations(ctx, opts) {
     writeFileSync(join(ctx.runDir, "design-system-gate.json"), JSON.stringify(opts.designSystemGate, null, 2) + "\n")
     appendRunEvent(ctx.runDir, { event: "design_system_gate", status: opts.designSystemGate.designSystem.status, blocked: opts.designSystemGate.blocked })
   }
+  if (opts.loopDecision) {
+    writeFileSync(join(ctx.runDir, "loop-decision.json"), JSON.stringify(opts.loopDecision, null, 2) + "\n")
+    appendRunEvent(ctx.runDir, { event: "loop_decision", mode: opts.loopDecision.mode, source: opts.loopDecision.source, confidence: opts.loopDecision.confidence })
+  }
 }
 
 function writeRunStatus(runDir, status) {

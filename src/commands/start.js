@@ -11,6 +11,7 @@ import { prompt, select, confirm, success, error, info, section, warn } from "..
 import { classifyWorkspace } from "../runtime/workspace.js"
 import { buildSkillRoute, buildModelIntake, MODEL_INTAKE_SOURCES } from "../skills/route.js"
 import { registerDesignSystem, evaluatePreWriteGate, resolveDesignSystem } from "../skills/design-system.js"
+import { resolveLoopDecision, LOOP_MODES } from "../skills/loop-router.js"
 
 /**
  * `start` — entrada Replit-like (PRD18 Sprint 1). Orquestra o wizard (objetivo →
@@ -23,7 +24,7 @@ import { registerDesignSystem, evaluatePreWriteGate, resolveDesignSystem } from 
  */
 
 // Flags do start: valor (consomem o próximo token) e booleanas (tabela → cc baixa).
-const VALUE_FLAGS = { "--name": "projectName", "--mode": "mode", "--skills": "skills", "--design-system": "designSystem" }
+const VALUE_FLAGS = { "--name": "projectName", "--mode": "mode", "--skills": "skills", "--design-system": "designSystem", "--loop": "loop" }
 const BOOL_FLAGS = { "--dry-run": "dryRun", "--json": "json", "--yes": "yes", "-y": "yes", "--assume-no-existing-model": "assumeNoExistingModel" }
 
 function parseStartArgs(args) {
@@ -202,6 +203,16 @@ function renderGateBlock(evidence, json) {
   info(`  ${evidence.requiredAction}`)
 }
 
+// Loop Router (F2-C): declara o modo de execução inferido. start é o replit_pipeline;
+// quando a intenção casa melhor com outro modo, sugere o comando — sem trocar de trilho.
+function declareLoopDecision(plan, flags, opts, json, planDir) {
+  const interactive = Boolean(opts.select) || Boolean(process.stdin.isTTY)
+  const decision = resolveLoopDecision({ objective: plan.objective, flags, interactive })
+  writeFileSync(join(planDir, "loop-decision.json"), JSON.stringify(decision, null, 2) + "\n")
+  if (!json && decision.mode !== "replit_pipeline") info(`  Loop Router: intenção casa com "${decision.mode}" (${LOOP_MODES[decision.mode].command}) — start segue como pipeline.`)
+  return decision
+}
+
 /** Persiste, confirma e roda o pipeline. Retorna o contrato público do start. */
 async function confirmAndRunPipeline(plan, flags, opts, json, cwd) {
   const planDir = persistPlanArtifacts(cwd, plan)
@@ -211,23 +222,27 @@ async function confirmAndRunPipeline(plan, flags, opts, json, cwd) {
   const skillRoute = await declareSkillRoute(plan, flags, opts, json)
   writeFileSync(join(planDir, "skill-route.json"), JSON.stringify(skillRoute, null, 2) + "\n")
 
+  // Loop Router declara o modo de execução inferido (F2-C) — ortogonal ao gate,
+  // registrado sempre (mesmo que o gate abaixo bloqueie).
+  const loopDecision = declareLoopDecision(plan, flags, opts, json, planDir)
+
   // Design System Gate pre-write (F2-B): bloqueia UI sem DS ANTES de qualquer escrita.
   // Choice via flag (--design-system) ou opts (chamada programática/testes).
   const dsChoice = flags.designSystem ?? opts.designSystem
   const dsGate = enforceDesignSystemGate(skillRoute, dsChoice, cwd, planDir)
   if (!dsGate.ok) {
     renderGateBlock(dsGate.evidence, json)
-    return { plan, executed: false, guarded: "design-system-gate", skillRoute, gate: dsGate.evidence }
+    return { plan, executed: false, guarded: "design-system-gate", skillRoute, loopDecision, gate: dsGate.evidence }
   }
 
   if (!(await confirmExecution(plan, flags, opts))) {
     info(`Plano salvo. Execute quando quiser: gstack_vibehard plan run ${plan.id}`)
-    return { plan, executed: false, skillRoute }
+    return { plan, executed: false, skillRoute, loopDecision }
   }
 
   // Pipeline Replit-like: create (hard cap+retomada) → dev → test → review → verify → preview.
   const pipeline = runPipeline({
-    plan, planDir, cwd, skillRoute, designSystemGate: dsGate.evidence,
+    plan, planDir, cwd, skillRoute, designSystemGate: dsGate.evidence, loopDecision,
     exec: opts.exec, gateExec: opts.gateExec,
     devRunner: opts.devRunner, verifyRunner: opts.verifyRunner, scoutRunner: opts.scoutRunner,
     maxAttempts: opts.maxAttempts,
@@ -235,7 +250,7 @@ async function confirmAndRunPipeline(plan, flags, opts, json, cwd) {
 
   if (json) process.stdout.write(JSON.stringify({ ok: pipeline.status === "done", runId: pipeline.runId, status: pipeline.status, stages: pipeline.stages, planId: plan.id, skillRoute: { selectedSkills: skillRoute.selectedSkills, modelIntake: skillRoute.modelIntake.status } }) + "\n")
   else renderPipelineHuman(pipeline, plan)
-  return { plan, result: pipeline.execResult, pipeline, executed: true, skillRoute }
+  return { plan, result: pipeline.execResult, pipeline, executed: true, skillRoute, loopDecision }
 }
 
 function resolveStartCtx(args, opts) {
