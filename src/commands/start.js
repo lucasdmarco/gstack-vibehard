@@ -10,6 +10,7 @@ import { printPlanHuman } from "./plan.js"
 import { prompt, select, confirm, success, error, info, section, warn } from "../cli/index.js"
 import { classifyWorkspace } from "../runtime/workspace.js"
 import { buildSkillRoute, buildModelIntake, MODEL_INTAKE_SOURCES } from "../skills/route.js"
+import { registerDesignSystem, evaluatePreWriteGate, resolveDesignSystem } from "../skills/design-system.js"
 
 /**
  * `start` — entrada Replit-like (PRD18 Sprint 1). Orquestra o wizard (objetivo →
@@ -22,7 +23,7 @@ import { buildSkillRoute, buildModelIntake, MODEL_INTAKE_SOURCES } from "../skil
  */
 
 // Flags do start: valor (consomem o próximo token) e booleanas (tabela → cc baixa).
-const VALUE_FLAGS = { "--name": "projectName", "--mode": "mode", "--skills": "skills" }
+const VALUE_FLAGS = { "--name": "projectName", "--mode": "mode", "--skills": "skills", "--design-system": "designSystem" }
 const BOOL_FLAGS = { "--dry-run": "dryRun", "--json": "json", "--yes": "yes", "-y": "yes", "--assume-no-existing-model": "assumeNoExistingModel" }
 
 function parseStartArgs(args) {
@@ -43,11 +44,14 @@ function dryRunReport(flags, cwd) {
   const commands = [...plan.steps, ...plan.optionalSteps]
     .filter((s) => Array.isArray(s.command))
     .map((s) => ({ id: s.id, command: sanitizeCommand(s.command), cwd: s.cwd, required: s.required !== false }))
+  // Status do design system SEM efeito colateral (dry-run não escreve: importLegacy=false).
+  const ds = resolveDesignSystem({ root: cwd, bypass: flags.designSystem === "none" ? "none" : null, importLegacy: false })
   return {
     ok: validation.ok,
     dryRun: true,
     plan,
     pipeline: { stages: [...PIPELINE_STAGES], commands },
+    designSystem: { status: ds.status, source: ds.source, wouldBlockUi: !["complete", "generated", "bypassed"].includes(ds.status) },
     warnings: validation.ok ? [] : validation.errors,
     note: "dry-run: nenhum comando executado, nada foi escrito",
     cwd,
@@ -179,6 +183,25 @@ async function declareSkillRoute(plan, flags, opts, json) {
   return route
 }
 
+// Design System Gate pre-write (F2-B / PRD29 29.3 + 28.11): quando a rota exige
+// (touchesFrontend), bloqueia a execução se não houver design system declarado.
+// `--design-system <path|none>` registra a decisão (none = opt-out explícito).
+// Universal: vale para qualquer harness (o hook Python só cobria o Claude).
+function enforceDesignSystemGate(route, dsChoice, cwd, planDir) {
+  const applies = route.blockingGates.includes("design-system-gate") || route.detectedCapabilities.touchesFrontend
+  if (!applies) return { ok: true, applicable: false, evidence: null }
+  if (dsChoice) registerDesignSystem({ root: cwd, choice: dsChoice })
+  const evidence = evaluatePreWriteGate({ root: cwd, uiIntended: true, bypass: dsChoice === "none" ? "none" : null })
+  writeFileSync(join(planDir, "design-system-gate.json"), JSON.stringify(evidence, null, 2) + "\n")
+  if (evidence.blocked) writeFileSync(join(planDir, "skill-gate-violations.json"), JSON.stringify({ gate: "design-system-gate", violations: evidence.violations }, null, 2) + "\n")
+  return { ok: !evidence.blocked, applicable: true, evidence }
+}
+function renderGateBlock(evidence, json) {
+  if (json) { process.stdout.write(JSON.stringify({ ok: false, blocked: "design-system-gate", gate: evidence }) + "\n"); return }
+  warn("Design System Gate: escrita de UI bloqueada — nenhum design system declarado.")
+  info(`  ${evidence.requiredAction}`)
+}
+
 /** Persiste, confirma e roda o pipeline. Retorna o contrato público do start. */
 async function confirmAndRunPipeline(plan, flags, opts, json, cwd) {
   const planDir = persistPlanArtifacts(cwd, plan)
@@ -188,6 +211,15 @@ async function confirmAndRunPipeline(plan, flags, opts, json, cwd) {
   const skillRoute = await declareSkillRoute(plan, flags, opts, json)
   writeFileSync(join(planDir, "skill-route.json"), JSON.stringify(skillRoute, null, 2) + "\n")
 
+  // Design System Gate pre-write (F2-B): bloqueia UI sem DS ANTES de qualquer escrita.
+  // Choice via flag (--design-system) ou opts (chamada programática/testes).
+  const dsChoice = flags.designSystem ?? opts.designSystem
+  const dsGate = enforceDesignSystemGate(skillRoute, dsChoice, cwd, planDir)
+  if (!dsGate.ok) {
+    renderGateBlock(dsGate.evidence, json)
+    return { plan, executed: false, guarded: "design-system-gate", skillRoute, gate: dsGate.evidence }
+  }
+
   if (!(await confirmExecution(plan, flags, opts))) {
     info(`Plano salvo. Execute quando quiser: gstack_vibehard plan run ${plan.id}`)
     return { plan, executed: false, skillRoute }
@@ -195,7 +227,7 @@ async function confirmAndRunPipeline(plan, flags, opts, json, cwd) {
 
   // Pipeline Replit-like: create (hard cap+retomada) → dev → test → review → verify → preview.
   const pipeline = runPipeline({
-    plan, planDir, cwd, skillRoute,
+    plan, planDir, cwd, skillRoute, designSystemGate: dsGate.evidence,
     exec: opts.exec, gateExec: opts.gateExec,
     devRunner: opts.devRunner, verifyRunner: opts.verifyRunner, scoutRunner: opts.scoutRunner,
     maxAttempts: opts.maxAttempts,

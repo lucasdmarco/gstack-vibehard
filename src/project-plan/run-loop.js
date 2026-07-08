@@ -40,6 +40,19 @@ function appendRunEvent(runDir, event) {
   appendFileSync(join(runDir, "journal.jsonl"), JSON.stringify({ ts: new Date().toISOString(), ...event }) + "\n")
 }
 
+// Declarações do start viram artefatos do RUN (skillsUsed + gate evidence): a
+// próxima sessão/agente lê quais skills e gates regem esta execução.
+function persistRunDeclarations(ctx, opts) {
+  if (opts.skillRoute) {
+    writeFileSync(join(ctx.runDir, "skill-route.json"), JSON.stringify(opts.skillRoute, null, 2) + "\n")
+    appendRunEvent(ctx.runDir, { event: "skill_route_declared", selectedSkills: opts.skillRoute.selectedSkills, blockingGates: opts.skillRoute.blockingGates })
+  }
+  if (opts.designSystemGate) {
+    writeFileSync(join(ctx.runDir, "design-system-gate.json"), JSON.stringify(opts.designSystemGate, null, 2) + "\n")
+    appendRunEvent(ctx.runDir, { event: "design_system_gate", status: opts.designSystemGate.designSystem.status, blocked: opts.designSystemGate.blocked })
+  }
+}
+
 function writeRunStatus(runDir, status) {
   mkdirSync(runDir, { recursive: true })
   writeFileSync(join(runDir, "status.json"), JSON.stringify({ ...status, updatedAt: new Date().toISOString() }, null, 2) + "\n")
@@ -302,10 +315,7 @@ export function runPipeline(opts = {}) {
 
   // Skill route declarada no start (PRD29 29.2): vira artefato do RUN — a próxima
   // sessão/agente lê quais skills e gates regem esta execução (skillsUsed).
-  if (opts.skillRoute) {
-    writeFileSync(join(ctx.runDir, "skill-route.json"), JSON.stringify(opts.skillRoute, null, 2) + "\n")
-    appendRunEvent(ctx.runDir, { event: "skill_route_declared", selectedSkills: opts.skillRoute.selectedSkills, blockingGates: opts.skillRoute.blockingGates })
-  }
+  persistRunDeclarations(ctx, opts)
 
   // Scout ANTES do create (projeto existente): contexto mínimo, read-only.
   scoutStage(ctx, stages)
