@@ -1,5 +1,17 @@
 # Changelog - gstack-vibehard
 
+## [3.93.0] - 2026-07-08
+
+### Skill Evidence Ledger + release gate por skill-gate P0 (PRD34 F5-A / PRD29 29.4)
+
+- **`src/skills/evidence.js`** (`gstack.skill-evidence.v1`): `recordSkillEvidence`
+  (provas tipadas question/file/command/screenshot/verify/proof por run),
+  `readSkillEvidence`, `evaluateSkillGateRelease` (varre `.gstack/runs/*` por
+  skill-gate P0 pendente — violação registrada ou `design-system-gate` blocked).
+  PURO/testável, verifier determinístico.
+- **`proof` ganha o check `skillGates`**: release FALHA (entra nos blockers) se
+  houver skill-gate P0 pendente em qualquer run — a evidência prova, não a memória.
+
 ## [3.92.0] - 2026-07-08
 
 ### Sprint Closeout Snapshot (PRD34 F4-B / PRD28 28.8)

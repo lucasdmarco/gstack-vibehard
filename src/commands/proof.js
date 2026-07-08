@@ -2,6 +2,7 @@ import { execFileSync } from "child_process"
 import { runVerify } from "../project-plan/verify-runner.js"
 import { audit } from "../dream/auditor.js"
 import { buildReadiness } from "../tools/readiness.js"
+import { evaluateSkillGateRelease } from "../skills/evidence.js"
 import { success, warn, error, info, section } from "../cli/index.js"
 
 /**
@@ -85,7 +86,8 @@ export function buildProof(opts = {}) {
   const dream = checkDream(deps)
   const readiness = checkReadiness(deps, cwd)
   const gitTree = checkGitTree(deps, cwd)
-  const blockers = [verify.blocker, dream.blocker, readiness.graphify.blocker, gitTree.blocker].filter(Boolean)
+  const skillGates = deps.skillGateRelease ? deps.skillGateRelease(cwd) : evaluateSkillGateRelease({ root: cwd })
+  const blockers = [verify.blocker, dream.blocker, readiness.graphify.blocker, gitTree.blocker, skillGates.blocker].filter(Boolean)
   const warnings = [...readiness.warnings, readiness.graphify.warning].filter(Boolean)
   return {
     schemaVersion: PROOF_SCHEMA,
@@ -94,7 +96,7 @@ export function buildProof(opts = {}) {
     ready: blockers.length === 0,
     blockers,
     warnings,
-    checks: { verify, dreamAudit: dream, toolReadiness: readiness.tools, graphifyFreshness: readiness.graphify, headroomRouting: readiness.headroom, gitTree },
+    checks: { verify, dreamAudit: dream, toolReadiness: readiness.tools, graphifyFreshness: readiness.graphify, headroomRouting: readiness.headroom, gitTree, skillGates },
   }
 }
 
@@ -103,6 +105,7 @@ function renderProof(p) {
   const rows = [
     ["verify", p.checks.verify.ok], ["dream audit", p.checks.dreamAudit.ok],
     ["graphify fresh", p.checks.graphifyFreshness.ok], ["git tree", p.checks.gitTree.ok],
+    ["skill gates", p.checks.skillGates.ok],
   ]
   for (const [name, ok] of rows) (ok ? success : error)(`  ${name}: ${ok ? "ok" : "FALHOU"}`)
   info(`  headroom: ${p.checks.headroomRouting.status} (honesto; routing é opt-in)`)
