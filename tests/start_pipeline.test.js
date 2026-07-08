@@ -51,6 +51,7 @@ test("pipeline: run done cria journal/status por run e estágios honestos (sem p
     const ran = []
     const r = await startCommand([], {
       cwd, objective: "quero um web app fullstack", projectName: "loja", mode: "lite",
+      designSystem: "none", // testa o pipeline, não o design-system gate (F2-B)
       confirm: async () => true, exec: (c) => ran.push(c.join(" ")),
     })
     // contrato antigo preservado
@@ -82,6 +83,7 @@ test("pipeline: falha persistente respeita HARD CAP e gera handoff.md (sem loop 
     let calls = 0
     const r = await startCommand([], {
       cwd, objective: "web app", projectName: "x", mode: "lite",
+      designSystem: "none", // testa o hard cap do pipeline, não o design-system gate
       confirm: async () => true, maxAttempts: 3,
       exec: (c) => { if (c.includes("create")) { calls++; throw new Error("create quebrou de propósito") } },
     })

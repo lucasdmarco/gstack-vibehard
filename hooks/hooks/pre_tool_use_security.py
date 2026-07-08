@@ -68,6 +68,17 @@ def check_design_system_mandate():
     if not gstack_project:
         return False, ""
 
+    # F2-B: o artefato canonico design-system.json (universal, escrito pela CLI)
+    # tem precedencia sobre o session_state legado. status resolvido = libera.
+    ds_file = search_dir / ".gstack" / "design-system.json"
+    if ds_file.exists():
+        try:
+            ds = json.loads(ds_file.read_text(encoding="utf-8"))
+            if ds.get("status") in ("complete", "generated", "bypassed"):
+                return False, ""
+        except (json.JSONDecodeError, OSError):
+            pass  # cai no fluxo legado abaixo (fail-open preservado)
+
     if not session_file:
         return True, (
             "BLOQUEADO: Este projeto nao tem configuracao de design system. "

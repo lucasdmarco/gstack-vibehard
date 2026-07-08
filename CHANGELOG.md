@@ -1,5 +1,26 @@
 # Changelog - gstack-vibehard
 
+## [3.85.0] - 2026-07-08
+
+### Design System Gate universal + pre-write skill gates (PRD29 29.3 + PRD28 28.11 + PRD34 F2-B)
+
+O mandato de design system deixa de ser só do hook Python do Claude e vira um
+gate **universal** na CLI (vale para qualquer harness):
+
+- **`src/skills/design-system.js`** (`gstack.design-system.v1` + `.gate.v1`):
+  `isUiWrite` (tsx/jsx/css/components/pages/app), `resolveDesignSystem` (status
+  canônico complete/generated/bypassed/missing), `evaluatePreWriteGate` (bloqueia
+  escrita de UI sem DS), `persistGateEvidence`. PURO/testável (io injetável).
+- **Artefato canônico `.gstack/design-system.json`**: importa o `session_state.json`
+  legado uma vez e **sincroniza de volta** — o hook Python continua coerente e agora
+  também **honra o artefato canônico** (precedência sobre o legado).
+- **`start` bloqueia ANTES de escrever**: objetivo frontend sem DS → execução
+  recusada (`guarded: "design-system-gate"`), `plans/<id>/skill-gate-violations.json`
+  + `runs/<runId>/design-system-gate.json` (contrato requiredEvidence da matriz).
+- **`--design-system <caminho|none>`**: registra o DS próprio, ou `none` = opt-out
+  explícito (PRD32 Q2). `--dry-run` reporta o status do gate **sem escrever nada**
+  (`importLegacy:false`).
+
 ## [3.84.0] - 2026-07-08
 
 ### Intent→Skill Route no start + 2 bugs reais de UX (PRD29 29.2 + PRD28 28.10 + PRD34 §2)

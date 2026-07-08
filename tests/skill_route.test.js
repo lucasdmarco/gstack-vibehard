@@ -99,7 +99,8 @@ test("start --yes: intake vira explicitly_skipped(--yes) e runs/<runId>/skill-ro
   const { startCommand } = await imp("src/commands/start.js")
   const dir = mkdtempSync(path.join(tmpdir(), "gstack-route-yes-"))
   try {
-    const r = await startCommand(["--yes"], startOpts(dir, { objective: "criar landing page", prompt: async () => "lp" }))
+    // --yes NÃO pula o gate P0 de design system sozinho — opt-out é explícito (F2-B).
+    const r = await startCommand(["--yes", "--design-system", "none"], startOpts(dir, { objective: "criar landing page", prompt: async () => "lp" }))
     assert.equal(r.skillRoute.modelIntake.status, "explicitly_skipped")
     assert.equal(r.skillRoute.modelIntake.skippedBy, "--yes")
     assert.equal(r.executed, true)

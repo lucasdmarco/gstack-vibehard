@@ -48,6 +48,7 @@ test("start: executa o plano após confirmação (UI+exec injetados) e persiste"
       objective: "quero um web app fullstack",
       projectName: "loja",
       mode: "lite",
+      designSystem: "none", // testa execução do pipeline, não o design-system gate (F2-B)
       confirm: async () => true,
       exec: (c) => ran.push(c.join(" ")),
     })
