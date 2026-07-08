@@ -1,7 +1,8 @@
 import { execFileSync } from "child_process"
-import { existsSync, readFileSync, readdirSync, statSync } from "fs"
+import { existsSync, readFileSync, readdirSync, statSync, writeFileSync, mkdirSync } from "fs"
 import { join, resolve, dirname, basename } from "path"
 import { fileURLToPath } from "url"
+import { buildCanonicalContract, findOrphans, renderCanonicalMarkdown } from "../skills/agents-canonical.js"
 import { hasExecutionContract } from "../agents/factory.js"
 import { getAdapterInfo, isInstructional } from "../agents/adapter-matrix.js"
 import { capabilityRow, validateScorecard } from "../harness/capabilities.js"
@@ -67,7 +68,7 @@ const AGENTS_HANDLERS = {
   build: (args) => agentsBuild(args),
   check: (args, json) => agentsCheck(json),
   diff: () => agentsDiff(),
-  list: (args, json) => listCmd(json),
+  list: (args, json) => listCmd(json, args),
   explain: (args, json) => explainCmd(explainId(args), json),
   doctor: (args, json) => doctorCmd(json),
 }
@@ -81,11 +82,31 @@ export async function agentsCommand(args = [], opts = {}) {
   info("  Use: agents <build|check|diff|doctor|list|explain>")
 }
 
-function listCmd(json) {
+function listCmd(json, args = []) {
   const agents = listSourceAgents()
+  if (args.includes("--canonical")) return canonicalList(agents, json)
   if (json) { process.stdout.write(JSON.stringify({ agents }) + "\n"); return }
   section(`agents list — ${agents.length} agente(s) fonte`)
   for (const a of agents) info(`  • ${a.id}${a.description ? ` — ${a.description}` : ""}`)
+}
+// F5-B: contrato canônico (papéis MEDIDOS; routers/packs não contam). Artefato
+// project-scoped em .gstack/agents/ (gitignored, como o skill catalog).
+function generatedClaudeIds() {
+  const dir = join(GEN, "claude")
+  return existsSync(dir) ? readdirSync(dir).filter((d) => existsSync(join(dir, d, "SKILL.md"))) : []
+}
+function canonicalList(agents, json) {
+  const contract = buildCanonicalContract(agents)
+  const orphans = findOrphans(contract, generatedClaudeIds())
+  const dir = join(PKG_ROOT, ".gstack", "agents")
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, "canonical.json"), JSON.stringify({ ...contract, orphans }, null, 2) + "\n")
+  writeFileSync(join(dir, "canonical.md"), renderCanonicalMarkdown(contract))
+  if (json) { process.stdout.write(JSON.stringify({ ...contract, orphans }) + "\n"); return }
+  section(`agents list --canonical — ${contract.count} papéis (medido)`)
+  contract.canonicalRoles.forEach((r) => info(`  • ${r}`))
+  info(`  Excluídos: ${contract.excluded.routers.length} routers, ${contract.excluded.packs.length} packs`)
+  if (orphans.rolesWithoutAdapter.length) warn(`  Papéis sem adapter: ${orphans.rolesWithoutAdapter.join(", ")}`)
 }
 
 const adapterStatusOf = (p) => (existsSync(p) ? (hasExecutionContract(readFileSync(p, "utf-8")) ? "ok+contract" : "SEM contrato") : "ausente")
