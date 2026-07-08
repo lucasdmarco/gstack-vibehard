@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from "fs"
 import { join } from "path"
 import { buildSkillCatalog, skillsDoctor, renderCatalogMarkdown } from "../skills/catalog.js"
 import { buildGateMatrix, gatesForPhase, renderGateMatrixMarkdown } from "../skills/gate-matrix.js"
+import { buildHarnessProjection, projectionSummary, renderHarnessProjectionMarkdown, KNOWN_HARNESSES } from "../skills/harness-projection.js"
 import { section, success, warn, error, info } from "../cli/index.js"
 
 /**
@@ -88,11 +89,44 @@ function gatesCmd(cwd, args, json) {
   return matrix
 }
 
+// ── harness (PRD29 29.6): projeção honesta de enforcement por harness ────────────
+function writeHarnessArtifacts(cwd, projection) {
+  const dir = join(cwd, ".gstack", "skills")
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, "harness-projection.json"), JSON.stringify(projection, null, 2) + "\n")
+  writeFileSync(join(dir, "harness-projection.md"), renderHarnessProjectionMarkdown(projection))
+}
+
+const levelIcon = (l) => (l === "enforced" ? "🔒" : l === "advisory" ? "📎" : "—")
+function renderHarnessHuman(projection) {
+  const summary = projectionSummary(projection)
+  section(`harness gate projection — enforcement REAL (${projection.harnesses.join(", ")})`)
+  for (const h of projection.harnesses) {
+    const s = summary[h]
+    info(`  ${h}: 🔒 ${s.enforced} enforced · 📎 ${s.advisory} advisory · — ${s.unsupported} unsupported`)
+    for (const r of projection.matrix[h]) info(`      ${levelIcon(r.level)} ${r.gate} (${r.event}) → ${r.level}`)
+  }
+  warn("  'enforced' em PRE-WRITE só onde há hook pre-tool; senão o gate é advisory nesse harness.")
+}
+
+function harnessCmd(cwd, args, json) {
+  const hIdx = args.indexOf("--harness")
+  const only = hIdx >= 0 ? args[hIdx + 1] : null
+  const matrix = buildGateMatrix({ root: cwd })
+  const harnesses = only ? [only] : KNOWN_HARNESSES
+  const projection = buildHarnessProjection(matrix.gates, harnesses)
+  writeHarnessArtifacts(cwd, projection)
+  if (json) { process.stdout.write(JSON.stringify(projection) + "\n"); return projection }
+  renderHarnessHuman(projection)
+  return projection
+}
+
 function printUsage() {
   section("skills")
   info("  skills catalog [--json]                     inventário determinístico (hash/provenance/fase)")
   info("  skills doctor [--json] [--strict]           saúde do catálogo (frontmatter/duplicatas/risco)")
   info("  skills gates show [--phase <fase>] [--json] matriz de gates por fase (a skill aconselha; o gate decide)")
+  info("  skills harness [--harness <nome>] [--json]  enforcement REAL por harness (enforced/advisory/unsupported)")
 }
 
 /** Dispatcher do `skills`. */
@@ -103,5 +137,6 @@ export async function skillsCommand(args = [], opts = {}) {
   if (sub === "catalog") return catalogCmd(cwd, json)
   if (sub === "doctor") return doctorCmd(cwd, json, args.includes("--strict"))
   if (sub === "gates") return gatesCmd(cwd, args, json)
+  if (sub === "harness") return harnessCmd(cwd, args, json)
   printUsage()
 }
