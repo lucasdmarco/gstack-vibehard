@@ -1,6 +1,12 @@
 import { readFileSync, readdirSync, existsSync } from "fs"
 import { createHash } from "crypto"
 import { join, dirname, basename } from "path"
+import { fileURLToPath } from "url"
+
+// As skills são SHIPADAS COM O PRODUTO (files: skills/, agents/, agent-packs/).
+// Default = raiz do pacote — a MESMA lição do dream audit (CM-08): medir o
+// PRODUTO, não o cwd do usuário (cwd vazio dava catálogo 0 e rota vazia).
+const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..")
 
 /**
  * Skill Catalog determinístico (PRD29 Sprint 29.0).
@@ -133,7 +139,7 @@ function skillEntry(relPath, content) {
  * Varre as raízes e monta o catálogo. `totalSkills` é MEDIDO. Determinístico:
  * ordena por path; hash sha256 por arquivo = provenance/drift baseline (29.7).
  */
-export function buildSkillCatalog({ root = process.cwd(), io } = {}) {
+export function buildSkillCatalog({ root = PACKAGE_ROOT, io } = {}) {
   const ctx = io || defaultIo(root)
   const files = SKILL_SOURCE_ROOTS.flatMap((r) => ctx.listSkillFiles(r)).sort()
   const skills = files.map((relPath) => skillEntry(relPath, ctx.read(relPath)))
