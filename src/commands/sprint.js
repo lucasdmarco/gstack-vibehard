@@ -2,7 +2,23 @@ import { existsSync, readFileSync } from "fs"
 import { join } from "path"
 import { execFileSync } from "child_process"
 import { homedir } from "os"
+import { saveSprintSnapshot } from "../skills/sprint-snapshot.js"
 import { success, warn, info, error } from "../cli/index.js"
+
+// F4-B: snapshot legível da sprint (best-effort, independe do hook post_sprint).
+function gitChangedFiles(cwd) {
+  try {
+    return execFileSync("git", ["status", "--porcelain"], { cwd, encoding: "utf-8", timeout: 10000 })
+      .split("\n").map((l) => l.slice(3).trim()).filter(Boolean)
+  } catch { return [] }
+}
+function writeSprintSnapshotSafe(cwd) {
+  try {
+    const graphState = existsSync(join(cwd, "graphify-out", "graph.json")) ? "present" : "absent"
+    const snap = saveSprintSnapshot({ cwd, changed: gitChangedFiles(cwd), graphState })
+    success(`Sprint snapshot: ${snap.dir} (summary.md + closeout.json)`)
+  } catch (e) { warn(`Snapshot da sprint (best-effort) falhou: ${e.message}`) }
+}
 
 function hooksDir() {
   const primary = join(homedir(), ".gstack", "hooks")
@@ -27,6 +43,9 @@ export async function sprintCommand(args) {
   if (flag === "--save") {
     const cwd = process.cwd()
     const lastMsgFile = join(hooksDir(), "last_message.txt")
+
+    // Snapshot da sprint SEMPRE (F4-B) — antes do hook, que é opcional/legado.
+    writeSprintSnapshotSafe(cwd)
 
     if (!existsSync(POST_SPRINT)) {
       error("post_sprint.py nao encontrado em ~/.gstack/hooks/ ou ~/.codex/hooks/")

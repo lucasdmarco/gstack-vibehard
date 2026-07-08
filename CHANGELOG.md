@@ -1,5 +1,16 @@
 # Changelog - gstack-vibehard
 
+## [3.92.0] - 2026-07-08
+
+### Sprint Closeout Snapshot (PRD34 F4-B / PRD28 28.8)
+
+- **`src/skills/sprint-snapshot.js`** (`gstack.sprint-snapshot.v1`): `saveSprintSnapshot`
+  grava `.gstack/sprints/<id>/summary.md` + `closeout.json` (reusa o contrato de closeout
+  F4-A). `nextSession.readFirst` orienta a próxima sessão; estado do grafo declarado
+  (fresh → sem ação; senão → ação `graphify update .`). PURO/testável.
+- **`sprint --save`**: grava o snapshot SEMPRE (best-effort, antes do hook legado
+  `post_sprint.py` que passa a ser opcional).
+
 ## [3.91.0] - 2026-07-08
 
 ### Run Closeout Sync — helper único de fechamento (PRD34 F4-A / PRD28 28.7 + PRD32 §6)
