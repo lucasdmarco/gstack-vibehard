@@ -9,6 +9,7 @@ import { loadRuntimeManifest } from "../runtime/manifest.js"
 import { readAllState } from "../runtime/supervisor.js"
 import { scout } from "../context-docs/scout.js"
 import { recordEvidence, writeTaskMd } from "./evidence-ledger.js"
+import { buildContextPack } from "../skills/context-pack.js"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const CLI_ENTRY = join(__dirname, "..", "index.js")
@@ -55,6 +56,10 @@ function persistRunDeclarations(ctx, opts) {
     writeFileSync(join(ctx.runDir, "loop-decision.json"), JSON.stringify(opts.loopDecision, null, 2) + "\n")
     appendRunEvent(ctx.runDir, { event: "loop_decision", mode: opts.loopDecision.mode, source: opts.loopDecision.source, confidence: opts.loopDecision.confidence })
   }
+  // Context Pack por run (F3-A): contexto compartilhado p/ subtarefas — secrets excluídos.
+  const pack = buildContextPack({ runId: ctx.runId, objective: ctx.plan.objective || ctx.plan.id, files: opts.contextFiles || [] })
+  writeFileSync(join(ctx.runDir, "context-pack.json"), JSON.stringify(pack, null, 2) + "\n")
+  appendRunEvent(ctx.runDir, { event: "context_pack", estimatedTokens: pack.tokenAccounting.estimatedTokens, files: pack.tokenAccounting.fileCount })
 }
 
 function writeRunStatus(runDir, status) {

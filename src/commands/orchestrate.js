@@ -7,6 +7,7 @@ import { createWorktree, removeWorktree, commitWorktree, isGitRepo, checkTracked
 import { diffHygiene } from "../project-plan/diff-hygiene.js"
 import { recordAction } from "../vfa/provenance.js"
 import { stripBom } from "../util/json.js"
+import { evaluateDoubleContextGuard, generateSharedPack } from "../skills/context-pack.js"
 import { section, success, warn, error, info } from "../cli/index.js"
 
 const DEFAULT_MATRIX = { claude: ["implementation", "refactor", "large-context"], codex: ["code-review", "patches", "tests"], opencode: ["isolated-task"] }
@@ -64,6 +65,23 @@ function orchestrateBlocked(cwd, a, opts) {
   if (!pf) return false
   ;(pf.level === "warn" ? warn : error)(pf.msg)
   return true
+}
+
+// Guard no-double-context (F3-A): paralelizar sem pack compartilhado fresco faz cada
+// subtarefa re-extrair o mundo. fallback generate_or_block: gera do grafo e segue.
+function generateAndVerifyPack(cwd, plan, jsonMode) {
+  generateSharedPack({ root: cwd, objective: plan.objective || plan.id })
+  const after = evaluateDoubleContextGuard({ root: cwd, parallel: true })
+  if (after.ok && !jsonMode) info("Context Pack compartilhado gerado (evita re-extração por subtarefa).")
+  return after
+}
+function ensureSharedContextPack(cwd, plan, a, opts) {
+  if (opts.executeStep || a.concurrency <= 1) return true
+  if (evaluateDoubleContextGuard({ root: cwd, parallel: true }).ok) return true
+  const after = generateAndVerifyPack(cwd, plan, a.json)
+  if (after.ok) return true
+  error(after.requiredAction)
+  return false
 }
 
 const defaultExec = (f, ar, o) => execFileSync(f, ar, { stdio: "pipe", encoding: "utf-8", timeout: 600000, ...o })
@@ -148,6 +166,7 @@ export async function orchestrateCommand(args = [], opts = {}) {
   const plan = loadOrchestratePlan(cwd, a)
   if (!plan) return
   if (orchestrateBlocked(cwd, a, opts)) return
+  if (!ensureSharedContextPack(cwd, plan, a, opts)) return
   const exec = opts.exec || defaultExec
   const wts = new Map()
   const reviewer = resolveReviewer(opts, a)
