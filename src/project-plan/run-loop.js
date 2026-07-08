@@ -300,6 +300,13 @@ export function runPipeline(opts = {}) {
   const stages = initialStages(plan)
   appendRunEvent(ctx.runDir, { event: "pipeline_started", runId: ctx.runId, planId: plan.id, stages: PIPELINE_STAGES })
 
+  // Skill route declarada no start (PRD29 29.2): vira artefato do RUN — a próxima
+  // sessão/agente lê quais skills e gates regem esta execução (skillsUsed).
+  if (opts.skillRoute) {
+    writeFileSync(join(ctx.runDir, "skill-route.json"), JSON.stringify(opts.skillRoute, null, 2) + "\n")
+    appendRunEvent(ctx.runDir, { event: "skill_route_declared", selectedSkills: opts.skillRoute.selectedSkills, blockingGates: opts.skillRoute.blockingGates })
+  }
+
   // Scout ANTES do create (projeto existente): contexto mínimo, read-only.
   scoutStage(ctx, stages)
   appendRunEvent(ctx.runDir, { event: "stage_done", stage: "scout", status: stages.scout.status })

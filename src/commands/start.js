@@ -9,6 +9,7 @@ import { buildConsult, renderConsultHuman } from "./consult.js"
 import { printPlanHuman } from "./plan.js"
 import { prompt, select, confirm, success, error, info, section, warn } from "../cli/index.js"
 import { classifyWorkspace } from "../runtime/workspace.js"
+import { buildSkillRoute, buildModelIntake, MODEL_INTAKE_SOURCES } from "../skills/route.js"
 
 /**
  * `start` — entrada Replit-like (PRD18 Sprint 1). Orquestra o wizard (objetivo →
@@ -21,8 +22,8 @@ import { classifyWorkspace } from "../runtime/workspace.js"
  */
 
 // Flags do start: valor (consomem o próximo token) e booleanas (tabela → cc baixa).
-const VALUE_FLAGS = { "--name": "projectName", "--mode": "mode" }
-const BOOL_FLAGS = { "--dry-run": "dryRun", "--json": "json", "--yes": "yes", "-y": "yes" }
+const VALUE_FLAGS = { "--name": "projectName", "--mode": "mode", "--skills": "skills" }
+const BOOL_FLAGS = { "--dry-run": "dryRun", "--json": "json", "--yes": "yes", "-y": "yes", "--assume-no-existing-model": "assumeNoExistingModel" }
 
 function parseStartArgs(args) {
   const out = { _: [] }
@@ -92,6 +93,8 @@ function wizardInputs(flags, opts, objective) {
     objective,
     projectName: opts.projectName !== undefined ? opts.projectName : flags.projectName,
     mode: opts.mode || flags.mode,
+    // --yes = zero perguntas: o wizard usa o modo recomendado sem select.
+    nonInteractive: flags.yes === true || opts.yes === true,
   }
 }
 
@@ -124,27 +127,83 @@ async function confirmExecution(plan, flags, opts) {
   return doConfirm(`Executar este plano (${plan.steps.length} passos)?`, false)
 }
 
+// ── Skill Route (PRD29 29.2 + PRD28 28.10) ───────────────────────────────────────
+// Antes de confirmar: detecta capacidades, pergunta pelo modelo existente (quando
+// frontend + interativo) e DECLARA a rota de skills. Bloqueio pre-write = 29.3.
+const INTAKE_LABELS = Object.freeze([
+  "Não tenho — pode propor",
+  "Screenshot/print existente", "Figma/design system", "Template/site de referência",
+  "Planilha/modelo de dados", "Schema Supabase/banco", "OpenAPI/API existente",
+  "Brand guide (cores/logo)", "App existente para adaptar",
+])
+// Sem TTY e sem `select` injetado não há como perguntar — perguntar penduraria
+// no stdin pra sempre (CI/pipe/background). Centraliza a regra dos dois gates.
+const canPromptSelect = (opts) => Boolean(opts.select) || Boolean(process.stdin.isTTY)
+
+async function askModelIntake(opts) {
+  const doSelect = opts.select || select
+  const labels = [...INTAKE_LABELS]
+  const idx = choiceIndex(await doSelect("Antes da interface: você já tem algum modelo/artefato para eu seguir?", labels), labels)
+  if (idx <= 0) return buildModelIntake({ sources: [] })
+  return buildModelIntake({ sources: [MODEL_INTAKE_SOURCES[idx - 1]] })
+}
+function skippedIntake(flags, opts) {
+  if (flags.assumeNoExistingModel) return buildModelIntake({ skipped: true, skippedBy: "--assume-no-existing-model" })
+  if (flags.yes || opts.yes === true) return buildModelIntake({ skipped: true, skippedBy: "--yes" })
+  // BUG FIX (PRD34 §2.1): degrada honesto sem TTY — nunca pendura no stdin.
+  if (!canPromptSelect(opts)) return buildModelIntake({ skipped: true, skippedBy: "non_interactive" })
+  return null // interativo → pergunta
+}
+async function resolveModelIntake(caps, flags, opts) {
+  if (!caps.touchesFrontend) return buildModelIntake({ sources: [] })
+  return skippedIntake(flags, opts) || askModelIntake(opts)
+}
+function renderRoute(route, json) {
+  if (json) return
+  info("")
+  info(`  Skills desta rota (${route.selectionSource === "user_flag" ? "--skills" : "detectadas pelos gates"}):`)
+  route.selectedSkills.slice(0, 8).forEach((s) => info(`    • ${s}`))
+  if (route.selectedSkills.length > 8) info(`    … +${route.selectedSkills.length - 8}`)
+  if (route.blockingGates.length) info(`  Gates desta rota: ${route.blockingGates.join(", ")}`)
+  info("")
+}
+async function declareSkillRoute(plan, flags, opts, json) {
+  const override = flags.skills ? flags.skills.split(",").map((s) => s.trim()).filter(Boolean) : null
+  // root default = raiz do PACOTE (as skills vêm com o produto) — cwd do usuário
+  // pode ser um dir vazio e daria rota vazia (mesma lição do dream audit CM-08).
+  const base = { objective: plan.objective, template: plan.template, intent: plan.intent }
+  const probe = buildSkillRoute(base) // catálogo+matriz compilados aqui; intake vem depois
+  const modelIntake = await resolveModelIntake(probe.detectedCapabilities, flags, opts)
+  const route = { ...probe, modelIntake, selectedSkills: override || probe.selectedSkills, selectionSource: override ? "user_flag" : "gate_matrix" }
+  renderRoute(route, json)
+  return route
+}
+
 /** Persiste, confirma e roda o pipeline. Retorna o contrato público do start. */
 async function confirmAndRunPipeline(plan, flags, opts, json, cwd) {
   const planDir = persistPlanArtifacts(cwd, plan)
   if (!json) printPlanHuman(plan)
 
+  // Rota de skills DECLARADA antes do confirm (29.2): pergunta intake se frontend.
+  const skillRoute = await declareSkillRoute(plan, flags, opts, json)
+  writeFileSync(join(planDir, "skill-route.json"), JSON.stringify(skillRoute, null, 2) + "\n")
+
   if (!(await confirmExecution(plan, flags, opts))) {
     info(`Plano salvo. Execute quando quiser: gstack_vibehard plan run ${plan.id}`)
-    return { plan, executed: false }
+    return { plan, executed: false, skillRoute }
   }
 
   // Pipeline Replit-like: create (hard cap+retomada) → dev → test → review → verify → preview.
   const pipeline = runPipeline({
-    plan, planDir, cwd,
+    plan, planDir, cwd, skillRoute,
     exec: opts.exec, gateExec: opts.gateExec,
-    devRunner: opts.devRunner, verifyRunner: opts.verifyRunner,
+    devRunner: opts.devRunner, verifyRunner: opts.verifyRunner, scoutRunner: opts.scoutRunner,
     maxAttempts: opts.maxAttempts,
   })
 
-  if (json) process.stdout.write(JSON.stringify({ ok: pipeline.status === "done", runId: pipeline.runId, status: pipeline.status, stages: pipeline.stages, planId: plan.id }) + "\n")
+  if (json) process.stdout.write(JSON.stringify({ ok: pipeline.status === "done", runId: pipeline.runId, status: pipeline.status, stages: pipeline.stages, planId: plan.id, skillRoute: { selectedSkills: skillRoute.selectedSkills, modelIntake: skillRoute.modelIntake.status } }) + "\n")
   else renderPipelineHuman(pipeline, plan)
-  return { plan, result: pipeline.execResult, pipeline, executed: true }
+  return { plan, result: pipeline.execResult, pipeline, executed: true, skillRoute }
 }
 
 function resolveStartCtx(args, opts) {
@@ -174,16 +233,28 @@ function renderGuardExit(ws, choiceIdx) {
   info("  Diagnóstico read-only desta pasta:")
   ws.actions.forEach((a) => info(`    • ${a}`))
 }
+/**
+ * BUG FIX (PRD34 §2.1): o `select()` da CLI retorna a STRING da opção escolhida
+ * (contrato real — o wizard depende disso), NÃO o índice. Normalizamos aqui;
+ * número segue aceito por retrocompat, mas o contrato canônico é string.
+ */
+function choiceIndex(choice, options) {
+  if (typeof choice === "number") return choice
+  const idx = options.indexOf(choice)
+  return idx >= 0 ? idx : 0
+}
 /** true = seguir para o wizard; false = usuário escolheu sair (já orientado). */
 async function workspaceGuard(cwd, opts) {
   const ws = (opts.classify || classifyWorkspace)(cwd)
   const q = GUARD_QUESTIONS[ws.state]
-  if (!q) return true
+  // Mesmo fix do intake: sem gate aplicável, ou sem como perguntar (não-TTY sem
+  // select), segue para o wizard em vez de pendurar no stdin.
+  if (!q || !canPromptSelect(opts)) return true
   warn(q.intro(ws))
   const doSelect = opts.select || select
-  const choice = await doSelect("O que você quer fazer?", q.choices, 0)
-  if (choice === 0) return true
-  renderGuardExit(ws, choice)
+  const idx = choiceIndex(await doSelect("O que você quer fazer?", q.choices), q.choices)
+  if (idx === 0) return true
+  renderGuardExit(ws, idx)
   return false
 }
 
