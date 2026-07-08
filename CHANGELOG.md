@@ -1,5 +1,19 @@
 # Changelog - gstack-vibehard
 
+## [3.88.0] - 2026-07-08
+
+### Delegate guiado + preflight model/quota/budget (PRD34 F3-B / PRD28 28.1+28.4)
+
+- **`src/skills/model-preflight.js`** (`gstack.model-preflight.v1`): `--model auto`
+  resolve por `--effort` (low→haiku / medium→sonnet / high→opus); classifica o
+  estado em 4 — `known` · `unknown` · `unavailable` · `user_capped`. `unknown` NÃO
+  bloqueia (não dá pra verificar → segue com aviso); `unavailable`/`user_capped`
+  bloqueiam com ação. PURO/testável.
+- **Budget de `.gstack/loop-budget.json`**: `cappedModels` (opt-out de modelo),
+  `maxDelegationsPerDay` (cota diária via `withinBudget`).
+- **`delegate` wiring**: novo `--effort`, gate de modelo antes de tocar em worktree
+  (bloqueia cedo, barato); gates de entrada agrupados em `runEntryGates`.
+
 ## [3.87.0] - 2026-07-08
 
 ### Context Pack compartilhado + guard no-double-context (PRD34 F3-A / PRD28 28.2+28.6)
