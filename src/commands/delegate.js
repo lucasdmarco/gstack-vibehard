@@ -8,9 +8,10 @@ import { runCandidateBridge } from "../harness/candidate-bridge.js"
 import { CODEBUFF } from "../harness/codebuff.js"
 import { FREEBUFF } from "../harness/freebuff.js"
 import { runVerify } from "../project-plan/verify-runner.js"
+import { preflightModel, loadBudget, withinBudget } from "../skills/model-preflight.js"
 import { confirm, success, warn, error, info, section } from "../cli/index.js"
 
-const DELEGATE_VALUE_FLAGS = { "--task": "task", "--model": "model" }
+const DELEGATE_VALUE_FLAGS = { "--task": "task", "--model": "model", "--effort": "effort" }
 const DELEGATE_INT_FLAGS = { "--max-iterations": "maxIterations" }
 const DELEGATE_BOOL_FLAGS = {
   "--worktree": "worktree", "--cloud-handoff": "cloudHandoff",
@@ -154,6 +155,25 @@ function runCandidateDelegate(target, task, flags, cwd, exec) {
   return result
 }
 
+// Motivo de bloqueio (decomposto p/ cc baixa). null = liberado.
+function modelBlock(pf, bud) {
+  if (!pf.ok) return { blocked: { status: `model_${pf.status}`, preflight: pf }, msg: `Modelo bloqueado: ${pf.reason}` }
+  if (!bud.ok) return { blocked: { status: "budget_capped", reason: bud.reason }, msg: `Budget: ${bud.reason}` }
+  return null
+}
+// Preflight de modelo/quota/budget (F3-B): resolve --model auto por esforço e bloqueia
+// unavailable/user_capped (unknown segue com aviso). Retorna {ok, preflight} ou {ok:false, blocked}.
+function modelPreflightGate(cwd, flags, opts) {
+  const budget = loadBudget(cwd)
+  const pf = preflightModel({ model: flags.model, effort: flags.effort, budget, availableModels: opts.availableModels })
+  const b = modelBlock(pf, withinBudget(budget, opts.usage))
+  if (b) { error(b.msg); return { ok: false, blocked: b.blocked } }
+  if (pf.status === "unknown") warn(pf.reason)
+  info(`  Modelo: ${pf.model} (esforço ${pf.effort}, ${pf.requestedModel})`)
+  flags.model = pf.model
+  return { ok: true, preflight: pf }
+}
+
 /** Imprime o cabeçalho/erros de preflight. Retorna true se pode prosseguir. */
 function handlePreflight(target, task, flags) {
   const bad = preflight(target, task, flags)
@@ -164,19 +184,27 @@ function handlePreflight(target, task, flags) {
   return true
 }
 
+// Gates de entrada (preflight + modelo/budget + secrets + cloud). {stop, result?, cloud?}.
+async function runEntryGates(target, task, flags, cwd, opts, doConfirm, exec) {
+  if (!handlePreflight(target, task, flags)) return { stop: true }
+  const mp = modelPreflightGate(cwd, flags, opts)
+  if (!mp.ok) return { stop: true, result: mp.blocked }
+  const sec = secretsGate(cwd, flags, exec)
+  if (!sec.ok) return { stop: true, result: { status: "blocked_tracked_secrets", tracked: sec.tracked } }
+  const cloud = await cloudHandoffGate(flags, doConfirm)
+  if (!cloud.ok) return { stop: true, result: { status: "cloud_handoff_declined" } }
+  return { stop: false, cloud }
+}
+
 export async function delegateCommand(args = [], opts = {}) {
   const { cwd = process.cwd(), confirm: doConfirm = confirm, exec } = opts
   const target = args[0]
   const flags = parseFlags(args.slice(1))
   const task = flags.task
 
-  if (!handlePreflight(target, task, flags)) return
-
-  const sec = secretsGate(cwd, flags, exec)
-  if (!sec.ok) return { status: "blocked_tracked_secrets", tracked: sec.tracked }
-
-  const cloud = await cloudHandoffGate(flags, doConfirm)
-  if (!cloud.ok) return { status: "cloud_handoff_declined" }
+  const gates = await runEntryGates(target, task, flags, cwd, opts, doConfirm, exec)
+  if (gates.stop) return gates.result
+  const cloud = gates.cloud
 
   if (!(await confirmDelegation(target, flags.worktree, flags, opts, doConfirm))) { info("Delegação cancelada."); return }
 
