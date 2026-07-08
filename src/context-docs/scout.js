@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "fs"
 import { join, relative } from "path"
+import { aggregateConfidence } from "../skills/context-confidence.js"
 
 /**
  * Context Scout (PRD18 Sprint 2): subagente explorador READ-ONLY e econômico.
@@ -226,6 +227,7 @@ export function scout({ cwd = process.cwd(), question = "", ftsSearch = null, ma
     keywords,
     results,
     backendsUsed,
+    contextConfidence: aggregateConfidence(results), // F3-D: confiança agregada do contexto
     tokensAvoided: estimateTokensAvoided(scan.bytesConsidered, results),
     note: "read-only, local-first; paths+linhas, nunca conteúdo bruto; FastContext remoto só com opt-in explícito (não default)",
   }
