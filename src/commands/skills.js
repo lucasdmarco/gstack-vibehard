@@ -1,7 +1,8 @@
 import { mkdirSync, writeFileSync } from "fs"
 import { join } from "path"
 import { buildSkillCatalog, skillsDoctor, renderCatalogMarkdown } from "../skills/catalog.js"
-import { section, success, warn, info } from "../cli/index.js"
+import { buildGateMatrix, gatesForPhase, renderGateMatrixMarkdown } from "../skills/gate-matrix.js"
+import { section, success, warn, error, info } from "../cli/index.js"
 
 /**
  * `gstack_vibehard skills <catalog|doctor>` (PRD29 Sprint 29.0).
@@ -54,10 +55,44 @@ function doctorCmd(cwd, json, strict) {
   return report
 }
 
+// ── gates (PRD29 29.1): compila matriz + show por fase ───────────────────────────
+function writeGateArtifacts(cwd, matrix) {
+  const dir = join(cwd, ".gstack", "skills")
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, "gate-matrix.json"), JSON.stringify(matrix, null, 2) + "\n")
+  writeFileSync(join(dir, "gate-matrix.md"), renderGateMatrixMarkdown(matrix))
+}
+
+function renderGatesHuman(matrix, phase, shown) {
+  section(`skill gates${phase ? ` — fase ${phase}` : ""} (${shown.length}/${matrix.totalGates})`)
+  for (const g of shown) {
+    info(`  ${g.mode === "blocking" ? "⛔" : "•"} ${g.id} [${g.severity}] — skills: ${g.skills.join(", ")}`)
+    g.preconditions.forEach((p) => info(`      requer: ${p}`))
+  }
+  for (const w of matrix.warnings) warn(`  ⚠ ${w.gate}: skill desconhecida no catálogo: ${w.skills.join(", ")}`)
+  if (!matrix.ok) { matrix.conflicts.forEach((c) => error(`  ✗ CONFLITO em ${c.phase}: ${c.path} — ${c.gates.join(" vs ")}`)); process.exitCode = 1 }
+}
+
+function gatesCmd(cwd, args, json) {
+  const phaseIdx = args.indexOf("--phase")
+  const phase = phaseIdx >= 0 ? args[phaseIdx + 1] : null
+  const matrix = buildGateMatrix({ root: cwd })
+  writeGateArtifacts(cwd, matrix)
+  const shown = phase ? gatesForPhase(matrix, phase) : matrix.gates
+  if (json) {
+    process.stdout.write(JSON.stringify(phase ? { ...matrix, gates: shown, phaseFilter: phase } : matrix) + "\n")
+    if (!matrix.ok) process.exitCode = 1
+    return matrix
+  }
+  renderGatesHuman(matrix, phase, shown)
+  return matrix
+}
+
 function printUsage() {
   section("skills")
-  info("  skills catalog [--json]            inventário determinístico (hash/provenance/fase)")
-  info("  skills doctor [--json] [--strict]  saúde do catálogo (frontmatter/duplicatas/risco)")
+  info("  skills catalog [--json]                     inventário determinístico (hash/provenance/fase)")
+  info("  skills doctor [--json] [--strict]           saúde do catálogo (frontmatter/duplicatas/risco)")
+  info("  skills gates show [--phase <fase>] [--json] matriz de gates por fase (a skill aconselha; o gate decide)")
 }
 
 /** Dispatcher do `skills`. */
@@ -67,5 +102,6 @@ export async function skillsCommand(args = [], opts = {}) {
   const sub = args.find((a) => !a.startsWith("-"))
   if (sub === "catalog") return catalogCmd(cwd, json)
   if (sub === "doctor") return doctorCmd(cwd, json, args.includes("--strict"))
+  if (sub === "gates") return gatesCmd(cwd, args, json)
   printUsage()
 }
