@@ -1,5 +1,16 @@
 # Changelog - gstack-vibehard
 
+## [3.91.0] - 2026-07-08
+
+### Run Closeout Sync — helper único de fechamento (PRD34 F4-A / PRD28 28.7 + PRD32 §6)
+
+- **`src/skills/closeout.js`** (`gstack.closeout.v1`): `runCloseoutSync({cwd,runId,
+  command,status,changed,refresh})` grava `runs/<runId>/closeout.{json,md}` e roda um
+  refresh BOUNDED opcional. best-effort: refresh que falha vira `degraded` honesto —
+  NUNCA esconde a falha, nunca lança. PURO/testável.
+- **Wiring no pipeline**: `start` (via run-loop) fecha cada run com o closeout unificado;
+  o mesmo helper é a base p/ delegate/workflow/orchestrate/task/dream/verify/proof.
+
 ## [3.90.0] - 2026-07-08
 
 ### FastContext Confidence Gate — remoto opt-in (PRD34 F3-D / PRD28 28.9 + PRD32 §7)
