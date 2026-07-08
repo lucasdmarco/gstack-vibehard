@@ -1,5 +1,19 @@
 # Changelog - gstack-vibehard
 
+## [3.90.0] - 2026-07-08
+
+### FastContext Confidence Gate — remoto opt-in (PRD34 F3-D / PRD28 28.9 + PRD32 §7)
+
+- **`src/skills/context-confidence.js`** (`gstack.context-policy.v1`):
+  `aggregateConfidence` (top-5), `loadContextPolicy` (default seguro `ask` + remoto
+  OFF), `resolveEnhancement`, `remoteAllowed`. PURO/testável.
+- **Política `.gstack/context-policy.json`**: `disabled` · `ask` · `project_auto` ·
+  `local_only`. Backend **remoto é opt-in EXPLÍCITO** (`allowRemote:true` + backend)
+  — nunca default. Sem TTY em `ask` → `needs_user_confirmation` (não chuta).
+- **`scout`** agora expõe `contextConfidence` agregado; **`tools readiness`** ganha
+  detector read-only `fastContext` (mode + remote disabled_default/opt_in_enabled).
+- Invariantes: nunca lê `.env*`, nunca extrai key, nunca registra MCP global.
+
 ## [3.89.0] - 2026-07-08
 
 ### Parallel preflight + proof offer no start (PRD34 F3-C / PRD28 28.3+28.5)
