@@ -10,6 +10,7 @@ import { readClaudeMcp } from "../mcp/readers/claude.js"
 import { readCodexMcp } from "../mcp/readers/codex.js"
 import { readOpenCodeMcp } from "../mcp/readers/opencode.js"
 import { readProjectMcp } from "../mcp/readers/project.js"
+import { loadContextPolicy, remoteAllowed } from "../skills/context-confidence.js"
 
 // Readers do inventário + o run context do GStack (runtime-injected).
 const mcpReaders = () => [readClaudeMcp, readCodexMcp, readOpenCodeMcp, readProjectMcp, readRuntimeMcp]
@@ -342,5 +343,12 @@ export function buildReadiness(opts = {}) {
     tools: buildTools(cwd, probe, runFull, head, opts.fallowAudit),
     mcp: buildMcpScope(cwd, home, opts.mcpInventory),
     harnessDiscovery: harnessDiscovery(cwd, home),
+    fastContext: fastContextReadiness(cwd),
   }
+}
+
+// Detector read-only (F3-D): estado da política FastContext. Remoto = opt-in explícito.
+function fastContextReadiness(cwd) {
+  const policy = loadContextPolicy(cwd)
+  return { mode: policy.mode, remote: remoteAllowed(policy) ? "opt_in_enabled" : "disabled_default", remoteBackend: policy.remoteBackend }
 }
