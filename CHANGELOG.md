@@ -1,5 +1,17 @@
 # Changelog - gstack-vibehard
 
+## [3.94.0] - 2026-07-08
+
+### Contrato canônico de agentes (PRD34 F5-B / PRD29 29.9)
+
+- **`src/skills/agents-canonical.js`** (`gstack.agents-canonical.v1`): `classifyAgent`
+  (role default; router/pack por `kind` ou sufixo), `buildCanonicalContract` (conta
+  papéis **MEDIDO**, não hardcoded; routers/packs NÃO contam; aliases source→canônico),
+  `findOrphans` (papel sem adapter / adapter sem papel). PURO/testável.
+- **`agents list --canonical`**: papéis canônicos medidos + órfãos; grava
+  `.gstack/agents/canonical.{json,md}` (project-scoped). Normaliza o descompasso
+  "20 fonte + 22 adapters vs 21".
+
 ## [3.93.0] - 2026-07-08
 
 ### Skill Evidence Ledger + release gate por skill-gate P0 (PRD34 F5-A / PRD29 29.4)
