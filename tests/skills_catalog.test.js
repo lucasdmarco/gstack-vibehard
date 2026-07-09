@@ -1,6 +1,8 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import path from "node:path"
+import os from "node:os"
+import { mkdtempSync, rmSync } from "node:fs"
 import { pathToFileURL } from "node:url"
 
 const repoRoot = path.resolve(import.meta.dirname, "..")
@@ -106,6 +108,29 @@ test("CLI: skills catalog --json é JSON PURO e skills é KNOWLEDGE no firewall"
   const j = JSON.parse(buf.trim()) // lança se houver banner antes
   assert.equal(j.schemaVersion, "gstack.skill-catalog.v1")
   assert.ok(j.totalSkills >= 200, `repo real tem 200+ skills (mediu ${j.totalSkills})`)
+})
+
+test("REGRESSÃO máquina limpa: catalog mede o PACOTE, não o cwd (cwd vazio ≠ 0 skills)", async () => {
+  // Bug real achado na máquina limpa C:\Users\Windows: instalado, `skills catalog`
+  // media o cwd do usuário (vazio) e dava 0 → gates todos "skill desconhecida".
+  const { skillsCommand } = await imp("src/commands/skills.js")
+  const neutral = mkdtempSync(path.join(os.tmpdir(), "skills-cwd-"))
+  try {
+    let out = ""
+    const orig = process.stdout.write.bind(process.stdout)
+    process.stdout.write = (s) => { out += s; return true }
+    try { await skillsCommand(["catalog", "--json"], { cwd: neutral }) } finally { process.stdout.write = orig }
+    const cat = JSON.parse(out.trim().split("\n").pop())
+    assert.ok(cat.totalSkills >= 200, `cwd neutro deve catalogar o PACOTE (veio ${cat.totalSkills})`)
+
+    // e os gates não podem marcar as skills do pacote como "desconhecidas"
+    out = ""
+    process.stdout.write = (s) => { out += s; return true }
+    try { await skillsCommand(["gates", "show", "--json"], { cwd: neutral }) } finally { process.stdout.write = orig }
+    const m = JSON.parse(out.trim().split("\n").pop())
+    assert.equal(m.catalogTotalSkills >= 200, true)
+    assert.equal(m.warnings.length, 0, "gates não devem ter skill desconhecida quando o catálogo é o do pacote")
+  } finally { rmSync(neutral, { recursive: true, force: true }) }
 })
 
 test("CLI: skills doctor --strict com warnings → exitCode 1 (repo real tem 10 sem frontmatter)", async () => {
