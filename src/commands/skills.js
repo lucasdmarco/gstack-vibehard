@@ -1,9 +1,12 @@
 import { mkdirSync, writeFileSync, readFileSync } from "fs"
-import { join } from "path"
+import { join, basename, isAbsolute } from "path"
 import { buildSkillCatalog, skillsDoctor, renderCatalogMarkdown } from "../skills/catalog.js"
 import { buildGateMatrix, gatesForPhase, renderGateMatrixMarkdown } from "../skills/gate-matrix.js"
 import { buildHarnessProjection, projectionSummary, renderHarnessProjectionMarkdown, KNOWN_HARNESSES } from "../skills/harness-projection.js"
 import { runDriftDoctor, computeBaseline, defaultBodyIo } from "../skills/drift-doctor.js"
+import { auditExternalSkills } from "../skills/external-audit.js"
+import { collectMirrorFiles } from "./research.js"
+import { buildVendorPlan, renderVendorPlanMarkdown } from "../skills/vendor.js"
 import { section, success, warn, error, info } from "../cli/index.js"
 
 /**
@@ -151,6 +154,78 @@ function harnessCmd(cwd, args, json) {
   return projection
 }
 
+// ── vendor (PRD29 29.10): vendoring de skills externas (dry-run default) ─────────
+const flagValue = (args, name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : null }
+const safeReadFile = (p) => { try { return readFileSync(p, "utf-8") } catch { return "" } }
+const firstLine = (t) => t.split(/\r?\n/).map((s) => s.trim()).find(Boolean) || "UNKNOWN"
+
+function detectLicense(dir) {
+  for (const f of ["LICENSE", "LICENSE.md", "LICENSE.txt"]) {
+    const t = safeReadFile(join(dir, f))
+    if (t) return firstLine(t)
+  }
+  return "UNKNOWN"
+}
+
+function loadMappings(file) {
+  if (!file) return {}
+  try { return JSON.parse(readFileSync(file, "utf-8")) } catch { return {} }
+}
+
+function applyVendor(cwd, mirrorDir, plan) {
+  for (const e of plan.entries) {
+    const targetAbs = join(cwd, e.targetDir)
+    mkdirSync(targetAbs, { recursive: true })
+    writeFileSync(join(targetAbs, "vendor.json"), JSON.stringify(e.manifest, null, 2) + "\n")
+    writeFileSync(join(targetAbs, basename(e.originPath)), safeReadFile(join(mirrorDir, e.originPath)))
+  }
+}
+
+function vendorApply(cwd, abs, args, plan) {
+  const wants = args.includes("--apply")
+  if (wants && plan.canApply) { applyVendor(cwd, abs, plan); return true }
+  if (wants) error("skills vendor --apply bloqueado: mapeie gate+agente para todas (veja needsMapping)")
+  return false
+}
+
+function writeVendorPlanArtifact(cwd, plan) {
+  const dir = join(cwd, ".gstack", "research")
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, "vendor-plan.json"), JSON.stringify(plan, null, 2) + "\n")
+  writeFileSync(join(dir, "vendor-plan.md"), renderVendorPlanMarkdown(plan))
+}
+
+function renderVendorHuman(p) {
+  const c = p.counts
+  section(`vendoring — ${p.source} (${p.applied ? "APLICADO" : "dry-run"})`)
+  info(`  planned ${c.planned} · avoid excluídas ${c.excludedAvoid} · sem mapeamento ${c.needsMapping}`)
+  if (p.needsMapping.length) warn(`  ⚠ mapeie gate+agente antes de aplicar: ${p.needsMapping.join(", ")}`)
+  if (p.applied) success("  vendado em skills/vendor/ (advisory até ter teste)")
+  else info("  nada escrito em skills/ (dry-run; use --apply após mapear tudo)")
+}
+
+function vendorImport(cwd, args, json) {
+  const dir = flagValue(args, "--path")
+  if (!dir) { error("skills vendor import: informe --path <mirror>"); process.exitCode = 1; return null }
+  const abs = isAbsolute(dir) ? dir : join(cwd, dir)
+  const source = flagValue(args, "--source") || basename(abs)
+  const audit = auditExternalSkills({ source, files: collectMirrorFiles(abs) })
+  const plan = buildVendorPlan({ audit, source, license: detectLicense(abs), mappings: loadMappings(flagValue(args, "--map")) })
+  const applied = vendorApply(cwd, abs, args, plan)
+  writeVendorPlanArtifact(cwd, plan)
+  const payload = { ...plan, applied }
+  if (json) { process.stdout.write(JSON.stringify(payload) + "\n"); return payload }
+  renderVendorHuman(payload)
+  return payload
+}
+
+function vendorCmd(cwd, args, json) {
+  const sub = args.filter((a) => !a.startsWith("-"))
+  if (sub[1] === "import") return vendorImport(cwd, args, json)
+  printUsage()
+  return null
+}
+
 function printUsage() {
   section("skills")
   info("  skills catalog [--json]                     inventário determinístico (hash/provenance/fase)")
@@ -158,6 +233,7 @@ function printUsage() {
   info("  skills gates show [--phase <fase>] [--json] matriz de gates por fase (a skill aconselha; o gate decide)")
   info("  skills harness [--harness <nome>] [--json]  enforcement REAL por harness (enforced/advisory/unsupported)")
   info("  skills baseline [--json]                    grava hash baseline p/ detecção de drift")
+  info("  skills vendor import --path <mirror> [--apply]  vendora skills externas (dry-run default; avoid excluído; advisory)")
 }
 
 // Tabela de subcomandos (mantém o dispatcher com cc baixa conforme cresce).
@@ -167,6 +243,7 @@ const SUBCOMMANDS = Object.freeze({
   gates: (cwd, args, json) => gatesCmd(cwd, args, json),
   harness: (cwd, args, json) => harnessCmd(cwd, args, json),
   baseline: (cwd, args, json) => baselineCmd(cwd, json),
+  vendor: (cwd, args, json) => vendorCmd(cwd, args, json),
 })
 
 /** Dispatcher do `skills`. */

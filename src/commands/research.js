@@ -39,7 +39,7 @@ function walkCandidates(root, dir, out, limit) {
 
 const safeRead = (p) => { try { return readFileSync(p, "utf-8") } catch { return "" } }
 
-function collectFiles(dir) {
+export function collectMirrorFiles(dir) {
   const rels = []
   walkCandidates(dir, dir, rels, 2000)
   return rels.sort().map((rel) => ({ path: rel, content: safeRead(join(dir, rel)) }))
@@ -106,7 +106,7 @@ function auditCmd(cwd, args, json) {
   const repo = flagValue(args, "--repo")
   const mirror = repo ? mirrorRepo(repo, cwd) : resolveLocalMirror(flagValue(args, "--path"), cwd)
   if (!mirror) { if (!repo) error("research skills audit: informe --path <dir> ou --repo <url>"); process.exitCode = 1; return null }
-  const audit = auditExternalSkills({ source: mirror.source, commit: mirror.commit, files: collectFiles(mirror.dir) })
+  const audit = auditExternalSkills({ source: mirror.source, commit: mirror.commit, files: collectMirrorFiles(mirror.dir) })
   const dir = writeAuditArtifacts(cwd, audit)
   if (json) { process.stdout.write(JSON.stringify(audit) + "\n"); return audit }
   renderAuditHuman(audit, dir)
