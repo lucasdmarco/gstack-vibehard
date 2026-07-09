@@ -1,5 +1,21 @@
 # Changelog - gstack-vibehard
 
+## [3.98.0] - 2026-07-08
+
+### Vendoring pipeline de skills externas (PRD34 F6-B / PRD29 29.10)
+
+- **`src/skills/vendor.js`** (`gstack.skill-vendor-plan.v1` +
+  `gstack.skill-vendor.v1`): `vendorSkillName`/`vendorTargetDir`,
+  `buildVendorPlan` (a partir da auditoria F6-A → plano por skill),
+  `renderVendorPlanMarkdown`. **Invariantes:** `avoid` NUNCA é vendado;
+  mapeamento gate+agente é OBRIGATÓRIO (`canApply` só com todas mapeadas); toda
+  skill vendada nasce `status: advisory`, `test: missing` (só vira enforced com
+  teste próprio). PURO/testável.
+- **`skills vendor import --path <mirror> [--source] [--map <file>] [--apply] [--json]`**:
+  **dry-run é o default seguro** (grava só `.gstack/research/vendor-plan.{json,md}`,
+  nada em `skills/`); `--apply` (após mapear tudo) escreve
+  `skills/vendor/<source>/<skill>/{SKILL.md,vendor.json}` com license/hash/provenance.
+
 ## [3.97.0] - 2026-07-08
 
 ### Auditoria read-only de skills externas (PRD34 F6-A / PRD29 29.5)
