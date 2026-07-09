@@ -72,6 +72,8 @@ jobs:
         run: head -1 src/index.js | grep -q '#!/usr/bin/env node'
       - name: Agent Factory drift guard (PRD 13 PR13.1)
         run: npm run build:agents -- --check
+      - name: Command-lint (README só cita comando que existe — PRD30 F7-A)
+        run: npm run lint:commands
 
   # Smoke de empacotamento + scaffold. O test:pack prova o TARBALL real (pegaria,
   # p.ex., o strip do .gitignore pelo npm); o test:templates valida o scaffold lite.
