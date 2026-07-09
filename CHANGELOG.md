@@ -1,5 +1,21 @@
 # Changelog - gstack-vibehard
 
+## [3.97.0] - 2026-07-08
+
+### Auditoria read-only de skills externas (PRD34 F6-A / PRD29 29.5)
+
+- **`src/skills/external-audit.js`** (`gstack.external-skills-audit.v1`):
+  `classifyExternalFile` (adopt/adapt/avoid por sinal de risco — destrutivo/
+  exec-remoto/exfiltração de secret/instalação → **avoid**; hook/rede/bloco de
+  comando → **adapt**; declarativo → **adopt**), `auditExternalSkills` (conta,
+  provenance, guardrails read-only), `renderAuditMarkdown`. PURO/testável.
+- **`research skills audit --path <dir> | --repo <url> [--json]`**: audita um
+  MIRROR read-only e grava `.gstack/research/external-audit.{json,md}`. `--repo`
+  é opt-in (rede) e faz clone raso com hooks desabilitados. **NUNCA executa
+  script do repo externo, NUNCA instala, NUNCA lê `.env`.** Skill externa é
+  REFERÊNCIA, nunca dependência runtime.
+- **`research`** classificado como KNOWLEDGE no firewall (`command-layers.js`).
+
 ## [3.96.0] - 2026-07-08
 
 ### Skill Drift & Safety Doctor (PRD34 F5-D / PRD29 29.7)
