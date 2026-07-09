@@ -213,6 +213,48 @@ export function gatesForPhase(matrix, phase) {
   return matrix.gates.filter((g) => g.phase === canonical)
 }
 
+// ── explain (29.8): "por que este gate existe e como satisfazê-lo" ───────────────
+export const GATE_EXPLAIN_SCHEMA = "gstack.skill-gate-explain.v1"
+
+// Ação humana por fallback (o que acontece se a precondição falhar).
+const FALLBACK_HELP = Object.freeze({
+  ask_before_any_write: "pergunta antes de qualquer escrita",
+  block_before_write: "bloqueia a escrita até a precondição ser satisfeita",
+  block_always: "bloqueia sempre até a evidência existir",
+  block_before_ship: "bloqueia o ship (deploy/PR) até passar",
+  block_before_delegate: "bloqueia a delegação até a precondição valer",
+  generate_or_block: "gera o artefato ausente ou bloqueia",
+  warn_and_log: "apenas avisa e registra (advisory)",
+})
+
+// Como satisfazer: evidência tem prioridade; senão a pergunta-chave.
+function howToSatisfy(gate) {
+  if (gate.requiredEvidence.length) return `Gere/garanta: ${gate.requiredEvidence.join(", ")}`
+  if (gate.requiredQuestions.length) return `Responda: "${gate.requiredQuestions[0]}"`
+  return "Satisfaça as precondições listadas."
+}
+
+/** Explicação estruturada de um gate (para `skills why <gate>`). PURO. */
+export function explainGate(gate) {
+  return {
+    schemaVersion: GATE_EXPLAIN_SCHEMA,
+    gate: gate.id,
+    phase: gate.phase,
+    severity: gate.severity,
+    mode: gate.mode,
+    skills: [...gate.skills],
+    appliesWhen: gate.appliesWhen,
+    why: `A skill aconselha; o gate '${gate.id}' DECIDE se o fluxo avança. ${gate.mode === "blocking" ? "É blocking: sem satisfazê-lo, a etapa não passa." : "É advisory: registra e explica, não trava."}`,
+    preconditions: [...gate.preconditions],
+    requiredQuestions: [...gate.requiredQuestions],
+    requiredEvidence: [...gate.requiredEvidence],
+    verifier: gate.verifier,
+    fallback: gate.fallback,
+    fallbackMeaning: FALLBACK_HELP[gate.fallback] || gate.fallback,
+    howToSatisfy: howToSatisfy(gate),
+  }
+}
+
 /** Render markdown da matriz (resumo — o JSON é a fonte completa). */
 export function renderGateMatrixMarkdown(m) {
   const lines = [

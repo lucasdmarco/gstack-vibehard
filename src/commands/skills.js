@@ -1,8 +1,8 @@
 import { mkdirSync, writeFileSync, readFileSync } from "fs"
 import { join, basename, isAbsolute } from "path"
 import { buildSkillCatalog, skillsDoctor, renderCatalogMarkdown } from "../skills/catalog.js"
-import { buildGateMatrix, gatesForPhase, renderGateMatrixMarkdown } from "../skills/gate-matrix.js"
-import { buildHarnessProjection, projectionSummary, renderHarnessProjectionMarkdown, KNOWN_HARNESSES } from "../skills/harness-projection.js"
+import { buildGateMatrix, gatesForPhase, renderGateMatrixMarkdown, explainGate } from "../skills/gate-matrix.js"
+import { buildHarnessProjection, projectionSummary, renderHarnessProjectionMarkdown, projectGate, KNOWN_HARNESSES } from "../skills/harness-projection.js"
 import { runDriftDoctor, computeBaseline, defaultBodyIo } from "../skills/drift-doctor.js"
 import { auditExternalSkills } from "../skills/external-audit.js"
 import { collectMirrorFiles } from "./research.js"
@@ -226,6 +226,34 @@ function vendorCmd(cwd, args, json) {
   return null
 }
 
+// ── why (PRD29 29.8): explica um gate (por que existe e como satisfazê-lo) ────────
+function gateEnforcement(gate) {
+  const out = {}
+  for (const h of KNOWN_HARNESSES) out[h] = projectGate(gate, h)
+  return out
+}
+
+function renderWhyHuman(x) {
+  section(`por que: ${x.gate} [${x.severity} · ${x.mode}]`)
+  info(`  fase: ${x.phase}`)
+  info(`  ${x.why}`)
+  info(`  skills que aconselham: ${x.skills.join(", ")}`)
+  x.preconditions.forEach((p) => info(`  precondição: ${p}`))
+  info(`  como satisfazer: ${x.howToSatisfy}`)
+  info(`  se falhar: ${x.fallbackMeaning} · verifier: ${x.verifier}`)
+  info(`  enforcement: ${Object.entries(x.enforcement).map(([h, l]) => `${h}=${l}`).join(" · ")}`)
+}
+
+function whyCmd(cwd, args, json) {
+  const gateId = args.filter((a) => !a.startsWith("-"))[1]
+  const gate = buildGateMatrix({ root: cwd }).gates.find((g) => g.id === gateId)
+  if (!gate) { error(`skills why: gate desconhecido: ${gateId || "(vazio)"} — veja 'skills gates show'`); process.exitCode = 1; return null }
+  const explanation = { ...explainGate(gate), enforcement: gateEnforcement(gate) }
+  if (json) { process.stdout.write(JSON.stringify(explanation) + "\n"); return explanation }
+  renderWhyHuman(explanation)
+  return explanation
+}
+
 function printUsage() {
   section("skills")
   info("  skills catalog [--json]                     inventário determinístico (hash/provenance/fase)")
@@ -234,6 +262,7 @@ function printUsage() {
   info("  skills harness [--harness <nome>] [--json]  enforcement REAL por harness (enforced/advisory/unsupported)")
   info("  skills baseline [--json]                    grava hash baseline p/ detecção de drift")
   info("  skills vendor import --path <mirror> [--apply]  vendora skills externas (dry-run default; avoid excluído; advisory)")
+  info("  skills why <gate> [--json]                  explica um gate: por que existe e como satisfazê-lo")
 }
 
 // Tabela de subcomandos (mantém o dispatcher com cc baixa conforme cresce).
@@ -244,6 +273,7 @@ const SUBCOMMANDS = Object.freeze({
   harness: (cwd, args, json) => harnessCmd(cwd, args, json),
   baseline: (cwd, args, json) => baselineCmd(cwd, json),
   vendor: (cwd, args, json) => vendorCmd(cwd, args, json),
+  why: (cwd, args, json) => whyCmd(cwd, args, json),
 })
 
 /** Dispatcher do `skills`. */
