@@ -1,5 +1,19 @@
 # Changelog - gstack-vibehard
 
+## [3.99.0] - 2026-07-08
+
+### Command-lint na CI + paridade PT-BR/EN (PRD34 F7-A / PRD30 30.3+30.4)
+
+- **`src/meta/command-lint.js`** (`gstack.command-lint.v1`): `ALL_CLI_COMMANDS`
+  (união do firewall Knowledge/Execution = fonte única), `citedCommands`/
+  `lintCommands` (comando de topo citado que não existe no CLI), `commandParity`
+  (comandos citados só num README — divergência PT×EN), `runCommandLint`. **GATE:**
+  `ok` = zero comando inexistente (a doc nunca engana o leigo); `parityOk` é
+  reportado à parte (divergência PT×EN = WARNING, não bloqueia). PURO/testável.
+- **`scripts/command-lint.mjs`** + `npm run lint:commands` + step no CI (`test.yml`
+  job `lint`): falha o build se um README citar comando inexistente; avisa (sem
+  bloquear) sobre divergência de comandos entre README.md e README.en.md.
+
 ## [3.98.0] - 2026-07-08
 
 ### Vendoring pipeline de skills externas (PRD34 F6-B / PRD29 29.10)
