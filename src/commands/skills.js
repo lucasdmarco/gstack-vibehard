@@ -1,8 +1,9 @@
-import { mkdirSync, writeFileSync } from "fs"
+import { mkdirSync, writeFileSync, readFileSync } from "fs"
 import { join } from "path"
 import { buildSkillCatalog, skillsDoctor, renderCatalogMarkdown } from "../skills/catalog.js"
 import { buildGateMatrix, gatesForPhase, renderGateMatrixMarkdown } from "../skills/gate-matrix.js"
 import { buildHarnessProjection, projectionSummary, renderHarnessProjectionMarkdown, KNOWN_HARNESSES } from "../skills/harness-projection.js"
+import { runDriftDoctor, computeBaseline, defaultBodyIo } from "../skills/drift-doctor.js"
 import { section, success, warn, error, info } from "../cli/index.js"
 
 /**
@@ -47,13 +48,42 @@ function renderDoctorHuman(report) {
   }
 }
 
+function readBaseline(cwd) {
+  try { return JSON.parse(readFileSync(join(cwd, ".gstack", "skills", "baseline.json"), "utf-8")) } catch { return null }
+}
+
+function renderSafetyHuman(m) {
+  const d = m.drift
+  info(`  drift: ${d.hasBaseline ? `${d.drifted.length} alteradas, ${d.added.length} novas, ${d.removed.length} removidas` : "sem baseline (rode 'skills baseline')"}`)
+  if (m.stale.length) m.stale.forEach((s) => error(`  ✗ stale: ${s.id} cita comando inexistente: ${s.missingCommands.join(", ")}`))
+  else success("  stale: nenhuma skill cita comando inexistente")
+  if (m.risk.high.length) warn(`  ⚠ risco alto (destrutivo/rede/secrets): ${m.risk.high.length} skill(s)`)
+}
+
+function doctorFailed(merged, report, strict) {
+  if (strict) return !merged.ok || report.findings.some((f) => f.severity === "warning")
+  return !merged.ok
+}
+
 function doctorCmd(cwd, json, strict) {
-  const report = skillsDoctor(buildSkillCatalog({ root: cwd }))
-  const failed = strict ? !report.ok || report.findings.some((f) => f.severity === "warning") : !report.ok
-  if (json) process.stdout.write(JSON.stringify(report) + "\n")
-  else renderDoctorHuman(report)
-  if (failed) process.exitCode = 1
-  return report
+  const catalog = buildSkillCatalog({ root: cwd })
+  const report = skillsDoctor(catalog)
+  const safety = runDriftDoctor({ catalog, baseline: readBaseline(cwd), io: defaultBodyIo(cwd), strict })
+  const merged = { ...report, ok: report.ok && safety.ok, drift: safety.drift, stale: safety.stale, risk: safety.risk }
+  if (json) process.stdout.write(JSON.stringify(merged) + "\n")
+  else { renderDoctorHuman(merged); renderSafetyHuman(merged) }
+  if (doctorFailed(merged, report, strict)) process.exitCode = 1
+  return merged
+}
+
+function baselineCmd(cwd, json) {
+  const baseline = computeBaseline(buildSkillCatalog({ root: cwd }))
+  const dir = join(cwd, ".gstack", "skills")
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, "baseline.json"), JSON.stringify(baseline, null, 2) + "\n")
+  if (json) { process.stdout.write(JSON.stringify(baseline) + "\n"); return baseline }
+  success(`Baseline gravado: ${dir}\\baseline.json (${baseline.totalSkills} skills, hash por skill)`)
+  return baseline
 }
 
 // ── gates (PRD29 29.1): compila matriz + show por fase ───────────────────────────
@@ -127,16 +157,24 @@ function printUsage() {
   info("  skills doctor [--json] [--strict]           saúde do catálogo (frontmatter/duplicatas/risco)")
   info("  skills gates show [--phase <fase>] [--json] matriz de gates por fase (a skill aconselha; o gate decide)")
   info("  skills harness [--harness <nome>] [--json]  enforcement REAL por harness (enforced/advisory/unsupported)")
+  info("  skills baseline [--json]                    grava hash baseline p/ detecção de drift")
 }
+
+// Tabela de subcomandos (mantém o dispatcher com cc baixa conforme cresce).
+const SUBCOMMANDS = Object.freeze({
+  catalog: (cwd, args, json) => catalogCmd(cwd, json),
+  doctor: (cwd, args, json) => doctorCmd(cwd, json, args.includes("--strict")),
+  gates: (cwd, args, json) => gatesCmd(cwd, args, json),
+  harness: (cwd, args, json) => harnessCmd(cwd, args, json),
+  baseline: (cwd, args, json) => baselineCmd(cwd, json),
+})
 
 /** Dispatcher do `skills`. */
 export async function skillsCommand(args = [], opts = {}) {
   const cwd = opts.cwd || process.cwd()
   const json = args.includes("--json")
   const sub = args.find((a) => !a.startsWith("-"))
-  if (sub === "catalog") return catalogCmd(cwd, json)
-  if (sub === "doctor") return doctorCmd(cwd, json, args.includes("--strict"))
-  if (sub === "gates") return gatesCmd(cwd, args, json)
-  if (sub === "harness") return harnessCmd(cwd, args, json)
-  printUsage()
+  const handler = SUBCOMMANDS[sub]
+  if (handler) return handler(cwd, args, json)
+  return printUsage()
 }
