@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync, readFileSync } from "fs"
 import { join, basename, isAbsolute } from "path"
-import { buildSkillCatalog, skillsDoctor, renderCatalogMarkdown } from "../skills/catalog.js"
+import { buildSkillCatalog, skillsDoctor, renderCatalogMarkdown, SKILL_PACKAGE_ROOT } from "../skills/catalog.js"
 import { buildGateMatrix, gatesForPhase, renderGateMatrixMarkdown, explainGate } from "../skills/gate-matrix.js"
 import { buildHarnessProjection, projectionSummary, renderHarnessProjectionMarkdown, projectGate, KNOWN_HARNESSES } from "../skills/harness-projection.js"
 import { runDriftDoctor, computeBaseline, defaultBodyIo } from "../skills/drift-doctor.js"
@@ -33,7 +33,7 @@ function renderCatalogHuman(catalog, dir) {
 }
 
 function catalogCmd(cwd, json) {
-  const catalog = buildSkillCatalog({ root: cwd })
+  const catalog = buildSkillCatalog()
   const dir = writeCatalogArtifacts(cwd, catalog)
   if (json) { process.stdout.write(JSON.stringify(catalog) + "\n"); return catalog }
   renderCatalogHuman(catalog, dir)
@@ -69,9 +69,9 @@ function doctorFailed(merged, report, strict) {
 }
 
 function doctorCmd(cwd, json, strict) {
-  const catalog = buildSkillCatalog({ root: cwd })
+  const catalog = buildSkillCatalog()
   const report = skillsDoctor(catalog)
-  const safety = runDriftDoctor({ catalog, baseline: readBaseline(cwd), io: defaultBodyIo(cwd), strict })
+  const safety = runDriftDoctor({ catalog, baseline: readBaseline(cwd), io: defaultBodyIo(SKILL_PACKAGE_ROOT), strict })
   const merged = { ...report, ok: report.ok && safety.ok, drift: safety.drift, stale: safety.stale, risk: safety.risk }
   if (json) process.stdout.write(JSON.stringify(merged) + "\n")
   else { renderDoctorHuman(merged); renderSafetyHuman(merged) }
@@ -80,7 +80,7 @@ function doctorCmd(cwd, json, strict) {
 }
 
 function baselineCmd(cwd, json) {
-  const baseline = computeBaseline(buildSkillCatalog({ root: cwd }))
+  const baseline = computeBaseline(buildSkillCatalog())
   const dir = join(cwd, ".gstack", "skills")
   mkdirSync(dir, { recursive: true })
   writeFileSync(join(dir, "baseline.json"), JSON.stringify(baseline, null, 2) + "\n")
@@ -110,7 +110,7 @@ function renderGatesHuman(matrix, phase, shown) {
 function gatesCmd(cwd, args, json) {
   const phaseIdx = args.indexOf("--phase")
   const phase = phaseIdx >= 0 ? args[phaseIdx + 1] : null
-  const matrix = buildGateMatrix({ root: cwd })
+  const matrix = buildGateMatrix()
   writeGateArtifacts(cwd, matrix)
   const shown = phase ? gatesForPhase(matrix, phase) : matrix.gates
   if (json) {
@@ -145,7 +145,7 @@ function renderHarnessHuman(projection) {
 function harnessCmd(cwd, args, json) {
   const hIdx = args.indexOf("--harness")
   const only = hIdx >= 0 ? args[hIdx + 1] : null
-  const matrix = buildGateMatrix({ root: cwd })
+  const matrix = buildGateMatrix()
   const harnesses = only ? [only] : KNOWN_HARNESSES
   const projection = buildHarnessProjection(matrix.gates, harnesses)
   writeHarnessArtifacts(cwd, projection)
@@ -246,7 +246,7 @@ function renderWhyHuman(x) {
 
 function whyCmd(cwd, args, json) {
   const gateId = args.filter((a) => !a.startsWith("-"))[1]
-  const gate = buildGateMatrix({ root: cwd }).gates.find((g) => g.id === gateId)
+  const gate = buildGateMatrix().gates.find((g) => g.id === gateId)
   if (!gate) { error(`skills why: gate desconhecido: ${gateId || "(vazio)"} — veja 'skills gates show'`); process.exitCode = 1; return null }
   const explanation = { ...explainGate(gate), enforcement: gateEnforcement(gate) }
   if (json) { process.stdout.write(JSON.stringify(explanation) + "\n"); return explanation }

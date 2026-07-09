@@ -7,6 +7,9 @@ import { fileURLToPath } from "url"
 // Default = raiz do pacote — a MESMA lição do dream audit (CM-08): medir o
 // PRODUTO, não o cwd do usuário (cwd vazio dava catálogo 0 e rota vazia).
 const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..")
+// Raiz do PACOTE (onde as skills são shipadas) — o comando `skills` deve catalogar
+// isto, NÃO o cwd do usuário (lição CM-08; máquina limpa dava "0 skills").
+export const SKILL_PACKAGE_ROOT = PACKAGE_ROOT
 
 /**
  * Skill Catalog determinístico (PRD29 Sprint 29.0).
