@@ -65,7 +65,7 @@ gstack_vibehard state summary --json | grep backend
 interativo e **exigem flags explícitas** em vez de travar:
 
 ```bash
-gstack_vibehard agent-reach enable --core            # sem wizard
+gstack_vibehard tools agent-reach enable --core       # sem wizard
 gstack_vibehard secrets set DATABASE_URL --stdin      # valor por stdin
 ```
 

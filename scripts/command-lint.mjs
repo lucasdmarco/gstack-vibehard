@@ -1,13 +1,22 @@
 #!/usr/bin/env node
 // Command-lint (PRD30 30.4 / PRD34 F7-A): a doc só cita comando que existe no CLI.
 // GATE: falha (exit 1) se README citar comando inexistente. Paridade PT×EN = WARNING.
-import { readFileSync, existsSync } from "fs"
+import { readFileSync, existsSync, readdirSync } from "fs"
+import { join } from "path"
 import { runCommandLint } from "../src/meta/command-lint.js"
 
+// READMEs primeiro (paridade compara os dois); guias entram só para o lint de comandos.
 const README_FILES = ["README.md", "README.en.md"]
+const GUIDES_DIR = "docs/guides"
+
+function guideFiles() {
+  if (!existsSync(GUIDES_DIR)) return []
+  return readdirSync(GUIDES_DIR).filter((f) => f.endsWith(".md")).map((f) => join(GUIDES_DIR, f))
+}
 
 function loadDocs() {
-  return README_FILES.filter((f) => existsSync(f)).map((f) => ({ name: f, text: readFileSync(f, "utf-8") }))
+  const files = [...README_FILES.filter((f) => existsSync(f)), ...guideFiles()]
+  return files.map((f) => ({ name: f, text: readFileSync(f, "utf-8") }))
 }
 
 const docs = loadDocs()

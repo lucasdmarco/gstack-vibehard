@@ -22,11 +22,21 @@ const CMD_PATTERNS = Object.freeze([
   /node[ \t]+src\/index\.js[ \t]+([a-z][a-z-]+)/gi,
 ])
 
-/** Comandos de topo citados no texto (deduplicados, ordenados). */
+// Só CONTEXTO de código conta como "citação de comando" — blocos ``` e spans `…`.
+// Prosa ("o gstack_vibehard num VPS") NÃO é invocação e não deve virar falso-positivo.
+function codeContext(text) {
+  const s = String(text)
+  const fenced = s.match(/```[\s\S]*?```/g) || []
+  const inline = s.match(/`[^`\n]+`/g) || []
+  return [...fenced, ...inline].join("\n")
+}
+
+/** Comandos de topo citados em contexto de código (deduplicados, ordenados). */
 export function citedCommands(text) {
+  const scanned = codeContext(text)
   const set = new Set()
   for (const re of CMD_PATTERNS) {
-    for (const m of String(text).matchAll(re)) set.add(m[1].toLowerCase())
+    for (const m of scanned.matchAll(re)) set.add(m[1].toLowerCase())
   }
   return [...set].sort()
 }
