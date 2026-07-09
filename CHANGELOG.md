@@ -1,5 +1,21 @@
 # Changelog - gstack-vibehard
 
+## [3.100.0] - 2026-07-08
+
+### Guias first-run/examples/skill-gates + `skills why <gate>` (PRD34 F7-B / PRD30 30.5+30.6 + PRD29 29.8)
+
+- **`skills why <gate> [--json]`** + `explainGate` em `gate-matrix.js`
+  (`gstack.skill-gate-explain.v1`): explica um gate — por que existe, o que checa,
+  como satisfazê-lo (evidência tem prioridade sobre a pergunta), o que o `fallback`
+  significa, e o **enforcement REAL por harness** (reusa `projectGate`).
+- **`docs/guides/first-run.md`** (transcript leigo, sem segredos),
+  **`examples.md`** (por intenção), **`skill-gates.md`** (o que cada gate checa e
+  por quê). Todos passam o `command-lint`.
+- **command-lint** agora varre também `docs/guides/*.md` e só conta citações em
+  **contexto de código** (blocos/spans) — elimina falso-positivo de prosa. Pegou e
+  corrigiu um bug real: `vps-ubuntu.md` citava `gstack_vibehard agent-reach` em vez
+  de `gstack_vibehard tools agent-reach`.
+
 ## [3.99.0] - 2026-07-08
 
 ### Command-lint na CI + paridade PT-BR/EN (PRD34 F7-A / PRD30 30.3+30.4)
