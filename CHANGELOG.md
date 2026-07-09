@@ -1,5 +1,20 @@
 # Changelog - gstack-vibehard
 
+## [3.100.1] - 2026-07-09
+
+### Correções encontradas em teste de máquina limpa (Windows, pacote instalado)
+
+- **fix(skills): `skills catalog/doctor/gates/harness/baseline/why` mediam o `cwd`
+  do usuário em vez do PACOTE.** Instalado numa pasta vazia, `skills catalog` dava
+  **0 skills** e `skills gates show` marcava os 12 gates como "skill desconhecida".
+  Agora a FONTE do catálogo é `SKILL_PACKAGE_ROOT` (onde as skills são shipadas —
+  mesma lição CM-08 que o `route.js` já seguia); os artefatos continuam gravados em
+  `cwd/.gstack`. Regressão coberta por teste rodando de um cwd neutro.
+- **fix(update): o hint de atualização usava `&&`, que não existe no PowerShell do
+  Windows** (produto é Windows-first). Agora imprime os dois passos separados
+  (`npm install -g …@latest` / `gstack_vibehard install`), válidos em PowerShell,
+  cmd e bash; `--json` ganhou `steps: [...]`.
+
 ## [3.100.0] - 2026-07-08
 
 ### Guias first-run/examples/skill-gates + `skills why <gate>` (PRD34 F7-B / PRD30 30.5+30.6 + PRD29 29.8)
