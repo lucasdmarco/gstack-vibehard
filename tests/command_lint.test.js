@@ -25,20 +25,26 @@ test("citedCommands + lintCommands: detecta comando inexistente", async () => {
   assert.deepEqual(lintCommands(text), ["fakecmd"], "só o inexistente")
 })
 
+test("citedCommands: só conta contexto de código, ignora prosa", async () => {
+  const { citedCommands } = await imp("src/meta/command-lint.js")
+  // "num" em prosa de título NÃO deve virar comando; só o que está em `code`
+  assert.deepEqual(citedCommands("# Rodando o gstack_vibehard num VPS — use `gstack_vibehard start`"), ["start"])
+})
+
 test("commandParity: comandos citados só num dos docs", async () => {
   const { commandParity } = await imp("src/meta/command-lint.js")
-  const p = commandParity("gstack_vibehard start\ngstack_vibehard proof", "gstack_vibehard start\ngstack_vibehard dev")
+  const p = commandParity("`gstack_vibehard start`\n`gstack_vibehard proof`", "`gstack_vibehard start`\n`gstack_vibehard dev`")
   assert.deepEqual(p.onlyInFirst, ["proof"])
   assert.deepEqual(p.onlyInSecond, ["dev"])
 })
 
 test("runCommandLint: ok exige zero comando inexistente; parityOk reportado à parte", async () => {
   const { runCommandLint } = await imp("src/meta/command-lint.js")
-  const bad = runCommandLint({ docs: [{ name: "a", text: "gstack_vibehard ghost" }, { name: "b", text: "gstack_vibehard start" }] })
+  const bad = runCommandLint({ docs: [{ name: "a", text: "`gstack_vibehard ghost`" }, { name: "b", text: "`gstack_vibehard start`" }] })
   assert.equal(bad.ok, false, "ghost não existe")
   assert.equal(bad.perFile[0].unknown[0], "ghost")
 
-  const good = runCommandLint({ docs: [{ name: "a", text: "gstack_vibehard start" }, { name: "b", text: "gstack_vibehard start" }] })
+  const good = runCommandLint({ docs: [{ name: "a", text: "`gstack_vibehard start`" }, { name: "b", text: "`gstack_vibehard start`" }] })
   assert.equal(good.ok, true)
   assert.equal(good.parityOk, true)
 })
