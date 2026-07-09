@@ -33,6 +33,7 @@ import { worktreeCommand } from "../commands/worktree.js"
 import { verifyCommand } from "../commands/verify.js"
 import { proofCommand } from "../commands/proof.js"
 import { skillsCommand } from "../commands/skills.js"
+import { researchCommand } from "../commands/research.js"
 import { dreamCommand } from "../commands/dream.js"
 import { proxyCommand } from "../commands/proxy.js"
 import { activateCommand } from "../commands/activate.js"
@@ -330,6 +331,7 @@ const DISPATCH = {
   verify: (a) => verifyCommand(a),
   proof: (a) => proofCommand(a),
   skills: (a) => skillsCommand(a),
+  research: (a) => researchCommand(a),
   "publish-guard": (a) => publishGuardCommand(a),
   update: (a) => updateCommand(a),
   dream: (a) => dreamCommand(a),
