@@ -1,5 +1,21 @@
 # Changelog - gstack-vibehard
 
+## [3.96.0] - 2026-07-08
+
+### Skill Drift & Safety Doctor (PRD34 F5-D / PRD29 29.7)
+
+- **`src/skills/drift-doctor.js`** (`gstack.skill-drift-doctor.v1` +
+  `gstack.skill-baseline.v1`): `computeBaseline` (hash por skill do catálogo),
+  `diffBaseline` (added/removed/drifted/unchanged), `citedCommands`/`staleCommands`
+  (skill que cita comando inexistente no CLI — validado contra o firewall
+  Knowledge/Execution real; separador horizontal + frontmatter strip evitam
+  falso-positivo de prosa), `scanRisk` (alto/médio do catálogo), `runDriftDoctor`
+  (agrega: **stale reprova sempre** — a doc engana o usuário; **drift só reprova em
+  `--strict`**; risk é informativo). PURO/testável.
+- **`skills baseline [--json]`**: grava `.gstack/skills/baseline.json` (hash por skill).
+- **`skills doctor [--strict] [--json]`**: agora inclui `drift`/`stale`/`risk` além
+  dos findings do catálogo, mantendo o contrato antigo (`ok`/`findings`).
+
 ## [3.95.0] - 2026-07-08
 
 ### Harness Skill Gate Projection (PRD34 F5-C / PRD29 29.6)
