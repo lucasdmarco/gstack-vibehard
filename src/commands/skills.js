@@ -116,13 +116,14 @@ function writeTruthArtifacts(cwd, truth) {
   writeFileSync(join(dir, "gate-truth.md"), renderGateTruthMarkdown(truth))
 }
 
+const provaMark = (r) => (r.provedBy ? (r.provedByBroken ? "QUEBRADA" : "✓") : "—")
+const truthRowLine = (r) =>
+  `  ${r.gate} (${r.event}) — impl ${r.implementedBy ? "✓" : "—"} · prova ${provaMark(r)} · claude=${r.byHarness.claude.level}`
+
 function renderTruthHuman(truth) {
   const s = truthSummary(truth)
   section(`gate truth — declared ${s.declared} · executed ${s.executed} · proved ${s.proved}`)
-  for (const r of truth.rows) {
-    const prova = r.provedBy ? (r.provedByBroken ? "QUEBRADA" : "✓") : "—"
-    info(`  ${r.gate} (${r.event}) — impl ${r.implementedBy ? "✓" : "—"} · prova ${prova} · claude=${r.byHarness.claude.level}`)
-  }
+  truth.rows.forEach((r) => info(truthRowLine(r)))
   for (const [h, n] of Object.entries(s.enforcedByHarness)) info(`  ${h}: ${n} enforced de ${s.declared} declarados`)
   for (const g of truth.brokenRefs) error(`  ✗ ${g}: provedBy cita teste inexistente — claim sem evidência`)
   warn("  enforced SÓ com implementação + bloqueio + teste negativo. declared ≠ routed ≠ executed ≠ blocking ≠ proved.")
@@ -137,6 +138,12 @@ function gatesDoctorCmd(cwd, json) {
   return truth
 }
 
+function emitGatesJson(matrix, shown, phase) {
+  process.stdout.write(JSON.stringify(phase ? { ...matrix, gates: shown, phaseFilter: phase } : matrix) + "\n")
+  if (!matrix.ok) process.exitCode = 1
+  return matrix
+}
+
 function gatesCmd(cwd, args, json) {
   if (args.filter((a) => !a.startsWith("-"))[1] === "doctor") return gatesDoctorCmd(cwd, json)
   const phaseIdx = args.indexOf("--phase")
@@ -144,11 +151,7 @@ function gatesCmd(cwd, args, json) {
   const matrix = buildGateMatrix()
   writeGateArtifacts(cwd, matrix)
   const shown = phase ? gatesForPhase(matrix, phase) : matrix.gates
-  if (json) {
-    process.stdout.write(JSON.stringify(phase ? { ...matrix, gates: shown, phaseFilter: phase } : matrix) + "\n")
-    if (!matrix.ok) process.exitCode = 1
-    return matrix
-  }
+  if (json) return emitGatesJson(matrix, shown, phase)
   renderGatesHuman(matrix, phase, shown)
   return matrix
 }
