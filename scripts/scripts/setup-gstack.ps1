@@ -3,10 +3,21 @@ param(
   [ValidateSet("express", "fastify", "hono")]
   [string]$Variant = "express"
 )
-# gstack - Infraestrutura e configuração do projeto
+# gstack - Infraestrutura e configuracao do projeto
+# Compativel com Windows PowerShell 5.1 (sem operadores exclusivos do PowerShell 7+)
 Write-Host "=== Instalando gstack (variante: $Variant) ===" -ForegroundColor Cyan
 
-# Criar estrutura de configuração
+function Get-ToolVersion {
+  param([string]$Tool)
+  $version = "unknown"
+  try {
+    $raw = & $Tool --version 2>$null
+    if ($raw) { $version = "$raw".Trim() }
+  } catch {}
+  return $version
+}
+
+# Criar estrutura de configuracao
 New-Item -ItemType Directory -Path "$ProjectDir\.gstack" -Force | Out-Null
 
 # Mapa de variantes
@@ -56,8 +67,8 @@ $toolsList = @("gstack", "gbrain", "context7", "superpowers", "graphify")
 
 @{
   project = Split-Path $ProjectDir -Leaf
-  node = (node --version 2>$null) || "unknown"
-  npm = (npm --version 2>$null) || "unknown"
+  node = Get-ToolVersion "node"
+  npm = Get-ToolVersion "npm"
   created = (Get-Date -Format "yyyy-MM-dd")
   stack = $v.stack
   infra = $v.infra
@@ -78,6 +89,6 @@ $toolsList = @("gstack", "gbrain", "context7", "superpowers", "graphify")
   }
 } | ConvertTo-Json -Depth 10 | Set-Content "$ProjectDir\.gstack\config.json"
 
-Write-Host "  ✓ .gstack/config.json criado (variante: $Variant)" -ForegroundColor Green
-Write-Host "  → Stack: $($v.stack -join ' + ')" -ForegroundColor Gray
-Write-Host "  → Infra: frontend=$($v.infra.frontend) backend=$($v.infra.backend) db=$($v.infra.database)" -ForegroundColor Gray
+Write-Host "  [OK] .gstack/config.json criado (variante: $Variant)" -ForegroundColor Green
+Write-Host "  -> Stack: $($v.stack -join ' + ')" -ForegroundColor Gray
+Write-Host "  -> Infra: frontend=$($v.infra.frontend) backend=$($v.infra.backend) db=$($v.infra.database)" -ForegroundColor Gray

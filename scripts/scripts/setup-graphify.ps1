@@ -1,10 +1,10 @@
 param([string]$ProjectDir)
-# graphify - Visualização de dependências do projeto
+# graphify - Visualizacao de dependencias do projeto
 Write-Host "=== Instalando graphify ===" -ForegroundColor Cyan
 
 New-Item -ItemType Directory -Path "$ProjectDir\.graphify" -Force | Out-Null
 
-# Gerar grafo de dependências do projeto
+# Gerar grafo de dependencias do projeto
 function Get-DependencyGraph {
   param([string]$Dir)
 
@@ -43,7 +43,7 @@ function Get-DependencyGraph {
     }
   }
 
-  # Detectar dependências internas (workspaces)
+  # Detectar dependencias internas (workspaces)
   $workspaceYaml = "$Dir\pnpm-workspace.yaml"
   if (Test-Path $workspaceYaml) {
     $yaml = Get-Content $workspaceYaml
@@ -69,7 +69,7 @@ function Get-DependencyGraph {
     }
   }
   else {
-    # Fallback: dependências padrão do template
+    # Fallback: dependencias padrao do template
     $graph.edges += @{ from = "apps/web"; to = "packages/db" }
     $graph.edges += @{ from = "apps/web"; to = "packages/shared" }
     $graph.edges += @{ from = "apps/api"; to = "packages/db" }
@@ -82,7 +82,7 @@ function Get-DependencyGraph {
 $graph = Get-DependencyGraph -Dir $ProjectDir
 $graph | ConvertTo-Json -Depth 10 | Set-Content "$ProjectDir\.graphify\deps.json"
 
-# Visualização HTML do grafo (dinâmica baseada nos nodes/edges reais)
+# Visualizacao HTML do grafo (dinamica baseada nos nodes/edges reais)
 $projectName = Split-Path $ProjectDir -Leaf
 $graphLines = @()
 $graphLines += "graph TD"
@@ -102,7 +102,7 @@ foreach ($edge in $graph.edges) {
     $graphLines += "  $fromId --> $toId"
   }
 }
-# Se tem frontend e backend, adicionar conexão HTTP
+# Se tem frontend e backend, adicionar conexao HTTP
 $frontends = $graph.nodes | Where-Object { $_.type -eq "frontend" }
 $backends = $graph.nodes | Where-Object { $_.type -eq "backend" }
 if ($frontends -and $backends) {
@@ -134,7 +134,7 @@ $mermaidContent = $graphLines -join "`n"
 </head>
 <body>
   <h1>$projectName</h1>
-  <div class="meta">Dependências do projeto — gerado por graphify</div>
+  <div class="meta">Dependencias do projeto - gerado por graphify</div>
   <div class="mermaid">
     $mermaidContent
   </div>
@@ -143,6 +143,6 @@ $mermaidContent = $graphLines -join "`n"
 </html>
 "@ | Set-Content "$ProjectDir\.graphify\index.html"
 
-Write-Host "  ✓ .graphify/deps.json criado" -ForegroundColor Green
-Write-Host "  ✓ .graphify/index.html criado" -ForegroundColor Green
-Write-Host "  → Abra .graphify/index.html no navegador para ver o grafo" -ForegroundColor Gray
+Write-Host "  [OK] .graphify/deps.json criado" -ForegroundColor Green
+Write-Host "  [OK] .graphify/index.html criado" -ForegroundColor Green
+Write-Host "  -> Abra .graphify/index.html no navegador para ver o grafo" -ForegroundColor Gray

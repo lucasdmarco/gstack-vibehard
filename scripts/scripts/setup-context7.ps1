@@ -1,5 +1,5 @@
 param([string]$ProjectDir)
-# context7 - Stack e documentação do projeto
+# context7 - Stack e documentacao do projeto
 Write-Host "=== Instalando context7 ===" -ForegroundColor Cyan
 
 New-Item -ItemType Directory -Path "$ProjectDir\.context7" -Force | Out-Null
@@ -27,7 +27,7 @@ New-Item -ItemType Directory -Path "$ProjectDir\.context7" -Force | Out-Null
   tools = @{
     monorepo = "pnpm workspaces"
     build = "turbo"
-    typescript = true
+    typescript = $true
   }
   updatedAt = (Get-Date -Format "yyyy-MM-dd")
 } | ConvertTo-Json | Set-Content "$ProjectDir\.context7\stack.json"
@@ -42,10 +42,10 @@ New-Item -ItemType Directory -Path "$ProjectDir\.context7" -Force | Out-Null
 - pnpm workspaces + TurboRepo
 
 ## Estrutura
-- apps/web → Frontend
-- apps/api → Backend
-- packages/db → Schema do banco
-- packages/shared → Tipos compartilhados
+- apps/web -> Frontend
+- apps/api -> Backend
+- packages/db -> Schema do banco
+- packages/shared -> Tipos compartilhados
 
 ## Comandos
 - dev: pnpm dev (roda web + api)
@@ -54,6 +54,6 @@ New-Item -ItemType Directory -Path "$ProjectDir\.context7" -Force | Out-Null
 - db push: cd packages/db && npx drizzle-kit push
 "@ | Set-Content "$ProjectDir\.context7\AGENTS.md"
 
-Write-Host "  ✓ .context7/stack.json criado" -ForegroundColor Green
-Write-Host "  ✓ .context7/AGENTS.md criado" -ForegroundColor Green
-Write-Host "  → O Codex carrega .context7/AGENTS.md automaticamente como contexto" -ForegroundColor Gray
+Write-Host "  [OK] .context7/stack.json criado" -ForegroundColor Green
+Write-Host "  [OK] .context7/AGENTS.md criado" -ForegroundColor Green
+Write-Host "  -> O Codex carrega .context7/AGENTS.md automaticamente como contexto" -ForegroundColor Gray
