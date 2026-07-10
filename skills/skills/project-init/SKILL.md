@@ -195,3 +195,19 @@ Se o usuário abrir um projeto existente e as pastas `.gstack`, `.gbrain`, `.con
 - Se o usuário disser "sim para todos", instale todos sem perguntar de novo
 - Se o usuário disser "não para um", pule e vá para o próximo
 - Respeite a escolha — não insista
+
+## Honestidade da instalação (obrigatório)
+
+- **Se um script `setup-*.ps1`/`setup-*.sh` FALHAR, o passo é `degraded` — NUNCA "instalado
+  com sucesso".** Mostre o erro ao usuário. Se você improvisar a configuração manualmente,
+  o status continua `degraded` e o usuário precisa ser informado do que foi feito à mão.
+- **Ferramenta só é "instalada" com o ARTEFATO verificado** (verifique com `Test-Path`/`ls`
+  após cada setup, nunca assuma):
+  - gstack → `.gstack/config.json` (com `variant`, `api_dir`, `db_package` preenchidos)
+  - gbrain → `.gbrain/context.json`
+  - context7 → `.context7/stack.json` e `.context7/AGENTS.md`
+  - superpowers → `scripts/run.ps1` (Windows) ou `scripts/run.sh` (Linux/macOS)
+  - graphify → `.graphify/deps.json`
+- Ao final, o resumo deve separar: **instalado (artefato verificado) / degraded (fallback
+  manual) / pulado (escolha do usuário) / falhou**. Nunca declare "Projeto pronto!" se
+  algum passo obrigatório falhou.

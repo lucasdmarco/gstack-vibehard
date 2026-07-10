@@ -1,10 +1,10 @@
 param([string]$ProjectDir)
-# gbrain - Contexto do negócio e decisões
+# gbrain - Contexto do negocio e decisoes
 Write-Host "=== Instalando gbrain ===" -ForegroundColor Cyan
 
 New-Item -ItemType Directory -Path "$ProjectDir\.gbrain" -Force | Out-Null
 
-# Template de contexto do negócio
+# Template de contexto do negocio
 @{
   project = Split-Path $ProjectDir -Leaf
   description = ""
@@ -17,9 +17,9 @@ New-Item -ItemType Directory -Path "$ProjectDir\.gbrain" -Force | Out-Null
 
 # README de contexto
 @"
-# gbrain - Contexto do Negócio
+# gbrain - Contexto do Negocio
 
-## Descrição
+## Descricao
 (preencher)
 
 ## Objetivos
@@ -33,17 +33,17 @@ New-Item -ItemType Directory -Path "$ProjectDir\.gbrain" -Force | Out-Null
 - Database: Supabase PostgreSQL
 - Deploy: Vercel
 
-## Decisões de Arquitetura
-| Decisão | Alternativas | Motivo |
+## Decisoes de Arquitetura
+| Decisao | Alternativas | Motivo |
 |---------|-------------|--------|
 | | | |
 
-## Glossário
-| Termo | Definição |
+## Glossario
+| Termo | Definicao |
 |-------|-----------|
 | | |
 "@ | Set-Content "$ProjectDir\.gbrain\README.md"
 
-Write-Host "  ✓ .gbrain/context.json criado" -ForegroundColor Green
-Write-Host "  ✓ .gbrain/README.md criado" -ForegroundColor Green
-Write-Host "  → Edite os arquivos em .gbrain/ com o contexto do projeto" -ForegroundColor Gray
+Write-Host "  [OK] .gbrain/context.json criado" -ForegroundColor Green
+Write-Host "  [OK] .gbrain/README.md criado" -ForegroundColor Green
+Write-Host "  -> Edite os arquivos em .gbrain/ com o contexto do projeto" -ForegroundColor Gray

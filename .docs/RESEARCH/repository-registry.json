@@ -44,5 +44,14 @@
         }
       ]
     }
+  ],
+  "externalReferences": [
+    {
+      "url": "https://github.com/code-yeongyu/oh-my-openagent",
+      "status": "active_reference",
+      "role": "opencode_plugin_reference",
+      "addedOn": "2026-07-09",
+      "note": "Plugin OpenCode-first (edicoes Ultimate/Light). Comparado em .docs/PLANS/comparacao090726.md (recomendacoes #2-#5 adotaveis; tmux Team Mode/telemetria/pacote-como-dependencia rejeitados). Referencia, nunca dependencia runtime. Ancora metodologica obrigatoria: batch-6-aidd-methodology."
+    }
   ]
 }

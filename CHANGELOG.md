@@ -1,5 +1,32 @@
 # Changelog - gstack-vibehard
 
+## [3.100.2] - 2026-07-10
+
+### Sprint 0 do programa PRD35/36/37 — onboarding Windows de verdade (PRD36 36.7/36.8)
+
+Bugs reais encontrados por transcript de campo (usuário rodando `project-init` numa
+máquina Windows com PowerShell 5.1) e **provados por execução real** antes do fix:
+
+- **fix(setup): `setup-gstack.ps1` quebrava o parse no PowerShell 5.1** por DUAS
+  causas: `||` (sintaxe PowerShell 7+) e **UTF-8 sem BOM lido como ANSI** (o último
+  byte do `✓` vira smart-quote `“` e mata a string). Resultado real: exit 1 e
+  `.gstack/config.json` **nunca era criado** — a falha exata do transcript. Agora:
+  helper `Get-ToolVersion` (try/catch) e scripts 100% ASCII (convenção asciiSafe do 26.A).
+- **fix(setup): `setup-superpowers.ps1` gerava um `run.ps1` CORROMPIDO**: o
+  here-string era interpolado, então `$Command` (indefinido no momento do setup)
+  expandia para vazio (`[string] = 'help'`, `switch ()` = parse error). Agora
+  here-strings literais; `run.ps1` gerado parseia e `run.ps1 help` executa.
+- **fix(setup): `setup-context7.ps1` era um falso-verde perfeito**: `typescript = true`
+  (sem `$`) vira comando inexistente no PowerShell → **exit 0 sem escrever
+  `stack.json`**. Ferramenta "instalada" sem artefato. Agora `$true`.
+- **test(setup): regressão `tests/setup_scripts_ps51.test.js`** — lint estático
+  cross-platform (ASCII puro, sem sintaxe PS7-only, booleanos com `$`, here-string
+  literal no gerador de .ps1) + integração win32: roda os 5 scripts no
+  `powershell.exe` 5.1 real e exige exit 0, os 9 artefatos e `run.ps1` executável.
+- **docs(skills): `project-init` ganhou "Honestidade da instalação"**: script que
+  falha = `degraded` (nunca "instalado com sucesso"); ferramenta só é "instalada"
+  com **artefato verificado**; resumo final separa instalado/degraded/pulado/falhou.
+
 ## [3.100.1] - 2026-07-09
 
 ### Correções encontradas em teste de máquina limpa (Windows, pacote instalado)
