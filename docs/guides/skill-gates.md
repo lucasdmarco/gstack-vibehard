@@ -32,13 +32,23 @@ O mesmo gate **não** é imposto igual em todo harness. Veja o real:
 gstack_vibehard skills harness
 ```
 
-- `enforced`: o harness (ou a CLI, no caso de gates de ship) **bloqueia de fato**;
-- `advisory`: o gate é registrado, mas o harness não intercepta a escrita em tempo real;
+- `enforced`: existe **implementação + bloqueio real + teste negativo** provando
+  que a ação é negada — os três, nunca só a declaração na matriz;
+- `advisory`: o gate é registrado, mas não há bloqueio provado naquele harness;
 - `unsupported`: o harness não representa aquele gate.
 
-Hoje só o Claude tem hook pre-tool que bloqueia escrita; nos demais, um gate de
-pre-write é `advisory` (a CLI ainda gateia quando o fluxo passa por ela). Isso é
-declarado — nunca fingimos que um advisory bloqueia.
+Para o detalhe completo, os **5 estados** de cada gate — `declared` (existe na
+matriz) ≠ `routed` (o harness recebe o evento) ≠ `executed` (a checagem roda) ≠
+`blocking` (pode negar a ação) ≠ `proved` (teste negativo verificado):
+
+```
+gstack_vibehard skills gates doctor
+```
+
+Hoje só o Claude intercepta escrita (hook pre-tool); nos demais, um gate de
+pre-write é `advisory` (a CLI ainda gateia quando o fluxo passa por ela). E um
+gate **só declarado** (sem implementação) é `advisory` em TODO harness — nunca
+fingimos que declaração bloqueia.
 
 ## Os gates hoje (resumo)
 

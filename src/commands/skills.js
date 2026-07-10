@@ -3,6 +3,7 @@ import { join, basename, isAbsolute } from "path"
 import { buildSkillCatalog, skillsDoctor, renderCatalogMarkdown, SKILL_PACKAGE_ROOT } from "../skills/catalog.js"
 import { buildGateMatrix, gatesForPhase, renderGateMatrixMarkdown, explainGate } from "../skills/gate-matrix.js"
 import { buildHarnessProjection, projectionSummary, renderHarnessProjectionMarkdown, projectGate, KNOWN_HARNESSES } from "../skills/harness-projection.js"
+import { buildGateTruth, truthSummary, renderGateTruthMarkdown } from "../skills/gate-truth.js"
 import { runDriftDoctor, computeBaseline, defaultBodyIo } from "../skills/drift-doctor.js"
 import { auditExternalSkills } from "../skills/external-audit.js"
 import { collectMirrorFiles } from "./research.js"
@@ -107,7 +108,37 @@ function renderGatesHuman(matrix, phase, shown) {
   if (!matrix.ok) { matrix.conflicts.forEach((c) => error(`  ✗ CONFLITO em ${c.phase}: ${c.path} — ${c.gates.join(" vs ")}`)); process.exitCode = 1 }
 }
 
+// ── gates doctor (PRD36 36.0): 5 estados reais — nunca "12/12" só pela matriz ─────
+function writeTruthArtifacts(cwd, truth) {
+  const dir = join(cwd, ".gstack", "skills")
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, "gate-truth.json"), JSON.stringify(truth, null, 2) + "\n")
+  writeFileSync(join(dir, "gate-truth.md"), renderGateTruthMarkdown(truth))
+}
+
+function renderTruthHuman(truth) {
+  const s = truthSummary(truth)
+  section(`gate truth — declared ${s.declared} · executed ${s.executed} · proved ${s.proved}`)
+  for (const r of truth.rows) {
+    const prova = r.provedBy ? (r.provedByBroken ? "QUEBRADA" : "✓") : "—"
+    info(`  ${r.gate} (${r.event}) — impl ${r.implementedBy ? "✓" : "—"} · prova ${prova} · claude=${r.byHarness.claude.level}`)
+  }
+  for (const [h, n] of Object.entries(s.enforcedByHarness)) info(`  ${h}: ${n} enforced de ${s.declared} declarados`)
+  for (const g of truth.brokenRefs) error(`  ✗ ${g}: provedBy cita teste inexistente — claim sem evidência`)
+  warn("  enforced SÓ com implementação + bloqueio + teste negativo. declared ≠ routed ≠ executed ≠ blocking ≠ proved.")
+}
+
+function gatesDoctorCmd(cwd, json) {
+  const truth = buildGateTruth({ gates: buildGateMatrix().gates })
+  writeTruthArtifacts(cwd, truth)
+  if (json) process.stdout.write(JSON.stringify({ ...truth, summary: truthSummary(truth) }) + "\n")
+  else renderTruthHuman(truth)
+  if (!truth.ok) process.exitCode = 1
+  return truth
+}
+
 function gatesCmd(cwd, args, json) {
+  if (args.filter((a) => !a.startsWith("-"))[1] === "doctor") return gatesDoctorCmd(cwd, json)
   const phaseIdx = args.indexOf("--phase")
   const phase = phaseIdx >= 0 ? args[phaseIdx + 1] : null
   const matrix = buildGateMatrix()
@@ -259,6 +290,7 @@ function printUsage() {
   info("  skills catalog [--json]                     inventário determinístico (hash/provenance/fase)")
   info("  skills doctor [--json] [--strict]           saúde do catálogo (frontmatter/duplicatas/risco)")
   info("  skills gates show [--phase <fase>] [--json] matriz de gates por fase (a skill aconselha; o gate decide)")
+  info("  skills gates doctor [--json]                verdade dos gates: declared/routed/executed/blocking/proved por harness")
   info("  skills harness [--harness <nome>] [--json]  enforcement REAL por harness (enforced/advisory/unsupported)")
   info("  skills baseline [--json]                    grava hash baseline p/ detecção de drift")
   info("  skills vendor import --path <mirror> [--apply]  vendora skills externas (dry-run default; avoid excluído; advisory)")
