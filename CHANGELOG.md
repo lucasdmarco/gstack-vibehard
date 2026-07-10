@@ -1,5 +1,33 @@
 # Changelog - gstack-vibehard
 
+## [3.101.0] - 2026-07-10
+
+### Sprint A1 — a verdade dos gates (PRD36 36.0)
+
+`declared` ≠ `routed` ≠ `executed` ≠ `blocking` ≠ `proved` — sempre separados:
+
+- **`src/skills/gate-truth.js`** (`gstack.skill-gate-truth.v1`): fonte ÚNICA dos
+  5 estados por gate×harness. `routed` deriva de `EVENT_DECLARATIONS` (events.js —
+  fim da cópia local `HARNESS_HOOK_SUPPORT` no harness-projection); `executed` =
+  implementação real (`implementedBy`); `blocking` = pode negar naquele harness
+  (ship=CLI; pre-write=só onde `file.write` é `enforced` — `partial` não garante);
+  `proved` = **teste negativo citado em `provedBy` e VERIFICADO** (o arquivo
+  existe e contém o nome). **`enforced` exige executed+blocking+proved.**
+- **REMOVIDO o claim "todo gate pre-write é aplicado pelo hook do Claude"**:
+  `projectGate` agora deriva do gate-truth. Blocking **só declarado** (sem
+  implementação) é `advisory` em TODO harness — `db-migration-gate`, `rls-gate`,
+  `visual-validation-gate` e `context-pack-required-gate` não fingem mais.
+- **`skills gates doctor [--json]`**: a verdade no CLI + artefatos
+  `.gstack/skills/gate-truth.{json,md}`. Resultado real hoje: **declared 12 ·
+  executed 8 · proved 6; claude 6 enforced, codex/opencode/cursor 2** — nunca
+  mais "12/12" só porque a matriz é válida. Prova citada que não existe = exit 1.
+- **`gate-matrix.js`**: os 6 gates com bloqueio comprovado citam o teste negativo
+  (`provedBy`): cwd-health, plan-before-code, design-system, secret-deny,
+  worktree-required, verify-proof. Anti-regressão em `tests/gate_truth.test.js`
+  (declared>executed>proved; prova quebrada reprova; declarado-apenas nunca enforced).
+- Honestidade de escopo: `capabilities.js` (ADAPTER_MATRIX, domínio dos agentes)
+  segue separado — a unificação do enforcement cross-harness é o Sprint A3 (36.2).
+
 ## [3.100.2] - 2026-07-10
 
 ### Sprint 0 do programa PRD35/36/37 — onboarding Windows de verdade (PRD36 36.7/36.8)

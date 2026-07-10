@@ -30,6 +30,7 @@ export const SKILL_GATES = Object.freeze([
     requiredEvidence: [],
     verifier: "workspace-classifier", fallback: "ask_before_any_write",
     implementedBy: "src/runtime/workspace.js (v3.80.0)",
+    provedBy: { test: "tests/workspace_guard.test.js", name: "start no home: pergunta criar/abrir/diagnosticar e NÃO segue quando usuário sai" },
   },
   {
     id: "plan-before-code-gate", phase: "planning-spec", severity: "P0", mode: "blocking",
@@ -40,6 +41,7 @@ export const SKILL_GATES = Object.freeze([
     requiredEvidence: [".gstack/plans/<planId>/plan.json"],
     verifier: "file-exists", fallback: "block_before_write",
     implementedBy: "src/commands/start.js confirmExecution",
+    provedBy: { test: "tests/start_wizard.test.js", name: "start: cancelar na confirmação salva o plano mas NÃO executa" },
   },
   {
     id: "existing-model-intake-gate", phase: "design-ui", severity: "P0", mode: "blocking",
@@ -49,6 +51,7 @@ export const SKILL_GATES = Object.freeze([
     requiredQuestions: ["Você já tem screenshot/Figma/template/schema/brand para eu seguir?"],
     requiredEvidence: [".gstack/runs/<runId>/skill-route.json"],
     verifier: "json-schema", fallback: "block_before_write",
+    implementedBy: "src/commands/start.js resolveModelIntake (intake obrigatório na rota)",
   },
   {
     id: "design-system-gate", phase: "design-ui", severity: "P0", mode: "blocking",
@@ -58,6 +61,8 @@ export const SKILL_GATES = Object.freeze([
     requiredQuestions: ["Você já tem um design system próprio?"],
     requiredEvidence: [".gstack/design-system.json", ".gstack/runs/<runId>/design-system-gate.json"],
     verifier: "json-schema + file-exists", fallback: "block_before_write",
+    implementedBy: "src/skills/design-system.js evaluatePreWriteGate + start guarded (F2-B)",
+    provedBy: { test: "tests/design_system_gate.test.js", name: "start: objetivo frontend SEM design system → bloqueia execução (guarded)" },
   },
   {
     id: "visual-validation-gate", phase: "test-preview", severity: "P1", mode: "blocking",
@@ -77,6 +82,7 @@ export const SKILL_GATES = Object.freeze([
     requiredEvidence: [],
     verifier: "command (git ls-files .env*)", fallback: "block_always",
     implementedBy: "delegação bloqueia .env rastreado (v3.4x)",
+    provedBy: { test: "tests/delegate_codebuff.test.js", name: "delegate codebuff BLOQUEIA com .env rastreado (segredo não vai a modelo externo)" },
   },
   {
     id: "db-migration-gate", phase: "data-auth-api", severity: "P1", mode: "blocking",
@@ -105,6 +111,7 @@ export const SKILL_GATES = Object.freeze([
     requiredEvidence: [],
     verifier: "command (git worktree list)", fallback: "block_before_delegate",
     implementedBy: "delegate --worktree default (v3.4x)",
+    provedBy: { test: "tests/delegate_codebuff.test.js", name: "delegate codebuff SEM --worktree é recusado (não roda fora de worktree)" },
   },
   {
     id: "context-pack-required-gate", phase: "delegation-parallel", severity: "P1", mode: "blocking",
@@ -124,6 +131,7 @@ export const SKILL_GATES = Object.freeze([
     requiredEvidence: [],
     verifier: "command (verify/proof --json)", fallback: "block_before_ship",
     implementedBy: "src/commands/proof.js (v3.78.0)",
+    provedBy: { test: "tests/verify_gates.test.js", name: "verify: qualquer gate que falha → blocked, ready=false" },
   },
   {
     id: "skill-route-gate", phase: "intake-onboarding", severity: "P1", mode: "advisory",
@@ -133,6 +141,7 @@ export const SKILL_GATES = Object.freeze([
     requiredQuestions: ["Executar esta etapa usando as skills recomendadas?"],
     requiredEvidence: [".gstack/runs/<runId>/skill-route.json"],
     verifier: "json-schema", fallback: "warn_and_log",
+    implementedBy: "src/skills/route.js buildSkillRoute (wired no start, F2-A)",
     note: "vira blocking quando o wiring do start chegar (F2-A/29.2)",
   },
 ])

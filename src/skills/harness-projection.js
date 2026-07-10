@@ -1,63 +1,41 @@
+import { gateEvent, gateTruth, truthLevel, verifyProvedBy, TRUTH_HARNESSES } from "./gate-truth.js"
+
 /**
- * Harness Skill Gate Projection (PRD29 29.6 / PRD34 F5-C).
+ * Harness Skill Gate Projection (PRD29 29.6 / PRD34 F5-C / PRD36 36.0).
  *
- * O mesmo skill-gate NÃO é imposto igual em todo harness. Honestidade de enforcement:
- *  - gate advisory                      → sempre `advisory` (registra/explica, não trava);
- *  - gate blocking em evento SHIP        → `enforced` em todo harness (a CLI roda
- *    verify/proof independentemente do harness);
- *  - gate blocking em evento PRE-WRITE   → `enforced` só onde o harness intercepta a
- *    escrita (hook pre-tool); sem hook, `advisory` — a CLI ainda gateia quando o fluxo
- *    passa por ela, mas o harness não bloqueia a escrita em tempo real;
- *  - harness desconhecido                → `unsupported`.
- *
- * Declara o REAL — nunca finge que um advisory bloqueia. PURO/testável.
+ * DERIVA de `gate-truth.js` (fonte única dos 5 estados). Honestidade:
+ *  - gate advisory → sempre `advisory`;
+ *  - gate blocking só é `enforced` com implementação + bloqueio real no harness
+ *    + TESTE NEGATIVO verificado (executed && blocking && proved) — a versão
+ *    anterior marcava todo pre-write como enforced no Claude sem provar cada
+ *    gate; esse claim foi removido (PRD36 36.0);
+ *  - harness desconhecido → `unsupported`.
  */
 
 export const HARNESS_GATE_PROJECTION_SCHEMA = "gstack.harness-gate-projection.v1"
 export const ENFORCEMENT_LEVELS = Object.freeze(["enforced", "advisory", "unsupported"])
+export const KNOWN_HARNESSES = TRUTH_HARNESSES
 
-// Suporte REAL de bloqueio pre-tool por harness (o que existe hoje no produto):
-// só o Claude tem hook pre_tool_use que NEGA a ação; os demais são advisory.
-const HARNESS_HOOK_SUPPORT = Object.freeze({
-  claude: { preToolBlock: true },
-  codex: { preToolBlock: false },
-  opencode: { preToolBlock: false },
-  cursor: { preToolBlock: false },
-})
+export { gateEvent }
 
-export const KNOWN_HARNESSES = Object.freeze(Object.keys(HARNESS_HOOK_SUPPORT))
-
-// Evento em que o gate incide, derivado do fallback declarado na matriz.
-// SHIP = imposto pela CLI (verify/proof/delegate) → independe do harness.
-// PRE-WRITE = precisa interceptar a escrita → depende de hook pre-tool.
-const SHIP_FALLBACKS = Object.freeze(["block_before_ship", "block_before_delegate"])
-
-/** "ship" | "pre-write" — quando o gate realmente incide. */
-export function gateEvent(gate) {
-  return SHIP_FALLBACKS.includes(gate.fallback) ? "ship" : "pre-write"
-}
-
-/** Nível de enforcement REAL de um gate num harness. */
-export function projectGate(gate, harness) {
-  const support = HARNESS_HOOK_SUPPORT[harness]
-  if (!support) return "unsupported"
-  if (gate.mode !== "blocking") return "advisory"
-  if (gateEvent(gate) === "ship") return "enforced"
-  return support.preToolBlock ? "enforced" : "advisory"
+/** Nível de enforcement REAL de um gate num harness (derivado dos 5 estados). */
+export function projectGate(gate, harness, io = undefined) {
+  const { proved } = verifyProvedBy(gate, io)
+  return truthLevel(gate, harness, gateTruth(gate, harness, proved))
 }
 
 /** Matriz gate × harness com o nível REAL de enforcement. */
-export function buildHarnessProjection(gates = [], harnesses = KNOWN_HARNESSES) {
+export function buildHarnessProjection(gates = [], harnesses = KNOWN_HARNESSES, io = undefined) {
   const matrix = {}
   for (const h of harnesses) {
-    matrix[h] = gates.map((g) => ({ gate: g.id, mode: g.mode, event: gateEvent(g), level: projectGate(g, h) }))
+    matrix[h] = gates.map((g) => ({ gate: g.id, mode: g.mode, event: gateEvent(g), level: projectGate(g, h, io) }))
   }
   return {
     schemaVersion: HARNESS_GATE_PROJECTION_SCHEMA,
     generatedAt: new Date().toISOString(),
     harnesses: [...harnesses],
     matrix,
-    note: "honesto: 'enforced' em SHIP vale em todo harness (CLI); em PRE-WRITE só onde há hook pre-tool; senão 'advisory'.",
+    note: "honesto: 'enforced' SÓ com implementação + bloqueio real no harness + teste negativo verificado (gate-truth); senão 'advisory'.",
   }
 }
 
@@ -87,7 +65,7 @@ export function renderHarnessProjectionMarkdown(projection) {
     `# Harness Skill Gate Projection — enforcement REAL por harness`, "",
     `Gerado: ${projection.generatedAt} · schema ${projection.schemaVersion}`, "",
     header, sep, ...rows, "",
-    "🔒 enforced (harness/CLI bloqueia) · 📎 advisory (registra, não trava) · — unsupported.", "",
+    "🔒 enforced (implementado + bloqueia + teste negativo) · 📎 advisory (registra, não trava) · — unsupported.", "",
     projection.note, "",
   ].join("\n")
 }
