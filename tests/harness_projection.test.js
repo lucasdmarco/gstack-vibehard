@@ -14,36 +14,48 @@ test("gateEvent: fallback ship → 'ship', o resto → 'pre-write'", async () =>
   assert.equal(gateEvent({ fallback: "warn_and_log" }), "pre-write")
 })
 
-test("projectGate: advisory sempre advisory; ship enforced em todo harness; pre-write depende de hook", async () => {
+// io injetado: a "prova" citada existe e contém o nome do teste negativo
+const provedIo = { readTest: () => "conteudo com: teste negativo prova o bloqueio" }
+const provedRef = { test: "tests/fake.test.js", name: "teste negativo prova o bloqueio" }
+
+test("projectGate (PRD36): enforced SÓ com impl+bloqueio+prova; declarado-apenas NUNCA é enforced", async () => {
   const { projectGate } = await imp("src/skills/harness-projection.js")
   const advisory = { id: "a", mode: "advisory", fallback: "warn_and_log" }
-  const preWrite = { id: "b", mode: "blocking", fallback: "block_before_write" }
-  const ship = { id: "c", mode: "blocking", fallback: "block_before_ship" }
+  const preWriteProved = { id: "b", mode: "blocking", fallback: "block_before_write", implementedBy: "src/x.js", provedBy: provedRef }
+  const preWriteDeclared = { id: "b2", mode: "blocking", fallback: "block_before_write" }
+  const shipProved = { id: "c", mode: "blocking", fallback: "block_before_ship", implementedBy: "src/y.js", provedBy: provedRef }
+  const shipDeclared = { id: "c2", mode: "blocking", fallback: "block_before_ship" }
 
   assert.equal(projectGate(advisory, "claude"), "advisory")
   assert.equal(projectGate(advisory, "codex"), "advisory")
 
-  // pre-write: só claude (tem hook pre-tool) impõe; codex/opencode/cursor advisory
-  assert.equal(projectGate(preWrite, "claude"), "enforced")
-  assert.equal(projectGate(preWrite, "codex"), "advisory")
-  assert.equal(projectGate(preWrite, "opencode"), "advisory")
+  // pre-write provado: só claude (hook file.write enforced) impõe; codex/opencode advisory
+  assert.equal(projectGate(preWriteProved, "claude", provedIo), "enforced")
+  assert.equal(projectGate(preWriteProved, "codex", provedIo), "advisory")
+  assert.equal(projectGate(preWriteProved, "opencode", provedIo), "advisory")
 
-  // ship: CLI roda em qualquer harness → enforced em todos
-  assert.equal(projectGate(ship, "claude"), "enforced")
-  assert.equal(projectGate(ship, "codex"), "enforced")
+  // o claim antigo morreu: blocking pre-write SEM impl+prova não é enforced nem no claude
+  assert.equal(projectGate(preWriteDeclared, "claude"), "advisory")
+
+  // ship provado: CLI nega em qualquer harness → enforced em todos
+  assert.equal(projectGate(shipProved, "claude", provedIo), "enforced")
+  assert.equal(projectGate(shipProved, "codex", provedIo), "enforced")
+
+  // ship declarado-apenas (sem implementação): advisory — não finge
+  assert.equal(projectGate(shipDeclared, "codex"), "advisory")
 
   // harness desconhecido → unsupported
-  assert.equal(projectGate(ship, "windsurf"), "unsupported")
+  assert.equal(projectGate(shipProved, "windsurf", provedIo), "unsupported")
 })
 
 test("buildHarnessProjection: matriz por harness com schema, event e level", async () => {
   const { buildHarnessProjection, HARNESS_GATE_PROJECTION_SCHEMA, KNOWN_HARNESSES } = await imp("src/skills/harness-projection.js")
   const gates = [
-    { id: "secret-deny-gate", mode: "blocking", fallback: "block_always" },
-    { id: "verify-proof-gate", mode: "blocking", fallback: "block_before_ship" },
+    { id: "secret-deny-gate", mode: "blocking", fallback: "block_always", implementedBy: "src/s.js", provedBy: provedRef },
+    { id: "verify-proof-gate", mode: "blocking", fallback: "block_before_ship", implementedBy: "src/p.js", provedBy: provedRef },
     { id: "skill-route-gate", mode: "advisory", fallback: "warn_and_log" },
   ]
-  const p = buildHarnessProjection(gates)
+  const p = buildHarnessProjection(gates, undefined, provedIo)
   assert.equal(p.schemaVersion, HARNESS_GATE_PROJECTION_SCHEMA)
   assert.deepEqual(p.harnesses, [...KNOWN_HARNESSES])
   // claude impõe os dois blocking; codex só o ship
@@ -59,11 +71,11 @@ test("buildHarnessProjection: matriz por harness com schema, event e level", asy
 test("projectionSummary: conta níveis por harness", async () => {
   const { buildHarnessProjection, projectionSummary } = await imp("src/skills/harness-projection.js")
   const gates = [
-    { id: "g1", mode: "blocking", fallback: "block_before_write" },
-    { id: "g2", mode: "blocking", fallback: "block_before_ship" },
+    { id: "g1", mode: "blocking", fallback: "block_before_write", implementedBy: "src/g1.js", provedBy: provedRef },
+    { id: "g2", mode: "blocking", fallback: "block_before_ship", implementedBy: "src/g2.js", provedBy: provedRef },
     { id: "g3", mode: "advisory", fallback: "warn_and_log" },
   ]
-  const s = projectionSummary(buildHarnessProjection(gates, ["claude", "codex"]))
+  const s = projectionSummary(buildHarnessProjection(gates, ["claude", "codex"], provedIo))
   assert.deepEqual(s.claude, { enforced: 2, advisory: 1, unsupported: 0 })
   assert.deepEqual(s.codex, { enforced: 1, advisory: 2, unsupported: 0 })
 })
