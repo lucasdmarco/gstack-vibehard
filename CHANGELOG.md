@@ -1,5 +1,32 @@
 # Changelog - gstack-vibehard
 
+## [3.106.0] - 2026-07-11
+
+### Sprint B3 — gate visual EXECUTADO (PRD36 36.9, base do PRD37 37.2)
+
+O `visual-validation-gate` era só **declarado** (Playwright era dependência, mas
+nada abria o navegador). Agora **executa**:
+
+- **`src/skills/visual-gate.js`** (`gstack.visual-gate.v1`): `runVisualGate`
+  observa a página (driver **injetável**; o real é Playwright via lazy-import),
+  captura **screenshot + console + rede + acessibilidade** como EVIDÊNCIA e grava
+  no Evidence Ledger (`skill-evidence.json`). Avaliação determinística: erro de
+  console / request ≥ 400 / violação de a11y / screenshot ausente → `failed`
+  (BLOQUEIA); tudo limpo → `validated`.
+- **Honestidade "nada é enfeite"**: sem driver de navegador → `needs_browser`
+  (BLOQUEIA) — **nunca finge verde**. `browserDriverAvailable()` reporta a
+  verdade (hoje `false`: playwright não está instalado, então o gate diz
+  claramente que não pode validar em vez de mentir).
+- **CLI `visual check --url <endereço>`** (knowledge): executa o gate no app
+  rodando, grava evidência, exit 1 se bloqueado.
+- **Verdade dos gates**: `visual-validation-gate` ganhou `implementedBy` +
+  `provedBy` e **sai dos "declarados-apenas"** — o `gate-truth` agora o conta
+  como `enforced` (ship). Declarados-apenas restantes: db-migration, rls,
+  context-pack.
+- Testes: os 5 caminhos (validated / needs_browser / console-erro / 5xx / a11y /
+  sem-screenshot) com driver fake + `browserDriverAvailable` honesto + evidência
+  gravada no ledger.
+
 ## [3.105.0] - 2026-07-11
 
 ### Sprint B2 — skills comprováveis por evidência + paridade cross-platform (PRD36 36.8/36.8b)
