@@ -7,19 +7,16 @@
  * escreve teste, faz a menor mudança, verifica).
  */
 import { LOOP_PATTERNS } from "./loop-patterns.js"
+import { normalize, matchedKeywords } from "./keyword-match.js"
 
 const DEFAULT_LOOP = "test-driven"
-
-function normalize(text) {
-  return String(text || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
-}
 
 export function classifyLoop(input = {}) {
   const hay = normalize(input.task)
   let best = { loopPattern: null, matched: [], score: 0 }
 
   for (const p of Object.values(LOOP_PATTERNS)) {
-    const matched = p.intentKeywords.filter((kw) => hay.includes(normalize(kw)))
+    const matched = matchedKeywords(hay, p.intentKeywords)
     if (matched.length > best.score) best = { loopPattern: p.id, matched, score: matched.length }
   }
 

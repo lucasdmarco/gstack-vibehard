@@ -1,5 +1,25 @@
 # Changelog - gstack-vibehard
 
+## [3.107.0] - 2026-07-11
+
+### Sprint B4 — hardening: classificador de intenção por palavra (PRD36 36.5)
+
+- **`src/project-plan/keyword-match.js`**: match de keyword por **limite de
+  palavra** (regex, acento-insensível, com cache), substituindo o
+  `hay.includes(kw)` frágil. Bugs reais que sumiram: `api` casava *therapist*,
+  `app` casava *apply*, `ia` casava *inteligencia*, `pr` casava *prazo*, `log`
+  casava *login*. Keywords multi-palavra (`react native`) continuam casando.
+- **`classifier.js` (recipe) e `loop-classifier.js`** passam a usar o matcher
+  compartilhado — a mesma correção nos dois classificadores determinísticos.
+- Regressão em `tests/intent_classifier.test.js`: false-positive de substring
+  reprova, match por palavra inteira e multi-palavra funcionam, sinais explícitos
+  (`hasRuntimeError`) ainda decidem.
+- **Escopo honesto**: o **contrato Full já BLOQUEIA** em componente obrigatório
+  degradado (a parte "falha" do 36.4, herdada do PRD12 — `full-contract.js`); o
+  **rollback transacional completo** (36.4 "restaura") e o **isolamento total de
+  HOME nos testes** (36.3) ficam como follow-up de hardening — não foram
+  entregues neste sprint e continuam rastreados.
+
 ## [3.106.0] - 2026-07-11
 
 ### Sprint B3 — gate visual EXECUTADO (PRD36 36.9, base do PRD37 37.2)
