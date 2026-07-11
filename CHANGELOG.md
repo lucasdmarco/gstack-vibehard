@@ -1,5 +1,32 @@
 # Changelog - gstack-vibehard
 
+## [3.102.0] - 2026-07-10
+
+### Sprint A2 — Action Checkpoint Kernel (PRD36 36.1)
+
+Fim do "tudo ou nada" (a suíte no Stop): checkpoints POR AÇÃO em 3 níveis,
+bounded — **`src/skills/action-kernel.js`** (`gstack.action-kernel.v1`):
+
+- **Nível 1 `preAction`**: policy, secrets, comando destrutivo, escopo (não
+  escreve fora do workspace — lição CWD-guard), plano e design — checagens
+  **determinísticas, sem rede**. Decisão `allow|warn|deny`; `gatesExecuted` lista
+  só as checagens que **realmente rodaram** (não as declaradas). Reusa
+  `redactSecrets`/`hasSecret` e `isUiWrite`; padrões destrutivos em sincronia
+  com o plugin OpenCode.
+- **Nível 2 `postAction`**: recibo **redigido** — arquivos, exit code e digests
+  de entrada/saída. **Nunca o prompt bruto, nunca segredo, nunca o conteúdo cru.**
+- **Nível 3 `stepClose`**: escolhe a checagem pelo **tipo do diff**
+  (`classifyDiff`: migration/frontend/backend/test/config/docs) — testes
+  incrementais, QG, evidência de navegador ou migration conforme o caso. **Nunca
+  a suíte inteira por edição** (o erro da v2.2.0); `ranFullSuite:false`.
+- **Ledger `.gstack/runs/<runId>/actions.jsonl`** append-only e **sanitizado**
+  (remove campos proibidos, redige, trunca): reconstrói o que rodou.
+- **CLI `actions ledger|bench`**: `ledger` mostra as ações do run; **`bench`
+  PROVA o DoD** — pre-action p95 **< 250ms sem rede** (real hoje: **p95 ~0,05ms**,
+  três ordens de grandeza sob o budget; exit 1 se estourar).
+- Honestidade de escopo: o kernel é o **mecanismo** + ledger + prova de p95; a
+  ligação nos eventos reais de cada harness (produtor de ações) é o Sprint A3 (36.2).
+
 ## [3.101.0] - 2026-07-10
 
 ### Sprint A1 — a verdade dos gates (PRD36 36.0)
