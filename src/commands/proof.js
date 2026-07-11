@@ -2,6 +2,7 @@ import { execFileSync } from "child_process"
 import { runVerify } from "../project-plan/verify-runner.js"
 import { audit } from "../dream/auditor.js"
 import { buildReadiness } from "../tools/readiness.js"
+import { routeDefaultOn, headroomPendency } from "../tools/headroom-policy.js"
 import { evaluateSkillGateRelease } from "../skills/evidence.js"
 import { success, warn, error, info, section } from "../cli/index.js"
 
@@ -60,13 +61,27 @@ function toolsWarnings(tools) {
   }
   return out
 }
-function checkReadiness(deps, cwd) {
+// No perfil `full`, o routing é default-on → callable_not_routed é PENDÊNCIA (C3).
+function headroomEntry(status, profile, env) {
+  const onByDefault = routeDefaultOn({ mode: profile === "full" ? "full" : "other", env })
+  const pend = headroomPendency({ status, onByDefault })
+  return {
+    status,
+    pending: pend.pending,
+    note: pend.pending ? pend.note : "callable_not_routed é o claim honesto; routing é opt-in",
+    ...(pend.action ? { action: pend.action } : {}),
+  }
+}
+function checkReadiness(deps, cwd, profile) {
   const r = (deps.readiness || buildReadiness)({ cwd })
+  const headroom = headroomEntry(r.tools.headroom.status, profile, deps.env || process.env)
+  const warnings = toolsWarnings(r.tools)
+  if (headroom.pending) warnings.push(`headroom: ${headroom.note} — corrija: ${headroom.action}`)
   return {
     tools: Object.fromEntries(Object.entries(r.tools).map(([k, t]) => [k, t.status])),
     graphify: graphifyCheck(r.tools),
-    headroom: { status: r.tools.headroom.status, note: "callable_not_routed é o claim honesto; routing é opt-in" },
-    warnings: toolsWarnings(r.tools),
+    headroom,
+    warnings,
   }
 }
 function checkGitTree(deps, cwd) {
@@ -84,7 +99,7 @@ export function buildProof(opts = {}) {
   const deps = opts.deps || {}
   const verify = checkVerify(deps, cwd, profile)
   const dream = checkDream(deps)
-  const readiness = checkReadiness(deps, cwd)
+  const readiness = checkReadiness(deps, cwd, profile)
   const gitTree = checkGitTree(deps, cwd)
   const skillGates = deps.skillGateRelease ? deps.skillGateRelease(cwd) : evaluateSkillGateRelease({ root: cwd })
   const blockers = [verify.blocker, dream.blocker, readiness.graphify.blocker, gitTree.blocker, skillGates.blocker].filter(Boolean)
