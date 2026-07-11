@@ -2,6 +2,7 @@ import { spawnSync } from "child_process"
 import { existsSync, readFileSync } from "fs"
 import { join, dirname, resolve } from "path"
 import { fileURLToPath } from "url"
+import { assertLocalExec } from "../installer/remote-policy.js"
 
 /**
  * Onboarding Executor determinístico (PRD36 36.6). O `project-init` era uma skill
@@ -47,7 +48,9 @@ function gstackConfigOk(projectDir, io) {
 }
 
 function defaultRunScript({ script, args }) {
-  const abs = join(SCRIPTS_DIR, script)
+  // Só executa scripts EMPACOTADOS (dentro de SCRIPTS_DIR) — nunca caminho remoto/
+  // arbitrário. O ExecutionPolicy Bypass abaixo vale só para os .ps1 do próprio pacote.
+  const abs = assertLocalExec(join(SCRIPTS_DIR, script), SCRIPTS_DIR)
   const isPs = script.endsWith(".ps1")
   const cmd = isPs ? "powershell.exe" : "bash"
   const argv = isPs ? ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", abs, ...args] : [abs, ...args]

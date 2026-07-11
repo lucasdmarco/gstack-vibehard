@@ -35,6 +35,14 @@ test("checkRemoteDownload: env GSTACK_ALLOW_REMOTE_DOWNLOADS=1 habilita", async 
   }
 })
 
+test("assertLocalExec: aceita script dentro do dir empacotado, recusa o que escapa", async () => {
+  const { assertLocalExec } = await imp()
+  const base = path.join(repoRoot, "scripts", "scripts")
+  assert.equal(assertLocalExec(path.join(base, "setup-gstack.ps1"), base), path.resolve(base, "setup-gstack.ps1"))
+  assert.throws(() => assertLocalExec(path.join(base, "..", "..", "evil.ps1"), base), /fora do diretório empacotado/)
+  assert.throws(() => assertLocalExec("C:/Windows/System32/evil.ps1", base), /fora do diretório empacotado/)
+})
+
 // GUARD: qualquer arquivo que faça execução remota perigosa (ExecutionPolicy
 // Bypass / sh de script baixado) DEVE passar pela política (importar remote-policy).
 test("GUARD: execução remota só em arquivos gated por remote-policy", () => {
