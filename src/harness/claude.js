@@ -104,6 +104,9 @@ export function registerClaudeHooks(report, hooksDir = GSTACK_HOOKS_DIR, setting
 
   const GSTACK_EVENTS = {
     PreToolUse: { matcher: "Write|Edit|Bash", script: "pre_tool_use_security.py", timeout: 30 },
+    // PostToolUse é REAL mas advisory: observa/roteia a checagem incremental pelo
+    // tipo do diff (nunca a suíte/fallow completo por ação). Não desfaz a ação.
+    PostToolUse: { matcher: "Write|Edit", script: "post_tool_use_review.py", timeout: 15 },
     Stop: { script: "stop.py", timeout: 600 },
     SessionStart: { script: "session_start.py", timeout: 60 },
     UserPromptSubmit: { script: "user_prompt_submit.py", timeout: 30 },
