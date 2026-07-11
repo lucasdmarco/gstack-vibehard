@@ -85,7 +85,7 @@ O Cursor tem um SDK de canvas com tipos TypeScript (chart-primitives, ui-primiti
 
 ## Como Verificar se Está Funcionando
 
-```bash
+```text
 # Testar Playwright MCP
 # Peça ao agente: "testa a página http://localhost:5173 no navegador"
 

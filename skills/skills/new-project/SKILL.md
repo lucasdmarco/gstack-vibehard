@@ -11,7 +11,7 @@ Cria um projeto fullstack completo copiando o template em `~/.agents/templates/f
 
 Quando o usuário pedir para criar um novo projeto, FAÇA:
 
-```bash
+```text
 # 1. Perguntar nome do projeto (se não foi dito)
 
 # 2. Criar diretório e copiar template
@@ -96,7 +96,7 @@ Pergunte uma a uma, espere a resposta, só instale se o usuário confirmar.
 Usuário: "quero criar um novo projeto chamado meuvendas"
 
 Agente executa:
-```bash
+```text
 mkdir meuvendas && cd meuvendas
 robocopy "$env:USERPROFILE\.agents\templates\fullstack-monorepo" "." /E
 # renomeia package.json files

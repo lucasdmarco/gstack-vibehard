@@ -4,6 +4,7 @@ import { buildSkillCatalog, skillsDoctor, renderCatalogMarkdown, SKILL_PACKAGE_R
 import { buildGateMatrix, gatesForPhase, renderGateMatrixMarkdown, explainGate } from "../skills/gate-matrix.js"
 import { buildHarnessProjection, projectionSummary, renderHarnessProjectionMarkdown, projectGate, KNOWN_HARNESSES } from "../skills/harness-projection.js"
 import { buildGateTruth, truthSummary, renderGateTruthMarkdown } from "../skills/gate-truth.js"
+import { buildSkillReach, renderSkillReachMarkdown, REACH_HARNESSES } from "../skills/skill-reach.js"
 import { runDriftDoctor, computeBaseline, defaultBodyIo } from "../skills/drift-doctor.js"
 import { auditExternalSkills } from "../skills/external-audit.js"
 import { collectMirrorFiles } from "./research.js"
@@ -188,6 +189,33 @@ function harnessCmd(cwd, args, json) {
   return projection
 }
 
+// ── reach (PRD36 36.8): quantas skills cada harness REALMENTE enxerga ────────────
+function writeReachArtifacts(cwd, report) {
+  const dir = join(cwd, ".gstack", "skills")
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, "skill-reach.json"), JSON.stringify(report, null, 2) + "\n")
+  writeFileSync(join(dir, "skill-reach.md"), renderSkillReachMarkdown(report))
+}
+
+const reachCell = (r) => (r.mechanism === "instructional" ? "instrucional (ponteiro, não N skills)" : `${r.reachable}/${r.declared}`)
+
+function renderReachHuman(report) {
+  section(`skill reach — ${report.declared} skills no catálogo (medido por evidência)`)
+  for (const r of report.rows) info(`  ${r.harness}: ${reachCell(r)} — ${r.proof}`)
+  for (const h of report.zeroReach) error(`  ✗ ${h}: reach ZERO — a doc prometeu auto-load que não existe nesta máquina`)
+  warn("  instrucional vê um ponteiro (AGENTS.md/regras), não as N skills auto-carregadas.")
+}
+
+function reachCmd(cwd, args, json) {
+  const only = flagValue(args, "--harness")
+  const harnesses = only ? [only] : REACH_HARNESSES
+  const report = buildSkillReach({ catalog: buildSkillCatalog(), harnesses })
+  writeReachArtifacts(cwd, report)
+  if (json) process.stdout.write(JSON.stringify(report) + "\n")
+  else renderReachHuman(report)
+  return report
+}
+
 // ── vendor (PRD29 29.10): vendoring de skills externas (dry-run default) ─────────
 const flagValue = (args, name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : null }
 const safeReadFile = (p) => { try { return readFileSync(p, "utf-8") } catch { return "" } }
@@ -295,6 +323,7 @@ function printUsage() {
   info("  skills gates show [--phase <fase>] [--json] matriz de gates por fase (a skill aconselha; o gate decide)")
   info("  skills gates doctor [--json]                verdade dos gates: declared/routed/executed/blocking/proved por harness")
   info("  skills harness [--harness <nome>] [--json]  enforcement REAL por harness (enforced/advisory/unsupported)")
+  info("  skills reach [--harness <nome>] [--json]    quantas skills cada harness REALMENTE enxerga (por evidência)")
   info("  skills baseline [--json]                    grava hash baseline p/ detecção de drift")
   info("  skills vendor import --path <mirror> [--apply]  vendora skills externas (dry-run default; avoid excluído; advisory)")
   info("  skills why <gate> [--json]                  explica um gate: por que existe e como satisfazê-lo")
@@ -306,6 +335,7 @@ const SUBCOMMANDS = Object.freeze({
   doctor: (cwd, args, json) => doctorCmd(cwd, json, args.includes("--strict")),
   gates: (cwd, args, json) => gatesCmd(cwd, args, json),
   harness: (cwd, args, json) => harnessCmd(cwd, args, json),
+  reach: (cwd, args, json) => reachCmd(cwd, args, json),
   baseline: (cwd, args, json) => baselineCmd(cwd, json),
   vendor: (cwd, args, json) => vendorCmd(cwd, args, json),
   why: (cwd, args, json) => whyCmd(cwd, args, json),
