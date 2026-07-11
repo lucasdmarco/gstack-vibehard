@@ -1,5 +1,25 @@
 # Changelog - gstack-vibehard
 
+## [3.110.0] - 2026-07-11
+
+### Sprint C2 — routing child-scoped + prova de tráfego por evidência (PRD35)
+
+- **`src/tools/headroom-traffic.js`** (`gstack.headroom.traffic.v1`):
+  - **`buildRoutedEnv`**: devolve um env NOVO **só para o processo FILHO** que o
+    GStack spawna (`ANTHROPIC_BASE_URL` / `OPENAI_BASE_URL`+`/v1`) — **nunca muta
+    o env do usuário nem toca config global**.
+  - **`readHeadroomSavings`**: lê o **ledger real** do headroom
+    (`savings --json`: `calls` / `tokens_saved` / `savings_percent`).
+  - **`proveRouting`**: só afirma economia com **`calls > 0` E `tokens_saved > 0`**.
+    Estados honestos: `proxy_off` · `savings_unavailable` · `routed_no_traffic`
+    (proxy rodando mas sem tráfego LLM — **não afirma economia**) · `routed_proven`.
+- **Provado em máquina real**: com o proxy ON mas sem tráfego, o verdito é
+  `routed_no_traffic` / `economyClaimable:false` (`calls=0`). **Nenhuma economia é
+  afirmada sem prova** — é o "não é enfeite" do usuário, agora imposto por código.
+- **`tools headroom prove`**: reporta o verdito honesto do routing.
+- Testes: `buildRoutedEnv` não muta o base (nada global); os 5 estados do verdito,
+  incluindo `calls>0` mas `tokens_saved=0` → **routed mas sem economia afirmável**.
+
 ## [3.109.0] - 2026-07-11
 
 ### Sprint C1 — Headroom proxy lifecycle project-scoped (PRD35, Fase C)

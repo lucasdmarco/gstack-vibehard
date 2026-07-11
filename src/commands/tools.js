@@ -14,6 +14,7 @@ import { runCleanMachine } from "../installer/clean-machine.js"
 import { buildToolRefresh } from "../tools/refresh.js"
 import { enableRouting, disableRouting } from "../tools/headroom-route.js"
 import { startProxy, stopProxy, proxyStatus, DEFAULT_PROXY_PORT as PROXY_DEFAULT_PORT } from "../tools/headroom-proxy.js"
+import { proveRouting } from "../tools/headroom-traffic.js"
 import { makeAnchor, validateAnchor } from "../tools/edit-guard.js"
 import { agentReachCommand } from "./agent-reach.js"
 import { confirm, success, warn, error, info, section } from "../cli/index.js"
@@ -490,17 +491,27 @@ async function headroomStatusCmd(args, cwd) {
   info(`  headroom proxy: ${r.state}${r.pid ? ` (pid ${r.pid}, ${r.host}:${r.port}, porta ${r.portOpen ? "aberta" : "fechada"})` : ""}`)
   return r
 }
+async function headroomProveCmd(args, cwd) {
+  const r = proveRouting({ cwd, proxyState: await proxyStatus({ cwd }) })
+  if (args.includes("--json")) return emitTools(r)
+  info(`  routing: ${r.state} · economia afirmável: ${r.economyClaimable}`)
+  ;(r.economyClaimable ? success : warn)(`  ${r.note}`)
+  return r
+}
 
-// `tools headroom <doctor|enable|disable|start|stop|status>`: routing opt-in +
-// lifecycle do proxy, project-scoped (nunca global/wrap).
+// `tools headroom <doctor|enable|disable|start|stop|status|prove>`: routing opt-in
+// + lifecycle do proxy, project-scoped (nunca global/wrap).
+const HEADROOM_SUBS = Object.freeze({
+  enable: (a, cwd) => headroomEnableCmd(a, cwd),
+  disable: (a, cwd) => headroomDisableCmd(a, cwd),
+  start: (a, cwd) => headroomStartCmd(a, cwd),
+  stop: (a, cwd) => headroomStopCmd(a, cwd),
+  status: (a, cwd) => headroomStatusCmd(a, cwd),
+  prove: (a, cwd) => headroomProveCmd(a, cwd),
+})
 function handleHeadroom({ args, cwd, opts }) {
-  const sub = args[1]
-  if (sub === "enable") return headroomEnableCmd(args, cwd)
-  if (sub === "disable") return headroomDisableCmd(args, cwd)
-  if (sub === "start") return headroomStartCmd(args, cwd)
-  if (sub === "stop") return headroomStopCmd(args, cwd)
-  if (sub === "status") return headroomStatusCmd(args, cwd)
-  return headroomDoctorCmd(args, cwd, opts)
+  const handler = HEADROOM_SUBS[args[1]]
+  return handler ? handler(args, cwd) : headroomDoctorCmd(args, cwd, opts)
 }
 
 // ── Hash-Anchored Edit Guard (PRD24 24.6) ────────────────────────────────────
