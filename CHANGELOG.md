@@ -1,5 +1,30 @@
 # Changelog - gstack-vibehard
 
+## [3.113.0] - 2026-07-11
+
+### Sprint D2 — camada de observação (navegador headless) (PRD37 37.2)
+
+A fase `observe` do ciclo Replit-parity: com o app rodando, abre o navegador headless
+(reusa o visual-gate B3) e devolve a observação que o contrato (D1) decide.
+
+- **`src/skills/observe-layer.js`** (`gstack.observe-layer.v1`, puro/injetável):
+  - **`observeRunningApp`**: espera **readiness bounded** (reusa `pollReadiness` do
+    supervisor) e só então observa; app que **não responde** → `unreachable` — **nunca
+    observa um app morto nem finge verde**. Reachable → roda o visual-gate (screenshot +
+    console + rede + a11y, gravado no Evidence Ledger) e resolve o driver real (Playwright
+    headless) **só se disponível**; sem driver → `needs_browser` (o ciclo não valida sem
+    prova de navegador).
+  - **`summarizeObservation`**: mapeia o resultado do gate para `{ visualValidated,
+    problems }` — **só `validated`** conta como visualmente válido.
+  - **`runObservePhase`**: registra a observação com `recordPhase` (D1) — a **observação
+    determinística decide**: observação com erro roteia o ciclo de volta para `autocorrect`
+    (o LLM nunca é o gate desta fase).
+- **`loop observe --run <id> --url <url> [--json]`**: roda a fase `observe` sobre o
+  `loop.json`, persiste o estado avançado e reporta o **verdito do ciclo**; exit 1 se a
+  observação não validou.
+- Testes (`tests/observe_layer.test.js`): app morto → unreachable; reachable+driver limpo →
+  validated; reachable sem driver → needs_browser; avanço/roteamento de fase; CLI.
+
 ## [3.112.0] - 2026-07-11
 
 ### Sprint D1 — Loop Contract gstack.replit-loop.v1 + intenção específica (PRD37, abre Fase D)

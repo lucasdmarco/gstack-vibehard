@@ -1,4 +1,5 @@
-import { buildLoopState, persistLoopState, loopExhausted, classifyIntent, LOOP_PHASES, REPLIT_LOOP_SCHEMA } from "../skills/replit-loop.js"
+import { buildLoopState, persistLoopState, readLoopState, loopVerdict, loopExhausted, classifyIntent, LOOP_PHASES, REPLIT_LOOP_SCHEMA } from "../skills/replit-loop.js"
+import { runObservePhase } from "../skills/observe-layer.js"
 import { section, success, warn, info, error } from "../cli/index.js"
 
 /**
@@ -34,13 +35,41 @@ function planCmd(cwd, args, json) {
   return payload
 }
 
-function printUsage() {
-  section("loop")
-  info("  loop plan --intent \"<o que implementar>\" [--accept \"c1;c2\"] [--run <id>] [--json]")
-  warn("  ciclo Replit-parity: implement→run→observe→diagnose→autocorrect→checkpoint (bounded). run/observe/autocorrect chegam em D2/D3.")
+function renderObserve(observation, verdict) {
+  section(`replit loop — observe (${observation.status})`)
+  info(`  url: ${observation.url}`)
+  if (observation.visualValidated) success("  observação limpa — navegador validou (screenshot + console + rede + a11y).")
+  else warn(`  não validou: ${observation.problems.join("; ")}`)
+  info(`  verdito do ciclo: ${verdict.verdict} — ${verdict.reason}`)
 }
 
-const SUBCOMMANDS = Object.freeze({ plan: (cwd, args, json) => planCmd(cwd, args, json) })
+async function observeCmd(cwd, args, json) {
+  const runId = flagValue(args, "--run")
+  const url = flagValue(args, "--url")
+  if (!runId || !url) { error("loop observe: informe --run <id> e --url <url do app rodando>"); process.exitCode = 1; return null }
+  const state = readLoopState({ root: cwd, runId })
+  if (!state) { error(`loop observe: sem loop.json para --run ${runId} (rode 'loop plan' antes)`); process.exitCode = 1; return null }
+  const { state: next, observation } = await runObservePhase(state, { root: cwd, url })
+  persistLoopState({ root: cwd, state: next })
+  const verdict = loopVerdict(next, observation)
+  if (!observation.visualValidated) process.exitCode = 1
+  const payload = { schemaVersion: REPLIT_LOOP_SCHEMA, runId, observation, verdict, state: next }
+  if (json) { process.stdout.write(JSON.stringify(payload) + "\n"); return payload }
+  renderObserve(observation, verdict)
+  return payload
+}
+
+function printUsage() {
+  section("loop")
+  info("  loop plan    --intent \"<o que implementar>\" [--accept \"c1;c2\"] [--run <id>] [--json]")
+  info("  loop observe --run <id> --url <url do app rodando> [--json]")
+  warn("  ciclo Replit-parity: implement→run→observe→diagnose→autocorrect→checkpoint (bounded). diagnose+autocorrect chegam em D3.")
+}
+
+const SUBCOMMANDS = Object.freeze({
+  plan: (cwd, args, json) => planCmd(cwd, args, json),
+  observe: (cwd, args, json) => observeCmd(cwd, args, json),
+})
 
 export async function loopCommand(args = [], opts = {}) {
   const cwd = opts.cwd || process.cwd()
