@@ -1,6 +1,7 @@
 import { buildLoopState, persistLoopState, readLoopState, loopVerdict, loopExhausted, classifyIntent, LOOP_PHASES, REPLIT_LOOP_SCHEMA } from "../skills/replit-loop.js"
 import { runObservePhase } from "../skills/observe-layer.js"
 import { runDiagnosePhase, buildCorrectionRequest } from "../skills/diagnose-loop.js"
+import { createCheckpoint, rollbackToCheckpoint, rollbackToLastGreen } from "../skills/loop-checkpoint.js"
 import { section, success, warn, info, error } from "../cli/index.js"
 
 /**
@@ -96,18 +97,53 @@ function diagnoseCmd(cwd, args, json) {
   return payload
 }
 
+const parseList = (arg) => (arg ? arg.split(";").map((s) => s.trim()).filter(Boolean) : [])
+
+function renderCheckpoint(manifest) {
+  section(`replit loop — checkpoint #${manifest.seq} (${manifest.green ? "verde" : "não-verde"})`)
+  const codeDesc = manifest.hasCode ? `${manifest.files.filter((f) => !f.missing).length} arquivo(s)` : "só contexto"
+  info(`  código: ${codeDesc} · nota: ${manifest.note || "-"}`)
+}
+
+function checkpointCmd(cwd, args, json) {
+  const runId = flagValue(args, "--run")
+  if (!runId) { error("loop checkpoint: informe --run <id>"); process.exitCode = 1; return null }
+  const manifest = createCheckpoint({ root: cwd, runId, files: parseList(flagValue(args, "--files")), state: readLoopState({ root: cwd, runId }), green: args.includes("--green"), note: flagValue(args, "--note") || "" })
+  const payload = { schemaVersion: REPLIT_LOOP_SCHEMA, runId, checkpoint: manifest }
+  if (json) { process.stdout.write(JSON.stringify(payload) + "\n"); return payload }
+  renderCheckpoint(manifest)
+  return payload
+}
+
+function rollbackCmd(cwd, args, json) {
+  const runId = flagValue(args, "--run")
+  if (!runId) { error("loop rollback: informe --run <id>"); process.exitCode = 1; return null }
+  const seqArg = flagValue(args, "--seq")
+  const result = seqArg ? rollbackToCheckpoint({ root: cwd, runId, seq: parseInt(seqArg, 10) }) : rollbackToLastGreen({ root: cwd, runId })
+  if (!result.ok) process.exitCode = 1
+  const payload = { schemaVersion: REPLIT_LOOP_SCHEMA, runId, rollback: result }
+  if (json) { process.stdout.write(JSON.stringify(payload) + "\n"); return payload }
+  if (result.ok) success(`  rollback ao checkpoint #${result.seq} — ${result.restored.length} arquivo(s) restaurado(s).`)
+  else error(`  rollback falhou: ${result.reason}`)
+  return payload
+}
+
 function printUsage() {
   section("loop")
-  info("  loop plan     --intent \"<o que implementar>\" [--accept \"c1;c2\"] [--run <id>] [--json]")
-  info("  loop observe  --run <id> --url <url do app rodando> [--json]")
-  info("  loop diagnose --run <id> [--json]")
-  warn("  ciclo Replit-parity: implement→run→observe→diagnose→autocorrect→checkpoint (bounded). checkpoints+rollback chegam em D4.")
+  info("  loop plan       --intent \"<o que implementar>\" [--accept \"c1;c2\"] [--run <id>] [--json]")
+  info("  loop observe    --run <id> --url <url do app rodando> [--json]")
+  info("  loop diagnose   --run <id> [--json]")
+  info("  loop checkpoint --run <id> [--files \"a;b\"] [--green] [--note \"...\"] [--json]")
+  info("  loop rollback   --run <id> [--seq <n>] [--json]   (sem --seq: último verde)")
+  warn("  ciclo Replit-parity: implement→run→observe→diagnose→autocorrect→checkpoint (bounded). economia provada (Headroom) chega em D5.")
 }
 
 const SUBCOMMANDS = Object.freeze({
   plan: (cwd, args, json) => planCmd(cwd, args, json),
   observe: (cwd, args, json) => observeCmd(cwd, args, json),
   diagnose: (cwd, args, json) => diagnoseCmd(cwd, args, json),
+  checkpoint: (cwd, args, json) => checkpointCmd(cwd, args, json),
+  rollback: (cwd, args, json) => rollbackCmd(cwd, args, json),
 })
 
 export async function loopCommand(args = [], opts = {}) {

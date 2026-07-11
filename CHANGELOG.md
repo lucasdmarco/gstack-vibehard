@@ -1,5 +1,31 @@
 # Changelog - gstack-vibehard
 
+## [3.115.0] - 2026-07-11
+
+### Sprint D4 — checkpoints Replit-like + rollback ao verde (PRD37 37.4)
+
+Como o Replit: cada checkpoint é um **snapshot real de código + contexto** com
+**rollback ao último ponto VERDE**. **Não é git commit** — não toca no histórico nem
+no index do usuário.
+
+- **`src/skills/loop-checkpoint.js`** (`gstack.loop-checkpoint.v1`, puro/io-injetável):
+  - **`createCheckpoint`**: grava os `files` (relativos ao root) em
+    `.gstack/runs/<runId>/checkpoints/<seq>/files/` **com sha256 + bytes** e o contexto
+    do ciclo (`state`); `green:true` marca um ponto provado (diagnose passou, D3).
+    Snapshot sem `files` é rotulado `hasCode:false` — **não mente que salvou código**;
+    arquivo ausente vira `missing:true` (nunca finge captura).
+  - **`listCheckpoints`/`lastGreenCheckpoint`**: leitura ordenada; o último verde é o
+    ponto de retorno seguro.
+  - **`rollbackToCheckpoint`/`rollbackToLastGreen`**: restauram ao working tree **só o
+    que foi realmente capturado**; sem checkpoint verde → falha honesta
+    (`nenhum checkpoint verde — nada provado para onde voltar`).
+- **`loop checkpoint --run <id> [--files "a;b"] [--green] [--note "..."]`** e
+  **`loop rollback --run <id> [--seq <n>]`** (sem `--seq` = último verde).
+- Testes (`tests/loop_checkpoint.test.js`): snapshot com sha256 + seq incremental;
+  arquivo ausente `missing`; só-contexto `hasCode:false`; **rollback restaura o
+  conteúdo verde de verdade** após regressão no working tree; sem verde falha honesto;
+  seq inexistente falha; CLI checkpoint→rollback ponta a ponta.
+
 ## [3.114.0] - 2026-07-11
 
 ### Sprint D3 — diagnose + autocorrect BOUNDED (PRD37 37.3)
