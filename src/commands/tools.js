@@ -13,6 +13,7 @@ import { buildReadiness } from "../tools/readiness.js"
 import { runCleanMachine } from "../installer/clean-machine.js"
 import { buildToolRefresh } from "../tools/refresh.js"
 import { enableRouting, disableRouting } from "../tools/headroom-route.js"
+import { startProxy, stopProxy, proxyStatus, DEFAULT_PROXY_PORT as PROXY_DEFAULT_PORT } from "../tools/headroom-proxy.js"
 import { makeAnchor, validateAnchor } from "../tools/edit-guard.js"
 import { agentReachCommand } from "./agent-reach.js"
 import { confirm, success, warn, error, info, section } from "../cli/index.js"
@@ -354,6 +355,7 @@ function handleToolsHelp() {
   info("    tools clean-machine [--json] [--no-write] [--keep]    Proof pack offline: OpenCode sacred, backup/restore byte-for-byte, matriz de tools")
   info("    tools refresh [--changed] [--json] [--strict]         Action close: refresca graphify/context/headroom/fallow (bounded) + report + readiness")
   info("    tools headroom doctor|enable --harness codex|claude --project-only|disable --restore  Routing opt-in, project-scoped (nunca global/wrap)")
+  info("    tools headroom start|stop|status [--port N]           Lifecycle do proxy Headroom (loopback, PID owned)")
   info("    tools doctor                  Validar binario/auth/MCP das instaladas")
   info("    tools generate                Gerar CLI de cauda-longa via HAR (em breve)")
   info("")
@@ -462,11 +464,42 @@ function headroomDisableCmd(args, cwd) {
   ;(r.disabled ? success : info)(r.disabled ? `Routing revertido (${r.removed.length} arquivo(s) removidos).` : r.reason)
   return r
 }
-// `tools headroom <doctor|enable|disable>` (PRD24 24.7): routing opt-in, project-scoped.
+// `tools headroom start|stop|status` (PRD35 C1): lifecycle do proxy project-scoped.
+const flagPort = (args) => { const v = flagVal(args, "--port"); return v ? parseInt(v, 10) : PROXY_DEFAULT_PORT }
+function renderStart(r) {
+  if (r.alreadyRunning) { info(`  headroom proxy já rodando (pid ${r.pid}) em ${r.host}:${r.port}`); return }
+  if (r.started && r.ready) { success(`  headroom proxy ON em ${r.host}:${r.port} (pid ${r.pid}, owned, loopback)`); return }
+  error(`  headroom proxy NÃO subiu: ${r.reason}`); process.exitCode = 1
+}
+async function headroomStartCmd(args, cwd) {
+  const r = await startProxy({ cwd, port: flagPort(args) })
+  const failed = !r.started && !r.alreadyRunning
+  if (args.includes("--json")) { emitTools(r); if (failed) process.exitCode = 1; return r }
+  renderStart(r)
+  return r
+}
+function headroomStopCmd(args, cwd) {
+  const r = stopProxy({ cwd })
+  if (args.includes("--json")) return emitTools(r)
+  ;(r.stopped ? success : info)(r.stopped ? `  headroom proxy encerrado (pid ${r.pid}, owned).` : r.reason)
+  return r
+}
+async function headroomStatusCmd(args, cwd) {
+  const r = await proxyStatus({ cwd })
+  if (args.includes("--json")) return emitTools(r)
+  info(`  headroom proxy: ${r.state}${r.pid ? ` (pid ${r.pid}, ${r.host}:${r.port}, porta ${r.portOpen ? "aberta" : "fechada"})` : ""}`)
+  return r
+}
+
+// `tools headroom <doctor|enable|disable|start|stop|status>`: routing opt-in +
+// lifecycle do proxy, project-scoped (nunca global/wrap).
 function handleHeadroom({ args, cwd, opts }) {
   const sub = args[1]
   if (sub === "enable") return headroomEnableCmd(args, cwd)
   if (sub === "disable") return headroomDisableCmd(args, cwd)
+  if (sub === "start") return headroomStartCmd(args, cwd)
+  if (sub === "stop") return headroomStopCmd(args, cwd)
+  if (sub === "status") return headroomStatusCmd(args, cwd)
   return headroomDoctorCmd(args, cwd, opts)
 }
 

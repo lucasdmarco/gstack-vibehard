@@ -1,5 +1,32 @@
 # Changelog - gstack-vibehard
 
+## [3.109.0] - 2026-07-11
+
+### Sprint C1 — Headroom proxy lifecycle project-scoped (PRD35, Fase C)
+
+O routing (opt-in, project-scoped) apontava um ENV para `127.0.0.1:8787`, mas
+**ninguém subia o proxy** nessa porta — por isso o readiness ficava
+`callable_not_routed` para sempre. Agora o GStack **gerencia o processo**:
+
+- **`src/tools/headroom-proxy.js`** (`gstack.headroom.proxy.v1`): sobe
+  `headroom proxy --host 127.0.0.1` (**loopback**, nunca `0.0.0.0`), aguarda
+  **readiness real** (a porta aceita conexão TCP — nunca `sleep` cego), grava o
+  **PID owned** em `.gstack/headroom/proxy.json` e encerra **só a árvore do
+  processo owned** (nunca um foreign na porta).
+- **Provado em máquina real**: `start → ready:true → status running/portOpen →
+  stop → porta livre`, sem órfão. Três bugs reais achados **pela prova** (não
+  pelos testes): (1) child não-detached morria junto com o CLI → `spawn
+  detached`; (2) o launcher spawna um worker uvicorn filho → **kill de árvore**
+  (`taskkill /T` no Windows, process-group no POSIX), senão orfanaria o listener;
+  (3) cold start do uvicorn ~20s → janela de readiness ampla mas bounded (sai
+  assim que a porta abre).
+- **`tools headroom start|stop|status [--port N]`**: CLI do lifecycle. Recusa
+  honesta quando não há venv (não há proxy p/ subir).
+- **Invariantes intactas**: NUNCA `headroom wrap`, NUNCA MCP global, NUNCA editar
+  config de harness. Só o binário local do venv do projeto.
+- Testes: lifecycle com io injetado — inclui a prova de que `stop` **nunca mata
+  processo foreign** (PID owned morto → só limpa o manifest, sem `kill`).
+
 ## [3.108.0] - 2026-07-11
 
 ### Sprint B5 — proof automático no encerramento + doc pública no npm (PRD36 36.10)
