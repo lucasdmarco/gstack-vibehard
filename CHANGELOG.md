@@ -1,5 +1,29 @@
 # Changelog - gstack-vibehard
 
+## [3.105.0] - 2026-07-11
+
+### Sprint B2 — skills comprováveis por evidência + paridade cross-platform (PRD36 36.8/36.8b)
+
+- **`skills reach` (`src/skills/skill-reach.js`, `gstack.skill-reach.v1`)**:
+  responde POR EVIDÊNCIA "quantas skills cada harness realmente enxerga" —
+  absorve a antiga rec #1 do oh-my-openagent. `skills_dir` (claude/opencode) →
+  reach **medido** (skill presente no diretório que o harness auto-carrega);
+  `instructional` (codex/cursor) → reach por-skill `null` (vê um **ponteiro** em
+  AGENTS.md/regras, **não** N skills). reach `0/N` num `skills_dir` = a doc
+  prometeu auto-load inexistente → `ok:false` + `zeroReach`. **Resultado real
+  hoje: claude 0/197 (dir vazio!), opencode 105/197** — a evidência que faltava
+  para o claim "auto-load" do OpenCode/Claude.
+- **command-lint estendido (36.8b)**: `lintShellFences` flagra fence ```bash/sh
+  com token PowerShell (`.ps1`, `$env:`, `Copy-Item`, `robocopy`, …) — quebra
+  quem copia no bash (macOS/Linux). `runSkillLint` = comando inexistente + fence
+  quebrado por skill.
+- **Fix de campo**: **12 fences ```bash→```text** em 5 skills
+  (project-init, artifacts, mcp-setup, migrate-to-multi-artifact, new-project)
+  que continham PowerShell — o problema exato do transcript (paridade quebrada).
+- Testes: `skill_reach.test.js` (reach por evidência com io injetado: medido /
+  zeroReach / instrucional=null) e `skill_lint.test.js` (varre **todas** as
+  skills — nenhuma pode ter fence shell com PowerShell).
+
 ## [3.104.0] - 2026-07-11
 
 ### Sprint B1 — onboarding determinístico: executor real (PRD36 36.6)
