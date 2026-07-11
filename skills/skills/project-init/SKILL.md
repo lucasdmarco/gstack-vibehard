@@ -18,7 +18,7 @@ Para cada ferramenta abaixo, o agente PERGUNTA antes de instalar:
 - **fastify**: Fastify 5 + Neon PostgreSQL + Railway
 - **hono**: Hono 4 + Turso SQLite + Render
 
-```bash
+```text
 # Pergunta: "Instalar gstack? (configura estrutura de infra do projeto)"
 # Se Sim, perguntar variante primeiro:
 # "Qual variante de backend? (express / fastify / hono)"
@@ -31,7 +31,7 @@ Para cada ferramenta abaixo, o agente PERGUNTA antes de instalar:
 **O que cria:** `.gstack/config.json` com stack, infra, versões, variant, api_dir, db_package
 
 **Pós-instalação:** copie apenas a variante escolhida do template:
-```bash
+```text
 # Se express:
 Copy-Item "$template\apps\api\*" -Destination "$project\apps\api\" -Recurse
 
@@ -48,7 +48,7 @@ Se for PostgreSQL (express/fastify), use `@my/db`. Se for Turso (hono), use `@my
 
 ### 2. gbrain — Contexto do Negócio
 
-```bash
+```text
 # Pergunta: "Instalar gbrain? (cria contexto do negócio e decisões)"
 # Se Sim:
 # - Windows: & "$env:USERPROFILE\.agents\scripts\setup-gbrain.ps1" -ProjectDir "<diretorio-do-projeto>"
@@ -61,7 +61,7 @@ Se for PostgreSQL (express/fastify), use `@my/db`. Se for Turso (hono), use `@my
 
 ### 3. context7 — Stack e Documentação
 
-```bash
+```text
 # Pergunta: "Instalar context7? (documentação da stack e contexto para IA)"
 # Se Sim:
 # - Windows: & "$env:USERPROFILE\.agents\scripts\setup-context7.ps1" -ProjectDir "<diretorio-do-projeto>"
@@ -74,7 +74,7 @@ Se for PostgreSQL (express/fastify), use `@my/db`. Se for Turso (hono), use `@my
 
 ### 4. superpowers — Utilitários
 
-```bash
+```text
 # Pergunta: "Instalar superpowers? (scripts de dev, build, deploy)"
 # Se Sim:
 # - Windows: & "$env:USERPROFILE\.agents\scripts\setup-superpowers.ps1" -ProjectDir "<diretorio-do-projeto>"
@@ -87,7 +87,7 @@ Se for PostgreSQL (express/fastify), use `@my/db`. Se for Turso (hono), use `@my
 
 ### 5. graphify — Grafos de Dependência
 
-```bash
+```text
 # Pergunta: "Instalar graphify? (visualização de dependências do projeto)"
 # Se Sim:
 # - Windows: & "$env:USERPROFILE\.agents\scripts\setup-graphify.ps1" -ProjectDir "<diretorio-do-projeto>"

@@ -38,7 +38,7 @@ antes/                     depois/
 
 ### 1. Analisar estrutura atual
 
-```bash
+```text
 # Listar tudo que tem no projeto
 Get-ChildItem -LiteralPath "src" -Recurse -Depth 2
 Get-Content -LiteralPath "package.json"

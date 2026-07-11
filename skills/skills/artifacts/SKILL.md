@@ -13,7 +13,7 @@ No Codex, artifacts são diretórios de projeto. Cada artifact é uma pasta inde
 
 Existe um template completo em `~/.agents/templates/fullstack-monorepo/`. Para iniciar um novo projeto, COPIE o template:
 
-```bash
+```text
 # Copiar template para o diretório atual
 robocopy "$env:USERPROFILE\.agents\templates\fullstack-monorepo" "." /E
 
@@ -69,7 +69,7 @@ meu-repo/
 
 ### 1. Copiar template (mais rápido)
 
-```bash
+```text
 robocopy "$env:USERPROFILE\.agents\templates\fullstack-monorepo" "." /E
 pnpm install
 ```
