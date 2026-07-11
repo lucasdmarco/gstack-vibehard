@@ -1,5 +1,29 @@
 # Changelog - gstack-vibehard
 
+## [3.103.0] - 2026-07-11
+
+### Sprint A3 — enforcement cross-harness honesto (PRD36 36.2)
+
+- **`post_tool_use_review.py` deixa de rodar `npx fallow audit` COMPLETO por
+  ação** (caro, repetia o erro da v2.2.0). Agora é um **roteador incremental
+  limitado**: classifica o arquivo tocado e recomenda a checagem certa (testes
+  da área / typecheck / evidência de navegador / migration), espelhando
+  `classifyDiff`/`stepClose` do Action Kernel. É **advisory** e **fail-open**.
+- **Claude passa a registrar `PostToolUse` de verdade** (`claude.js`, matcher
+  `Write|Edit`) — o hook existia mas **nunca estava wired**. Honestidade: o
+  PostToolUse OBSERVA/roteia; não desfaz a ação já executada.
+- **`tool.after` do Claude: `enforced` → `advisory`** em `events.js` — um hook
+  pós-ação não pode bloquear o que já rodou; declarar enforced era desonesto.
+- **Invariante estrutural no conformance**: **nenhum** harness pode declarar
+  `tool.after=enforced` (`forbidden_claim`), somando-se à regra que já proibia
+  instrucional=enforced. `checkEvent` reescrito como tabela `CLAIM_RULES`.
+- Testes: `enforcement_honesty.test.js` (nenhum tool.after enforced; conformance
+  ok; declaração falsa é acusada), `hooks_registration` cobre o PostToolUse, e
+  `test_post_tool_review.py` (Python) prova o roteador incremental — recomenda a
+  checagem por tipo, **nunca menciona fallow/suíte completa**, e é fail-open.
+- Nota: 3 falhas pré-existentes em `test_per_project_activation.py` são
+  ambientais (falham igual no master) — fora do escopo deste sprint.
+
 ## [3.102.0] - 2026-07-10
 
 ### Sprint A2 — Action Checkpoint Kernel (PRD36 36.1)

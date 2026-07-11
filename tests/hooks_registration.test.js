@@ -28,6 +28,10 @@ test("registerClaudeHooks escreve formato real de hooks no settings.json", async
     assert.ok(settings.hooks.Stop[0].hooks[0].command.includes("stop.py"))
     assert.ok(settings.hooks.SessionStart[0].hooks[0].command.includes("session_start.py"))
     assert.ok(settings.hooks.UserPromptSubmit[0].hooks[0].command.includes("user_prompt_submit.py"))
+    // PostToolUse REAL (PRD36 36.2): roteador incremental, matcher Write|Edit
+    assert.ok(Array.isArray(settings.hooks.PostToolUse), "PostToolUse registrado")
+    assert.equal(settings.hooks.PostToolUse[0].matcher, "Write|Edit")
+    assert.ok(settings.hooks.PostToolUse[0].hooks[0].command.includes("post_tool_use_review.py"))
     // Nunca a chave ficticia
     assert.equal(settings.lifecycleHooks, undefined)
   } finally {

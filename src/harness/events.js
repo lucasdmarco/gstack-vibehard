@@ -25,10 +25,11 @@ export const EVENT_DECLARATIONS = Object.freeze({
   claude: {
     target: "~/.claude/settings.json (hooks) + hooks/*.py",
     format: "settings.json hooks v1",
-    residualRisk: "hooks precisam estar registrados (install); usuário pode removê-los",
+    residualRisk: "hooks precisam estar registrados (install); usuário pode removê-los. tool.after é PostToolUse REAL mas advisory: observa/roteia a checagem, não desfaz a ação já executada",
     events: {
       "session.start": "enforced", "session.stop": "enforced", "message.output": "advisory",
-      "tool.before": "enforced", "tool.after": "enforced", "mcp.call": "enforced",
+      // tool.after = advisory: PostToolUse roda DEPOIS da ação — não bloqueia o que já rodou.
+      "tool.before": "enforced", "tool.after": "advisory", "mcp.call": "enforced",
       "file.write": "enforced", "command.exec": "enforced",
     },
   },

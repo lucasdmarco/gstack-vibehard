@@ -21,14 +21,25 @@ const MAX_LEVEL_BY_ENFORCEMENT = Object.freeze({
 
 const LEVEL_RANK = Object.freeze({ unsupported: 0, advisory: 1, partial: 2, enforced: 3 })
 
-/** Violações de UM evento declarado (contra teto da matrix + regra instrucional). */
-function checkEvent({ event, level, harness, enforcement, maxLevel }) {
+const forbid = (event, detail) => ({ event, kind: "forbidden_claim", detail })
+
+// Regras de claim proibida (cada uma: retorna violação ou null). PRD36 36.2.
+const CLAIM_RULES = Object.freeze([
+  ({ level, maxLevel, enforcement, event }) =>
+    LEVEL_RANK[level] > LEVEL_RANK[maxLevel] ? forbid(event, `matrix diz ${enforcement} (máx ${maxLevel}) mas declara ${level}`) : null,
+  ({ level, harness, event }) =>
+    isInstructional(harness) && level === "enforced" ? forbid(event, "harness instrucional NUNCA pode declarar enforced") : null,
+  // tool.after roda DEPOIS da ação — não desfaz o que já rodou; enforced ali é desonesto.
+  ({ level, event }) =>
+    event === "tool.after" && level === "enforced" ? forbid(event, "tool.after é pós-ação: observa/roteia, não pode ser enforced") : null,
+])
+
+/** Violações de UM evento declarado (contra teto da matrix + regras de claim). */
+function checkEvent(ctx) {
+  const { event, level } = ctx
   if (level === undefined) return [{ event, kind: "missing_event", detail: "evento do contrato não declarado" }]
   if (!EVENT_LEVELS.includes(level)) return [{ event, kind: "invalid_level", detail: `nível desconhecido: ${level}` }]
-  const out = []
-  if (LEVEL_RANK[level] > LEVEL_RANK[maxLevel]) out.push({ event, kind: "forbidden_claim", detail: `matrix diz ${enforcement} (máx ${maxLevel}) mas declara ${level}` })
-  if (isInstructional(harness) && level === "enforced") out.push({ event, kind: "forbidden_claim", detail: "harness instrucional NUNCA pode declarar enforced" })
-  return out
+  return CLAIM_RULES.map((rule) => rule(ctx)).filter(Boolean)
 }
 
 /** Violações de UMA declaração contra a matrix. */
