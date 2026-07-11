@@ -1,5 +1,39 @@
 # Changelog - gstack-vibehard
 
+## [4.0.0] - 2026-07-11
+
+### Sprint D5 — prova de economia (Headroom real) + honestidade do ciclo fechado (PRD37 37.5/37.6) — FECHA o programa PRD35+PRD36+PRD37
+
+Marco: o diferencial fundador restaurado com honestidade de ponta a ponta. O ciclo
+Replit-parity roda, observa, autocorrige e versiona em checkpoints — e só afirma
+economia **com prova de ledger**, só fecha `validated` **com evidência de navegador**.
+
+- **`src/skills/loop-economy.js`** (`gstack.loop-economy.v1`, puro/injetável):
+  - **`buildLoopEconomy`**: amarra o ciclo ao Headroom REAL (Fase C). Mede os tokens do
+    loop (bounded) e só marca `claimable:true` com economia **provada pelo ledger**
+    (`proveRouting`/C2: `calls>0` E `tokens_saved>0`). Enquanto não provado, o loop roda
+    mas **NÃO afirma economia** — e no Full (default-on, C3) isso vira **PENDÊNCIA** com o
+    comando de correção, não estado aceitável.
+  - **`finalizeLoop`** (37.6): combina o verdito de observação (D1/D2) com a economia. O
+    ciclo só é `validated` **com evidência de navegador limpa**; senão `degraded`/
+    `needs_user`. A economia é um dado **separado** — rodar barato **nunca** valida o
+    ciclo sozinho. `honest` resume as duas dimensões sem fingir nenhuma.
+- **`loop economy --run <id> [--json]`**: fecha o ciclo — verdito + economia provada por
+  ledger (ou a pendência honesta). Integração real com o proxy (C1 `proxyStatus`).
+- **Prova E2E real** (dir neutro): `loop plan` → `loop checkpoint --green` → regressão no
+  working tree → `loop rollback` restaura o ponto verde → `loop economy` reporta
+  `degraded` (sem navegador) + `economia NÃO afirmada` com a pendência do Headroom —
+  **tudo honesto, nada fingido**.
+- Testes (`tests/loop_economy.test.js`): economia provada/não-provada; pendência no Full
+  vs opt-out; `finalizeLoop` só valida com navegador; CLI integração real.
+
+**Programa PRD35+36+37 COMPLETO** (v3.100.2→v4.0.0, 16 sprints): Fase 0 (onboarding PS
+5.1 real) · Fase A (verdade dos gates + Action Kernel + enforcement honesto) · Fase B
+(onboarding/skills/visual/hardening/proof) · Fase C (Headroom real: proxy lifecycle +
+routing child-scoped + default-on no Full) · Fase D (ciclo Replit-parity: contrato +
+observação + diagnose/autocorrect + checkpoints + economia). Invariante em cada sprint:
+QG strict 0 · suíte verde · proof ready:true · nada é enfeite.
+
 ## [3.115.0] - 2026-07-11
 
 ### Sprint D4 — checkpoints Replit-like + rollback ao verde (PRD37 37.4)
