@@ -57,6 +57,33 @@ export function commandParity(aText, bText) {
   }
 }
 
+// PRD36 36.8b — paridade cross-platform: um fence ```bash/sh com PowerShell quebra
+// quem copia no bash (macOS/Linux). Tokens exclusivos de PowerShell:
+const POWERSHELL_TOKENS = /\.ps1\b|\$env:|Copy-Item|robocopy|Write-Host|New-Item|Get-ChildItem|-ProjectDir|Test-Path|ConvertTo-Json|Set-Content/i
+const SHELL_LANGS = new Set(["bash", "sh", "shell", "zsh"])
+
+/** Fences ```bash/sh que contêm PowerShell (quebram no bash). PURO. */
+export function lintShellFences(text) {
+  const offenders = []
+  for (const m of String(text).matchAll(/```([A-Za-z0-9_-]*)\r?\n([\s\S]*?)```/g)) {
+    const lang = m[1].toLowerCase()
+    if (SHELL_LANGS.has(lang) && POWERSHELL_TOKENS.test(m[2])) {
+      offenders.push({ lang, firstLine: (m[2].trim().split(/\r?\n/)[0] || "").slice(0, 70) })
+    }
+  }
+  return offenders
+}
+
+/**
+ * Lint de SKILLS (36.8b): comando inexistente + fence shell com PowerShell.
+ * `skills` = [{ name, text }]. `ok` = zero comando desconhecido E zero fence quebrado.
+ */
+export function runSkillLint({ skills = [], known = ALL_CLI_COMMANDS } = {}) {
+  const perSkill = skills.map((s) => ({ name: s.name, unknown: lintCommands(s.text, known), shellFences: lintShellFences(s.text) }))
+  const ok = perSkill.every((s) => s.unknown.length === 0 && s.shellFences.length === 0)
+  return { schemaVersion: COMMAND_LINT_SCHEMA, generatedAt: new Date().toISOString(), ok, perSkill }
+}
+
 const parityBalanced = (p) => p.onlyInFirst.length === 0 && p.onlyInSecond.length === 0
 
 /**
