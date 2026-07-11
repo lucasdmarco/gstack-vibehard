@@ -1,5 +1,30 @@
 # Changelog - gstack-vibehard
 
+## [3.111.0] - 2026-07-11
+
+### Sprint C3 — default-on no Full + callable_not_routed vira pendência (PRD35, fecha Fase C)
+
+O usuário autorizou explicitamente o routing automático no Full. Entregue com as
+invariantes intactas (routing **sempre child-scoped**, nunca global/wrap):
+
+- **`src/tools/headroom-policy.js`** (`gstack.headroom.policy.v1`):
+  - **`routeDefaultOn`**: no modo **Full** (e sem opt-out `GSTACK_HEADROOM_ROUTE=off`)
+    o routing child-scoped é **default-on**.
+  - **`headroomPendency`**: sob default-on, `callable_not_routed` (e
+    `installed_not_callable`/`missing`) deixa de ser "estado aceitável" e vira uma
+    **PENDÊNCIA a corrigir**, com a ação (`tools headroom start && enable`). Fora do
+    Full, opt-in continua aceitável.
+  - **`ensureRoutedChildEnv`**: no Full, **sobe o proxy se preciso** (reusa se já
+    rodando) e devolve o env **child-scoped** roteado — **nunca muta o env
+    global/shell do usuário**. Opt-out/não-Full/proxy-não-pronto → não roteia
+    (honesto, env base intacto).
+- **`proof --profile full`**: `callable_not_routed` passa a aparecer como
+  **pendência** (`pending:true`) + **warning com o comando de correção** —
+  **provado em máquina real**. `release`/opt-in seguem aceitando o estado.
+- Testes: os 3 gatilhos de `routeDefaultOn`, pendência com/sem default-on, e os
+  4 caminhos de `ensureRoutedChildEnv` (roteia / reusa / opt-out / proxy-não-pronto),
+  todos confirmando que o **env base nunca é mutado**.
+
 ## [3.110.0] - 2026-07-11
 
 ### Sprint C2 — routing child-scoped + prova de tráfego por evidência (PRD35)
