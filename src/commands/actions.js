@@ -26,17 +26,28 @@ function latestRun(cwd) {
   return best ? best.name : null
 }
 
+const decisionIcon = (d) => (d === "deny" ? "⛔" : d === "warn" ? "⚠" : "✓")
+const actionLine = (a) => {
+  const gates = a.gatesExecuted?.length ? a.gatesExecuted.join(", ") : "—"
+  return `  ${decisionIcon(a.decision)} ${a.tool ?? "?"}/${a.harness ?? "?"} → ${a.decision} · gates: ${gates} · exit ${a.exitCode}`
+}
+
+function renderAction(a) {
+  info(actionLine(a))
+  for (const r of a.reasons ?? []) info(`      ${r}`)
+}
+
+function renderLedgerHuman(runId, actions) {
+  section(`actions ledger — run ${runId} (${actions.length} ação/ações)`)
+  actions.forEach(renderAction)
+}
+
 function ledgerCmd(cwd, args, json) {
   const runId = flagValue(args, "--run") || latestRun(cwd)
   if (!runId) { warn("Nenhum run em .gstack/runs — rode um fluxo antes."); return { runId: null, actions: [] } }
   const actions = readActions({ root: cwd, runId })
-  if (json) { process.stdout.write(JSON.stringify({ schemaVersion: ACTION_KERNEL_SCHEMA, runId, actions }) + "\n"); return { runId, actions } }
-  section(`actions ledger — run ${runId} (${actions.length} ação/ações)`)
-  for (const a of actions) {
-    const icon = a.decision === "deny" ? "⛔" : a.decision === "warn" ? "⚠" : "✓"
-    info(`  ${icon} ${a.tool || "?"}/${a.harness || "?"} → ${a.decision} · gates: ${(a.gatesExecuted || []).join(", ") || "—"} · exit ${a.exitCode}`)
-    for (const r of a.reasons || []) info(`      ${r}`)
-  }
+  if (json) process.stdout.write(JSON.stringify({ schemaVersion: ACTION_KERNEL_SCHEMA, runId, actions }) + "\n")
+  else renderLedgerHuman(runId, actions)
   return { runId, actions }
 }
 

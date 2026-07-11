@@ -88,15 +88,20 @@ function planCheck(action, ctx) {
   return finding("plan", "plan-before-code-gate", ctx.requirePlan ? "deny" : "warn", "escrita de código sem plano aprovado")
 }
 
-function designCheck(action, ctx) {
-  const uiFiles = (action.files || []).filter(isUiWrite)
-  if (!uiFiles.length) return null
+const designFinding = (level, reason) => finding("design", "design-system-gate", level, reason)
+
+function designLevel(action, ctx) {
   if (typeof ctx.evaluateDesign === "function") {
     const r = ctx.evaluateDesign(action) || {}
-    return r.blocked ? finding("design", "design-system-gate", "deny", r.reason || "UI sem design system") : finding("design", "design-system-gate", "pass")
+    return r.blocked ? ["deny", r.reason || "UI sem design system"] : ["pass"]
   }
-  if (ctx.designResolved === true) return finding("design", "design-system-gate", "pass")
-  return finding("design", "design-system-gate", "warn", "design system não verificado para escrita de UI")
+  if (ctx.designResolved === true) return ["pass"]
+  return ["warn", "design system não verificado para escrita de UI"]
+}
+
+function designCheck(action, ctx) {
+  if (!(action.files || []).some(isUiWrite)) return null
+  return designFinding(...designLevel(action, ctx))
 }
 
 const PRE_CHECKS = Object.freeze([policyCheck, secretsCheck, destructiveCheck, scopeCheck, planCheck, designCheck])
@@ -118,10 +123,13 @@ export function preAction(action = {}, ctx = {}) {
 }
 
 // ── Nível 2: recibo redigido (sem prompt bruto, sem segredo) ─────────────────────
+const resultExit = (result) => (result.exitCode ?? (result.ok === false ? 1 : 0))
+const resultText = (result) => String(result.summary ?? result.stdout ?? result.output ?? "")
+
 /** Nível 2: recibo da ação — digests + resumo redigido, nunca o conteúdo cru. */
 export function postAction(action = {}, result = {}) {
-  const exitCode = result.exitCode ?? (result.ok === false ? 1 : 0)
-  const raw = String(result.summary ?? result.stdout ?? result.output ?? "")
+  const exitCode = resultExit(result)
+  const raw = resultText(result)
   return {
     schemaVersion: ACTION_KERNEL_SCHEMA,
     tool: action.tool || null,
