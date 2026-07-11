@@ -36,6 +36,7 @@ import { skillsCommand } from "../commands/skills.js"
 import { actionsCommand } from "../commands/actions.js"
 import { onboardingCommand } from "../commands/onboarding.js"
 import { visualCommand } from "../commands/visual.js"
+import { loopCommand } from "../commands/loop.js"
 import { researchCommand } from "../commands/research.js"
 import { dreamCommand } from "../commands/dream.js"
 import { proxyCommand } from "../commands/proxy.js"
@@ -191,6 +192,7 @@ const COMMANDS = [
   { name: "actions", group: "advanced", desc: "Action Kernel: ledger por ação + bench de p95 (checkpoints por ação)", usage: "gstack_vibehard actions <ledger|bench> [--run <id>] [--iters N] [--json]" },
   { name: "onboarding", group: "advanced", desc: "Executor determinístico: roda os setup-*.ps1/.sh e VERIFICA os artefatos", usage: "gstack_vibehard onboarding run [--dir <d>] [--tools all] [--variant express] [--json]" },
   { name: "visual", group: "advanced", desc: "Gate visual EXECUTADO: navegador/screenshot/console/rede/a11y como evidência", usage: "gstack_vibehard visual check --url <endereço> [--run <id>] [--json]" },
+  { name: "loop", group: "advanced", desc: "Ciclo Replit-parity: implement→run→observe→diagnose→autocorrect→checkpoint (bounded)", usage: "gstack_vibehard loop plan --intent \"...\" [--accept \"c1;c2\"] [--json]" },
   { name: "install", group: "common", desc: "Instalar no ambiente (preflight-first; pede confirmação)", usage: "gstack_vibehard install [--audit-only [--save-report]] [--project-only] [--harness <id>] [--no-global-mcp] [--no-obsidian] [--allow-degraded] [--yes]" },
   { name: "uninstall", group: "common", desc: "Remover (rollback via manifest)", usage: "gstack_vibehard uninstall [--dry-run] [--restore-only] [--resolve-drift] [--legacy-name-cleanup]" },
   { name: "update", group: "common", desc: "Checar/atualizar para a última versão (npm)", usage: "gstack_vibehard update [--run] [--json]" },
@@ -340,6 +342,7 @@ const DISPATCH = {
   actions: (a) => actionsCommand(a),
   onboarding: (a) => onboardingCommand(a),
   visual: (a) => visualCommand(a),
+  loop: (a) => loopCommand(a),
   research: (a) => researchCommand(a),
   "publish-guard": (a) => publishGuardCommand(a),
   update: (a) => updateCommand(a),
