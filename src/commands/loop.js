@@ -2,6 +2,8 @@ import { buildLoopState, persistLoopState, readLoopState, loopVerdict, loopExhau
 import { runObservePhase } from "../skills/observe-layer.js"
 import { runDiagnosePhase, buildCorrectionRequest } from "../skills/diagnose-loop.js"
 import { createCheckpoint, rollbackToCheckpoint, rollbackToLastGreen } from "../skills/loop-checkpoint.js"
+import { proveLoopEconomy, finalizeLoop } from "../skills/loop-economy.js"
+import { proxyStatus } from "../tools/headroom-proxy.js"
 import { section, success, warn, info, error } from "../cli/index.js"
 
 /**
@@ -128,6 +130,27 @@ function rollbackCmd(cwd, args, json) {
   return payload
 }
 
+function renderEconomyClose(final, economy) {
+  section(`replit loop — fechamento (${final.verdict})`)
+  info(`  ${final.honest}`)
+  if (economy.claimable) { success(`  ${economy.note}`); return }
+  const pend = economy.pendency?.pending ? ` — pendência: ${economy.pendency.action}` : ""
+  warn(`  ${economy.note}${pend}`)
+}
+
+async function economyCmd(cwd, args, json) {
+  const runId = flagValue(args, "--run")
+  if (!runId) { error("loop economy: informe --run <id>"); process.exitCode = 1; return null }
+  const state = loadRunState(cwd, runId, "economy")
+  if (!state) return null
+  const economy = proveLoopEconomy({ state, cwd, proxyState: await proxyStatus({ cwd }) })
+  const final = finalizeLoop({ state, observation: state.lastObservation, economy })
+  const payload = { schemaVersion: REPLIT_LOOP_SCHEMA, runId, economy, final }
+  if (json) { process.stdout.write(JSON.stringify(payload) + "\n"); return payload }
+  renderEconomyClose(final, economy)
+  return payload
+}
+
 function printUsage() {
   section("loop")
   info("  loop plan       --intent \"<o que implementar>\" [--accept \"c1;c2\"] [--run <id>] [--json]")
@@ -135,7 +158,8 @@ function printUsage() {
   info("  loop diagnose   --run <id> [--json]")
   info("  loop checkpoint --run <id> [--files \"a;b\"] [--green] [--note \"...\"] [--json]")
   info("  loop rollback   --run <id> [--seq <n>] [--json]   (sem --seq: último verde)")
-  warn("  ciclo Replit-parity: implement→run→observe→diagnose→autocorrect→checkpoint (bounded). economia provada (Headroom) chega em D5.")
+  info("  loop economy    --run <id> [--json]   (fecha o ciclo: verdito + economia provada por ledger)")
+  warn("  ciclo Replit-parity: implement→run→observe→diagnose→autocorrect→checkpoint (bounded). economia só afirmada com prova de tráfego (Headroom C).")
 }
 
 const SUBCOMMANDS = Object.freeze({
@@ -144,6 +168,7 @@ const SUBCOMMANDS = Object.freeze({
   diagnose: (cwd, args, json) => diagnoseCmd(cwd, args, json),
   checkpoint: (cwd, args, json) => checkpointCmd(cwd, args, json),
   rollback: (cwd, args, json) => rollbackCmd(cwd, args, json),
+  economy: (cwd, args, json) => economyCmd(cwd, args, json),
 })
 
 export async function loopCommand(args = [], opts = {}) {
