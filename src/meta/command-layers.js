@@ -20,6 +20,7 @@ export const KNOWLEDGE = Object.freeze([
   "audit", "qa", "doctor", "status", "list", "monitor", "logs", "state", // diagnóstico/leitura
   "skills", // PRD29: inventário/diagnóstico de skills — nunca edita fonte (artefatos .gstack como o context)
   "research", // PRD29 29.5: auditoria READ-ONLY de skills externas — nunca executa/instala/edita fonte
+  "actions", // PRD36 36.1: ledger/bench do Action Kernel — só lê .gstack/runs e mede p95, nunca edita fonte
 ])
 
 // Explícitos do PRD22 §4.3 + tudo que muta repo/config/estado (via gates).
