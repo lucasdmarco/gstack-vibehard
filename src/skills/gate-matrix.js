@@ -72,6 +72,8 @@ export const SKILL_GATES = Object.freeze([
     requiredQuestions: [],
     requiredEvidence: [".gstack/runs/<runId>/skill-evidence.json"],
     verifier: "file-exists", fallback: "block_before_ship",
+    implementedBy: "src/skills/visual-gate.js runVisualGate (navegador/screenshot/console/rede/a11y, B3)",
+    provedBy: { test: "tests/visual_gate.test.js", name: "evaluateVisualGate: sem driver de navegador → needs_browser (BLOQUEIA, nunca finge verde)" },
   },
   {
     id: "secret-deny-gate", phase: "security", severity: "P0", mode: "blocking",

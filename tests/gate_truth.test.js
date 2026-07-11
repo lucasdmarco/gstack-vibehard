@@ -74,16 +74,19 @@ test("matriz REAL: nunca 12/12 — declared > executed > proved; gates só-decla
   // toda prova citada foi VERIFICADA contra o arquivo de teste real do repo
   for (const r of truth.rows.filter((x) => x.provedBy)) assert.equal(r.provedByBroken, false, r.gate)
 
-  // os declarados-apenas do audit (visual/db/rls/context-pack) NÃO aparecem enforced em lugar nenhum
-  for (const id of ["visual-validation-gate", "db-migration-gate", "rls-gate", "context-pack-required-gate"]) {
+  // os declarados-apenas restantes (db/rls/context-pack) NÃO aparecem enforced em lugar nenhum
+  // (visual-validation-gate SAIU desta lista: B3 o implementou e provou de verdade)
+  for (const id of ["db-migration-gate", "rls-gate", "context-pack-required-gate"]) {
     const row = truth.rows.find((r) => r.gate === id)
     const levels = Object.values(row.byHarness).map((h) => h.level)
     assert.ok(levels.every((l) => l !== "enforced"), `${id} não pode fingir enforcement: ${levels}`)
   }
 
-  // verify-proof-gate (ship, implementado, provado) é enforced em todos os 4
-  const vp = truth.rows.find((r) => r.gate === "verify-proof-gate")
-  for (const h of truth.harnesses) assert.equal(vp.byHarness[h].level, "enforced")
+  // verify-proof-gate E visual-validation-gate (ship, implementados, provados) → enforced nos 4
+  for (const id of ["verify-proof-gate", "visual-validation-gate"]) {
+    const row = truth.rows.find((r) => r.gate === id)
+    for (const h of truth.harnesses) assert.equal(row.byHarness[h].level, "enforced", `${id} em ${h}`)
+  }
 
   // design-system-gate (pre-write provado): enforced SÓ onde a escrita é interceptada
   const ds = truth.rows.find((r) => r.gate === "design-system-gate")
