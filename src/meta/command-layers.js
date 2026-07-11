@@ -30,6 +30,7 @@ export const EXECUTION = Object.freeze([
   "install", "create", "init", "uninstall", "enable", "disable", // instalação/ativação
   "secrets", "agents", "policy", "worktree", "update", "dream", "proxy", // infra que escreve
   "tools", "pp", "a2a", // tools (refresh escreve), pp=alias tools, a2a dispara agentes
+  "onboarding", // PRD36 36.6: roda setup-*.ps1/.sh e escreve artefatos no projeto (executor)
 ])
 
 // Meta/ajuda: não é knowledge (não consulta a base) nem execution (não muta nada).
