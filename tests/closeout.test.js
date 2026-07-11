@@ -41,6 +41,43 @@ test("runCloseoutSync: refresh que quebra → degraded honesto (nunca esconde, n
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })
 
+test("runCloseoutSync: proof AUTOMÁTICO em sucesso (done) — grava ready/blockers (PRD36 36.10)", async () => {
+  const { runCloseoutSync } = await imp("src/skills/closeout.js")
+  const dir = mk("gstack-closeout-proof-")
+  try {
+    let called = 0
+    const proof = () => { called++; return { ready: true, blockers: [] } }
+    const c = runCloseoutSync({ cwd: dir, runId: "rp", command: "start", status: "done", proof })
+    assert.equal(called, 1, "proof roda no encerramento OK")
+    assert.equal(c.proof.ran, true)
+    assert.equal(c.proof.ready, true)
+    assert.deepEqual(c.proof.blockers, [])
+    assert.match(readFileSync(path.join(dir, ".gstack", "runs", "rp", "closeout.md"), "utf-8"), /Proof: ready=true/)
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+test("runCloseoutSync: proof NÃO roda em run que parou/handoff (só sucesso)", async () => {
+  const { runCloseoutSync } = await imp("src/skills/closeout.js")
+  const dir = mk("gstack-closeout-noproof-")
+  try {
+    let called = 0
+    const c = runCloseoutSync({ cwd: dir, runId: "rh", command: "start", status: "handoff", proof: () => { called++; return { ready: true } } })
+    assert.equal(called, 0, "proof num run falho seria ruído")
+    assert.equal(c.proof.ran, false)
+    assert.equal(c.proof.state, "skipped_not_success")
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+test("runCloseoutSync: proof que quebra → degraded honesto (nunca esconde, nunca lança)", async () => {
+  const { runCloseoutSync } = await imp("src/skills/closeout.js")
+  const dir = mk("gstack-closeout-proofdeg-")
+  try {
+    const c = runCloseoutSync({ cwd: dir, runId: "rd", command: "start", status: "done", proof: () => { throw new Error("proof timeout") } })
+    assert.equal(c.proof.state, "degraded")
+    assert.match(c.proof.error, /proof timeout/)
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
 test("start: o pipeline grava closeout.json no run (wiring run-loop)", async () => {
   const { startCommand } = await imp("src/commands/start.js")
   const dir = mk("gstack-closeout-start-")
