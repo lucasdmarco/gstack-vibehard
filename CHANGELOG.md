@@ -1,5 +1,34 @@
 # Changelog - gstack-vibehard
 
+## [3.112.0] - 2026-07-11
+
+### Sprint D1 — Loop Contract gstack.replit-loop.v1 + intenção específica (PRD37, abre Fase D)
+
+Primeiro passo do diferencial fundador restaurado: o **contrato** do ciclo Replit-parity
+`implement → run → observe → diagnose → autocorrect → checkpoint`. Só o CONTRATO/estado —
+o motor de observação (D2), autocorreção (D3) e checkpoints (D4) constroem sobre ele.
+
+- **`src/skills/replit-loop.js`** (`gstack.replit-loop.v1`, puro/io-injetável):
+  - **`LOOP_PHASES` + `PHASE_DECIDER`**: as 6 fases e **quem decide cada uma** — o LLM
+    propõe (`implement`/`autocorrect`), mas **runtime/observação/verifier DECIDEM**
+    (`run`/`observe`/`diagnose`). O LLM **nunca é o gate final**.
+  - **`classifyIntent`**: distingue **"criar projeto"** de **"implementar feature X"** e
+    marca **scaffold genérico** (`isGenericScaffold`) — o ciclo não é scaffold, é a intenção
+    específica (corrige o classificador por substring, PRD36 36.3–36.10).
+  - **`buildLoopState`**: estado inicial **BOUNDED** (reusa `loop-budget`: máx N iterações +
+    budget de tempo/tokens) — nunca loop caro infinito, nunca suíte inteira por iteração.
+  - **`loopExhausted`**: encerra por iterações OU tempo OU tokens (sempre limitado).
+  - **`recordPhase`**: avança as fases; **checkpoint** fecha 1 iteração; uma fase de
+    **decisão que falha** volta o ciclo para `autocorrect`.
+  - **`loopVerdict`**: só **`validated`** com **evidência de observação limpa**
+    (`visualValidated && !problems`); senão `degraded`/`needs_user` — nunca finge o ciclo fechado.
+  - **`persistLoopState`/`readLoopState`**: `.gstack/runs/<runId>/loop.json`.
+- **`loop plan --intent "..." [--accept "c1;c2"] [--run <id>] [--json]`**
+  (`src/commands/loop.js`): monta o contrato, grava `loop.json` e **avisa** quando a intenção
+  é scaffold genérico. Camada **EXECUTION** (o ciclo roda o app e, em D3, autocorrige a fonte).
+- Testes (`tests/replit_loop.test.js`): classificação de intenção, budget bounded, avanço de
+  fases + roteamento decisão-falha→autocorrect, verdito só-com-evidência e persistência.
+
 ## [3.111.0] - 2026-07-11
 
 ### Sprint C3 — default-on no Full + callable_not_routed vira pendência (PRD35, fecha Fase C)

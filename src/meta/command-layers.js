@@ -32,6 +32,7 @@ export const EXECUTION = Object.freeze([
   "secrets", "agents", "policy", "worktree", "update", "dream", "proxy", // infra que escreve
   "tools", "pp", "a2a", // tools (refresh escreve), pp=alias tools, a2a dispara agentes
   "onboarding", // PRD36 36.6: roda setup-*.ps1/.sh e escreve artefatos no projeto (executor)
+  "loop", // PRD37: ciclo Replit-parity — roda o app e (D3) autocorrige o código-fonte
 ])
 
 // Meta/ajuda: não é knowledge (não consulta a base) nem execution (não muta nada).
