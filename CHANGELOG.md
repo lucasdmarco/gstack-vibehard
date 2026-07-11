@@ -1,5 +1,27 @@
 # Changelog - gstack-vibehard
 
+## [3.108.0] - 2026-07-11
+
+### Sprint B5 — proof automático no encerramento + doc pública no npm (PRD36 36.10)
+
+- **Proof automático no closeout**: `runCloseoutSync` ganha um `proof` injetável,
+  **success-gated** (só roda em `done/ready/...`, nunca em run que parou/handoff)
+  e **best-effort** (erro → `degraded`, nunca esconde nem lança). O run-loop
+  injeta `closeoutReadiness`: a prontidão é **derivada do gate `verify` que já
+  rodou no pipeline** — síncrono, bounded, **sem relançar a suíte** (evita
+  lentidão/EBUSY por run). O proof completo continua sendo `proof` /
+  `start --proof` explícito. O resultado entra no `closeout.{json,md}`.
+- **Documentação pública empacotada no npm**: `docs/guides/` entra no
+  `package.json.files` — as **9 guias** (first-run, examples, skill-gates,
+  quickstart, capabilities, harness-matrix, install-paths, reset-uninstall,
+  vps-ubuntu) passam a ir no tarball. Sem isso, quem instala não recebia a doc
+  que a própria CLI referencia. Verificado: 9 arquivos no `npm pack`.
+- Testes: closeout auto-proof (sucesso grava ready/blockers; handoff pula;
+  runner que quebra → degraded) + empacotamento (`files` inclui `docs/guides/`;
+  guias existem).
+- **Nota de escopo**: o teste em máquinas limpas nos 3 SOs (parte do 36.10) é
+  validação **manual do usuário** (fora da suíte automatizada).
+
 ## [3.107.0] - 2026-07-11
 
 ### Sprint B4 — hardening: classificador de intenção por palavra (PRD36 36.5)

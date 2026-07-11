@@ -291,6 +291,15 @@ function writePipelineEvidence(ctx, stages) {
   try { writeTaskMd(ctx.cwd, taskId, ctx.plan.objective) } catch { /* TASK.md best-effort */ }
 }
 
+// Prontidão de release derivada do que o pipeline JÁ rodou (verify gate). Sem
+// relançar nada — o proof completo continua sendo `proof`/`start --proof` explícito.
+const verifyReady = (v) => Boolean(v) && (v.status === "ready" || v.ready === true)
+function closeoutReadiness(stages) {
+  const v = stages ? stages.verify : null
+  if (verifyReady(v)) return { ready: true, blockers: [] }
+  return { ready: false, blockers: [`verify: ${(v && v.status) || "não rodou"}`] }
+}
+
 /** Fecha o run: handoff.md quando aplicável + journal + status.json. */
 function finishPipeline(ctx, stages, status, failedStage) {
   let handoffPath
@@ -301,8 +310,10 @@ function finishPipeline(ctx, stages, status, failedStage) {
   appendRunEvent(ctx.runDir, { event: "pipeline_ended", status, failedStage: failedStage || null, attempts: ctx.attempts })
   writeRunStatus(ctx.runDir, { runId: ctx.runId, planId: ctx.plan.id, status, stages, attempts: ctx.attempts })
   try { writePipelineEvidence(ctx, stages) } catch { /* evidence best-effort — não derruba o run */ }
-  // Run Closeout Sync (F4-A): fechamento unificado do run. best-effort, não derruba.
-  try { runCloseoutSync({ cwd: ctx.cwd, runId: ctx.runId, command: "start", status }) } catch { /* closeout best-effort */ }
+  // Run Closeout Sync (F4-A) + proof automático no encerramento (36.10): a prontidão
+  // é DERIVADA do gate verify que já rodou no pipeline — síncrono, bounded, sem
+  // relançar a suíte (evita lentidão/EBUSY por run). best-effort, não derruba.
+  try { runCloseoutSync({ cwd: ctx.cwd, runId: ctx.runId, command: "start", status, proof: () => closeoutReadiness(stages) }) } catch { /* closeout best-effort */ }
   return { runId: ctx.runId, status, stages, attempts: ctx.attempts, execResult: ctx.execResult, ...(handoffPath ? { handoffPath } : {}) }
 }
 
