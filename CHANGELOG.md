@@ -1,5 +1,30 @@
 # Changelog - gstack-vibehard
 
+## [3.104.0] - 2026-07-11
+
+### Sprint B1 — onboarding determinístico: executor real (PRD36 36.6)
+
+O `project-init` era uma skill **instrucional** — o LLM improvisava quando um
+script falhava e declarava "instalado com sucesso" sobre um passo que caiu em
+fallback (o falso-verde do transcript de campo). Agora existe um **executor**:
+
+- **`src/skills/onboarding.js`** (`gstack.onboarding.v1`): dado o projeto + as
+  ferramentas escolhidas + variante, **roda os `setup-*.ps1/.sh`** (os mesmos
+  corrigidos no S0) e **VERIFICA o artefato** de cada uma. Status honesto:
+  `installed` (artefato presente; gstack com `variant/api_dir/db_package`
+  provados) · `degraded` (script falhou OU config a meio — **nunca "sucesso"**) ·
+  `failed` (artefato ausente — marcador não instala) · `skipped`. `ok` exige
+  `installed>0` e zero `failed/degraded`. `io` injetável (testável sem spawnar).
+- **`onboarding run` (CLI, execution layer)**: executa, grava
+  `.gstack/onboarding/report.{json,md}` e retorna **exit 1** se não estiver
+  pronto. `project-init/SKILL.md` passa a **apontar para o executor** em vez de
+  mandar rodar os `.ps1` na mão.
+- Testes: os 4 status honestos com `io` injetado (incl. o **falso-verde** —
+  script falhou mas artefato existe → `degraded`) + **integração real no win32**
+  rodando os 5 setups e verificando 9 artefatos.
+- Nota: a seleção de harness/modelo/esforço do `start` já existia
+  (`model-preflight`, F3-B); B1 fecha o buraco de campo (onboarding executável).
+
 ## [3.103.0] - 2026-07-11
 
 ### Sprint A3 — enforcement cross-harness honesto (PRD36 36.2)

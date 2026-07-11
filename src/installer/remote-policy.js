@@ -7,6 +7,8 @@
  * HTTPS. Isso fecha o vetor `curl|sh` / `irm|iex` / `ExecutionPolicy Bypass`.
  */
 
+import { resolve, relative, isAbsolute } from "path"
+
 // Allowlist de ORIGENS HTTPS confiáveis (instaladores oficiais conhecidos).
 export const ALLOWED_REMOTE_ORIGINS = Object.freeze([
   // (atomic-vcs.dev removido: domínio morto. Atomic VCS agora vem de
@@ -47,4 +49,20 @@ export function checkRemoteDownload(url, opts = {}) {
     return { allowed: false, reason: `origem fora da allowlist HTTPS: ${url}` }
   }
   return { allowed: true, reason: "permitido (opt-in + origem confiável)" }
+}
+
+/**
+ * Contrapartida LOCAL do guard remoto: garante que um script a executar está
+ * DENTRO do diretório empacotado permitido (nunca um caminho arbitrário/baixado).
+ * Fecha o vetor de rodar um `.ps1/.sh` de fora do pacote com ExecutionPolicy
+ * Bypass. Lança se escapar; retorna o caminho absoluto validado.
+ */
+export function assertLocalExec(scriptAbs, allowedDir) {
+  const abs = resolve(String(scriptAbs))
+  const base = resolve(String(allowedDir))
+  const rel = relative(base, abs)
+  if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) {
+    throw new Error(`execução local recusada: ${abs} está fora do diretório empacotado ${base}`)
+  }
+  return abs
 }

@@ -196,6 +196,19 @@ Se o usuário abrir um projeto existente e as pastas `.gstack`, `.gbrain`, `.con
 - Se o usuário disser "não para um", pule e vá para o próximo
 - Respeite a escolha — não insista
 
+## Executor determinístico (recomendado)
+
+Em vez de rodar os `setup-*.ps1` à mão e improvisar quando um falha, use o **executor**
+que já roda os scripts e **VERIFICA os artefatos**, retornando o status honesto por ferramenta:
+
+```bash
+gstack_vibehard onboarding run --dir <projeto> --tools all --variant express --json
+```
+
+Ele devolve `installed` (artefato verificado) / `degraded` (script falhou ou config incompleta)
+/ `failed` (artefato ausente) / `skipped`, e **exit 1** se não estiver pronto. O relatório fica
+em `.gstack/onboarding/report.json`. Prefira isto a declarar sucesso na base da confiança.
+
 ## Honestidade da instalação (obrigatório)
 
 - **Se um script `setup-*.ps1`/`setup-*.sh` FALHAR, o passo é `degraded` — NUNCA "instalado
