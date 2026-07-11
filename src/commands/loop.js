@@ -1,5 +1,6 @@
 import { buildLoopState, persistLoopState, readLoopState, loopVerdict, loopExhausted, classifyIntent, LOOP_PHASES, REPLIT_LOOP_SCHEMA } from "../skills/replit-loop.js"
 import { runObservePhase } from "../skills/observe-layer.js"
+import { runDiagnosePhase, buildCorrectionRequest } from "../skills/diagnose-loop.js"
 import { section, success, warn, info, error } from "../cli/index.js"
 
 /**
@@ -43,14 +44,27 @@ function renderObserve(observation, verdict) {
   info(`  verdito do ciclo: ${verdict.verdict} — ${verdict.reason}`)
 }
 
+// Carrega o loop.json de um run; erra + marca exit 1 se ausente (retorna null).
+function loadRunState(cwd, runId, sub) {
+  const state = readLoopState({ root: cwd, runId })
+  if (!state) { error(`loop ${sub}: sem loop.json para --run ${runId}`); process.exitCode = 1 }
+  return state
+}
+
+// Persiste o estado avançado guardando a última observação (consumida por diagnose).
+function persistObservedState(cwd, next, observation) {
+  const lastObservation = { status: observation.status, visualValidated: observation.visualValidated, problems: observation.problems, checks: observation.checks || {} }
+  persistLoopState({ root: cwd, state: { ...next, lastObservation } })
+}
+
 async function observeCmd(cwd, args, json) {
   const runId = flagValue(args, "--run")
   const url = flagValue(args, "--url")
   if (!runId || !url) { error("loop observe: informe --run <id> e --url <url do app rodando>"); process.exitCode = 1; return null }
-  const state = readLoopState({ root: cwd, runId })
-  if (!state) { error(`loop observe: sem loop.json para --run ${runId} (rode 'loop plan' antes)`); process.exitCode = 1; return null }
+  const state = loadRunState(cwd, runId, "observe")
+  if (!state) return null
   const { state: next, observation } = await runObservePhase(state, { root: cwd, url })
-  persistLoopState({ root: cwd, state: next })
+  persistObservedState(cwd, next, observation)
   const verdict = loopVerdict(next, observation)
   if (!observation.visualValidated) process.exitCode = 1
   const payload = { schemaVersion: REPLIT_LOOP_SCHEMA, runId, observation, verdict, state: next }
@@ -59,16 +73,41 @@ async function observeCmd(cwd, args, json) {
   return payload
 }
 
+function renderDiagnose(diagnosis, decision, correction) {
+  section(`replit loop — diagnose (${decision.action})`)
+  if (diagnosis.passed) { success("  critérios atendidos com evidência e observação limpa — pode fechar checkpoint."); return }
+  warn(`  reprovou: ${[...diagnosis.problems, ...diagnosis.pendingCriteria.map((c) => `critério s/ evidência: ${c}`)].join("; ")}`)
+  info(`  próximo: ${decision.action} — ${decision.reason}`)
+  if (correction) info(`  correção (tentativa ${correction.attempt}/${correction.maxAttempts}): ${correction.guidance}`)
+}
+
+function diagnoseCmd(cwd, args, json) {
+  const runId = flagValue(args, "--run")
+  if (!runId) { error("loop diagnose: informe --run <id>"); process.exitCode = 1; return null }
+  const state = loadRunState(cwd, runId, "diagnose")
+  if (!state) return null
+  const { state: next, diagnosis, next: decision } = runDiagnosePhase(state, { observation: state.lastObservation })
+  const correction = diagnosis.passed ? null : buildCorrectionRequest({ diagnosis, state: next })
+  persistLoopState({ root: cwd, state: next })
+  if (!diagnosis.passed) process.exitCode = 1
+  const payload = { schemaVersion: REPLIT_LOOP_SCHEMA, runId, diagnosis, decision, correction, state: next }
+  if (json) { process.stdout.write(JSON.stringify(payload) + "\n"); return payload }
+  renderDiagnose(diagnosis, decision, correction)
+  return payload
+}
+
 function printUsage() {
   section("loop")
-  info("  loop plan    --intent \"<o que implementar>\" [--accept \"c1;c2\"] [--run <id>] [--json]")
-  info("  loop observe --run <id> --url <url do app rodando> [--json]")
-  warn("  ciclo Replit-parity: implement→run→observe→diagnose→autocorrect→checkpoint (bounded). diagnose+autocorrect chegam em D3.")
+  info("  loop plan     --intent \"<o que implementar>\" [--accept \"c1;c2\"] [--run <id>] [--json]")
+  info("  loop observe  --run <id> --url <url do app rodando> [--json]")
+  info("  loop diagnose --run <id> [--json]")
+  warn("  ciclo Replit-parity: implement→run→observe→diagnose→autocorrect→checkpoint (bounded). checkpoints+rollback chegam em D4.")
 }
 
 const SUBCOMMANDS = Object.freeze({
   plan: (cwd, args, json) => planCmd(cwd, args, json),
   observe: (cwd, args, json) => observeCmd(cwd, args, json),
+  diagnose: (cwd, args, json) => diagnoseCmd(cwd, args, json),
 })
 
 export async function loopCommand(args = [], opts = {}) {

@@ -1,5 +1,32 @@
 # Changelog - gstack-vibehard
 
+## [3.114.0] - 2026-07-11
+
+### Sprint D3 — diagnose + autocorrect BOUNDED (PRD37 37.3)
+
+O miolo do ciclo Replit-parity: compara a observação (D2) com a intenção/critérios e,
+quando reprova, emite uma correção **limitada** — o LLM propõe, o verifier/observação
+decidem (o LLM nunca é o gate final).
+
+- **`src/skills/diagnose-loop.js`** (`gstack.diagnose-loop.v1`, puro/testável):
+  - **`diagnoseObservation`**: VERIFIER determinístico — um critério de aceite só conta
+    como atendido com **evidência explícita** (`observation.checks[criterio] === true`);
+    nunca se presume "pronto". Reprova se a observação não validou, há problemas, ou algum
+    critério está sem prova. Sem observação → reprova (o ciclo não rodou).
+  - **`buildCorrectionRequest`**: contrato de correção **BOUNDED** (attempt/maxAttempts +
+    `bounded`); budget esgotado → `stop:true` (pede usuário). **Nunca fabrica o patch** —
+    devolve os alvos; o agente/LLM é quem propõe.
+  - **`decideNext`**: decisão determinística — `passed`→checkpoint; reprovou dentro do
+    budget→autocorrect; budget esgotado→stop/`needs_user`.
+  - **`runDiagnosePhase`/`runAutocorrectPhase`**: registram com `recordPhase` (D1) —
+    diagnose é fase de decisão (reprovar roteia p/ autocorrect); autocorrect registra a
+    correção **proposta pelo LLM** e avança (a próxima observação valida).
+- **`loop diagnose --run <id> [--json]`**: lê a última observação persistida por
+  `loop observe`, diagnostica contra o aceite e imprime a correção bounded + próxima
+  decisão; exit 1 se reprovou.
+- Testes (`tests/diagnose_loop.test.js`): critério sem evidência nunca passa; correção
+  bounded (propõe/stop); decisão do próximo passo; roteamento de fase; CLI.
+
 ## [3.113.0] - 2026-07-11
 
 ### Sprint D2 — camada de observação (navegador headless) (PRD37 37.2)
