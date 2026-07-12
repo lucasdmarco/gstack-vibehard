@@ -1,5 +1,38 @@
 # Changelog - gstack-vibehard
 
+## [4.0.1] - 2026-07-12
+
+### Sprint S41.0 — verdade da release: release-source-parity (PRD41 / PRD40 P0.2)
+
+Abre o programa PRD41 (recuperação de integridade v4). Fecha o buraco de
+auditabilidade: a v4.0.0 foi publicada com `gitHead` de um commit que depois foi
+reescrito do histórico público (higienização do fixture de segredo) — o tarball não
+podia mais ser reproduzido a partir da fonte declarada.
+
+- **`src/release/source-parity.js`** (`release-source-parity`, puro/injetável):
+  `checkSourceParity` verifica, quando há remoto, que (i) o commit a publicar está em
+  algum branch remoto; (ii) a árvore **não está à frente** do remoto (nunca publicar
+  ahead); (iii) a tag `vX.Y.Z` local e remota são o **mesmo objeto** (`git rev-parse`
+  vs `ls-remote`, comparação por objeto-tag — garantia mais forte que "mesmo commit",
+  robusta a tag anotada com/sem linha `^{}`); (iv, opcional `checkPack`) `npm pack
+  --dry-run` reproduzível. **Fail-closed**: com remoto e paridade quebrada → `failed`;
+  sem remoto → `not_applicable`.
+- **`publish-guard`**: novo check HARD `release-source-parity` — bloqueia publish de
+  commit/árvore não auditável a partir da fonte pública.
+- **`scripts/test-pack.mjs`**: cache npm **isolado** por execução
+  (`npm_config_cache` em temp) — mata o `EPERM` ambiental do cache compartilhado
+  (P2.1), tornando o pack smoke determinístico.
+- Testes: defeito da v4.0.0 (commit fora do remoto / árvore ahead / tag divergente)
+  agora **bloqueia**; tag anotada compara o objeto direto; sem remoto → not_applicable;
+  reprodutibilidade do pack. Provado no repo real (v4.0.0: commit no remoto, tag
+  corresponde).
+
+> **Proveniência honesta:** a partir de 4.0.1 a release é auditável a partir da fonte
+> pública (`master`/tag no GitHub apontam para o mesmo commit publicado). A 4.0.0
+> permanece publicada mas com `gitHead` órfão — recomenda-se `npm deprecate` apontando
+> para >=4.0.1 (ação do mantenedor; o conteúdo empacotado é idêntico, `tests/` nunca
+> entra no tarball).
+
 ## [4.0.0] - 2026-07-11
 
 ### Sprint D5 — prova de economia (Headroom real) + honestidade do ciclo fechado (PRD37 37.5/37.6) — FECHA o programa PRD35+PRD36+PRD37
