@@ -1,6 +1,7 @@
 import { readFileSync } from "fs"
 import { join } from "path"
 import { execFileSync as defaultExec } from "child_process"
+import { checkSourceParity } from "../release/source-parity.js"
 
 /**
  * publish-guard — check determinístico de checkpoint para publicar um pacote.
@@ -68,6 +69,10 @@ export function publishGuard(opts = {}) {
   else if (qgVersion === version) add("qg-version", "passed", `qg.py em ${qgVersion}`)
   else add("qg-version", "failed", `qg.py em ${qgVersion} ≠ package ${version} — rode \`node scripts/sync-qg-version.mjs\``)
 
+  // 3.6. release-source-parity (HARD) — impede publicar commit/árvore não auditável
+  // a partir da fonte pública (PRD41 S41.0 / P0.2). Sem remoto → not_applicable.
+  checks.push(checkSourceParity({ cwd, exec, version, checkPack: opts.checkPack === true, npmPack: opts.npmPack }))
+
   // 4. tag da versão (soft — o fluxo cria a tag após publicar)
   const tagV = `v${version}`
   if (tags.includes(tagV) || tags.includes(version)) add("tag-exists", "warning", `tag ${tagV} já existe (re-publicação?)`)
@@ -90,7 +95,7 @@ export function publishGuard(opts = {}) {
   return finalize(checks, version)
 }
 
-const HARD = new Set(["package-version", "tree-clean", "version-bump", "changelog-entry", "qg-version"])
+const HARD = new Set(["package-version", "tree-clean", "version-bump", "changelog-entry", "qg-version", "release-source-parity"])
 
 /**
  * Detalhe ACIONÁVEL do tree-clean: lista OS ARQUIVOS (até 5) em vez de só contar

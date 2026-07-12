@@ -14,9 +14,17 @@ let failures = 0
 const ok = (m) => console.log(`  ✓ ${m}`)
 const bad = (m) => { console.error(`  ✗ ${m}`); failures++ }
 
+// Cache npm ISOLADO (PRD41 S41.0 / P2.1): o cache global compartilhado dá EPERM no
+// Windows quando outra coisa o toca em paralelo. Um cache dedicado por execução
+// torna o pack smoke determinístico e a falha diagnosticável (nunca ambiental).
+const npmCache = mkdtempSync(join(tmpdir(), "gstack-npmcache-"))
+
 // npm via cmd.exe no Windows (.cmd shim dá EINVAL no execFileSync direto).
 function npm(args, opts = {}) {
-  const base = { encoding: "utf-8", stdio: "pipe", timeout: 180000, ...opts }
+  const base = {
+    encoding: "utf-8", stdio: "pipe", timeout: 180000, ...opts,
+    env: { ...process.env, npm_config_cache: npmCache, ...(opts.env || {}) },
+  }
   return isWin ? execFileSync("cmd.exe", ["/c", "npm", ...args], base) : execFileSync("npm", args, base)
 }
 function node(args, opts = {}) {
@@ -67,6 +75,7 @@ try {
   bad(`erro fatal: ${e.message}`)
 } finally {
   try { rmSync(work, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }) } catch { /* cleanup */ }
+  try { rmSync(npmCache, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }) } catch { /* cleanup */ }
 }
 
 if (failures > 0) { console.error(`\npack smoke: ${failures} falha(s)`); process.exit(1) }

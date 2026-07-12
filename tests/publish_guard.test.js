@@ -16,15 +16,36 @@ async function repo(version, changelog) {
   return cwd
 }
 
-// git mock: tags, status porcelain, branch configuráveis
-function gitExec({ tags = [], porcelain = "", hasGh = false } = {}) {
+// git/gh mock via TABELA de rotas (cc baixo). `remote` vazio por padrão →
+// release-source-parity fica not_applicable (não interfere nos casos legados);
+// `parity` liga o cenário de paridade real.
+function ghRoute(hasGh) {
+  return [
+    [(f, a) => f === "gh" && a[0] === "--version", () => { if (hasGh) return "gh 2"; throw new Error("no gh") }],
+    [(f, a) => f === "gh" && a[0] === "run", () => "success"],
+  ]
+}
+function parityRoute(parity) {
+  const p = parity || {}
+  return [
+    [(f, a) => f === "git" && a[0] === "remote" && a.length === 1, () => (parity ? "origin" : "")],
+    [(f, a) => parity && f === "git" && a.join(" ").startsWith("branch -r --contains"), () => p.contains ?? "origin/master"],
+    [(f, a) => parity && f === "git" && a.join(" ").startsWith("rev-list --count"), () => p.ahead ?? "0"],
+    [(f, a) => parity && f === "git" && a[0] === "rev-parse" && a[1] !== "HEAD", () => p.tagLocal ?? "master"],
+    [(f, a) => parity && f === "git" && a[0] === "ls-remote", () => p.tagRemote ?? "master\trefs/tags/vX"],
+  ]
+}
+function gitExec({ tags = [], porcelain = "", hasGh = false, parity = null } = {}) {
+  const routes = [
+    [(f, a) => f === "git" && a[0] === "status", () => porcelain],
+    [(f, a) => f === "git" && a[0] === "tag", () => tags.join("\n")],
+    [(f, a) => f === "git" && a[0] === "rev-parse" && a[1] === "HEAD", () => "master"],
+    ...ghRoute(hasGh),
+    ...parityRoute(parity),
+  ]
   return (file, args) => {
-    if (file === "git" && args[0] === "status") return porcelain
-    if (file === "git" && args[0] === "tag") return tags.join("\n")
-    if (file === "git" && args[0] === "rev-parse") return "master"
-    if (file === "gh" && args[0] === "--version") { if (hasGh) return "gh 2"; throw new Error("no gh") }
-    if (file === "gh" && args[0] === "run") return "success"
-    return ""
+    const hit = routes.find(([match]) => match(file, args))
+    return hit ? hit[1]() : ""
   }
 }
 
@@ -142,5 +163,35 @@ test("publish-guard: sem qg.py → qg-version not_applicable (não bloqueia)", a
     const r = publishGuard({ cwd, exec: gitExec({ tags: ["v3.0.16"] }), readQgVersion: () => null })
     assert.equal(r.status, "pass")
     assert.equal(r.checks.find((c) => c.id === "qg-version").status, "not_applicable")
+  } finally { await rm(cwd, { recursive: true, force: true }) }
+})
+
+test("publish-guard: sem remoto → release-source-parity not_applicable (casos legados intactos)", async () => {
+  const cwd = await repo("2.29.0", "## [2.29.0]")
+  try {
+    const { publishGuard } = await imp()
+    const r = publishGuard({ cwd, exec: gitExec({ tags: ["v2.28.1"] }) })
+    assert.equal(r.checks.find((c) => c.id === "release-source-parity").status, "not_applicable")
+  } finally { await rm(cwd, { recursive: true, force: true }) }
+})
+
+test("publish-guard: DEFEITO v4.0.0 — commit fora do remoto → fail HARD (bloqueia publish)", async () => {
+  const cwd = await repo("4.0.1", "## [4.0.1]")
+  try {
+    const { publishGuard } = await imp()
+    const r = publishGuard({ cwd, exec: gitExec({ tags: ["v4.0.0"], parity: { contains: "" } }), readQgVersion: () => "4.0.1" })
+    assert.equal(r.status, "fail")
+    assert.ok(r.failed.includes("release-source-parity"), "paridade fonte↔release bloqueia")
+  } finally { await rm(cwd, { recursive: true, force: true }) }
+})
+
+test("publish-guard: paridade completa (commit no remoto + tag corresponde) → pass", async () => {
+  const cwd = await repo("4.0.1", "## [4.0.1]")
+  try {
+    const { publishGuard } = await imp()
+    const parity = { contains: "origin/master", ahead: "0", tagLocal: "deadbeef", tagRemote: "deadbeef\trefs/tags/v4.0.1" }
+    const r = publishGuard({ cwd, exec: gitExec({ tags: ["v4.0.0"], parity }), readQgVersion: () => "4.0.1" })
+    assert.equal(r.checks.find((c) => c.id === "release-source-parity").status, "passed")
+    assert.equal(r.status, "pass")
   } finally { await rm(cwd, { recursive: true, force: true }) }
 })
