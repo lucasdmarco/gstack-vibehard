@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any
 
 
-QG_VERSION = "4.0.1"
+QG_VERSION = "4.1.0"
 FALLOW_ARGS = ["audit", "--format", "json"]
 # Contrato historico: o JSON expoe `command` como `npx fallow ...` (o caminho de
 # fallback). A resolucao REAL prefere binario local/global (ver _resolve_fallow).
@@ -144,6 +144,47 @@ def truthy(value: Any) -> bool:
     if isinstance(value, str):
         return value.strip().lower() in {"true", "yes", "1"}
     return bool(value)
+
+
+# Sinais de que o Fallow NAO concluiu uma analise confiavel (tool_failed), em vez
+# de reprovar por achados de qualidade (quality_failed). "failed" NAO entra aqui:
+# reprovacao de qualidade e legitima e tratada pelos findings.
+FALLOW_ERROR_VERDICTS = {"error", "crashed", "aborted", "tool_error", "timeout"}
+
+
+def classify_tool_failure(raw: Any, returncode: int, total_findings: int) -> str | None:
+    """Retorna a CAUSA se a execucao do Fallow nao concluiu uma analise confiavel
+    (tool_failed), ou None se a saida e uma analise legitima. Fail-closed (PRD41
+    S41.1 / P0.1): um payload de erro, um exit de erro operacional (>=2), ou um exit
+    nao-zero SEM nenhum achado que o explique sao falha da FERRAMENTA — nunca 'pass'
+    silencioso. Fallow usa exit 1=achados, 0=limpo, >=2=erro operacional."""
+    if not isinstance(raw, (dict, list)):
+        return "saida do Fallow nao e objeto/array JSON (schema desconhecido)"
+    if isinstance(raw, dict):
+        if raw.get("error") is True:
+            return "Fallow reportou error=true: " + str(raw.get("message") or raw.get("detail") or "sem detalhe")
+        for key in ("verdict", "status", "result"):
+            value = raw.get(key)
+            if isinstance(value, str) and value.strip().lower() in FALLOW_ERROR_VERDICTS:
+                return f"Fallow {key}={value.strip()} — execucao nao concluiu analise"
+    if returncode >= 2:
+        return f"Fallow saiu com codigo {returncode} (erro operacional: worktree/baseline/config)"
+    if returncode != 0 and total_findings == 0:
+        return f"Fallow saiu com codigo {returncode} sem nenhum achado — analise nao concluida"
+    return None
+
+
+def tool_failed_result(reason: str, returncode: int, args, findings: dict) -> dict[str, Any]:
+    """Resultado tool_failed: pass=False, verdict distinto de quality_failed. Ambos
+    bloqueiam, mas o veredito separado deixa a causa acionavel (PRD40 P0.1)."""
+    return {
+        "pass": False, "engine": "fallow", "level": args.level, "profile": args.profile,
+        "command": FALLOW_COMMAND, "verdict": "tool_failed", "returncode": returncode,
+        "reason": reason,
+        "issues": findings["auto_fixable"], "auto_fixable": findings["auto_fixable"],
+        "blocking": findings["blocking"], "blocking_severity_count": findings["blockers"],
+        "summary": f"Fallow Quality Gate: TOOL_FAILED — {reason} (falha da ferramenta e falha do gate)",
+    }
 
 
 def infer_verdict(raw: Any, returncode: int) -> str:
@@ -378,6 +419,20 @@ def main() -> None:
     # Gating por severidade: so CRITICO/ALTO reprovam (ver BLOCKING_SEVERITIES).
     all_findings = auto_fixable + blocking
     blockers = [i for i in all_findings if str(i.get("severity", "")).upper() in BLOCKING_SEVERITIES]
+
+    # FAIL-CLOSED (PRD41 S41.1 / P0.1): antes de decidir por achados, checar se o
+    # Fallow SEQUER concluiu a analise. Erro operacional (exit>=2), payload de erro
+    # ou exit nao-zero sem achados = tool_failed, NUNCA pass silencioso.
+    findings = {"auto_fixable": auto_fixable, "blocking": blocking, "blockers": len(blockers)}
+    tool_failure = classify_tool_failure(raw, completed.returncode, len(all_findings))
+    if tool_failure is not None:
+        result = tool_failed_result(tool_failure, completed.returncode, args, findings)
+        typecheck = run_typecheck(root)
+        if typecheck.get("status") == "failed":
+            result["typecheck"] = typecheck
+            result["summary"] += f" | {typecheck['summary']}"
+        emit(result, 0 if args.log_only else 1)
+
     passed = len(blockers) == 0
     verdict = "pass" if passed else "fail"
     summary = (

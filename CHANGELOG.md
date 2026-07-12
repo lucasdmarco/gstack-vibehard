@@ -1,5 +1,32 @@
 # Changelog - gstack-vibehard
 
+## [4.1.0] - 2026-07-12
+
+### Sprint S41.1 — Quality Gate fail-closed (PRD41 / PRD40 P0.1)
+
+Fecha o bloqueador mais crítico: o `qg.py` declarava `PASS` quando o Fallow **falhava
+operacionalmente** (exit 2 por worktree/baseline), porque o veredito era calculado só a
+partir de uma lista de findings — vazia num payload de erro. **Falha de ferramenta agora
+é falha do gate.**
+
+- **`hooks/hooks/qg.py`** — `classify_tool_failure(raw, returncode, total_findings)`
+  roda **antes** do veredito por achados e distingue `tool_failed` de `quality_failed`:
+  - `error: true` no payload, `verdict/status/result` ∈ {error, crashed, aborted,
+    tool_error, timeout}, schema não-objeto/array, **exit ≥ 2** (erro operacional), ou
+    **exit ≠ 0 sem nenhum achado** que o explique → `tool_failed` (`pass:false`, exit 1).
+  - Fallow usa exit 1 = achados, 0 = limpo, ≥ 2 = erro operacional — por isso `exit 1
+    COM achados` continua sendo análise legítima (quality), e o repo real (exit 1, 4
+    achados não-bloqueantes) **segue passando**.
+  - `tool_failed` **bloqueia sempre** (não só em `--strict`): falha de ferramenta é
+    falha do gate. `log-only` continua não-bloqueante.
+  - Propaga para `verify --profile release` e `proof` via exit 1 + `required:true` no
+    passo `qg-l1/qg-l2`.
+- Testes (`tests/test_qg_fail_closed.py`): o defeito exato do P0.1 (exit 2 + payload de
+  erro + zero findings) agora **reprova**; exit ≥ 2 com achados, `verdict:error` em exit
+  0, exit 1 sem achados → todos `tool_failed`; projeto limpo (exit 0, zero achados) e
+  saída lista continuam **passando**; `tool_failed` bloqueia sem `--strict`. Os 6 testes
+  do wrapper legado (caminho de qualidade) seguem verdes.
+
 ## [4.0.1] - 2026-07-12
 
 ### Sprint S41.0 — verdade da release: release-source-parity (PRD41 / PRD40 P0.2)
