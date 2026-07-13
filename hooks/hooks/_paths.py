@@ -2,6 +2,7 @@ from pathlib import Path
 import json
 import shutil
 import os
+import uuid
 
 HOOKS_DIR = Path(__file__).parent
 GSTACK_DIR = Path.home() / ".gstack"
@@ -9,14 +10,57 @@ CODEX_DIR = Path.home() / ".codex"
 GSTACK_VIBEHARD_DIR = Path.home() / ".gstack_vibehard"
 MOM_DB_PATH = Path.home() / ".mom" / "mom.db"
 
+# Marcador CANONICO de projeto ativado (PRD41 S41.2 / PRD40 P0.3). A mera existencia
+# de `.gstack/` NAO ativa mais um projeto — um `.gstack` vazado/copiado (ex.: resto de
+# teste sob %TEMP%) nao pode injetar identidade/governanca num projeto alheio. So um
+# `.gstack/project.json` VALIDO, cujo `root` canonico corresponde ao diretorio, ativa.
+PROJECT_MARKER_SCHEMA = "gstack.project.v1"
+
+
+def _valid_project_marker(gstack_dir, project_root):
+    """True se `.gstack/project.json` e um marcador VALIDO cujo root canonico
+    corresponde ao diretorio (anti-ativacao por `.gstack` vazado/copiado)."""
+    marker = gstack_dir / "project.json"
+    try:
+        if not marker.is_file():
+            return False
+        data = json.loads(marker.read_text(encoding="utf-8"))
+        if not isinstance(data, dict) or data.get("schemaVersion") != PROJECT_MARKER_SCHEMA:
+            return False
+        declared = data.get("root")
+        if not declared:
+            return False
+        return Path(declared).resolve() == project_root.resolve()
+    except Exception:
+        return False
+
+
+def write_project_marker(project_root, *, mode="lite", created_by="gstack_vibehard", project_id=None):
+    """Escreve/atualiza o marcador `.gstack/project.json` (migracao explicita de um
+    projeto). `root` grava o caminho canonico — mover/copiar a pasta invalida o
+    marcador ate re-migrar. Retorna o dict do marcador."""
+    root = Path(project_root).resolve()
+    gdir = root / ".gstack"
+    gdir.mkdir(parents=True, exist_ok=True)
+    marker = {
+        "schemaVersion": PROJECT_MARKER_SCHEMA,
+        "projectId": project_id or str(uuid.uuid4()),
+        "root": str(root),
+        "mode": mode,
+        "activated": True,
+        "createdBy": created_by,
+    }
+    (gdir / "project.json").write_text(json.dumps(marker, indent=2), encoding="utf-8")
+    return marker
+
 
 def find_gstack_root(cwd, max_depth=30):
-    """Sobe a árvore a partir de `cwd` procurando um projeto gstack (`.gstack/`).
+    """Sobe a árvore a partir de `cwd` procurando um projeto gstack ATIVADO.
 
     É a chave da ATIVAÇÃO POR PROJETO: a infra dos hooks é global, mas as regras
-    gstack (chronicle, gates, identidade) só agem onde existe `.gstack/`. Projeto
-    alheio (sem `.gstack/`) → retorna None → hooks ficam passivos. Retorna o Path
-    do root do projeto gstack, ou None.
+    gstack (chronicle, gates, identidade) só agem em projeto com marcador CANONICO
+    `.gstack/project.json` válido (schema + root correspondente). `.gstack/` genérico
+    (vazado/copiado) permanece INERTE → retorna None → hooks passivos (P0.3).
     """
     if not cwd:
         return None
@@ -27,10 +71,9 @@ def find_gstack_root(cwd, max_depth=30):
         return None
     for _ in range(max_depth):
         try:
-            # IMPORTANTE: `~/.gstack` é o dir GLOBAL do gstack (chronicle/hooks), NÃO
-            # um marcador de projeto. Ignorar o próprio home evita que TODO projeto
-            # sob a home pareça "gstack-ativo" (falso positivo que furaria o gate).
-            if d != home and (d / ".gstack").is_dir():
+            # `~/.gstack` é o dir GLOBAL do gstack, NÃO um projeto; e um `.gstack/`
+            # sem marcador válido (ex.: %TEMP%/.gstack vazado) NUNCA ativa.
+            if d != home and _valid_project_marker(d / ".gstack", d):
                 return d
         except Exception:
             return None

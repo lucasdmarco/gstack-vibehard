@@ -15,8 +15,10 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 HOOKS = REPO / "hooks" / "hooks"
 sys.path.insert(0, str(HOOKS))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _paths import token_budget, read_project_profile  # noqa: E402
+from _marker import mark_project  # noqa: E402
 
 
 def run_hook(name, stdin_text, cwd=None):
@@ -28,7 +30,7 @@ def run_hook(name, stdin_text, cwd=None):
 
 def make_proj(tmp, budget):
     proj = Path(tmp) / "p"
-    (proj / ".gstack").mkdir(parents=True)
+    mark_project(proj)
     if budget is not None:
         (proj / ".gstack" / "profile.json").write_text(
             json.dumps({"profile": "cli", "mode": "observe", "tokenBudget": budget}),

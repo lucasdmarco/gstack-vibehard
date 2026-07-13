@@ -10,6 +10,9 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 STOP = REPO_ROOT / "hooks" / "hooks" / "stop.py"
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _marker import mark_project  # noqa: E402
+
 
 def run_stop(payload, home, extra_env=None):
     env = os.environ.copy()
@@ -31,7 +34,7 @@ def run_stop(payload, home, extra_env=None):
 def make_node_project(root, exit_code):
     """Projeto Node com test script que sai com exit_code."""
     root.mkdir(parents=True)
-    (root / ".gstack").mkdir(exist_ok=True)  # projeto gstack: stop só roda com .gstack/
+    mark_project(root)  # projeto gstack: stop só roda com marcador válido
     (root / "package.json").write_text(json.dumps({
         "name": "fixture",
         "scripts": {"test": f"node -e \"process.exit({exit_code})\""},
@@ -109,7 +112,7 @@ class StopTestGateTest(unittest.TestCase):
             root = Path(tmp) / "repo"
             home = Path(tmp) / "home"
             root.mkdir()
-            (root / ".gstack").mkdir(exist_ok=True)
+            mark_project(root)
             home.mkdir()
             # projeto sem package.json/tests — gate deve pular sem falhar
 

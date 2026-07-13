@@ -150,6 +150,11 @@ test("create DEFAULT é LITE: só ./app, sem Casdoor/Atomic, app.json mode=lite"
     assert.equal(app.mode, "lite")
     assert.equal(app.mcpGateway, null)
     assert.equal(app.iam, "none")
+    // P0.3: projeto novo já nasce ATIVO — marcador canônico presente (mode=lite).
+    const marker = JSON.parse(await readFile(path.join(appDir, ".gstack", "project.json"), "utf8"))
+    assert.equal(marker.schemaVersion, "gstack.project.v1", "create grava o marcador canônico")
+    assert.equal(marker.mode, "lite")
+    assert.equal(marker.activated, true)
   } finally {
     delete process.env.GSTACK_SKIP_PREFLIGHT; delete process.env.GSTACK_SKIP_SIDE_EFFECTS
     await rm(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })

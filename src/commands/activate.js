@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, writeFileSync, renameSync } from "fs"
 import { join } from "path"
 import { buildContextRegistry } from "../context-docs/registry.js"
 import { detectProfile } from "../project-plan/detect-profile.js"
+import { writeProjectMarker, hasValidMarker } from "../project/identity.js"
 import { success, warn, info, section } from "../cli/index.js"
 
 /**
@@ -24,18 +25,31 @@ export async function activateCommand(sub, args = [], opts = {}) {
 
 function enable(cwd) {
   section("gstack enable — ativar neste projeto")
-  // Reativa um projeto desativado (preserva contexto/planos).
+  // Reativa um projeto desativado (preserva contexto/planos). Garante o marcador
+  // canônico (um `.gstack-disabled/` de antes do P0.3 pode não ter `project.json`).
   if (existsSync(gdisabled(cwd)) && !existsSync(gdir(cwd))) {
     renameSync(gdisabled(cwd), gdir(cwd))
+    writeProjectMarker(cwd, { mode: "lite", createdBy: "gstack_vibehard:reactivate" })
     success("gstack REATIVADO neste projeto (dados preservados). Regras/hooks voltam a agir aqui.")
     return { status: "reactivated" }
   }
   if (existsSync(gdir(cwd))) {
+    // Já tem `.gstack/`: se falta o marcador válido (projeto de antes do P0.3), o
+    // projeto estava INERTE — migra gravando o marcador em vez de mentir "já ativo".
+    if (!hasValidMarker(cwd)) {
+      writeProjectMarker(cwd, { mode: "lite", createdBy: "gstack_vibehard:migrate" })
+      success("gstack MIGRADO: `.gstack/` existia mas sem marcador canônico — agora ATIVO de verdade (hooks passam a agir).")
+      if (existsSync(gdisabled(cwd))) warn("Há um `.gstack-disabled/` residual (de um disable anterior) — remova quando quiser, não é mais usado.")
+      return { status: "migrated" }
+    }
     info("gstack já está ATIVO neste projeto.")
     if (existsSync(gdisabled(cwd))) warn("Há um `.gstack-disabled/` residual (de um disable anterior) — remova quando quiser, não é mais usado.")
     return { status: "already_active" }
   }
   mkdirSync(gdir(cwd), { recursive: true })
+  // Marcador CANÔNICO (P0.3): sem ele os hooks Python veem `.gstack/` como INERTE.
+  // Ativar de verdade = gravar o marcador, não só criar a pasta (nada de falso-verde).
+  writeProjectMarker(cwd, { mode: "lite", createdBy: "gstack_vibehard:enable" })
   const p = join(gdir(cwd), "context.json")
   if (!existsSync(p)) writeFileSync(p, JSON.stringify(buildContextRegistry(), null, 2) + "\n")
   // Detecta o ARQUÉTIPO e grava o profile.json: adoção observe-only (reporta,
@@ -67,7 +81,10 @@ function disable(cwd) {
 
 function status(cwd) {
   section("gstack status — neste projeto")
-  if (existsSync(gdir(cwd))) { success("ATIVO — o gstack age neste projeto (`.gstack/` presente)."); return { status: "active" } }
+  // Fonte de verdade = marcador canônico (o mesmo que os hooks checam), não a mera
+  // pasta. Um `.gstack/` sem marcador válido está INERTE — reportar isso, não "ativo".
+  if (hasValidMarker(cwd)) { success("ATIVO — o gstack age neste projeto (marcador `.gstack/project.json` válido)."); return { status: "active" } }
+  if (existsSync(gdir(cwd))) { warn("PRESENTE MAS INERTE — há `.gstack/` sem marcador canônico (hooks passivos). Rode `gstack_vibehard enable` para migrar."); return { status: "inert" } }
   if (existsSync(gdisabled(cwd))) { warn("DESATIVADO — reative com `gstack_vibehard enable` (dados em `.gstack-disabled/`)."); return { status: "disabled" } }
   info("INATIVO — projeto sem gstack (intocado). Ative com `gstack_vibehard enable`.")
   info("(Projetos novos criados com `gstack_vibehard create` já vêm ATIVOS.)")

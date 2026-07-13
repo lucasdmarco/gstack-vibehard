@@ -17,6 +17,9 @@ REPO = Path(__file__).resolve().parents[1]
 HOOKS = REPO / "hooks" / "hooks"
 IS_WIN = os.name == "nt"
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _marker import mark_project  # noqa: E402
+
 
 def make_stub_cli(tmpdir, decision_json):
     """Cria um executavel fake `gstack_vibehard` que imprime a decisao dada."""
@@ -58,7 +61,7 @@ class ChallengePretoolHookTest(unittest.TestCase):
     def test_alto_risco_em_projeto_gstack_nega_com_challenge(self):
         with tempfile.TemporaryDirectory() as tmp:
             proj = Path(tmp) / "proj"
-            (proj / ".gstack").mkdir(parents=True)
+            mark_project(proj)
             deny = json.dumps({"decision": "deny", "rule": "global-config-write",
                                "howTo": "gstack_vibehard challenge evaluate --evidence x"})
             stub = make_stub_cli(tmp, deny)
@@ -73,7 +76,7 @@ class ChallengePretoolHookTest(unittest.TestCase):
     def test_grant_allow_deixa_passar(self):
         with tempfile.TemporaryDirectory() as tmp:
             proj = Path(tmp) / "proj"
-            (proj / ".gstack").mkdir(parents=True)
+            mark_project(proj)
             allow = json.dumps({"decision": "allow", "risk": "high", "grantedBy": "sha256:x"})
             stub = make_stub_cli(tmp, allow)
             r = run_hook(global_config_write(str(proj)), cwd=str(proj),
@@ -84,7 +87,7 @@ class ChallengePretoolHookTest(unittest.TestCase):
     def test_cli_ausente_fail_open(self):
         with tempfile.TemporaryDirectory() as tmp:
             proj = Path(tmp) / "proj"
-            (proj / ".gstack").mkdir(parents=True)
+            mark_project(proj)
             # PATH sem gstack_vibehard + sem GSTACK_CLI_BIN → gate nao age (fail-open)
             r = run_hook(global_config_write(str(proj)), cwd=str(proj),
                          extra_env={"GSTACK_CLI_BIN": "", "PATH": tmp})
@@ -94,7 +97,7 @@ class ChallengePretoolHookTest(unittest.TestCase):
     def test_cli_quebrada_fail_open(self):
         with tempfile.TemporaryDirectory() as tmp:
             proj = Path(tmp) / "proj"
-            (proj / ".gstack").mkdir(parents=True)
+            mark_project(proj)
             stub = make_stub_cli(tmp, "isto nao e json")
             r = run_hook(global_config_write(str(proj)), cwd=str(proj),
                          extra_env={"GSTACK_CLI_BIN": str(stub)})
@@ -104,7 +107,7 @@ class ChallengePretoolHookTest(unittest.TestCase):
     def test_escrita_comum_nao_invoca_challenge(self):
         with tempfile.TemporaryDirectory() as tmp:
             proj = Path(tmp) / "proj"
-            (proj / ".gstack").mkdir(parents=True)
+            mark_project(proj)
             # arquivo de projeto normal: nem parece config global → gate nem roda a CLI
             inp = {"tool_name": "Write", "tool_input": {"file_path": str(proj / "src" / "app.js")}, "cwd": str(proj)}
             stub = make_stub_cli(tmp, json.dumps({"decision": "deny", "rule": "x", "howTo": "y"}))
