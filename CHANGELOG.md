@@ -1,5 +1,30 @@
 # Changelog - gstack-vibehard
 
+## [4.8.0] - 2026-07-13
+
+### Sprint S41.8 — Headroom roteado de verdade (PRD41 / PRD40 P1.4)
+
+O roteamento deixou de ser uma função sem chamador, e a economia deixou de ser um número
+acumulado sem prova de causalidade.
+
+- **Chamador de PRODUÇÃO.** `supervisor.planStart` chama `ensureRoutedChildEnv` quando
+  `opts.routing.enabled` (Full + opt-in): o env do processo-FILHO recebe as base-URLs do proxy.
+  Sem opt-in, o env do child é intocado e o `process.env` global **NUNCA** é mutado (child-scoped,
+  provado byte-a-byte).
+- **Economia por DELTA.** `src/tools/headroom-run.js::proveEconomyDelta` mede o delta de savings
+  (antes/depois) vinculado ao `runId`; só afirma economia com `delta.calls>0 && delta.tokensSaved>0`
+  — substitui o número lifetime acumulado.
+- **Ownership de porta (negativo obrigatório).** `proxyPortOwnership`: porta ocupada por processo
+  ALHEIO → `foreign`/`abort` — jamais reutiliza ou mata processo de terceiro; só `reuse` com
+  PID+idade batendo com o manifesto do nosso proxy.
+- Invariantes intactas: nunca `wrap`, nunca MCP global, nunca config global de harness. Suíte JS
+  1025/1025. QG strict 0.
+
+### Escopo honesto (deferido)
+Adapters testados por harness (OpenCode/Cursor entram só com adapter provado; senão `unsupported`)
+e o supervisor de proxy com porta dinâmica + handshake por nonce ficam como incremento sobre esta
+base (o chamador real, o delta e o ownership-guard estão entregues e provados).
+
 ## [4.7.0] - 2026-07-13
 
 ### Sprint S41.7 — Checkpoints seguros (PRD41 / PRD40 P0.7)
