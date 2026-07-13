@@ -25,6 +25,8 @@ import { buildIntegrationsRegistry } from "../printing-press/registry.js"
 import { buildContextRegistry, DOC_SOURCES as CONTEXT_DOC_SOURCES } from "../context-docs/registry.js"
 import { DEFAULT_LOOP_BUDGET } from "../loop-budget/policy.js"
 import { writeProjectMarker } from "../project/identity.js"
+import { buildAtomicPlan, executePlan } from "../installer/operation-plan.js"
+import { runTransaction } from "../installer/journal.js"
 
 const HOME = resolve(homedir() || process.env.USERPROFILE || process.env.HOME || "/tmp")
 
@@ -276,37 +278,14 @@ __pycache__/
 .gstack/casdoor.json
 `)
 
-  const atomicDir = join(projectDir, ".atomic")
-  mkdirSync(atomicDir, { recursive: true })
-  // Secrets Broker (PRD 12 §10): `.env`/`.env.local` NÃO são expostos às views do
-  // Atomic — segredo vive no keychain (`gstack_vibehard secrets`), não em arquivo.
-  writeFileSync(join(atomicDir, "workspace.toml"),
-`[workspace]
-expose = [
-  ".claude/",
-  ".cursor/",
-  ".windsurf/",
-  ".vscode/",
-  ".idea/",
-  ".gstack/",
-  ".mcp.json",
-  ".agent/",
-]
-`)
-
-  const globalAtomicDir = join(HOME, ".atomic")
-  mkdirSync(globalAtomicDir, { recursive: true })
-  const globalCfg = join(globalAtomicDir, "config.toml")
-  if (!existsSync(globalCfg)) {
-    writeFileSync(globalCfg,
-`[defaults]
-engine = "atomic"
-
-[workspace]
-default_expose = [".env", ".claude/", ".gstack/", ".agent/"]
-`)
-  }
-  safeExec("node", ["--version"]) // noop: ensure workspace expose is registered
+  // PRD41 S41.3 (P0.9+P0.10): as escritas Atomic (workspace do projeto + config GLOBAL)
+  // passam pelo PLANO ÚNICO (o mesmo que o dry-run mostra) e por uma TRANSAÇÃO — falha em
+  // qualquer escrita reverte TUDO ao byte anterior (nada de `.atomic` global meia-boca).
+  // `.env` está FORA das listas de exposição por construção; o plano tem trava que rejeita
+  // qualquer entrada `.env` (Secrets Broker: segredo vive no keychain, não numa view).
+  const plan = buildAtomicPlan({ projectDir, home: HOME })
+  const tx = runTransaction((journal) => executePlan(plan, journal))
+  if (!tx.ok) throw tx.error
 }
 
 // ─────────────────────────────────────────────────────────────
