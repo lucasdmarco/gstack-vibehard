@@ -112,6 +112,13 @@ function checkpointCmd(cwd, args, json) {
   const runId = flagValue(args, "--run")
   if (!runId) { error("loop checkpoint: informe --run <id>"); process.exitCode = 1; return null }
   const manifest = createCheckpoint({ root: cwd, runId, files: parseList(flagValue(args, "--files")), state: readLoopState({ root: cwd, runId }), green: args.includes("--green"), note: flagValue(args, "--note") || "" })
+  // S41.4/S41.7: checkpoint rejeitado (runId inválido / arquivo negado por denylist/traversal/segredo)
+  if (manifest.ok === false) {
+    error(`loop checkpoint: rejeitado (${manifest.status}) — ${manifest.reason}`)
+    process.exitCode = 1
+    if (json) process.stdout.write(JSON.stringify({ schemaVersion: REPLIT_LOOP_SCHEMA, runId, checkpoint: manifest }) + "\n")
+    return null
+  }
   const payload = { schemaVersion: REPLIT_LOOP_SCHEMA, runId, checkpoint: manifest }
   if (json) { process.stdout.write(JSON.stringify(payload) + "\n"); return payload }
   renderCheckpoint(manifest)
