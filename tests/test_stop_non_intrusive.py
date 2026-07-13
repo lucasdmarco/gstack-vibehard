@@ -12,6 +12,9 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 STOP = REPO_ROOT / "hooks" / "hooks" / "stop.py"
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _marker import mark_project  # noqa: E402
+
 
 def run_stop(payload, home, extra_env=None, timeout=30):
     env = os.environ.copy()
@@ -33,7 +36,7 @@ class StopNonIntrusiveTest(unittest.TestCase):
             root = Path(tmp) / "repo"
             home = Path(tmp) / "home"
             root.mkdir()
-            (root / ".gstack").mkdir(exist_ok=True)
+            mark_project(root)
             home.mkdir()
             (root / "package.json").write_text("{}\n", encoding="utf-8")
 
@@ -57,7 +60,7 @@ class StopNonIntrusiveTest(unittest.TestCase):
             root = Path(tmp) / "repo"
             home = Path(tmp) / "home"
             root.mkdir()
-            (root / ".gstack").mkdir(exist_ok=True)
+            mark_project(root)
             home.mkdir()
             subprocess.run(["git", "init", "-q"], cwd=root, capture_output=True)
             subprocess.run(["git", "config", "user.email", "t@t.co"], cwd=root, capture_output=True)

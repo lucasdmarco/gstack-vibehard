@@ -10,6 +10,9 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 STOP = REPO_ROOT / "hooks" / "hooks" / "stop.py"
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _marker import mark_project  # noqa: E402
+
 
 def write_fake_openhands(bin_dir: Path, exit_code: int) -> None:
     runner = bin_dir / "fake_openhands.py"
@@ -67,7 +70,7 @@ class StopSandboxTest(unittest.TestCase):
             args_file = Path(tmp) / "openhands_args.json"
             post_sprint_marker = Path(tmp) / "post_sprint_called.txt"
             root.mkdir()
-            (root / ".gstack").mkdir(exist_ok=True)
+            mark_project(root)
             home.mkdir()
             bin_dir.mkdir()
             (root / "package.json").write_text("{}\n", encoding="utf-8")
@@ -112,7 +115,7 @@ class StopSandboxTest(unittest.TestCase):
             home = Path(tmp) / "home"
             bin_dir = Path(tmp) / "bin"
             root.mkdir()
-            (root / ".gstack").mkdir(exist_ok=True)
+            mark_project(root)
             home.mkdir()
             bin_dir.mkdir()
             (root / "package.json").write_text("{}\n", encoding="utf-8")
