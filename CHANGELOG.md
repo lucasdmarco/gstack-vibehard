@@ -1,5 +1,28 @@
 # Changelog - gstack-vibehard
 
+## [4.6.0] - 2026-07-13
+
+### Sprint S41.6 — QA visual real (PRD41 / PRD40 P1.1)
+
+O visual-gate deixou de aceitar evidência de fachada: a acessibilidade é medida de verdade e o
+screenshot é verificado no disco por hash.
+
+- **a11y REAL.** Removido o `a11y: { violations: [] }` HARDCODED do driver — `defaultA11yProbe`
+  injeta o axe-core na página e roda de verdade; ausente → `checked:false` (a11y **NÃO
+  verificada**, jamais fingida como "limpa"). Probe injetável.
+- **Evidência com hash.** `verifyScreenshotEvidence` checa existência + sha256 do screenshot no
+  disco — não confia no path. Screenshot declarado mas ausente → falha por **evidência**;
+  `expectedHash` divergente → falha por **evidência adulterada**.
+- **4 lentes determinísticas** (QA/engenharia/segurança/produto) sobre o app rodando —
+  heurísticas, nunca LLM (`evaluateLenses`).
+- Cada motivo de falha é **DISTINTO**: erro 500 → rede; violação a11y plantada → a11y;
+  screenshot ausente/adulterado → evidência. Suíte JS 1005/1005. QG strict 0.
+
+### Escopo honesto (deferido)
+`tools doctor` instalar Playwright + axe-core sob consentimento (aparecendo no dry-run do S41.3) e
+a aplicabilidade do gate amarrada ao Gate Registry (S41.5) são incrementais; nesta máquina, sem
+Playwright/axe-core, o gate reporta `needs_browser`/`a11y checked:false` — honesto.
+
 ## [4.5.0] - 2026-07-13
 
 ### Sprint S41.5 — Action Kernel ligado + Gate Registry central (PRD41 / PRD40 P0.8 + P1.2 + P1.3)
