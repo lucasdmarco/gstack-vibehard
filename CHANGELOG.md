@@ -1,5 +1,29 @@
 # Changelog - gstack-vibehard
 
+## [4.7.0] - 2026-07-13
+
+### Sprint S41.7 — Checkpoints seguros (PRD41 / PRD40 P0.7)
+
+Checkpoint captura e restaura arquivos do working tree — passou a falhar FECHADO contra
+traversal, symlink, segredo e blob adulterado.
+
+- **Guardas** (`src/skills/checkpoint-guard.js`, puro/injetável): `validCheckpointId` (runId/seq
+  do SISTEMA — traversal/estranho rejeitado); `resolveWithin` (path canônico DENTRO do root —
+  absoluto, `../`, e symlink/junction/UNC que escapa falham **ANTES de ler**); `isDeniedPath`
+  (`.env*`, `.git/`, `.ssh`, `.aws`, `.npmrc`, `id_rsa*` nunca entram); `contentHasSecret`
+  (arquivo permitido mas com segredo embutido → negado).
+- **createCheckpoint fail-closed:** qualquer arquivo negado rejeita o checkpoint INTEIRO sem
+  persistir nada.
+- **Rollback atômico anti-tamper:** verifica o sha256 de TODO blob capturado ANTES de escrever;
+  qualquer divergência → aborta (`tamper_detected`) sem tocar o working tree.
+- Suíte adversarial (11): traversal/junction/`.env`/segredo negados antes de ler; blob adulterado
+  aborta com working tree intacto; seq externo inválido rejeitado. Suíte JS 1016/1016. QG strict 0.
+
+### Escopo honesto (deferido)
+Store content-addressed por sha256 (dedupe) e `green` DERIVADO só do motor (matar `--green`
+manual, que cascata nos testes do loop) ficam como incremento — a segurança do P0.7
+(containment/denylist/tamper) está entregue e provada.
+
 ## [4.6.0] - 2026-07-13
 
 ### Sprint S41.6 — QA visual real (PRD41 / PRD40 P1.1)
