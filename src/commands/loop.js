@@ -3,6 +3,7 @@ import { runObservePhase } from "../skills/observe-layer.js"
 import { runDiagnosePhase, buildCorrectionRequest } from "../skills/diagnose-loop.js"
 import { createCheckpoint, rollbackToCheckpoint, rollbackToLastGreen } from "../skills/loop-checkpoint.js"
 import { proveLoopEconomy, finalizeLoop } from "../skills/loop-economy.js"
+import { phaseAtLeast } from "../skills/loop-engine.js"
 import { proxyStatus } from "../tools/headroom-proxy.js"
 import { section, success, warn, info, error } from "../cli/index.js"
 
@@ -138,11 +139,21 @@ function renderEconomyClose(final, economy) {
   warn(`  ${economy.note}${pend}`)
 }
 
+function rejectEconomyOrder(runId, from, json) {
+  error(`loop economy: invalid_transition — fase '${from}' está antes de 'diagnose'; rode 'loop diagnose --run ${runId}' antes de fechar`)
+  process.exitCode = 1
+  if (json) process.stdout.write(JSON.stringify({ schemaVersion: REPLIT_LOOP_SCHEMA, runId, error: "invalid_transition", from, need: "diagnose" }) + "\n")
+  return null
+}
+
 async function economyCmd(cwd, args, json) {
   const runId = flagValue(args, "--run")
   if (!runId) { error("loop economy: informe --run <id>"); process.exitCode = 1; return null }
   const state = loadRunState(cwd, runId, "economy")
   if (!state) return null
+  // PRD41 S41.4 (P0.5): fechar o ciclo/economia ANTES de diagnosticar é `invalid_transition`
+  // — a ordem é a do Loop Engine (fonte única). Sem diagnose, não há o que "fechar".
+  if (!phaseAtLeast(state.phase, "diagnose").ok) return rejectEconomyOrder(runId, state.phase, json)
   const economy = proveLoopEconomy({ state, cwd, proxyState: await proxyStatus({ cwd }) })
   const final = finalizeLoop({ state, observation: state.lastObservation, economy })
   const payload = { schemaVersion: REPLIT_LOOP_SCHEMA, runId, economy, final }

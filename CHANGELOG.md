@@ -1,5 +1,32 @@
 # Changelog - gstack-vibehard
 
+## [4.4.0] - 2026-07-13
+
+### Sprint S41.4 — Loop Engine canônico (PRD41 / PRD40 P0.5 + P0.6 + P1.5)
+
+O ciclo Replit-parity ganhou um MOTOR único (`src/skills/loop-engine.js`) — o único que muta
+fase e contadores sobre o schema `replit-loop.v1`. Fecha três defeitos:
+
+- **P0.5 — ordem real.** Pipeline completo (`intent→plan→scout→approve→implement→run→observe→
+  diagnose→autocorrect→checkpoint→verify→proof→handoff`) só avança por transições declaradas;
+  fase fora de ordem lança `invalid_transition` (tipado) e NÃO muda a fase. `loop economy` antes
+  de `diagnose` agora reprova com `invalid_transition` (exit 1) — a permissividade antiga era o bug.
+- **P0.6 — caps incontornáveis.** Contadores (tentativas, wall-clock, tokens, falhas idênticas
+  consecutivas, thrash por hash de diff/erro) são calculados PELO MOTOR — o chamador não injeta
+  `consumed`; wall-clock vem do relógio do motor. Limite → hard halt (`blocked`). Thrashing =
+  mesma falha 3× seguidas.
+- **P1.5 — status tipado.** `finalize` retorna `completed | planned_only | handoff | blocked |
+  cancelled | not_executed`; `completed` EXIGE os 4 portões (aceites + observação fresca +
+  checkpoint verde provado + `proof.ready`).
+- Teste property-based (300×20): nenhuma sequência aleatória pula transição. `phaseAtLeast`/
+  `phaseRank` = fonte única de ordem, consumida pelo CLI. Suíte JS 990/990. QG strict 0.
+
+### Escopo honesto (deferido)
+O motor é o contrato provado. Substituir `start`/`runPipeline` pelo motor e ligar os executores
+REAIS de cada fase (implement→harness, run→supervisor, autocorrect→re-entrada) é incremental
+sobre esta base (S41.4 entrega o state-machine + caps + status; os executores reais chegam junto
+com S41.6/visual e a integração do `start`).
+
 ## [4.3.0] - 2026-07-13
 
 ### Sprint S41.3 — Instalador e create transacionais (PRD41 / PRD40 P0.9 + P0.10)
