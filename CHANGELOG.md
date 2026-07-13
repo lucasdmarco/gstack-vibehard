@@ -1,5 +1,31 @@
 # Changelog - gstack-vibehard
 
+## [4.2.0] - 2026-07-12
+
+### Sprint S41.2 — Isolamento de projeto e testes (PRD41 / PRD40 P0.3 + P0.4)
+
+A ativação por-projeto era furável: a mera existência de `.gstack/` ligava as regras, então
+um `.gstack` vazado/copiado (ex.: resíduo de teste sob `%TEMP%`) podia injetar governança e
+identidade num projeto alheio — e quebrava testes vizinhos que criavam projetos em subpastas
+do TEMP. **Ativação agora exige um marcador canônico provado, e o lado JS grava esse marcador
+de verdade** (nada de "ativado" sem hooks reais).
+
+- **P0.3 — marcador canônico `gstack.project.v1`.** `hooks/hooks/_paths.py`:
+  `find_gstack_root` só ativa com `.gstack/project.json` VÁLIDO (schema + `root` canônico
+  batendo com o diretório). Um `.gstack` nu permanece INERTE. Novos `write_project_marker`
+  (migração explícita) e `_valid_project_marker`.
+- **Espelho JS do marcador.** Novo `src/project/identity.js`
+  (`writeProjectMarker`/`readProjectMarker`/`hasValidMarker`) espelha byte-a-byte o contrato
+  do validador Python. `create` grava o marcador (mode lite/full) — projeto novo nasce ATIVO;
+  `enable` grava e **MIGRA** um `.gstack/` legado sem marcador; `status` reporta a verdade pelo
+  marcador (`PRESENTE MAS INERTE` quando falta). Teste **cross-language** prova que o marcador
+  escrito pelo JS ativa o `find_gstack_root` do Python.
+- **P0.4 — higiene e sentinela de vazamento.** Testes com `mkdtemp()` sem cleanup passam a
+  limpar; nova sentinela `test_no_activation_leak.py` falha se a árvore de TEMP ativar qualquer
+  projeto (pega inclusive um marcador VÁLIDO vazado) ou se sobrar `.gstack` na raiz do TEMP.
+  Fixtures de teste migradas para `mark_project`.
+- Suíte JS 975/975, Python 84/84. QG strict `blocking_severity_count: 0`.
+
 ## [4.1.0] - 2026-07-12
 
 ### Sprint S41.1 — Quality Gate fail-closed (PRD41 / PRD40 P0.1)
