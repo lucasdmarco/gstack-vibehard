@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, rmSync
 import { join, resolve, relative, isAbsolute } from "path"
 import { allocatePort } from "./ports.js"
 import { stripBom } from "../util/json.js"
+import { ensureRoutedChildEnv } from "../tools/headroom-policy.js"
 
 /**
  * Supervisor de runtime (PRD 12 PR4): consome o Runtime Manifest V2 e sobe/derruba
@@ -89,16 +90,38 @@ function buildServicePlan(s, env, port) {
     readinessTimeout: readinessTimeoutOf(s),
   }
 }
+/**
+ * Resolve o overlay de env ROTEADO pelo Headroom (PRD41 S41.8 / P1.4) — o chamador de
+ * PRODUÇÃO de `ensureRoutedChildEnv`. Só roteia com `opts.routing.enabled` (Full+opt-in);
+ * senão devolve null → env do child intocado. Nunca muta env global (só monta objetos).
+ */
+const routingArgs = (r) => ({
+  cwd: r.cwd || process.cwd(), baseEnv: {}, mode: r.mode || "full",
+  env: r.env || process.env, start: r.start, status: r.status,
+})
+async function resolveChildRoutingOverlay(opts) {
+  const r = opts.routing
+  if (!r || !r.enabled) return null
+  const res = await ensureRoutedChildEnv(routingArgs(r))
+  return res.routed ? res.env : null
+}
+
+async function planService(s, ctx) {
+  const env = safeBaseEnv(ctx.source)
+  const port = await applyPort(s, env, ctx.allocate)
+  applySecrets(s, ctx.source, env)
+  if (ctx.routingOverlay) Object.assign(env, ctx.routingOverlay)
+  return buildServicePlan(s, env, port)
+}
+
 export async function planStart(manifest, opts = {}) {
-  const source = opts.envSource || opts.env || {}
-  const allocate = opts.allocatePort || ((p) => allocatePort(p))
-  const plans = []
-  for (const s of manifest.services || []) {
-    const env = safeBaseEnv(source)
-    const port = await applyPort(s, env, allocate)
-    applySecrets(s, source, env)
-    plans.push(buildServicePlan(s, env, port))
+  const ctx = {
+    source: opts.envSource || opts.env || {},
+    allocate: opts.allocatePort || ((p) => allocatePort(p)),
+    routingOverlay: await resolveChildRoutingOverlay(opts),
   }
+  const plans = []
+  for (const s of manifest.services || []) plans.push(await planService(s, ctx))
   return plans
 }
 
