@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
@@ -15,8 +15,10 @@ const imp = (rel) => import(`${pathToFileURL(path.join(repoRoot, rel))}?t=${Date
 
 const pollOk = async () => ({ ok: true, status: 200 })
 const pollDead = async () => ({ ok: false, status: null, timedOut: true })
-const cleanDriver = { async observe(_url, { screenshotPath }) { return { screenshotPath, console: [], network: [], a11y: { violations: [] } } } }
-const brokenDriver = { async observe(_url, { screenshotPath }) { return { screenshotPath, console: [{ type: "error", text: "boom" }], network: [], a11y: { violations: [] } } } }
+// S41.6: o gate verifica a evidência no disco → o driver de teste ESCREVE o screenshot.
+async function writeShot(p) { if (p) { await mkdir(path.dirname(p), { recursive: true }); await writeFile(p, "PNG") } }
+const cleanDriver = { async observe(_url, { screenshotPath }) { await writeShot(screenshotPath); return { screenshotPath, console: [], network: [], a11y: { checked: true, violations: [] } } } }
+const brokenDriver = { async observe(_url, { screenshotPath }) { await writeShot(screenshotPath); return { screenshotPath, console: [{ type: "error", text: "boom" }], network: [], a11y: { checked: true, violations: [] } } } }
 
 test("summarizeObservation: só 'validated' conta como visualmente válido", async () => {
   const { summarizeObservation } = await imp("src/skills/observe-layer.js")
