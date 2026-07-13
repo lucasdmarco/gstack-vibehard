@@ -67,7 +67,10 @@ jobs:
       - name: Check ESM imports
         run: grep -rn 'require(' src/ --include='*.js' && exit 1 || exit 0
       - name: Check no hardcoded paths
-        run: grep -rn '/Users/\|/home/' src/ --include='*.js' && exit 1 || exit 0
+        # Pega path absoluto de home REAL (em string literal); ignora linhas de comentário
+        # (// ou *) que só DESCREVEM o conceito — ex.: workspace.js documenta a heurística
+        # HOME-like citando /Users//home sem hardcodear nada.
+        run: grep -rn '/Users/\|/home/' src/ --include='*.js' | grep -vE ':[0-9]+:[[:space:]]*(//|\*)' && exit 1 || exit 0
       - name: Check shebang
         run: head -1 src/index.js | grep -q '#!/usr/bin/env node'
       - name: Agent Factory drift guard (PRD 13 PR13.1)
