@@ -1,5 +1,33 @@
 # Changelog - gstack-vibehard
 
+## [4.3.0] - 2026-07-13
+
+### Sprint S41.3 — Instalador e create transacionais (PRD41 / PRD40 P0.9 + P0.10)
+
+Instalação/scaffold com escrita global deixou de ser "best-effort": qualquer falha no meio
+reverte tudo, e o que o dry-run mostra é, por construção, o que a execução faz. Segredo nunca
+vira view.
+
+- **P0.9 — journal transacional.** Novo `src/installer/journal.js`
+  (`InstallJournal`/`runTransaction`) captura o estado PRÉVIO de cada escrita (arquivo ausente
+  vs. bytes originais; dir criado) e, em QUALQUER falha, reverte TUDO ao byte exato — rollback
+  automático intrínseco (não um `uninstall --restore-only` manual).
+- **Plano único (dry-run === execução).** `src/installer/operation-plan.js`: `buildAtomicPlan`
+  é o plano que o dry-run RENDERIZA (path+hash) e a execução RODA pelo journal — proibido
+  divergir. O global só entra no plano se ainda não existir (não clobbera config do usuário).
+- **P0.10 — `.env` nunca exposto.** `assertNoEnvExposure` rejeita qualquer `.env`/`.env.*`
+  numa lista de exposição. `create` parou de escrever `~/.atomic/config.toml` com `.env` no
+  `default_expose` (a view do projeto já o excluía; a global não — inconsistência fechada).
+- Testes: fault-injection reverte byte-a-byte; commit mantém; dry-run===execução (paths);
+  a trava pega `.env`/`.env.local`/aninhados; fixture de create → zero `.env` exposto.
+- Suíte JS 980/980, Python 84/84. QG strict `blocking_severity_count: 0`.
+
+### Escopo honesto (deferido)
+Journal e plano cobrem as escritas Atomic (project + global). A extensão do plano/journal a
+TODAS as fases do Full (ECC/AgentMemory/Casdoor com ownership por projectId) e a matriz
+Lite×Full versionada seguem como trabalho incremental sobre esta base; o núcleo transacional
+e a trava anti-`.env` estão provados.
+
 ## [4.2.0] - 2026-07-12
 
 ### Sprint S41.2 — Isolamento de projeto e testes (PRD41 / PRD40 P0.3 + P0.4)
