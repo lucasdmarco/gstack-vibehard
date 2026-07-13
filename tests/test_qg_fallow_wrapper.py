@@ -101,7 +101,9 @@ class FallowWrapperTest(unittest.TestCase):
     def _run_with_fallow_payload(self, payload, exit_code):
         """Helper: roda o qg.py com um npx falso que cospe `payload` e sai com `exit_code`."""
         import tempfile as _tf
+        import shutil as _sh
         tmp = _tf.mkdtemp()
+        self.addCleanup(_sh.rmtree, tmp, ignore_errors=True)  # P0.4: sem vazar temp
         tmp_path = Path(tmp)
         fake_bin = tmp_path / "bin"
         fake_bin.mkdir()

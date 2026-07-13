@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -40,6 +41,7 @@ class QgFailClosedTest(unittest.TestCase):
 
     def _run(self, payload, exit_code, extra_args=None):
         tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)  # P0.4: sem vazar temp
         tmp_path = Path(tmp)
         fake_bin = tmp_path / "bin"
         fake_bin.mkdir()
