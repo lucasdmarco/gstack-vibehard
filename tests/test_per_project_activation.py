@@ -14,7 +14,7 @@ REPO = Path(__file__).resolve().parents[1]
 HOOKS = REPO / "hooks" / "hooks"
 sys.path.insert(0, str(HOOKS))
 
-from _paths import find_gstack_root, is_gstack_project  # noqa: E402
+from _paths import find_gstack_root, is_gstack_project, write_project_marker  # noqa: E402
 
 
 def run_hook(name, stdin_text, cwd=None):
@@ -26,12 +26,31 @@ def run_hook(name, stdin_text, cwd=None):
 
 
 class FindGstackRootTest(unittest.TestCase):
-    def test_projeto_com_gstack_detectado(self):
+    def test_projeto_com_gstack_MARCADO_detectado(self):
         with tempfile.TemporaryDirectory() as tmp:
-            proj = Path(tmp) / "proj"
-            (proj / ".gstack").mkdir(parents=True)
+            proj = (Path(tmp) / "proj").resolve()
+            (proj / "src").mkdir(parents=True)
+            write_project_marker(proj)  # marcador canônico gstack.project.v1
             self.assertEqual(find_gstack_root(str(proj / "src")), proj)
             self.assertTrue(is_gstack_project(str(proj)))
+
+    def test_gstack_SEM_marcador_permanece_inerte(self):
+        # PRD41 S41.2 / P0.3: `.gstack/` vazado/copiado (sem project.json válido)
+        # NÃO ativa — como o %TEMP%/.gstack que furava projetos alheios.
+        with tempfile.TemporaryDirectory() as tmp:
+            proj = Path(tmp) / "vazado"
+            (proj / ".gstack").mkdir(parents=True)  # bare, sem marcador
+            self.assertIsNone(find_gstack_root(str(proj)))
+            self.assertFalse(is_gstack_project(str(proj)))
+
+    def test_marcador_com_root_divergente_nao_ativa(self):
+        # root canônico do marcador tem que corresponder ao diretório (anti-cópia).
+        with tempfile.TemporaryDirectory() as tmp:
+            proj = (Path(tmp) / "proj").resolve()
+            write_project_marker(proj)
+            moved = Path(tmp) / "movido"
+            (proj).rename(moved)  # marcador aponta pro root antigo → inválido no novo
+            self.assertIsNone(find_gstack_root(str(moved)))
 
     def test_projeto_sem_gstack_retorna_none(self):
         with tempfile.TemporaryDirectory() as tmp:
