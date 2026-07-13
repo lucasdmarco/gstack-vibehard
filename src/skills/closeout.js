@@ -12,12 +12,19 @@ import { join, dirname } from "path"
 
 export const CLOSEOUT_SCHEMA = "gstack.closeout.v1"
 
+// PRD41 S41.9 (P1.8): `fresh` só é verdade se o refresh RODOU e ficou ok. Um refresh que
+// falhou/degradou REMOVE o claim de frescor (o trabalho não se perde, mas não se finge que
+// readiness/contexto foram atualizados). Transacional: sem prova, sem claim.
+const isFresh = (r) => r.ran === true && r.state === "ok"
+
 export function buildCloseout({ runId, command, status, changed = [], toolsRefresh = null, proof = null } = {}) {
+  const refresh = toolsRefresh || { ran: false, state: "not_run" }
   return {
     schemaVersion: CLOSEOUT_SCHEMA, generatedAt: new Date().toISOString(),
     runId: runId ?? null, command: command ?? null, status: status ?? "unknown",
     changedFiles: [...changed],
-    toolsRefresh: toolsRefresh || { ran: false, state: "not_run" },
+    toolsRefresh: refresh,
+    fresh: isFresh(refresh),
     proof: proof || { ran: false, state: "not_run" },
   }
 }

@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "fs"
 import { join, dirname } from "path"
 import { fileURLToPath } from "url"
 import { HARNESS_CAPABILITIES } from "./capabilities.js"
+import { gradeClaimStatus, contractFor, NOT_PROVED } from "./claim-contract.js"
 
 /**
  * Auditor anti-placebo (PRD Fase 3 §1). DETERMINÍSTICO, sem LLM, somente-leitura:
@@ -277,9 +278,16 @@ function auditScope(root) {
   }
 }
 
+// PRD41 S41.9 (P1.6): rebaixa REAL sem contrato comportamental para NOT_PROVED.
+function applyBehavioral(claim) {
+  const status = gradeClaimStatus(claim.status, contractFor(claim.id))
+  return status === claim.status ? claim : { ...claim, status, notProved: status === NOT_PROVED }
+}
+
 export function audit(opts = {}) {
   const root = opts.root || DEFAULT_ROOT
   const { has, read } = reader(root)
-  const claims = CLAIM_BUILDERS.map((build) => build(has, read))
-  return { generatedAt: new Date().toISOString(), root: ".", scope: auditScope(root), claims, summary: tallySummary(claims) }
+  const raw = CLAIM_BUILDERS.map((build) => build(has, read))
+  const claims = opts.behavioral ? raw.map(applyBehavioral) : raw
+  return { generatedAt: new Date().toISOString(), root: ".", behavioral: Boolean(opts.behavioral), scope: auditScope(root), claims, summary: tallySummary(claims) }
 }
