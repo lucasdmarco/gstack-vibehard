@@ -1,5 +1,31 @@
 # Changelog - gstack-vibehard
 
+## [4.9.0] - 2026-07-13 — Release Candidate (fecha o programa PRD41)
+
+### Sprint S41.9 — Templates vivos, honestidade do Dream Audit e RC (PRD41 / PRD40 P1.6+P1.7+P1.8)
+
+Fecha o programa de recuperação de integridade v4. A honestidade do audit sobe de nível, o
+closeout vira transacional e um checklist rastreável declara a prontidão de RC.
+
+- **P1.6 — Dream Audit comportamental.** `src/dream/claim-contract.js`: um claim só é `REAL` COM
+  contrato comportamental (evidenceAdapter + e2eCommand + negativeControl + freshness). Presença de
+  arquivo deixa de valer — vira `NOT_PROVED`. `audit({behavioral:true})` aplica a queda honesta;
+  RISK/PLACEBO ficam intactos (o proof não é afetado).
+- **P1.8 — Closeout transacional.** `buildCloseout` ganha `fresh`: só verdade se o refresh RODOU e
+  ficou `ok`; refresh falho/degradado REMOVE o claim de frescor (o trabalho não se perde, mas não se
+  finge atualização).
+- **RC — checklist DoD §10.** `src/dream/rc-checklist.js` mapeia os 10 P0 + 8 P1 do PRD40 →
+  sprint/versão/prova; `rcReadiness` só dá `ready:true` com TODOS os P0 `delivered`; um P0 pendente
+  derruba (fail-closed). Suíte JS 1031/1031. QG strict 0.
+
+### Estado do programa PRD41 (S41.0 → S41.9)
+Os **10 bloqueadores P0** do PRD40 estão entregues e provados (cada um com controle negativo):
+P0.1 QG fail-closed · P0.2 source-parity · P0.3 isolamento de projeto · P0.4 isolamento de testes ·
+P0.5 ordem real do loop · P0.6 caps incontornáveis · P0.7 checkpoints seguros · P0.8 Action Kernel
+governando · P0.9 instalador transacional · P0.10 `.env` nunca exposto. P1.1–P1.6/P1.8 entregues;
+**P1.7 (matriz E2E de templates nos 3 SOs em CI) fica como incremento honesto** — declarado `partial`
+no checklist.
+
 ## [4.8.0] - 2026-07-13
 
 ### Sprint S41.8 — Headroom roteado de verdade (PRD41 / PRD40 P1.4)
