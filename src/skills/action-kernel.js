@@ -214,10 +214,8 @@ export function actionsPath(root, runId) {
   return join(root, ".gstack", "runs", runId, "actions.jsonl")
 }
 
-/** Junta pre+post numa entrada única do ledger (o que um produtor de ação grava). */
-export function buildActionRecord({ action = {}, ctx = {}, result = {} } = {}) {
-  const pre = preAction(action, ctx)
-  const post = postAction(action, result)
+/** Junta pre+post numa entrada única do ledger. Fonte única do formato de recibo. */
+function mergePrePost(pre, post) {
   return {
     tool: post.tool, harness: post.harness,
     decision: pre.decision, gatesExecuted: pre.gatesExecuted,
@@ -226,6 +224,44 @@ export function buildActionRecord({ action = {}, ctx = {}, result = {} } = {}) {
     inputDigest: post.inputDigest, outputDigest: post.outputDigest, summary: post.summary,
     preElapsedMs: Number(pre.elapsedMs.toFixed(3)),
   }
+}
+
+/** Junta pre+post numa entrada única do ledger (o que um produtor de ação grava). */
+export function buildActionRecord({ action = {}, ctx = {}, result = {} } = {}) {
+  return mergePrePost(preAction(action, ctx), postAction(action, result))
+}
+
+const denyReasons = (pre) => pre.checks.filter((c) => c.level === "deny").map((c) => c.name).join(",") || "policy"
+
+async function runExecute(execute, action) {
+  if (typeof execute !== "function") return {}
+  return (await execute(action)) || {}
+}
+
+function persistGoverned({ root, runId, entry, io }) {
+  if (root && runId) return recordAction({ root, runId, entry, io })
+  return { at: new Date().toISOString(), ...sanitizeEntry(entry) }
+}
+
+/**
+ * ADAPTER ÚNICO do Action Kernel (PRD41 S41.5 / PRD40 P0.8) — governa uma ação REAL:
+ * `preAction` decide; se `deny` E o harness é ENFORCED, `execute` NUNCA roda e o recibo
+ * registra a negação; senão executa, gera recibo (`postAction`) e grava UMA entrada no
+ * ledger. Harness instrucional (`ctx.enforced=false`) declara `advisory:true` no recibo e
+ * NÃO simula bloqueio (a negação é registrada mas a ação segue — honestidade P0.8 unit 3).
+ * É o ponto por onde CLI/hooks/adapters passam — ninguém reimplementa o gate.
+ */
+export async function runGovernedAction({ action = {}, ctx = {}, execute, root, runId, io = defaultIo } = {}) {
+  const pre = preAction(action, ctx)
+  const enforced = ctx.enforced !== false
+  const blocked = pre.decision === "deny" && enforced
+  const result = blocked
+    ? { ok: false, exitCode: 126, summary: `denied by kernel: ${denyReasons(pre)}` }
+    : await runExecute(execute, action)
+  const post = postAction(action, result)
+  const entry = { ...mergePrePost(pre, post), executed: !blocked, enforced, advisory: !enforced }
+  const record = persistGoverned({ root, runId, entry, io })
+  return { decision: pre.decision, enforced, executed: !blocked, blocked, receipt: post, record, pre }
 }
 
 /** Grava uma ação no ledger do run (sanitizada: sem campo proibido, redigida). */
