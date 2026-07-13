@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises"
 import { existsSync, readFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
@@ -12,8 +12,14 @@ import { pathToFileURL } from "node:url"
 const repoRoot = path.resolve(import.meta.dirname, "..")
 const imp = (rel) => import(`${pathToFileURL(path.join(repoRoot, rel))}?t=${Date.now()}`)
 
-// Driver fake: devolve a observação que o teste quiser.
-const fakeDriver = (obs) => ({ observe: async (url, { screenshotPath }) => ({ screenshotPath, console: [], network: [], a11y: { violations: [] }, ...obs }) })
+// Driver fake: devolve a observação que o teste quiser. Escreve o screenshot no disco
+// (S41.6: o gate agora VERIFICA a evidência — path declarado sem arquivo = falha).
+const fakeDriver = (obs) => ({
+  observe: async (url, { screenshotPath }) => {
+    if (screenshotPath) { await mkdir(path.dirname(screenshotPath), { recursive: true }); await writeFile(screenshotPath, "PNG") }
+    return { screenshotPath, console: [], network: [], a11y: { checked: true, violations: [] }, ...obs }
+  },
+})
 
 test("evaluateVisualGate: sem driver de navegador → needs_browser (BLOQUEIA, nunca finge verde)", async () => {
   const { evaluateVisualGate } = await imp("src/skills/visual-gate.js")
