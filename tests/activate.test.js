@@ -28,6 +28,10 @@ test("enable cria .gstack/ e status reflete ATIVO", async () => {
     assert.equal(prof.mode, "observe", "adoção em modo observe (não bloqueia)")
     assert.equal(prof.tokenBudget, "standard")
     assert.ok(typeof prof.profile === "string" && prof.profile.length > 0, "arquétipo detectado")
+    // P0.3: enable tem que gravar o marcador canônico, senão o `.gstack/` fica INERTE
+    const marker = JSON.parse(await readFile(path.join(tmp, ".gstack", "project.json"), "utf-8"))
+    assert.equal(marker.schemaVersion, "gstack.project.v1", "marcador canônico gravado")
+    assert.equal(marker.activated, true)
     const s = await activateCommand("status", [], { cwd: tmp })
     assert.equal(s.status, "active")
   } finally {
@@ -65,6 +69,24 @@ test("enable reativa preservando dados (.gstack-disabled -> .gstack)", async () 
     assert.ok(!existsSync(path.join(tmp, ".gstack-disabled")), "removeu .gstack-disabled/")
     const data = await readFile(path.join(tmp, ".gstack", "plans.md"), "utf-8")
     assert.equal(data, "meu plano", "dados preservados na reativação")
+  } finally {
+    await rm(tmp, { recursive: true, force: true })
+  }
+})
+
+test("enable MIGRA um .gstack/ legado (sem marcador) para ativo de verdade", async () => {
+  const tmp = await mkdtemp(path.join(tmpdir(), "gstack-act-"))
+  try {
+    const { activateCommand } = await load()
+    // Simula projeto de ANTES do P0.3: `.gstack/` existe mas sem project.json.
+    await mkdir(path.join(tmp, ".gstack"), { recursive: true })
+    const before = await activateCommand("status", [], { cwd: tmp })
+    assert.equal(before.status, "inert", "`.gstack/` sem marcador = PRESENTE MAS INERTE")
+    const r = await activateCommand("enable", [], { cwd: tmp })
+    assert.equal(r.status, "migrated")
+    assert.ok(existsSync(path.join(tmp, ".gstack", "project.json")), "gravou o marcador")
+    const after = await activateCommand("status", [], { cwd: tmp })
+    assert.equal(after.status, "active", "após migrar, ATIVO de verdade")
   } finally {
     await rm(tmp, { recursive: true, force: true })
   }

@@ -24,6 +24,7 @@ import { nextStepsContent } from "../runtime/workspace.js"
 import { buildIntegrationsRegistry } from "../printing-press/registry.js"
 import { buildContextRegistry, DOC_SOURCES as CONTEXT_DOC_SOURCES } from "../context-docs/registry.js"
 import { DEFAULT_LOOP_BUDGET } from "../loop-budget/policy.js"
+import { writeProjectMarker } from "../project/identity.js"
 
 const HOME = resolve(homedir() || process.env.USERPROFILE || process.env.HOME || "/tmp")
 
@@ -705,6 +706,9 @@ function writeGstackManifests(gstackDir, { projectName, now, isLite, tpl, templa
   // Context docs + loop budget (governança de workflows agênticos; delegação opt-in).
   writeJson(join(gstackDir, "context.json"), buildContextRegistry())
   writeJson(join(gstackDir, "loop-budget.json"), DEFAULT_LOOP_BUDGET)
+  // Marcador CANÔNICO (P0.3): projeto NOVO já nasce ATIVO de verdade — sem ele os
+  // hooks Python veriam este `.gstack/` como inerte (o falso-verde que o P0.3 mata).
+  writeProjectMarker(dirname(gstackDir), { mode: isLite ? "lite" : "full", createdBy: "gstack_vibehard:create" })
 }
 function writeContextDocDirs(projectDir) {
   for (const rel of Object.values(CONTEXT_DOC_SOURCES)) {
