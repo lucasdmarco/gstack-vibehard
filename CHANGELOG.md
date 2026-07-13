@@ -1,5 +1,32 @@
 # Changelog - gstack-vibehard
 
+## [4.5.0] - 2026-07-13
+
+### Sprint S41.5 — Action Kernel ligado + Gate Registry central (PRD41 / PRD40 P0.8 + P1.2 + P1.3)
+
+O kernel deixou de ser só um conjunto de primitivas e passou a GOVERNAR ações reais por um
+ponto único; o `proof` deixou de decidir ad-hoc quem bloqueia e passou a consumir um registro
+central de gates.
+
+- **P0.8 — adapter único.** `runGovernedAction({action,ctx,execute,root,runId})` (em
+  `action-kernel.js`) é o ponto por onde ações passam: `preAction` decide → se `deny` E o
+  harness é ENFORCED, `execute` NUNCA roda e o recibo registra a negação (exit 126) → senão
+  executa → `postAction` → UMA entrada no ledger `.gstack/runs/<runId>/actions.jsonl`. Harness
+  instrucional (`ctx.enforced=false`) declara `advisory:true` e NÃO simula bloqueio.
+- **P1.3 — conformance / controle negativo.** Teste prova que uma ação negada NÃO chama
+  `execute`: remover o gate do kernel faz o teste falhar (o enforcement é verificável por caminho).
+- **P1.2 — Gate Registry central.** Novo `src/skills/gate-registry.js`: cada gate do proof
+  declara `id/version/severity(hard|advisory)/appliesTo/evidenceKey/toolMissing/negativeControl`.
+  `resolveGateOutcomes` monta blockers×warnings PELO registry — `hard` bloqueia, `advisory` só
+  avisa (Headroom routing nunca reprova). `buildProof` consome o registry (paridade provada);
+  `validateGateContract` garante contrato completo.
+- Suíte JS 999/999. QG strict `blocking_severity_count: 0`.
+
+### Escopo honesto (deferido)
+Falta ligar `post_tool_use_review.py` para DELEGAR ao kernel via CLI bridge e unificar o ledger
+do kernel com VFA/provenance numa fonte só — incremental sobre o adapter e o registry desta base
+(o adapter, o ledger por-run e o registro central já são reais e provados).
+
 ## [4.4.0] - 2026-07-13
 
 ### Sprint S41.4 — Loop Engine canônico (PRD41 / PRD40 P0.5 + P0.6 + P1.5)

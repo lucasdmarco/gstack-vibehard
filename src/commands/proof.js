@@ -4,6 +4,7 @@ import { audit } from "../dream/auditor.js"
 import { buildReadiness } from "../tools/readiness.js"
 import { routeDefaultOn, headroomPendency } from "../tools/headroom-policy.js"
 import { evaluateSkillGateRelease } from "../skills/evidence.js"
+import { resolveGateOutcomes, buildGateRegistry } from "../skills/gate-registry.js"
 import { success, warn, error, info, section } from "../cli/index.js"
 
 /**
@@ -102,8 +103,12 @@ export function buildProof(opts = {}) {
   const readiness = checkReadiness(deps, cwd, profile)
   const gitTree = checkGitTree(deps, cwd)
   const skillGates = deps.skillGateRelease ? deps.skillGateRelease(cwd) : evaluateSkillGateRelease({ root: cwd })
-  const blockers = [verify.blocker, dream.blocker, readiness.graphify.blocker, gitTree.blocker, skillGates.blocker].filter(Boolean)
-  const warnings = [...readiness.warnings, readiness.graphify.warning].filter(Boolean)
+  // PRD41 S41.5 (P1.2): o proof não decide mais ad-hoc quem bloqueia — o Gate Registry
+  // central declara a severidade (hard×advisory) de cada gate e resolve blockers×warnings.
+  const checks = { verify, dreamAudit: dream, graphifyFreshness: readiness.graphify, gitTree, skillGates, toolReadiness: readiness.tools, headroomRouting: readiness.headroom }
+  const outcomes = resolveGateOutcomes({ profile, checks })
+  const blockers = outcomes.blockers
+  const warnings = [...outcomes.warnings, ...readiness.warnings].filter(Boolean)
   return {
     schemaVersion: PROOF_SCHEMA,
     profile,
@@ -111,7 +116,8 @@ export function buildProof(opts = {}) {
     ready: blockers.length === 0,
     blockers,
     warnings,
-    checks: { verify, dreamAudit: dream, toolReadiness: readiness.tools, graphifyFreshness: readiness.graphify, headroomRouting: readiness.headroom, gitTree, skillGates },
+    gateRegistry: buildGateRegistry().schemaVersion,
+    checks: { ...checks },
   }
 }
 
