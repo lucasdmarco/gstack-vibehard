@@ -132,3 +132,65 @@ test("start: --design-system none libera (opt-out explícito) e executa", async 
     assert.ok(existsSync(path.join(routeDir, "design-system-gate.json")), "evidência do gate no run")
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })
+
+// ── Design Direction v2 (PRD42 S42.2): gate valida CONTEÚDO, não só status ────────
+test("v2: DS que declara conteúdo (generated) mas com tokens VAZIOS é bloqueado", async () => {
+  const { evaluatePreWriteGate } = await imp("src/skills/design-system.js")
+  const dir = mkProj("gstack-dsv2-")
+  try {
+    writeGstack(dir, "design-system.json", { schemaVersion: "gstack.design-system.v2", status: "generated", tokens: { colors: {}, typography: {} } })
+    const g = evaluatePreWriteGate({ root: dir, uiIntended: true })
+    assert.equal(g.blocked, true, "conteúdo declarado e vazio deve bloquear (v1 passava só por status)")
+    assert.match(g.violations[0].reason, /falta.*(colors|typography|direction)/i)
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+test("v2: DS com direção + tokens (colors E typography) libera a escrita de UI", async () => {
+  const { evaluatePreWriteGate } = await imp("src/skills/design-system.js")
+  const dir = mkProj("gstack-dsv2ok-")
+  try {
+    writeGstack(dir, "design-system.json", {
+      schemaVersion: "gstack.design-system.v2", status: "generated",
+      direction: "Dark, minimal, alto contraste", tokens: { colors: { primary: "#0A0A0A" }, typography: { body: "Inter" } },
+    })
+    assert.equal(evaluatePreWriteGate({ root: dir, uiIntended: true }).blocked, false)
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+test("v2 migração: artefato v1 (só engine/path) é grandfathered — NÃO quebra projetos v1", async () => {
+  const { evaluatePreWriteGate, resolveDesignSystem } = await imp("src/skills/design-system.js")
+  const dir = mkProj("gstack-dsv1-")
+  try {
+    writeGstack(dir, "design-system.json", { schemaVersion: "gstack.design-system.v1", engine: "custom", path: "ds/", status: "complete" })
+    assert.equal(evaluatePreWriteGate({ root: dir, uiIntended: true }).blocked, false, "v1 externo continua liberando")
+    const ds = resolveDesignSystem({ root: dir })
+    assert.equal(ds.schemaVersion, "gstack.design-system.v2", "migrado para v2 na leitura")
+    assert.equal(ds.declaresContent, false, "declaração externa não exige conteúdo inline")
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+test("v2: validateDesignContent + migrateDesignSystem (unidade + CONTROLE NEGATIVO)", async () => {
+  const { validateDesignContent, migrateDesignSystem, DESIGN_SYSTEM_SCHEMA_V2 } = await imp("src/skills/design-system.js")
+  assert.equal(validateDesignContent({ direction: "x", tokens: { colors: { a: 1 }, typography: { b: 2 } } }).ok, true)
+  const bad = validateDesignContent({ direction: "", tokens: {} })
+  assert.equal(bad.ok, false)
+  assert.deepEqual(bad.missing, ["direction", "tokens.colors", "tokens.typography"])
+  assert.equal(validateDesignContent(null).ok, false, "nulo nunca é válido")
+  // migração idempotente + preserva campos
+  const m = migrateDesignSystem({ schemaVersion: "gstack.design-system.v1", status: "complete", path: "z" })
+  assert.equal(m.schemaVersion, DESIGN_SYSTEM_SCHEMA_V2)
+  assert.equal(m.migratedFrom, "gstack.design-system.v1")
+  assert.equal(m.path, "z", "migração é não-destrutiva")
+  assert.equal(migrateDesignSystem(m).schemaVersion, DESIGN_SYSTEM_SCHEMA_V2, "idempotente")
+})
+
+test("v2: registerDesignSystem grava schema v2 (declaração externa, contentValidated:false)", async () => {
+  const { registerDesignSystem } = await imp("src/skills/design-system.js")
+  const dir = mkProj("gstack-dsreg-")
+  try {
+    registerDesignSystem({ root: dir, choice: "my-ds/" })
+    const ds = JSON.parse(readFileSync(path.join(dir, ".gstack", "design-system.json"), "utf8"))
+    assert.equal(ds.schemaVersion, "gstack.design-system.v2")
+    assert.equal(ds.contentValidated, false)
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
