@@ -55,6 +55,13 @@ test("start: executa o plano após confirmação (UI+exec injetados) e persiste"
     assert.equal(r.result.status, "done")
     assert.ok(ran.some((c) => c.includes("create loja") && c.includes("--lite")))
     assert.ok(existsSync(path.join(tmp, ".gstack", "plans", r.plan.id, "plan.json")), "plano persistido")
+    // S42.1: Product Brief persistido como artefato vivo (decisões + aceites com verificador/pending)
+    const briefPath = path.join(tmp, ".gstack", "plans", r.plan.id, "brief.json")
+    assert.ok(existsSync(briefPath), "brief.json persistido")
+    const brief = JSON.parse(await (await import("node:fs/promises")).readFile(briefPath, "utf8"))
+    assert.equal(brief.schema, "gstack.product-brief.v1")
+    assert.ok(brief.acceptances.length >= 3, "brief tem aceites")
+    assert.ok(brief.decisions.every((d) => d.source), "toda decisão tem fonte rastreada")
   } finally {
     await rm(tmp, { recursive: true, force: true })
   }

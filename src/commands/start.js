@@ -83,13 +83,16 @@ function printNonInteractiveHelp() {
   info("  gstack_vibehard plan run <id> --yes                    # executa")
 }
 
-/** Persiste plan.json + plan.md + status.json (PRD18: artefato humano E máquina). */
-function persistPlanArtifacts(cwd, plan) {
+/** Persiste plan.json + plan.md + status.json (+ brief.json S42.1). Artefato humano E máquina. */
+function persistPlanArtifacts(cwd, plan, brief) {
   const planDir = join(cwd, ".gstack", "plans", plan.id)
   mkdirSync(planDir, { recursive: true })
   writeFileSync(join(planDir, "plan.json"), JSON.stringify(plan, null, 2) + "\n")
   writeFileSync(join(planDir, "plan.md"), renderPlanMarkdown(plan))
   writeFileSync(join(planDir, "status.json"), JSON.stringify({ id: plan.id, status: "ready", steps: {} }, null, 2) + "\n")
+  // Product Brief (S42.1): decisões com fonte + aceites com verificador/pending — brief vivo
+  // que o closeout (S42.10) reidrata. Só grava se o wizard o produziu (retrocompat).
+  if (brief) writeFileSync(join(planDir, "brief.json"), JSON.stringify(brief, null, 2) + "\n")
   return planDir
 }
 
@@ -98,8 +101,10 @@ function wizardInputs(flags, opts, objective) {
     objective,
     projectName: opts.projectName !== undefined ? opts.projectName : flags.projectName,
     mode: opts.mode || flags.mode,
-    // --yes = zero perguntas: o wizard usa o modo recomendado sem select.
-    nonInteractive: flags.yes === true || opts.yes === true,
+    // --yes = zero perguntas: o wizard usa o modo recomendado sem select. Sem TTY e sem
+    // `select` injetado também é não-interativo — senão as decisões do intake (S42.1)
+    // penduram no stdin (CI/pipe/background). Mesma regra dos outros gates: canPromptSelect.
+    nonInteractive: flags.yes === true || opts.yes === true || !canPromptSelect(opts),
   }
 }
 
@@ -222,8 +227,8 @@ async function runStartProof(cwd, json, opts) {
 }
 
 /** Persiste, confirma e roda o pipeline. Retorna o contrato público do start. */
-async function confirmAndRunPipeline(plan, flags, opts, json, cwd) {
-  const planDir = persistPlanArtifacts(cwd, plan)
+async function confirmAndRunPipeline(plan, flags, opts, json, cwd, brief) {
+  const planDir = persistPlanArtifacts(cwd, plan, brief)
   if (!json) printPlanHuman(plan)
 
   // Rota de skills DECLARADA antes do confirm (29.2): pergunta intake se frontend.
@@ -326,7 +331,7 @@ export async function startCommand(args = [], opts = {}) {
   if (!(await workspaceGuard(cwd, opts))) return { executed: false, guarded: true }
   const res = await collectPlan(flags, opts, objective, json, cwd)
   if (!res) return
-  return confirmAndRunPipeline(res.plan, flags, opts, json, cwd)
+  return confirmAndRunPipeline(res.plan, flags, opts, json, cwd, res.brief)
 }
 
 function stageIcon(status) {
