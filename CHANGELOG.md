@@ -1,5 +1,19 @@
 # Changelog - gstack-vibehard
 
+## [4.20.0] - 2026-07-14 — Handoff / reidratação compacta (PRD42 S42.10)
+
+Abre a Fase 3 (fechamento). Ao fechar um ciclo, produz um "brief vivo" para retomar a sessão sem
+reler tudo — com honestidade sobre tokens e economia.
+
+- **`src/project-plan/handoff.js`** (schema `gstack.handoff.v1`): `buildHandoff` (objetivo/mode/
+  aceites do Product Brief S42.1 + estado + threads abertas; sem brief não inventa). `estimateTokens`
+  **SEMPRE rotulado `estimated`** (heurística ~4 chars/token, nunca "measured"). `resumeBenchmark`
+  (handoff vs leitura integral; economia rotulada `estimated`). `headroomClaim`: **sem `routed` não
+  há claim** (`callable_not_routed`); com routing, exige delta MEDIDO no ledger — nunca inventa número.
+- **Testes** `handoff_rehydration`: tokens sempre estimated; brief vivo + threads (sem brief=nulo);
+  benchmark rotula economia como estimada; headroom sem routing/sem delta → sem claim (controles
+  negativos); claim válido só com routed+delta medido. QG strict 0; lint 0; typecheck limpo.
+
 ## [4.19.0] - 2026-07-14 — Debug científico (PRD42 S42.9) — FECHA A FASE 2
 
 Método sobre chute: um bug percorre `reported → reproduced → hypothesis → fix_applied →
