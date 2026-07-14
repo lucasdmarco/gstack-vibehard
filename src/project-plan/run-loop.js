@@ -11,6 +11,7 @@ import { scout } from "../context-docs/scout.js"
 import { recordEvidence, writeTaskMd } from "./evidence-ledger.js"
 import { buildContextPack } from "../skills/context-pack.js"
 import { runCloseoutSync } from "../skills/closeout.js"
+import { LoopEngine } from "../skills/loop-engine.js"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const CLI_ENTRY = join(__dirname, "..", "index.js")
@@ -34,6 +35,23 @@ export const PIPELINE_STAGES = Object.freeze([
   "intent", "plan", "scout", "create", "dev", "test", "review", "verify", "preview",
 ])
 export const DEFAULT_MAX_ATTEMPTS = 3
+
+// PRD42 S42.0C: o LoopEngine canônico é a AUTORIDADE de ordem e caps do `start` — NÃO uma
+// 2ª máquina de estados. Cada estágio do pipeline caminha pelas fases canônicas exigidas
+// (ENGINE_PHASES); fora de ordem o motor lança `invalid_transition` (não avança silencioso).
+// `review` é advisory → não move o motor. `create` = approve+implement; gates = checkpoint→
+// verify→proof. Assim o ranking/ordem/caps têm fonte única (o motor), não este arquivo.
+export const STAGE_PHASE_PATH = Object.freeze({
+  intent: [], plan: ["plan"], scout: ["scout"], create: ["approve", "implement"],
+  dev: ["run"], test: ["observe", "diagnose"], review: [], verify: ["checkpoint", "verify"], preview: ["proof"],
+})
+
+/** Caminha o motor pelas fases do estágio. Fora de ordem → InvalidTransitionError (prova
+ * que a ordem é governada pelo motor, não reimplementada aqui). */
+export function advanceEngine(engine, stage) {
+  for (const phase of STAGE_PHASE_PATH[stage] || []) engine.advance(phase)
+  return engine.phase
+}
 
 export function runsDir(cwd, runId) { return join(cwd, ".gstack", "runs", runId) }
 
@@ -129,19 +147,23 @@ function execResultToStage(res) {
     : { status: "failed", detail: `parou em '${res.failed?.stepId}': ${res.failed?.summary}` }
 }
 
-/** Executa o create/plan com retomada e hard cap. */
+/** Executa o create/plan com retomada e hard cap. Cada tentativa é contada PELO MOTOR
+ * (caps incontornáveis, P0.6): atingiu maxIterations → o motor faz hard halt (blocked). */
 function createStage(ctx, stages) {
+  advanceEngine(ctx.engine, "create") // approve → implement
   let res = null
   for (let attempt = 1; attempt <= ctx.maxAttempts; attempt++) {
     ctx.attempts = attempt
     appendRunEvent(ctx.runDir, { event: "attempt_started", attempt, stage: "create" })
     res = executePlan({ plan: ctx.plan, planDir: ctx.planDir, cwd: ctx.cwd, exec: ctx.exec, includeOptional: ctx.includeOptional })
+    const cap = ctx.engine.recordAttempt({ errorHash: res.status === "done" ? null : stableFail(res) })
     if (res.status === "done") break
-    appendRunEvent(ctx.runDir, { event: "attempt_failed", attempt, stoppedAt: res.failed?.stepId, summary: res.failed?.summary })
+    appendRunEvent(ctx.runDir, { event: "attempt_failed", attempt, stoppedAt: res.failed?.stepId, summary: res.failed?.summary, capped: cap.halted })
   }
   stages.create = execResultToStage(res)
   return res
 }
+const stableFail = (res) => `${res.failed?.stepId || "?"}:${(res.failed?.summary || "").slice(0, 40)}`
 
 /** Estado dos serviços → status honesto do estágio dev. */
 function devStatusFromServices(services) {
@@ -225,7 +247,19 @@ function buildPipelineCtx(opts, plan, planDir) {
     includeOptional: opts.includeOptional === true,
     maxAttempts,
     attempts: 0,
+    engine: makeEngine(runId, plan, maxAttempts, opts.acceptance),
   }
+}
+
+// Motor canônico do start: caps por-iteração (start não usa wall/token — o cap é o hard cap
+// de tentativas do create). buildLoopBudget default wall=900s; sobrescrevo alto p/ o cap do
+// start ser SÓ maxIterations (mesma semântica do hard cap histórico).
+function makeEngine(runId, plan, maxAttempts, acceptance) {
+  return new LoopEngine({
+    runId, intent: plan.objective || plan.id,
+    budget: { maxIterations: maxAttempts, maxWallTimeSeconds: 86400 },
+    acceptance: acceptance || [],
+  })
 }
 
 function initialStages(plan) {
@@ -300,6 +334,16 @@ function closeoutReadiness(stages) {
   return { ready: false, blockers: [`verify: ${(v && v.status) || "não rodou"}`] }
 }
 
+// Snapshot canônico do motor (fonte única de fase/caps): a próxima sessão e os testes
+// leem daqui — não há 2ª FSM. `capped` = algum limite do motor estourou (hard halt).
+function engineSnapshot(engine) {
+  const cap = engine.capStatus()
+  return {
+    schemaVersion: engine.schemaVersion, phase: engine.phase, status: engine.status,
+    capped: cap.halted, cappedReason: cap.reason, counters: cap.counters, transitions: engine.history.length,
+  }
+}
+
 /** Fecha o run: handoff.md quando aplicável + journal + status.json. */
 function finishPipeline(ctx, stages, status, failedStage) {
   let handoffPath
@@ -307,21 +351,23 @@ function finishPipeline(ctx, stages, status, failedStage) {
     handoffPath = join(ctx.runDir, "handoff.md")
     writeFileSync(handoffPath, renderHandoff({ runId: ctx.runId, plan: ctx.plan, stages, attempts: ctx.attempts, failedStage }))
   }
-  appendRunEvent(ctx.runDir, { event: "pipeline_ended", status, failedStage: failedStage || null, attempts: ctx.attempts })
-  writeRunStatus(ctx.runDir, { runId: ctx.runId, planId: ctx.plan.id, status, stages, attempts: ctx.attempts })
+  const engine = engineSnapshot(ctx.engine)
+  appendRunEvent(ctx.runDir, { event: "pipeline_ended", status, failedStage: failedStage || null, attempts: ctx.attempts, enginePhase: engine.phase, engineCapped: engine.capped })
+  writeRunStatus(ctx.runDir, { runId: ctx.runId, planId: ctx.plan.id, status, stages, attempts: ctx.attempts, engine })
   try { writePipelineEvidence(ctx, stages) } catch { /* evidence best-effort — não derruba o run */ }
   // Run Closeout Sync (F4-A) + proof automático no encerramento (36.10): a prontidão
   // é DERIVADA do gate verify que já rodou no pipeline — síncrono, bounded, sem
   // relançar a suíte (evita lentidão/EBUSY por run). best-effort, não derruba.
   try { runCloseoutSync({ cwd: ctx.cwd, runId: ctx.runId, command: "start", status, proof: () => closeoutReadiness(stages) }) } catch { /* closeout best-effort */ }
-  return { runId: ctx.runId, status, stages, attempts: ctx.attempts, execResult: ctx.execResult, ...(handoffPath ? { handoffPath } : {}) }
+  return { runId: ctx.runId, status, stages, attempts: ctx.attempts, execResult: ctx.execResult, engine, ...(handoffPath ? { handoffPath } : {}) }
 }
 
 /** Roda dev→test→verify→preview. Retorna o nome do gate que falhou, ou null. */
 function runPostCreateStages(ctx, stages) {
   for (const [stage, fn] of POST_CREATE_STAGES) {
     fn(ctx, stages)
-    appendRunEvent(ctx.runDir, { event: "stage_done", stage, status: stages[stage].status, detail: stages[stage].detail })
+    advanceEngine(ctx.engine, stage) // run → observe/diagnose → checkpoint/verify → proof
+    appendRunEvent(ctx.runDir, { event: "stage_done", stage, status: stages[stage].status, detail: stages[stage].detail, enginePhase: ctx.engine.phase })
     // Gate determinístico falhou e não há passo retomável para corrigir → handoff
     // imediato (repetir o mesmo verify sem mudança seria loop zumbi).
     if (GATE_STAGES.has(stage) && stages[stage].status === "failed") return stage
@@ -334,6 +380,7 @@ export function runPipeline(opts = {}) {
   if (!plan || !planDir) throw new Error("runPipeline: plan e planDir são obrigatórios")
   const ctx = buildPipelineCtx(opts, plan, planDir)
   const stages = initialStages(plan)
+  advanceEngine(ctx.engine, "plan") // intent → plan (plan já está pronto em initialStages)
   appendRunEvent(ctx.runDir, { event: "pipeline_started", runId: ctx.runId, planId: plan.id, stages: PIPELINE_STAGES })
 
   // Skill route declarada no start (PRD29 29.2): vira artefato do RUN — a próxima
@@ -342,6 +389,7 @@ export function runPipeline(opts = {}) {
 
   // Scout ANTES do create (projeto existente): contexto mínimo, read-only.
   scoutStage(ctx, stages)
+  advanceEngine(ctx.engine, "scout") // plan → scout
   appendRunEvent(ctx.runDir, { event: "stage_done", stage: "scout", status: stages.scout.status })
 
   // Create (com hard cap + retomada). Cap esgotado → handoff, nunca loop infinito.
