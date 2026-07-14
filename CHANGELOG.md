@@ -1,5 +1,22 @@
 # Changelog - gstack-vibehard
 
+## [4.19.0] - 2026-07-14 — Debug científico (PRD42 S42.9) — FECHA A FASE 2
+
+Método sobre chute: um bug percorre `reported → reproduced → hypothesis → fix_applied →
+regression_green`, com dois invariantes que impedem debugging cego.
+
+- **`src/project-plan/debug-investigation.js`** (schema `gstack.debug-investigation.v1`):
+  máquina de estados fail-closed (`advanceDebug`/TRANSITIONS). `reproduce` exige
+  **`evidence.reproduced === true`** (não basta afirmar). `applyFix` **BLOQUEIA editar antes de
+  reproduzir** (estado `reported`). `recordRegression`: verde → `regression_green` (fim); vermelha
+  conta a tentativa e, ao atingir **MAX_FIX_ATTEMPTS (3), HARD HALT** em
+  `architecture_review_required` (para de consertar o sintoma — o problema é estrutural); antes do
+  limite, volta a `hypothesis`.
+- **Testes** `debug_investigation`: caminho feliz; **editar antes de reproduzir bloqueado**;
+  reprodução exige evidência; **3 vermelhas → architecture_review_required**; 1 vermelha volta a
+  hypothesis; recordRegression fora de fix_applied lança; terminal não avança (controles negativos).
+  QG strict 0 (cc≤6); lint 0; typecheck limpo. **Fase 2 (S42.7-9) COMPLETA.**
+
 ## [4.18.0] - 2026-07-14 — Quality Profiles + tiers + budgets (PRD42 S42.8)
 
 `verify --tier smoke|regression|release` — FLAG NOVA, **ortogonal** ao `--profile` (o profile diz
