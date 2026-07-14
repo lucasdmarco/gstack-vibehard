@@ -1,5 +1,27 @@
 # Changelog - gstack-vibehard
 
+## [4.10.2] - 2026-07-14 — `start` dirigido pelo LoopEngine canônico (PRD42 S42.0C)
+
+Fecha o segundo (e último) bloqueador de baseline do §0. O `start` (runPipeline) deixa de ser uma
+máquina de estados implícita paralela e passa a ser DIRIGIDO pelo LoopEngine canônico — fonte
+única de ordem de fase e de caps.
+
+- **Ordem de fase governada pelo motor.** Cada estágio do pipeline caminha pelas fases canônicas
+  (`ENGINE_PHASES`) via `advanceEngine`; fase fora de ordem lança `invalid_transition` (não avança
+  em silêncio). Mapeamento: `create`=approve+implement, `dev`=run, `test`=observe+diagnose,
+  `verify`=checkpoint+verify, `preview`=proof; `review` é advisory (não move o motor).
+- **Caps incontornáveis pelo motor.** Cada tentativa do create é contada por `recordAttempt`;
+  atingir `maxIterations`/thrash → hard halt tipado (`status: blocked`). Snapshot do motor
+  (`phase/status/counters/capped`) vai ao resultado e ao `status.json`.
+- **Forma pública preservada:** `runPipeline` mantém `status/stages/attempts/handoffPath` — os
+  193+ testes de pipeline seguem intactos; `engine` é aditivo.
+- **Testes** `start_engine`: pipeline OK avança até `proof`; controle negativo de ordem
+  (`advanceEngine` fora de ordem lança `invalid_transition`); controle negativo de cap (create
+  falha em série → motor `blocked` + handoff, attempts=3). Suíte JS 1047 + Py 84; QG strict 0;
+  lint 0; typecheck limpo.
+- **Deferido honesto:** executores REAIS de cada fase (implement→harness, run→supervisor) e o
+  `finalize()` de 4 portões seguem no ciclo `task`/`loop`; `start` é o scaffold governado.
+
 ## [4.10.1] - 2026-07-14 — Dream Audit comportamental canônico + Capability Truth Contract (PRD42 S42.0B)
 
 Fecha um dos dois bloqueadores de baseline do §0 (o outro, `start`↔Loop Engine, é o S42.0C) e
