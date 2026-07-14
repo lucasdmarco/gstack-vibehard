@@ -1,5 +1,42 @@
 # Changelog - gstack-vibehard
 
+## [5.0.0] - 2026-07-14 — PRD42 fechado: verdade de capacidade do intake à máquina limpa
+
+Release maior que consolida o programa PRD42 (14 sprints, v4.10.0→v4.23.0) sobre o núcleo de
+integridade do PRD41 (v4.9.0). O produto agora prova, com controle negativo, que **nada é enfeite**
+— cada gate/loop/claim só fica verde com execução comprovada por evidência. Destaques por fase:
+
+**Fase 0 — Capability Truth + reparo de baseline (S42.0A–E):** Lite não materializa capacidades Full
+(sem vazar Casdoor/Headroom MCP nem `sandbox:"openhands"`); harness honesto (`agent-hooks` só onde há
+`real_hooks`); claims numéricos removidos ("até 95%"→"medido por ledger"); dream behavioral no CLI;
+Capability Contract (`gstack.capability-contract.v1`); `start` dirigido pelo Loop Engine canônico;
+backend E2E em jobs de CI dedicados (`capability-e2e.yml`) — required sem engine BLOQUEIA, não pula;
+Golden Harness + package lifecycle + curadoria Replit.
+
+**Fase 1 — Produto (S42.1–6):** intake estruturado + Product Brief (aceites com verificador real ou
+`pending_verifier`); Design Direction v2 com migração; Skill Execution Contract
+(`selected→loaded→applied→verified`, mutation test); Behavioral Conformance (`agents conformance`,
+`inconclusive`≠verde); Artifact Review Pipeline (produtor≠reviewer, traceability determinística);
+Runtime manifest v3 + preview só `ready` após health real.
+
+**Fase 2 — Qualidade (S42.7–9):** step-close incremental (nunca suíte inteira por edição); Quality
+Profiles + `verify --tier` (engine ausente em release = `blocked_missing_engine`; `not_applicable`≠
+`passed`); debug científico (`reported→…→regression_green`, 3 fracassos→`architecture_review_required`).
+
+**Fase 3 — Fechamento (S42.10–12):** handoff/reidratação compacta (tokens `estimated`, nunca claim
+Headroom sem routing); paralelismo adaptativo (quota `unknown` nunca suficiente; DAG misto→ask_user);
+Acceptance Demo `proof --explain` (visão leiga+técnica da MESMA evidência; **a média nunca esconde um
+P0**; sem deploy = `not_applicable`).
+
+**Fase 4 — Máquina limpa (S42.13):** Clean-Machine Test Pack (`gstack.cleanmachine.v1`,
+`npm run test:cleanmachine`) — jornada real do usuário final com veredito por capacidade e por
+plataforma; só `passed` é verde; backend sem engine ⇒ `blocked_missing_engine` (nunca "ready" liso);
+runbook cross-OS. Os 23 cenários E2E do §S42.13 cobertos pelas capacidades provadas em S42.0–S42.12.
+
+Gates do release: lint 0 · typecheck limpo · JS 1147 (1146 pass/0 fail/1 skip) + Py 84 · QG L1 strict
+0 · proof `--profile release` ready:true · dream behavioral 0 RISK/0 PLACEBO. Publicação com aprovação
+humana e source parity.
+
 ## [4.23.0] - 2026-07-14 — Clean-Machine Test Pack (PRD42 S42.13, parte 1)
 
 Abre a Fase 4. Entrega o artefato-título que o usuário pediu para fechar o programa: uma prova de
