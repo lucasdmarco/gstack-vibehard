@@ -1,5 +1,24 @@
 # Changelog - gstack-vibehard
 
+## [4.18.0] - 2026-07-14 — Quality Profiles + tiers + budgets (PRD42 S42.8)
+
+`verify --tier smoke|regression|release` — FLAG NOVA, **ortogonal** ao `--profile` (o profile diz
+quais gates existem; o tier diz quão fundo). Ausência de `--tier` = comportamento intacto.
+
+- **`src/project-plan/quality-profile.js`** (schema `gstack.quality-profile.v1`): `TIER_SPEC`
+  (smoke/regression sem engine; **release EXIGE engine**). `aggregateTier`: release sem engine →
+  `blocked_missing_engine` (nunca skip-verde); **`not_applicable` NUNCA conta como `passed`**
+  (`passedCount` o exclui); `tierSpec` fail-closed em tier desconhecido.
+- **`src/project-plan/budget-policy.js`**: `evaluateBudget` (within/over medidos; **`unknown`
+  sem medição nunca é "dentro do orçamento"**).
+- **`src/project-plan/qa-plan.js`**: `buildQaPlan` combina tier (profundidade) + superfície do diff
+  (S42.7); superfície de risco eleva o mínimo mesmo em smoke.
+- **`verify --tier`** (aditivo): probe de engine (Docker) real; anexa `report.tier` e rebaixa
+  status ready→blocked quando o tier bloqueia. Injetável (`opts.engineProbe`).
+- **Testes** `quality_tiers_budget`: release sem engine bloqueia; `not_applicable`≠passed; budget
+  unknown≠ok; tier desconhecido fail-closed; integração `verify --tier release` sem engine bloqueia
+  + sem `--tier` nada muda. QG strict 0 (`downgradeIfTierBlocks` extraído p/ cc≤6); lint 0; typecheck.
+
 ## [4.17.0] - 2026-07-14 — Step-close incremental: nunca a suíte inteira por edição (PRD42 S42.7)
 
 Abre a Fase 2 (qualidade). Uma edição roda SÓ as checagens que o diff pede — a suíte completa
