@@ -16,10 +16,42 @@ import { join, dirname } from "path"
  */
 
 export const DESIGN_SYSTEM_SCHEMA = "gstack.design-system.v1"
+export const DESIGN_SYSTEM_SCHEMA_V2 = "gstack.design-system.v2"
 export const DESIGN_SYSTEM_GATE_SCHEMA = "gstack.design-system-gate.v1"
 
 // Status que LIBERAM a escrita de UI. bypassed = opt-out explícito do usuário.
 const PASS_STATUSES = Object.freeze(["complete", "generated", "bypassed"])
+
+// ── Design Direction v2 (PRD42 S42.2) ────────────────────────────────────────────
+// v1 aprovava por STATUS (qualquer engine/path virava "complete"). v2 valida CONTEÚDO
+// quando o DS o DECLARA inline (direção + tokens). Declarações EXTERNAS (só path/engine)
+// e artefatos v1 continuam grandfathered (não quebram projetos v1); a validação de
+// conteúdo morde quem CLAMA ter gerado tokens mas os deixou vazios.
+const nonEmptyStr = (v) => typeof v === "string" && v.trim().length > 0
+const nonEmptyColl = (v) => (Array.isArray(v) ? v.length > 0 : Boolean(v && typeof v === "object" && Object.keys(v).length > 0))
+
+const CONTENT_CHECKS = Object.freeze([
+  ["direction", (ds) => nonEmptyStr(ds.direction)],
+  ["tokens.colors", (ds) => nonEmptyColl((ds.tokens || {}).colors)],
+  ["tokens.typography", (ds) => nonEmptyColl((ds.tokens || {}).typography)],
+])
+
+/** Conteúdo mínimo do design system: direção declarada + tokens (colors E typography). */
+export function validateDesignContent(ds) {
+  if (!ds || typeof ds !== "object") return { ok: false, missing: CONTENT_CHECKS.map((c) => c[0]) }
+  const missing = CONTENT_CHECKS.filter(([, ok]) => !ok(ds)).map(([k]) => k)
+  return { ok: missing.length === 0, missing }
+}
+
+/** Um DS "declara conteúdo inline" (e portanto é validável) se traz tokens/direção ou status=generated. */
+const declaresInlineContent = (ds) => Boolean(ds && (ds.tokens || ds.direction || ds.status === "generated"))
+
+/** Migração NÃO-destrutiva v1→v2: preserva status/engine/path; marca origem e que conteúdo não foi validado. */
+export function migrateDesignSystem(ds) {
+  if (!ds) return ds
+  if (ds.schemaVersion === DESIGN_SYSTEM_SCHEMA_V2) return ds
+  return { ...ds, schemaVersion: DESIGN_SYSTEM_SCHEMA_V2, migratedFrom: ds.schemaVersion || "unknown", contentValidated: false }
+}
 
 // Extensões e diretórios que contam como UI (alinhado ao hook Python).
 const UI_EXTS = Object.freeze([".tsx", ".jsx", ".css", ".scss", ".sass", ".less", ".html", ".vue", ".svelte"])
@@ -68,7 +100,18 @@ function importFromSessionState(gdir, dsPath, io) {
 
 const bypassedDs = (dsPath) => ({ status: "bypassed", source: "--design-system none", engine: null, path: null, artifact: dsPath, imported: false })
 const missingDs = (dsPath) => ({ status: "missing", source: "none", engine: null, path: null, artifact: dsPath, imported: false })
-const fromDsFile = (ds, dsPath) => ({ status: statusOfDs(ds), source: "design-system.json", engine: (ds && ds.engine) || null, path: (ds && ds.path) || null, artifact: dsPath, imported: false })
+// v2: migra o artefato lido, valida conteúdo SÓ se ele o declara inline, e carrega os campos
+// de conteúdo p/ o gate decidir (declaresContent/contentValid/contentMissing).
+function fromDsFile(raw, dsPath) {
+  const ds = migrateDesignSystem(raw) || {}
+  const declaresContent = declaresInlineContent(ds)
+  const content = declaresContent ? validateDesignContent(ds) : { ok: true, missing: [] }
+  return {
+    status: statusOfDs(ds), source: "design-system.json",
+    engine: ds.engine || null, path: ds.path || null, artifact: dsPath, imported: false,
+    schemaVersion: ds.schemaVersion || null, declaresContent, contentValid: content.ok, contentMissing: content.missing,
+  }
+}
 
 /**
  * Status canônico do design system do projeto. Ordem: bypass explícito >
@@ -91,9 +134,11 @@ export function registerDesignSystem({ root, choice, io = defaultIo } = {}) {
   const gdir = join(root, ".gstack")
   const dsPath = join(gdir, "design-system.json")
   const bypass = choice === "none"
+  // v2: declaração EXTERNA (o usuário aponta um DS que já existe no `choice`). Sem tokens inline
+  // → não passa por validação de conteúdo (grandfathered), mas fica marcado contentValidated:false.
   const ds = {
-    schemaVersion: DESIGN_SYSTEM_SCHEMA, status: bypass ? "bypassed" : "complete",
-    engine: bypass ? null : "custom", path: bypass ? null : choice,
+    schemaVersion: DESIGN_SYSTEM_SCHEMA_V2, status: bypass ? "bypassed" : "complete",
+    engine: bypass ? null : "custom", path: bypass ? null : choice, contentValidated: false,
     generatedAt: new Date().toISOString(), source: "--design-system",
   }
   io.writeJson(dsPath, ds)
@@ -109,21 +154,39 @@ export function registerDesignSystem({ root, choice, io = defaultIo } = {}) {
  * arquivos concretos de UI em `files`) e o design system NÃO está resolvido.
  * verifier determinístico: status ∈ {complete,generated,bypassed} libera.
  */
+// v2: a razão do bloqueio distingue STATUS ausente de CONTEÚDO declarado-porém-incompleto.
+function gateViolationReason(ds, contentPass) {
+  if (!contentPass) return `design system declara conteúdo mas falta: ${(ds.contentMissing || []).join(", ") || "tokens/direção"}`
+  return `escrita de UI sem design system (status=${ds.status})`
+}
+const requiredActionFor = (contentPass) => (contentPass
+  ? "Declare o design system: responda no `start` ou use --design-system <caminho> (ou --design-system none para opt-out explícito)."
+  : "Design system declara conteúdo incompleto: forneça direção + tokens (colors/typography) ou registre um caminho externo válido.")
+
+const violationList = (uiFiles, reason) => (uiFiles.length ? uiFiles : ["<ui>"]).map((f) => ({ file: f, reason }))
+
+// Decisão do gate (extraída p/ cc≤6): STATUS ausente OU conteúdo declarado-porém-inválido bloqueia.
+function gateDecision(ds, uiFiles, touchesUi) {
+  const statusPass = PASS_STATUSES.includes(ds.status)
+  const contentPass = !ds.declaresContent || ds.contentValid !== false // v2: conteúdo declarado deve ser válido
+  const blocked = touchesUi && !(statusPass && contentPass)
+  return {
+    blocked,
+    violations: blocked ? violationList(uiFiles, gateViolationReason(ds, contentPass)) : [],
+    requiredAction: blocked ? requiredActionFor(contentPass) : null,
+  }
+}
+
 export function evaluatePreWriteGate({ root, runId = null, files = [], uiIntended = false, bypass = null, io = defaultIo } = {}) {
   const ds = resolveDesignSystem({ root, bypass, io })
   const uiFiles = files.filter(isUiWrite)
   const touchesUi = uiIntended || uiFiles.length > 0
-  const blocked = touchesUi && !PASS_STATUSES.includes(ds.status)
+  const d = gateDecision(ds, uiFiles, touchesUi)
   return {
     schemaVersion: DESIGN_SYSTEM_GATE_SCHEMA, gate: "design-system-gate",
     generatedAt: new Date().toISOString(), runId,
-    designSystem: ds, uiFiles, touchesUi, blocked,
-    violations: blocked
-      ? (uiFiles.length ? uiFiles : ["<ui>"]).map((f) => ({ file: f, reason: `escrita de UI sem design system (status=${ds.status})` }))
-      : [],
-    requiredAction: blocked
-      ? "Declare o design system: responda no `start` ou use --design-system <caminho> (ou --design-system none para opt-out explícito)."
-      : null,
+    designSystem: ds, uiFiles, touchesUi, blocked: d.blocked,
+    violations: d.violations, requiredAction: d.requiredAction,
   }
 }
 

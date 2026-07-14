@@ -1,5 +1,24 @@
 # Changelog - gstack-vibehard
 
+## [4.12.0] - 2026-07-14 — Design Direction v2: o gate valida CONTEÚDO, não só status (PRD42 S42.2)
+
+Fecha o gap real do Design System Gate v1: `statusOfDs` promovia **qualquer** `engine`/`path` a
+`complete` — passava sem validar tokens/direção. v2 valida o conteúdo declarado, com migração
+não-destrutiva que **não quebra projetos v1**.
+
+- **Schema v2** (`gstack.design-system.v2`) + `migrateDesignSystem` (não-destrutiva, idempotente,
+  marca `migratedFrom`/`contentValidated:false`). Artefatos v1 migram na leitura.
+- **Validação de conteúdo** (`validateDesignContent`): exige direção + `tokens.colors` E
+  `tokens.typography` não vazios. Só morde quem **declara conteúdo inline** (`tokens`/`direction`
+  ou `status:generated`) — declarações EXTERNAS (só `path`/`engine`) e v1 seguem grandfathered.
+- **Gate v2** (`evaluatePreWriteGate` via `gateDecision`): bloqueia STATUS ausente **ou** conteúdo
+  declarado-porém-inválido, com razão específica (`falta: tokens.colors, ...`) e `requiredAction`
+  distinta. `registerDesignSystem` grava v2 (`contentValidated:false` p/ declaração externa).
+- **Testes**: DS com `generated` + tokens vazios **bloqueia** (v1 passava); DS com direção+tokens
+  libera; artefato v1 grandfathered (migra p/ v2 na leitura, não quebra); unidade de
+  `validateDesignContent`/`migrateDesignSystem` + controle negativo (nulo/vazio). QG strict 0
+  (`gateDecision`/`violationList` extraídos p/ cc≤6); lint 0; typecheck limpo.
+
 ## [4.11.0] - 2026-07-14 — Intake estruturado + Product Brief (PRD42 S42.1)
 
 Abre a Fase 1 (produto). O wizard do `start` deixa de ser 2 perguntas soltas e vira um **intake
