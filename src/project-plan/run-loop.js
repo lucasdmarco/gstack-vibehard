@@ -5,7 +5,7 @@ import { execFileSync } from "child_process"
 import { executePlan, sanitizeCommand } from "./executor.js"
 import { runVerify } from "./verify-runner.js"
 import { runChangedFilesVerify } from "./changed-files.js"
-import { loadRuntimeManifest } from "../runtime/manifest.js"
+import { loadRuntimeManifest, evaluatePreviewReadiness } from "../runtime/manifest.js"
 import { readAllState } from "../runtime/supervisor.js"
 import { scout } from "../context-docs/scout.js"
 import { recordEvidence, writeTaskMd } from "./evidence-ledger.js"
@@ -215,10 +215,16 @@ function verifyStage(ctx, stages) {
   return report
 }
 
-/** Estado do runtime → status honesto do preview. */
+/** Estado do runtime → status honesto do preview. S42.6: URL só `ready` com health REAL. */
 function previewFromState(state, devStatus) {
   const web = state.find((s) => s.url)
-  if (web) return { status: "ready", detail: web.url, url: web.url, port: web.port }
+  if (web) {
+    // health-gated: só libera a URL quando o serviço passou readiness (status="ready"),
+    // não apenas porque tem URL (um serviço "unhealthy" também grava url).
+    const pv = evaluatePreviewReadiness({ url: web.url, healthProbe: { ok: web.status === "ready" } })
+    if (pv.ready) return { status: "ready", detail: web.url, url: web.url, port: web.port }
+    return { status: "unhealthy", detail: `runtime respondeu mas health não passou (status=${web.status}) — veja \`gstack_vibehard logs\``, port: web.port }
+  }
   if (state.length) return { status: "pending", detail: "runtime de pé sem URL web — veja `gstack_vibehard logs`" }
   const status = devStatus === "not_applicable" ? "not_applicable" : "pending"
   return { status, detail: "sem preview — rode `gstack_vibehard dev`" }

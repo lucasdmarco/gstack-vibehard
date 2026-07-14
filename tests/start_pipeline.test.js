@@ -128,6 +128,29 @@ test("pipeline: com projeto real (runtime manifest) dev/preview refletem estado 
   } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
 })
 
+// S42.6 CONTROLE NEGATIVO: serviço com URL mas status="unhealthy" NÃO vira preview "ready".
+test("pipeline: serviço unhealthy (tem URL, health não passou) NÃO libera preview ready", async () => {
+  const cwd = await mkdtemp(path.join(tmpdir(), "gstack-unhealthy-"))
+  try {
+    const proj = path.join(cwd, "app")
+    await mkdir(path.join(proj, ".gstack", "runtime"), { recursive: true })
+    await writeFile(path.join(proj, ".gstack", "runtime.json"), JSON.stringify({ schemaVersion: 2, services: [{ name: "web", command: ["node", "s.js"], cwd: ".", dependsOn: [], port: null, health: { readiness: { type: "process" }, liveness: { type: "process" } }, restart: { policy: "never" }, secretRefs: [] }] }))
+    // url presente MAS status unhealthy (o supervisor grava url mesmo quando readiness falha)
+    await writeFile(path.join(proj, ".gstack", "runtime", "web.state.json"), JSON.stringify({ name: "web", pid: 1, port: 3000, status: "unhealthy", url: "http://127.0.0.1:3000/" }))
+    const { runPipeline } = await imp("src/project-plan/run-loop.js")
+    const { buildPlan } = await imp("src/project-plan/planner.js")
+    const { plan } = buildPlan({ objective: "web app", projectName: "app", mode: "lite" })
+    const r = runPipeline({
+      plan, planDir: path.join(cwd, ".gstack", "plans", plan.id), cwd,
+      exec: () => {}, devRunner: () => ({ services: [{ name: "web", status: "unhealthy" }] }),
+      verifyRunner: () => ({ status: "ready", usable: true, failed: [] }),
+    })
+    assert.notEqual(r.stages.preview.status, "ready", "unhealthy nunca vira preview ready")
+    assert.equal(r.stages.preview.status, "unhealthy")
+    assert.equal(r.stages.preview.url, undefined, "URL retida enquanto health não passa")
+  } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
+})
+
 test("pipeline: gate determinístico falhou → handoff imediato (LLM não aprova nada)", async () => {
   const cwd = await mkdtemp(path.join(tmpdir(), "gstack-gate-"))
   try {
