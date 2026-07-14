@@ -13,7 +13,7 @@
  * negativo do próprio harness).
  */
 import { spawnSync, execFileSync } from "node:child_process"
-import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs"
+import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync, mkdirSync, realpathSync } from "node:fs"
 import { tmpdir, homedir } from "node:os"
 import { fileURLToPath } from "node:url"
 import { dirname, join, resolve } from "node:path"
@@ -48,7 +48,10 @@ function pkgVersion() {
   return JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).version
 }
 
-const caseCwd = (caseDef) => (caseDef.cwdTemp ? mkdtempSync(join(tmpdir(), "gstack-golden-")) : ROOT)
+// realpathSync: o filho resolve `process.cwd()` para o path REAL (macOS /var→/private/var,
+// Windows short-8.3→long) — sem resolver aqui, o marcador <CWD> não casaria no CI e daria
+// falso "drift" de golden. Alinha o cwd que passamos ao normalize com o que o filho imprime.
+const caseCwd = (caseDef) => (caseDef.cwdTemp ? realpathSync(mkdtempSync(join(tmpdir(), "gstack-golden-"))) : ROOT)
 function cleanupCwd(caseDef, cwd) {
   if (caseDef.cwdTemp) { try { rmSync(cwd, { recursive: true, force: true }) } catch { /* best-effort */ } }
 }

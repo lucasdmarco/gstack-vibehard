@@ -1,5 +1,24 @@
 # Changelog - gstack-vibehard
 
+## [5.0.1] - 2026-07-14 — CI verde: golden cross-OS + capability-e2e invocation
+
+Corrige duas falhas de CI que só apareceram no primeiro push do trilho PRD42 ao GitHub (rodavam
+em código nunca exercitado localmente: sem Docker aqui, e sem os symlinks de /var do macOS).
+
+- **`scripts/golden.mjs`** — `caseCwd` agora resolve `realpathSync` do dir temporário. Sem isso, o
+  filho resolvia `process.cwd()` para o path REAL (macOS `/var`→`/private/var`; Windows short-8.3→
+  long) e o marcador `<CWD>` não casava no normalize, dando **falso "drift" de golden** em
+  `test (macos-latest)` e `test (windows-latest)` (ubuntu passava). Fixtures inalteradas (já eram
+  OS-independentes por marcador).
+- **`scripts/test-capabilities.mjs`** — invocação `node --test tests/e2e/capabilities/` (diretório)
+  falhava com "Cannot find module" no Node ≥21; trocado pelo **glob** `tests/e2e/capabilities/**/*.
+  test.js`. Só disparava no runner **com Docker** (ubuntu CI), depois do guard de engine ausente —
+  por isso passou despercebido local. Com Docker presente o container real (alpine pinado por
+  digest) roda e o teardown limpa.
+
+QG strict 0 · lint 0 · typecheck limpo · golden 2/2 local. Patch de infra de teste; sem mudança de
+comportamento do produto publicado.
+
 ## [5.0.0] - 2026-07-14 — PRD42 fechado: verdade de capacidade do intake à máquina limpa
 
 Release maior que consolida o programa PRD42 (14 sprints, v4.10.0→v4.23.0) sobre o núcleo de

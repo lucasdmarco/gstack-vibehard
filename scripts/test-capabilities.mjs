@@ -28,7 +28,9 @@ if (!dockerUp()) {
   process.exit(strict ? 1 : 0)
 }
 
-const res = spawnSync(process.execPath, ["--test", "tests/e2e/capabilities/"], {
+// Glob (não diretório): `node --test <dir>` trata o path como módulo e falha com "Cannot find
+// module" no Node ≥21 — o padrão glob deixa o runner descobrir os arquivos de teste.
+const res = spawnSync(process.execPath, ["--test", "tests/e2e/capabilities/**/*.test.js"], {
   cwd: ROOT, stdio: "inherit", env: { ...process.env, GSTACK_CAP_E2E: "1" },
 })
 process.exit(res.status || 0)
