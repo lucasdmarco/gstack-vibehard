@@ -1,5 +1,20 @@
 # Changelog - gstack-vibehard
 
+## [4.15.0] - 2026-07-14 — Artifact Review Pipeline + traceability determinística (PRD42 S42.5)
+
+Fecha a porta contra teatro de revisão e evidência órfã, com dois módulos puros e determinísticos.
+
+- **`src/project-plan/artifact-review.js`** (schema `gstack.artifact-review.v1`): revisões em
+  `spec → plan → compliance → quality`. `validateReview` exige **produtor ≠ revisor**. `reviewGates`:
+  revisão de **LLM é advisory** (nunca bloqueia); só revisão **determinística** com
+  `changes_requested` gateia. `aggregateReviews`: `ok` só sem review inválido E sem gate determinístico.
+- **`src/project-plan/traceability.js`** (schema `gstack.traceability.v1`): cadeia
+  `brief → spec → task → diff → test → evidence`; cada nó referencia o id anterior (`ref`).
+  `validateChain` reprova estágio ausente OU `ref` quebrado (evita evidência que não se liga ao brief).
+- **Testes** `artifact_review_traceability`: cadeia completa ok; estágio ausente e ref quebrado
+  reprovam (controle negativo); produtor=revisor reprova; LLM `changes` vira advisory (não bloqueia);
+  compliance determinístico `changes` gateia. QG strict 0; lint 0; typecheck limpo.
+
 ## [4.14.0] - 2026-07-14 — Behavioral Conformance: as skills P0 se COMPORTAM (PRD42 S42.4)
 
 Novo subcomando `agents conformance`: cada skill P0 é exercitada em RED/GREEN/REFACTOR contra
