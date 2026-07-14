@@ -1,0 +1,1 @@
+{"project":"goldenapp","template":"fullstack-monorepo","mode":"lite","dir":"<CWD>/goldenapp","writes":{"projectScoped":["<CWD>/goldenapp"],"global":[]},"provisions":[],"note":"dry-run: nada foi escrito"}

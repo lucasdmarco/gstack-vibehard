@@ -24,6 +24,14 @@ export const SCOUT_DENYLIST = [
   /\.(pem|key|p12|pfx|keystore|dpapi)$/i,
   /(^|[\\/])id_(rsa|ed25519|ecdsa)/i,
   /names\.json$/i, // índice do vault de segredos
+  // Curadoria Replit (S42.0E): artefatos portadores de credencial comuns em templates
+  // full-stack (Replit-style) que NÃO estavam cobertos. Ver .docs/RESEARCH/replit-project-evidence/.
+  /(^|[\\/])\.npmrc$/i, // tokens de registry (_authToken)
+  /(^|[\\/])\.netrc$/i, // credenciais de rede
+  /(^|[\\/])\.git-credentials$/i, // creds git em texto
+  /(^|[\\/])\.pgpass$/i, // senha postgres
+  /\.tfstate(\.backup)?$/i, // terraform state (secrets materializados)
+  /(^|[\\/])\.aws([\\/]|$)/i, // ~/.aws/credentials
 ]
 
 const TEXT_EXT = /\.(mjs|cjs|js|ts|tsx|jsx|py|md|json|jsonc|yml|yaml|toml|html|css|txt)$/i
