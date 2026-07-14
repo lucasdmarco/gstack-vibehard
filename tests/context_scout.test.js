@@ -54,10 +54,14 @@ test("scout: DENYLIST — .env* e secrets/ NUNCA aparecem nem são lidos", async
     assert.ok(!r.results.some((x) => /\.env|secrets\//.test(x.file)), "nenhum hit em secret")
     assert.ok(!JSON.stringify(r).includes("super-secreto"), "valor de secret nunca vaza")
     // unidade da denylist
-    for (const p of [".env", ".env.local", "config/.env.production", "secrets/x.txt", "a/id_rsa", "k.pem", "node_modules/x.js", ".gstack/state.jsonl"]) {
+    for (const p of [".env", ".env.local", "config/.env.production", "secrets/x.txt", "a/id_rsa", "k.pem", "node_modules/x.js", ".gstack/state.jsonl",
+      // curadoria Replit (S42.0E): portadores de credencial antes descobertos
+      ".npmrc", "app/.npmrc", ".netrc", ".git-credentials", ".pgpass", "infra/terraform.tfstate", "state.tfstate.backup", ".aws/credentials"]) {
       assert.equal(isDeniedPath(p), true, `negado: ${p}`)
     }
+    // CONTROLE NEGATIVO: fontes legítimas de código NÃO são negadas
     assert.equal(isDeniedPath("src/auth.js"), false)
+    assert.equal(isDeniedPath("src/npmrc-helper.js"), false)
   } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
 })
 

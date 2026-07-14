@@ -52,6 +52,13 @@
       "role": "opencode_plugin_reference",
       "addedOn": "2026-07-09",
       "note": "Plugin OpenCode-first (edicoes Ultimate/Light). Comparado em .docs/PLANS/comparacao090726.md (recomendacoes #2-#5 adotaveis; tmux Team Mode/telemetria/pacote-como-dependencia rejeitados). Referencia, nunca dependencia runtime. Ancora metodologica obrigatoria: batch-6-aidd-methodology."
+    },
+    {
+      "url": "local:.docs/PLANS/replit arquivos",
+      "status": "archived_reference",
+      "role": "replit_workspace_runtime_schema",
+      "addedOn": "2026-07-14",
+      "note": "Dump bruto de workspace Replit (35.789 entradas) curado em .docs/RESEARCH/replit-project-evidence/ (manifest.md + findings.json). O schema .replit ([workflows]/[postMerge]/[deployment]/[[ports]]) CORROBORA o runtime manifest v3 do GStack (S42.6) como espelho de design — NUNCA dependencia runtime; nenhum plugin @replit/* ou node_modules vendorizado. Motivou deny-patterns novos no scout (.npmrc/.netrc/.git-credentials/.pgpass/*.tfstate/.aws)."
     }
   ]
 }

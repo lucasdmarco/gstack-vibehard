@@ -1,5 +1,31 @@
 # Changelog - gstack-vibehard
 
+## [4.10.4] - 2026-07-14 — Golden Harness + package lifecycle + curadoria Replit (PRD42 S42.0E)
+
+Fecha a **Fase 0** (reparo de baseline). Trava contratos de saída determinísticos como regressão
+byte-a-byte, completa os npm scripts do S42.13 sem reimplementar nada e cura o dump Replit como
+referência histórica (nunca dependência runtime).
+
+- **Golden Harness (`scripts/golden.mjs` + `tests/golden/` + `npm run test:golden`).** Compara a
+  saída REAL de comandos determinísticos contra fixtures versionados, normalizando o ambiental
+  (dir temp/HOME/tmp/versão/separador). Os 2 casos (`create --dry-run --json` Lite e Full) travam
+  a **Verdade de Capacidade do S42.0A**: Lite = zero escrita global + zero provisões; Full =
+  `.atomic` + Casdoor/Atomic/ECC/AgentMemory. `--update` **RECUSA árvore suja** fora de
+  `tests/golden/` (golden nunca é "atualizado só p/ passar CI"); `--fixtures <dir>` p/ o controle
+  negativo do próprio harness.
+- **Package lifecycle (`scripts/test-package.mjs` + `npm run test:e2e:package`).** NÃO reimplementa:
+  COMPÕE `test-pack.mjs` (tarball smoke) + `test-e2e-lifecycle.mjs` (lifecycle isolado com HOME
+  isolado + contrato 18 REAL/0 PLACEBO), propagando env e o primeiro exit não-zero. Cross-platform.
+- **`npm run agents:check`** = alias `build:agents --check` (drift de agentes gerados vira gate).
+- **Curadoria Replit** (`.docs/RESEARCH/replit-project-evidence/{manifest.md,findings.json}`,
+  registrada como `archived_reference`). O schema `.replit` corrobora o manifest v3 (S42.6) como
+  espelho de design — nunca dependência; nenhum plugin `@replit/*` vendorizado. Motivou
+  **deny-patterns novos** no indexador (`SCOUT_DENYLIST`): `.npmrc`/`.netrc`/`.git-credentials`/
+  `.pgpass`/`*.tfstate`/`.aws` (com teste + controle negativo).
+- **Testes** `golden.test.js` (fixtures batem + controle negativo pega drift + normalização +
+  guarda de árvore suja) e `context_scout` ampliado. QG strict 0 (`main`/`runCase` decompostos p/
+  cc≤6); lint 0; typecheck limpo. **Fase 0 (S42.0A-E) COMPLETA** — S42.1 desbloqueado.
+
 ## [4.10.3] - 2026-07-14 — E2E de backend: gating `blocked_missing_engine` + harness Docker real (PRD42 S42.0D)
 
 Estabelece a infraestrutura honesta de E2E de backend: capacidade `required` sem engine (Docker)

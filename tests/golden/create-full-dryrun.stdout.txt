@@ -1,0 +1,1 @@
+{"project":"goldenfull","template":"fullstack-monorepo","mode":"full","dir":"<CWD>/goldenfull","writes":{"projectScoped":["<CWD>/goldenfull"],"global":["<HOME>/.atomic"]},"provisions":["Casdoor (Docker)","Atomic VCS","ECC (ecc-universal)","AgentMemory federation"],"note":"dry-run: nada foi escrito"}

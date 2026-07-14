@@ -1,0 +1,54 @@
+{
+  "schema": "gstack.research.replit-evidence.v1",
+  "curatedOn": "2026-07-14",
+  "sprint": "PRD42-S42.0E",
+  "status": "archived_reference",
+  "rule": "referencia historica; NUNCA dependencia runtime (CLAUDE.md)",
+  "source": {
+    "path": ".docs/PLANS/replit arquivos/",
+    "entries": 35789,
+    "kinds": ["git-objects-by-sha", "node_modules", "@replit/vite-plugin-*", ".replit", ".replitignore"],
+    "vendored": false,
+    "note": "gitignored; insumo de leitura, nao publicavel"
+  },
+  "methodologyFindings": [
+    {
+      "id": "replit-manifest-schema",
+      "evidence": ".replit [workflows]/[postMerge]/[deployment]/[[ports]]",
+      "corroborates": "runtime manifest v3 do GStack (workflows/postMerge/deploy/health)",
+      "appliesToSprint": "S42.6",
+      "kind": "schema-as-design-mirror",
+      "runtimeDependency": false
+    },
+    {
+      "id": "replit-preview-ports",
+      "evidence": ".replit [[ports]] localPort->externalPort",
+      "corroborates": "URL de preview so 'ready' apos health real (S42.6)",
+      "appliesToSprint": "S42.6",
+      "kind": "schema-as-design-mirror",
+      "runtimeDependency": false
+    },
+    {
+      "id": "replit-agent-stack",
+      "evidence": ".replit [agent] stack=PNPM_WORKSPACE expertMode=true",
+      "corroborates": "intake estruturado por stack/modo (S42.1)",
+      "appliesToSprint": "S42.1",
+      "kind": "schema-as-design-mirror",
+      "runtimeDependency": false
+    }
+  ],
+  "securityFindings": [
+    {
+      "id": "credential-bearing-artifacts-uncovered",
+      "detail": "dumps full-stack carregam artefatos de credencial fora do denylist do scout",
+      "remediation": "SCOUT_DENYLIST += .npmrc/.netrc/.git-credentials/.pgpass/*.tfstate/.aws",
+      "test": "tests/context_scout.test.js (com controle negativo)",
+      "file": "src/context-docs/scout.js"
+    }
+  ],
+  "rejected": [
+    { "what": "vendorizar plugins @replit/vite-plugin-*", "why": "GStack nao roda no Replit; runtime proprio" },
+    { "what": "importar node_modules do dump", "why": "supply-chain; nunca dependencia de referencia" },
+    { "what": "re-hospedar o dump", "why": "nao redistribuimos material de terceiros" }
+  ]
+}
