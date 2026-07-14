@@ -1,5 +1,23 @@
 # Changelog - gstack-vibehard
 
+## [4.14.0] - 2026-07-14 — Behavioral Conformance: as skills P0 se COMPORTAM (PRD42 S42.4)
+
+Novo subcomando `agents conformance`: cada skill P0 é exercitada em RED/GREEN/REFACTOR contra
+o SEU verificador real (fixtures sintéticas determinísticas). `inconclusive` **nunca** é verde.
+
+- **`src/skills/behavioral-conformance.js`** (schema `gstack.behavioral-conformance.v1`): runner
+  BOUNDED (maxMs/maxTurns); `aggregateVerdict` com precedência `nonconformant > inconclusive >
+  conformant`; erro/timeout no cenário → `inconclusive` (jamais pass). `aggregateRelease`:
+  `ready` só se TODA P0 é `conformant`.
+- **Specs P0 sobre verificadores REAIS**: `design-system` (RED=tokens vazios bloqueiam ·
+  GREEN=direção+tokens liberam · REFACTOR=v1 migrado grandfathered) e `skill-execution`
+  (RED=mutation reprova · GREEN=hash bate · REFACTOR=transição fora de ordem lança).
+- **`agents conformance`** (subcomando novo): imprime/JSONs os vereditos; sai 1 se alguma P0 não
+  for `conformant`.
+- **Testes** `behavioral_conformance`: P0 conformant medido; precedência; **inconclusive ≠ ready**
+  (controle negativo); fase quebrada → nonconformant; erro→inconclusive; bound maxMs. QG strict 0
+  (`scenarioOutcome` cc≤6); lint 0; typecheck limpo.
+
 ## [4.13.0] - 2026-07-14 — Skill Execution Contract: selecionada ≠ aplicada (PRD42 S42.3)
 
 Uma skill não é "aplicada" porque foi SELECIONADA. Este sprint dá teeth ao ciclo de execução

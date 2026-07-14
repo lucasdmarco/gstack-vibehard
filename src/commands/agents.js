@@ -7,6 +7,7 @@ import { hasExecutionContract } from "../agents/factory.js"
 import { getAdapterInfo, isInstructional } from "../agents/adapter-matrix.js"
 import { capabilityRow, validateScorecard } from "../harness/capabilities.js"
 import { stripBom } from "../util/json.js"
+import { runP0Conformance } from "../skills/behavioral-conformance.js"
 import { section, success, warn, error, info } from "../cli/index.js"
 
 const PKG_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..")
@@ -64,6 +65,19 @@ function agentsDiff() {
 }
 const explainId = (args) => args.filter((a) => !a.startsWith("-"))[1]
 
+const verdictIcon = (v) => (v === "conformant" ? "✓" : v === "inconclusive" ? "?" : "✗")
+
+// S42.4: conformance comportamental das skills P0 (RED/GREEN/REFACTOR sobre o verificador
+// REAL). `inconclusive` NUNCA é verde. Sai 1 se alguma P0 não for conformant.
+function conformanceCmd(json) {
+  const agg = runP0Conformance()
+  if (json) { process.stdout.write(JSON.stringify(agg) + "\n"); return }
+  section(`agents conformance — ${agg.reports.length} skill(s) P0`)
+  for (const r of agg.reports) info(`  ${verdictIcon(r.verdict)} ${r.skill}: ${r.verdict} (${r.phases.map((p) => `${p.phase}:${p.verdict}`).join(" ")})`)
+  if (agg.ready) success("Todas as skills P0 conformes (comportamento medido).")
+  else { error(`Não-conforme: ${agg.blocked.map((b) => `${b.skill}:${b.verdict}`).join(", ")}`); process.exitCode = 1 }
+}
+
 const AGENTS_HANDLERS = {
   build: (args) => agentsBuild(args),
   check: (args, json) => agentsCheck(json),
@@ -71,6 +85,7 @@ const AGENTS_HANDLERS = {
   list: (args, json) => listCmd(json, args),
   explain: (args, json) => explainCmd(explainId(args), json),
   doctor: (args, json) => doctorCmd(json),
+  conformance: (args, json) => conformanceCmd(json),
 }
 
 export async function agentsCommand(args = [], opts = {}) {
@@ -79,7 +94,7 @@ export async function agentsCommand(args = [], opts = {}) {
   const handler = AGENTS_HANDLERS[sub]
   if (handler) return handler(args, json)
   warn(`Subcomando desconhecido: ${sub}`)
-  info("  Use: agents <build|check|diff|doctor|list|explain>")
+  info("  Use: agents <build|check|diff|doctor|list|explain|conformance>")
 }
 
 function listCmd(json, args = []) {
