@@ -1,5 +1,20 @@
 # Changelog - gstack-vibehard
 
+## [4.21.0] - 2026-07-14 — Paralelismo adaptativo (PRD42 S42.11)
+
+Estende o preflight de DAG (`analyzeParallelSafety`) com decisões honestas de quando paralelizar.
+
+- **`src/project-plan/adaptive-parallel.js`** (schema `gstack.adaptive-parallel.v1`):
+  `quotaSufficient` — quota `unknown` (não numérica) **NUNCA é "suficiente"**. `planParallelism`:
+  ciclo→`blocked`; quota insuficiente/unknown OU **DAG misto → `ask_user`** (decisão humana, não
+  auto); independente+quota ok→`parallel`; encadeado→`sequential`. `mergeBarrier`: nenhuma branch
+  entra no merge sem passar TODOS os **gates comuns**. `packReference`: Context Pack por **hash**
+  (nunca inlinado — economiza contexto de verdade).
+- **Testes** `adaptive_parallel`: quota unknown nunca suficiente; independente+quota→parallel; DAG
+  misto→ask_user; **quota unknown força ask_user mesmo com DAG paralelo** (controle negativo);
+  encadeado→sequential, ciclo→blocked; merge barrier bloqueia branch sem gate comum; pack por hash
+  determinístico e não-inlinado. QG strict 0; lint 0; typecheck limpo.
+
 ## [4.20.0] - 2026-07-14 — Handoff / reidratação compacta (PRD42 S42.10)
 
 Abre a Fase 3 (fechamento). Ao fechar um ciclo, produz um "brief vivo" para retomar a sessão sem
