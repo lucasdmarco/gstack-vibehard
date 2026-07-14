@@ -1,5 +1,34 @@
 # Changelog - gstack-vibehard
 
+## [4.23.0] - 2026-07-14 — Clean-Machine Test Pack (PRD42 S42.13, parte 1)
+
+Abre a Fase 4. Entrega o artefato-título que o usuário pediu para fechar o programa: uma prova de
+**máquina limpa** da jornada real do usuário final, com veredito honesto por capacidade e por
+plataforma. **Não reimplementa** — compõe os provadores existentes.
+
+- **`src/installer/clean-machine-pack.js`** (schema `gstack.cleanmachine.v1`): agregador PURO do
+  veredito. Invariantes fail-closed — só `passed` é verde; `not_applicable`/`blocked_missing_engine`/
+  `not_run` nunca contam nem inflam o placar; capacidade `unsupported` na plataforma corrente ⇒
+  `not_applicable` (nunca "passa por omissão"); backend REQUIRED sem engine ⇒
+  `blocked_missing_engine` ⇒ veredito `ready_engines_blocked` (parcial honesto, **nunca "ready"
+  liso nem "not_ready" por engine**); qualquer jornada falha ⇒ `not_ready`; jornada não-rodada ⇒
+  `incomplete`.
+- **`scripts/clean-machine-pack.mjs`** + **`npm run test:cleanmachine`**: orquestra a jornada real
+  compondo `test:e2e:package` (tarball → prefixo isolado → create/build/uninstall byte-a-byte),
+  `tools clean-machine --json` (12 invariantes offline), `proof --profile full --explain --json` e
+  `dream audit`. Backends sem Docker local = `blocked_missing_engine` (E2E real em CI dedicado).
+  Grava `.gstack/reports/cleanmachine.json`.
+- **`.docs/GUIDES/clean-machine-runbook.md`**: passo a passo para o usuário rodar em Windows/macOS/
+  Linux e reportar o JSON (o transcript vira insumo, como no PRD26), com matriz de plataforma.
+- **Testes** `clean_machine_pack` (7): 3 controles negativos (backend sem engine nunca vira "ready";
+  jornada falha ⇒ not_ready mesmo com resto verde; unsupported ⇒ N/A nunca passed). QG strict 0;
+  lint 0; typecheck limpo. JS **1147** (1 skip) + Py **84**.
+
+Os 23 cenários E2E do PRD42 §S42.13 já estão majoritariamente cobertos pelas capacidades provadas
+em S42.0–S42.12 (acceptance demo, behavioral conformance, debug científico, Lite/Full, tarball
+lifecycle, OpenHands wsl_only, matriz de harness). O **gate de release + tag/publish `v5.0.0`**
+permanece dependente de aprovação humana e source parity (não executado autonomamente).
+
 ## [4.22.0] - 2026-07-14 — Acceptance Demo + scorecard + health pós-deploy (PRD42 S42.12)
 
 Fecha a Fase 3. `proof --explain` mostra a MESMA evidência do proof em duas visões — uma **leiga**
