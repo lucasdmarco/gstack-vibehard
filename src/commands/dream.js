@@ -50,11 +50,13 @@ function promoteCmd(cwd, args, json) {
   })
 }
 function claimIcon(status) {
-  return status === "REAL" ? "✓" : status === "RISK" ? "⚠" : status === "PLACEBO" ? "✗" : "•"
+  return status === "REAL" ? "✓" : status === "RISK" ? "⚠" : status === "PLACEBO" ? "✗" : status === "NOT_PROVED" ? "○" : "•"
 }
 
 function auditCmd(ctx) {
-  const r = audit({ root: ctx.root })
+  // PRD42 S42.0B: o modo COMPORTAMENTAL é o default do CLI — arquivo presente não vale
+  // como REAL (vira NOT_PROVED). O modo legado (por arquivo) só sob opt-in `--files-only`.
+  const r = audit({ root: ctx.root, behavioral: !ctx.filesOnly })
   return emit(ctx.json, r, () => {
     section("dream audit — promessas vs evidência (determinístico, sem LLM)")
     for (const c of r.claims) {
@@ -108,7 +110,7 @@ function trustLabel(level) {
 }
 
 function statusCmd(ctx) {
-  const r = audit({ root: ctx.root })
+  const r = audit({ root: ctx.root, behavioral: !ctx.filesOnly })
   const payload = { audit: r.summary, harnesses: HARNESS_CAPABILITIES, learning: learningSummary(ctx.cwd) }
   return emit(ctx.json, payload, () => {
     section("dream status")
@@ -138,6 +140,6 @@ const SUBCOMMANDS = {
 
 export async function dreamCommand(args = [], opts = {}) {
   const sub = args.find((a) => !a.startsWith("--")) || "status"
-  const ctx = { sub, args, json: args.includes("--json"), root: opts.root, cwd: opts.cwd || process.cwd(), improveDeps: opts.improveDeps }
+  const ctx = { sub, args, json: args.includes("--json"), filesOnly: args.includes("--files-only"), root: opts.root, cwd: opts.cwd || process.cwd(), improveDeps: opts.improveDeps }
   return (SUBCOMMANDS[sub] || statusCmd)(ctx)
 }

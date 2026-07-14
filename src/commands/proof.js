@@ -38,7 +38,9 @@ function checkDream(deps) {
   // O dream audit do proof mede O PRODUTO (package root do gstack), não o cwd —
   // rodar `proof` em C:\Users\x auditava o HOME e dava 0 REAL (pego na máquina
   // limpa real). O `scope` no resultado declara o root auditado.
-  const d = (deps.dream || audit)({})
+  // PRD42 S42.0B: o proof audita o produto em modo COMPORTAMENTAL (arquivo não prova REAL).
+  // Seguro p/ o ready: behavioral só rebaixa REAL→NOT_PROVED; RISK/PLACEBO ficam intactos.
+  const d = (deps.dream || audit)({ behavioral: true })
   const s = d.summary
   const ok = s.RISK === 0 && s.PLACEBO === 0
   return { ok, summary: s, scope: d.scope, blocker: ok ? null : `dream audit: ${s.RISK} RISK / ${s.PLACEBO} PLACEBO` }
