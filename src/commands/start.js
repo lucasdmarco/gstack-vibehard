@@ -12,6 +12,7 @@ import { classifyWorkspace } from "../runtime/workspace.js"
 import { buildSkillRoute, buildModelIntake, MODEL_INTAKE_SOURCES } from "../skills/route.js"
 import { registerDesignSystem, evaluatePreWriteGate, resolveDesignSystem } from "../skills/design-system.js"
 import { resolveLoopDecision, LOOP_MODES } from "../skills/loop-router.js"
+import { contractsForRoute } from "../skills/execution-contract.js"
 
 /**
  * `start` — entrada Replit-like (PRD18 Sprint 1). Orquestra o wizard (objetivo →
@@ -234,6 +235,12 @@ async function confirmAndRunPipeline(plan, flags, opts, json, cwd, brief) {
   // Rota de skills DECLARADA antes do confirm (29.2): pergunta intake se frontend.
   const skillRoute = await declareSkillRoute(plan, flags, opts, json)
   writeFileSync(join(planDir, "skill-route.json"), JSON.stringify(skillRoute, null, 2) + "\n")
+
+  // Skill Execution Contract (S42.3): cada skill selecionada entra sob contrato
+  // selected→loaded→applied→verified (hash). Enforcement honesto (advisory na CLI —
+  // sem real_hooks do harness). Verificação por hash roda onde a skill executa.
+  writeFileSync(join(planDir, "skill-execution.json"),
+    JSON.stringify(contractsForRoute(skillRoute, { harnessEnforcement: opts.harnessEnforcement || null }), null, 2) + "\n")
 
   // Loop Router declara o modo de execução inferido (F2-C) — ortogonal ao gate,
   // registrado sempre (mesmo que o gate abaixo bloqueie).

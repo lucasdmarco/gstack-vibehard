@@ -1,5 +1,25 @@
 # Changelog - gstack-vibehard
 
+## [4.13.0] - 2026-07-14 — Skill Execution Contract: selecionada ≠ aplicada (PRD42 S42.3)
+
+Uma skill não é "aplicada" porque foi SELECIONADA. Este sprint dá teeth ao ciclo de execução
+de skills com um contrato tipado + verificação por hash com **mutation test** embutido.
+
+- **`src/skills/execution-contract.js`** (schema `gstack.skill-execution.v1`): ciclo
+  `selected → loaded → applied → verified` (ou `failed`); transição fora de ordem =
+  `invalid_transition` (fail-closed). `recordApplied` grava o **hash** de cada deliverable;
+  `verifyExecution` recomputa e reprova se um deliverable **some** ou **muda** após o applied
+  (mutation test). Contrato **sem deliverables NÃO é sucesso vazio** (`empty:true → failed`).
+- **Enforcement honesto** (ligado ao S42.0A): `enforcementFor` só marca `enforced` para
+  `real_hooks` (Claude); instructional/rules_only/partial → `advisory`. O contrato nunca afirma
+  bloqueio que o harness não tem.
+- **`contractsForRoute`** + `start` persiste `skill-execution.json` (um contrato por skill
+  selecionada, estado `selected`, enforcement advisory na CLI). A verificação por hash roda onde
+  a skill executa.
+- **Testes** `skill_execution_contract`: ciclo feliz; **mutation** (deliverable ausente e conteúdo
+  alterado reprovam); transição fora de ordem fail-closed; contrato vazio ≠ sucesso; enforcement
+  honesto. QG strict 0 (cc≤6 em todo o módulo); lint 0; typecheck limpo.
+
 ## [4.12.0] - 2026-07-14 — Design Direction v2: o gate valida CONTEÚDO, não só status (PRD42 S42.2)
 
 Fecha o gap real do Design System Gate v1: `statusOfDs` promovia **qualquer** `engine`/`path` a
