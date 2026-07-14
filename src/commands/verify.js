@@ -5,6 +5,9 @@ import { execFileSync } from "child_process"
 import { runVerify } from "../project-plan/verify-runner.js"
 import { runChangedFilesVerify } from "../project-plan/changed-files.js"
 import { npxArgv } from "../installer/deps.js"
+import { aggregateTier } from "../project-plan/quality-profile.js"
+import { isKnownTier } from "../project-plan/qa-plan.js"
+import { dockerAvailable } from "../capabilities/e2e-runner.js"
 import { success, warn, error, info, section } from "../cli/index.js"
 
 /**
@@ -129,12 +132,30 @@ function tryChangedFiles(args, cwd, opts, json) {
   if (!args.includes("--changed-files")) return null
   return handleChangedFiles(cwd, opts, json)
 }
+// S42.8: `--tier smoke|regression|release` é ADITIVO ao --profile. release exige engine (Docker);
+// ausente ⇒ blocked_missing_engine (nunca skip-verde). Ausência de --tier = comportamento intacto.
+const pickTier = (args) => { const ti = args.indexOf("--tier"); return ti !== -1 && args[ti + 1] ? args[ti + 1] : null }
+const dockerInfoProbe = () => { execFileSync("docker", ["info"], { stdio: "ignore", timeout: 15000 }); return true }
+
+const downgradeIfTierBlocks = (report) => { if (!report.tier.ready && report.status === "ready") report.status = "blocked" }
+
+function applyTierGate(args, report, opts) {
+  const tier = pickTier(args)
+  if (!tier) return
+  if (!isKnownTier(tier)) { report.tier = { ready: false, unknownTier: tier }; return }
+  const engineAvailable = dockerAvailable(opts.engineProbe || dockerInfoProbe)
+  const checks = (report.steps || []).map((s) => ({ name: s.id, status: s.status }))
+  report.tier = aggregateTier({ tier, engineAvailable, checks })
+  downgradeIfTierBlocks(report)
+}
+
 function runFullVerify(args, cwd, opts) {
   const runId = opts.runId || randomUUID().slice(0, 8)
   const dir = join(cwd, ".gstack", "runs", runId)
   const report = runVerify({ cwd, profile: pickProfile(args), harness: pickHarness(args, opts), exec: opts.exec, stepExec: opts.stepExec, home: opts.home, runId, onStep: makeProgressSink(dir, runId) })
   // ECC AgentShield (opt-in): camada de segurança de prompt-injection, advisory.
   if (wantsAgentShield(args)) report.agentShield = runAgentShield(cwd, opts.exec)
+  applyTierGate(args, report, opts)
   persistVerify(dir, runId, report)
   return { report, runId }
 }
