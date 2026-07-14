@@ -1,5 +1,30 @@
 # Changelog - gstack-vibehard
 
+## [4.11.0] - 2026-07-14 — Intake estruturado + Product Brief (PRD42 S42.1)
+
+Abre a Fase 1 (produto). O wizard do `start` deixa de ser 2 perguntas soltas e vira um **intake
+estruturado** (≤5 decisões bloqueantes, cada uma com *why* + *consequência* + *default*) que
+produz um **Product Brief** com aceites honestos.
+
+- **Question Registry** (`src/project-plan/question-registry.js`): decisões bloqueantes
+  (`projectName`/`mode`/`integrations`/`deployTarget`) com why/consequência; defaults e opções
+  derivados do objetivo classificado (recipe) — não pergunta o que dá p/ inferir. Teto de 5
+  decisões é **fail-closed** (excede → lança). `slugFromObjective` determinístico.
+- **Intake** (`src/project-plan/intake.js`): resolve cada decisão rastreando a FONTE — `flag`
+  (CLI explícito) · `user_answer` (respondida) · `recommended_default` (`--yes`/não-interativo).
+  **`--yes` NUNCA inventa resposta**: grava o default com fonte explícita.
+- **Product Brief** (`src/project-plan/product-brief.js`, schema `gstack.product-brief.v1`):
+  cada aceite aponta um **verificador REAL** (scaffold→`verify --profile scaffold`, QG→`qg
+  --strict`, lint) OU é `pending_verifier` com motivo (feature/integração → conformance S42.4 /
+  E2E S42.13). `acceptanceIsHonest` = XOR (nunca os dois, nunca nenhum); `buildProductBrief` lança
+  se algum aceite ficar desonesto. `acceptanceCoverage` p/ o scorecard.
+- **Wizard = casca fina** (`wizard.js`) sobre o intake (não duplica FSM); `start` persiste
+  `brief.json` junto do plano (brief vivo p/ o closeout S42.10). Sem TTY e sem UI injetada →
+  não-interativo (evita pendurar no stdin — mesma regra `canPromptSelect`).
+- **Testes**: `intake_product_brief.test.js` (fonte por decisão; flag sobrepõe; XOR do aceite +
+  controle negativo; teto fail-closed; slug) e `start_wizard` ampliado (brief persistido). QG
+  strict 0 (`runIntake` → `intakeCtx`, cc≤6); lint 0; typecheck limpo.
+
 ## [4.10.4] - 2026-07-14 — Golden Harness + package lifecycle + curadoria Replit (PRD42 S42.0E)
 
 Fecha a **Fase 0** (reparo de baseline). Trava contratos de saída determinísticos como regressão
