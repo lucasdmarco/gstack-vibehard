@@ -4,7 +4,8 @@
  * Arquitetura HIBRIDA de dupla via — nao substitui o Composio, complementa:
  *  - Composio (nuvem): auth OAuth + acoes de ESCRITA nos apps padrao (@composio/mcp)
  *  - Printing Press (local): LEITURA de alta frequencia via CLI Go + SQLite, e
- *    cauda-longa sem API. Reduz tokens (~60-80% com --compact).
+ *    cauda-longa sem API. Reduz tokens com --compact (economia medida por ledger;
+ *    sem percentual cravado sem benchmark reproduzido).
  *
  * Este modulo e PURO (sem efeitos colaterais / sem rede): so monta o objeto.
  * Nada e instalado no bootstrap — tudo opt-in depois via `gstack_vibehard tools`.
