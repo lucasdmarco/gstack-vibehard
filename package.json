@@ -1,6 +1,6 @@
 {
   "name": "@gstack-vibehard/installer",
-  "version": "4.10.2",
+  "version": "4.10.3",
   "description": "gstack_vibehard — Cross-harness installer & fullstack template kit with deep agent integration (Codex, Claude Code, OpenCode)",
   "license": "MIT",
   "type": "module",
@@ -17,6 +17,7 @@
     "test:e2e": "node --test \"tests/e2e/**/*.e2e.test.js\"",
     "test:e2e:terminal": "node scripts/test-terminal-e2e.mjs",
     "test:e2e:lifecycle": "node scripts/test-e2e-lifecycle.mjs",
+    "test:e2e:capabilities": "node scripts/test-capabilities.mjs",
     "test:pack": "node scripts/test-pack.mjs",
     "test:templates": "node scripts/test-templates.mjs",
     "test:accept": "sh scripts/clean-install-acceptance.sh",

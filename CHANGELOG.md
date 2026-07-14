@@ -1,5 +1,25 @@
 # Changelog - gstack-vibehard
 
+## [4.10.3] - 2026-07-14 — E2E de backend: gating `blocked_missing_engine` + harness Docker real (PRD42 S42.0D)
+
+Estabelece a infraestrutura honesta de E2E de backend: capacidade `required` sem engine (Docker)
+fica `blocked_missing_engine` — **nunca** skip-verde nem `not_applicable→passed`.
+
+- **Gating (`src/capabilities/e2e-runner.js`).** `classifyE2E` (sem engine → `blocked_missing_engine`;
+  com engine, o probe real decide `passed|failed`; nunca inventa sucesso), `dockerAvailable`
+  (fail-closed), `aggregateCapabilityE2E` (required blocked/failed derruba `ready`; opcional não).
+- **Runner (`scripts/test-capabilities.mjs` + `npm run test:e2e:capabilities`).** Probea o Docker:
+  ausente → reporta `blocked_missing_engine` e sai 0 (local honesto); `--strict` sai 1 (release
+  exige engine). Presente → roda `tests/e2e/capabilities/` com `GSTACK_CAP_E2E=1`.
+- **Harness Docker REAL** (`tests/e2e/capabilities/docker-harness.e2e.test.js`): exercita um
+  container (`alpine` pinado por **digest**) + teardown; gated por contexto (não acopla Docker ao
+  suite principal). Prova que o harness roda Docker de verdade.
+- **Workflow** `.github/workflows/capability-e2e.yml`: job ubuntu com Docker, timeout + artifact.
+- **Testes** `capability_e2e_runner` (gating: blocked nunca vira passed; required bloqueia).
+  Suíte JS 1051 (1 skip honesto) + Py 84; QG strict 0; lint 0; typecheck limpo.
+- **Escopo honesto:** os probes POR-BACKEND (Casdoor RBAC, Atomic merge concorrente, AgentMemory
+  retrieval, OpenHands sandbox) são os cenários 17-18 do **S42.13** — não stubados aqui.
+
 ## [4.10.2] - 2026-07-14 — `start` dirigido pelo LoopEngine canônico (PRD42 S42.0C)
 
 Fecha o segundo (e último) bloqueador de baseline do §0. O `start` (runPipeline) deixa de ser uma

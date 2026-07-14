@@ -1,0 +1,42 @@
+name: Capability E2E
+
+# PRD42 S42.0D — E2E de BACKEND em job dedicado com engine (Docker). Prova a FÍSICA da
+# integração (não arquivo gerado). Regra dura: capacidade `required` sem engine = blocked
+# (nunca skip-verde). Roda em ubuntu (Docker disponível nos runners), com timeout e teardown.
+# Os probes por-backend (Casdoor RBAC, Atomic concorrente, AgentMemory retrieval, OpenHands
+# sandbox) crescem em tests/e2e/capabilities/ e são executados pelo mesmo runner (S42.13).
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "src/capabilities/**"
+      - "tests/e2e/capabilities/**"
+      - "scripts/test-capabilities.mjs"
+      - ".github/workflows/capability-e2e.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  capability-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Docker engine disponível?
+        run: docker info
+      - name: E2E de capacidade (strict — required sem engine BLOQUEIA)
+        run: node scripts/test-capabilities.mjs --strict
+      - name: Upload de evidências (best-effort)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: capability-e2e-evidence
+          path: |
+            .gstack/runs/**/evidence/**
+          if-no-files-found: ignore
