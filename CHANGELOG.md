@@ -1,5 +1,25 @@
 # Changelog - gstack-vibehard
 
+## [4.10.1] - 2026-07-14 — Dream Audit comportamental canônico + Capability Truth Contract (PRD42 S42.0B)
+
+Fecha um dos dois bloqueadores de baseline do §0 (o outro, `start`↔Loop Engine, é o S42.0C) e
+planta a fonte única de verdade de capacidade.
+
+- **Dream Audit comportamental é o DEFAULT do CLI.** `dream audit`/`dream status` rodam
+  `audit({behavioral:true})`: presença de arquivo não vale como `REAL` (vira `NOT_PROVED`) sem
+  contrato comportamental. Modo legado (por arquivo) só sob opt-in `--files-only`. O `proof`
+  também audita comportamental — seguro para o `ready` (behavioral só rebaixa `REAL→NOT_PROVED`;
+  `RISK`/`PLACEBO` intactos).
+- **Capability Truth Contract (§5.11).** `src/capabilities/{contract,registry,probe}.js`: um
+  `claim:real` exige backend EXERCITADO (runtime `healthy` + probe + controle negativo); arquivo
+  presente é no máximo `configured` → `not_proved`. Suporte é POR PLATAFORMA — OpenHands é
+  `wsl_only` no Windows e `not_proved` até o E2E de sandbox (S42.0D). Em LITE os backends do Full
+  são `excluded`. `probe.js` é puro/injetável (sem chamadas reais de Docker).
+- **Testes:** `dream_cli_behavioral`, `capability_contract` (com controles negativos Full).
+  Suíte JS 1044 + Py 84 verdes; QG strict 0; lint 0; typecheck limpo.
+- **Deferido honesto (incremental):** consumo pleno do registry por create/doctor + unificação
+  dos warnings de readiness no Gate Registry.
+
 ## [4.10.0] - 2026-07-14 — Capability Truth: verdade do Lite e dos claims (PRD42 S42.0A)
 
 Abre o programa PRD42 pela verdade operacional (antes de qualquer feature nova). Corrige três

@@ -62,7 +62,10 @@ test("proof: dream audit mede O PRODUTO (package root), não o cwd", async () =>
   const deps = greenDeps()
   deps.dream = (args) => { receivedArgs = args; return { summary: { REAL: 20, PARTIAL: 1, PLACEBO: 0, ROADMAP: 0, RISK: 0 }, scope: { target: "gstack_package" } } }
   const p = buildProof({ cwd: "C:/Users/alguem", deps })
-  assert.deepEqual(receivedArgs, {}, "sem root=cwd — o auditor usa o package root default")
+  // PRD42 S42.0B: o proof audita em modo COMPORTAMENTAL — passa apenas { behavioral: true },
+  // NUNCA root=cwd (o auditor usa o package root default; é o que prova "mede o PRODUTO").
+  assert.equal(receivedArgs.root, undefined, "sem root=cwd — o auditor usa o package root default")
+  assert.equal(receivedArgs.behavioral, true, "proof audita em modo comportamental")
   assert.equal(p.checks.dreamAudit.scope.target, "gstack_package")
 })
 
