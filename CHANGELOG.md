@@ -1,5 +1,26 @@
 # Changelog - gstack-vibehard
 
+## [4.16.0] - 2026-07-14 — Runtime manifest v3 + preview health-gated (PRD42 S42.6) — FECHA A FASE 1
+
+Fecha a Fase 1 (produto). O manifest de runtime ganha campos de PROJETO (corroborados pela
+evidência `.replit` do S42.0E) e o preview deixa de ficar "verde por subir".
+
+- **Manifest v3** (`schemaVersion 3`): campos de projeto `workflows`/`postMerge`/`deploy`/`health`.
+  `migrateManifestToV3` (não-destrutiva, idempotente, `migratedFrom`) preserva os services v2;
+  `buildRuntimeManifestV3`; `validateRuntimeManifestV3` reaproveita a validação de serviços do v2.
+  **v2 segue um contrato válido** (não quebra projetos existentes).
+- **Preview health-gated** (`evaluatePreviewReadiness` + `previewFromState`): a URL de preview só
+  fica `ready` quando um health probe REAL passou (`status="ready"`). Um serviço com URL mas
+  `status="unhealthy"` (o supervisor grava URL mesmo assim) agora reporta `unhealthy` e **retém a
+  URL** — nunca "verde por subir".
+- **Higiene de legado** (Fallow diff-scoped trouxe a dívida ao editar o arquivo): `validateServices`
+  (cc19), `migrateServiceToV2` (cc11) e `loadRuntimeManifest` (cc10) decompostos em tabelas/helpers
+  para cc≤6, sem mudar comportamento.
+- **Testes**: migração v2→v3 preserva services + idempotente; v3 valida workflows/deploy/health
+  (controle negativo: schemaVersion errado, workflows não-array); preview só ready com health ok
+  (controle negativo: unhealthy/sem-probe retêm URL); pipeline com serviço unhealthy NÃO libera
+  preview ready. QG strict 0; lint 0; typecheck limpo.
+
 ## [4.15.0] - 2026-07-14 — Artifact Review Pipeline + traceability determinística (PRD42 S42.5)
 
 Fecha a porta contra teatro de revisão e evidência órfã, com dois módulos puros e determinísticos.

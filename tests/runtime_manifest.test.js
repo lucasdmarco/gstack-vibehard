@@ -80,3 +80,53 @@ test("loadRuntimeManifest: prefere runtime.json; deriva de services.json se ause
   }
   assert.equal(loadRuntimeManifest("/proj", io2).services[0].name, "web")
 })
+
+// ── Manifest v3 + preview health-gated (PRD42 S42.6) ─────────────────────────────
+test("v3: migração não-destrutiva v2→v3 adiciona campos de projeto e preserva services", async () => {
+  const { buildRuntimeManifest, migrateManifestToV3, validateRuntimeManifestV3 } = await imp()
+  const v2 = buildRuntimeManifest({ services: [{ name: "web", command: "pnpm dev", port: 3000 }] })
+  const v3 = migrateManifestToV3(v2)
+  assert.equal(v3.schemaVersion, 3)
+  assert.equal(v3.migratedFrom, 2)
+  assert.equal(v3.services.length, 1, "services preservados")
+  assert.deepEqual(v3.workflows, [])
+  assert.ok(v3.health && v3.health.type === "http")
+  assert.equal(validateRuntimeManifestV3(v3).valid, true)
+  // idempotente
+  assert.equal(migrateManifestToV3(v3).schemaVersion, 3)
+})
+
+test("v3: buildRuntimeManifestV3 aceita workflows/postMerge/deploy; v2 segue válido", async () => {
+  const { buildRuntimeManifestV3, validateRuntimeManifest, validateRuntimeManifestV3, buildRuntimeManifest } = await imp()
+  const v3 = buildRuntimeManifestV3({
+    services: [{ name: "api", command: "node server.js", port: 8080 }],
+    workflows: [{ name: "Project", run: "pnpm dev" }], postMerge: { path: "scripts/post-merge.sh" },
+  })
+  assert.equal(v3.schemaVersion, 3)
+  assert.equal(v3.workflows[0].name, "Project")
+  assert.equal(validateRuntimeManifestV3(v3).valid, true)
+  // v2 continua um contrato válido separado (não quebra)
+  assert.equal(validateRuntimeManifest(buildRuntimeManifest({ services: [] })).valid, true)
+})
+
+test("CONTROLE NEGATIVO v3: schemaVersion errado e workflows não-array reprovam", async () => {
+  const { validateRuntimeManifestV3 } = await imp()
+  assert.equal(validateRuntimeManifestV3({ schemaVersion: 2, services: [], workflows: [] }).valid, false)
+  const r = validateRuntimeManifestV3({ schemaVersion: 3, services: [], workflows: "nope" })
+  assert.equal(r.valid, false)
+  assert.match(r.errors.join(" "), /workflows/)
+})
+
+test("preview health-gated: URL só ready com health probe ok (nunca 'verde por subir')", async () => {
+  const { evaluatePreviewReadiness } = await imp()
+  const ok = evaluatePreviewReadiness({ url: "http://127.0.0.1:3000/", healthProbe: { ok: true } })
+  assert.equal(ok.ready, true)
+  assert.equal(ok.url, "http://127.0.0.1:3000/")
+  // CONTROLE NEGATIVO: health falhou OU ausente → URL retida
+  const unhealthy = evaluatePreviewReadiness({ url: "http://x/", healthProbe: { ok: false } })
+  assert.equal(unhealthy.ready, false)
+  assert.equal(unhealthy.url, null)
+  const noProbe = evaluatePreviewReadiness({ url: "http://x/" })
+  assert.equal(noProbe.ready, false)
+  assert.match(noProbe.reason, /não é liberada só por subir/)
+})
