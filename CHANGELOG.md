@@ -1,5 +1,20 @@
 # Changelog - gstack-vibehard
 
+## [4.17.0] - 2026-07-14 — Step-close incremental: nunca a suíte inteira por edição (PRD42 S42.7)
+
+Abre a Fase 2 (qualidade). Uma edição roda SÓ as checagens que o diff pede — a suíte completa
+fica para verify/proof. Estende o Action Kernel (não duplica a matriz superfície→checks).
+
+- **`src/project-plan/change-surface.js`** (schema `gstack.change-surface.v1`): classifica o diff
+  por SUPERFÍCIE (migrations/runtime/backend/cli/frontend/skills/tests/config/docs) via caminho, e
+  decide se GATEIA release (`blocking`). Complementa o `classifyDiff` (por tipo de arquivo) do kernel.
+- **`src/project-plan/step-close.js`** (schema `gstack.step-close.v1`): EXECUTA as checagens que
+  `stepClose` (Action Kernel) escolheu, via runners injetados. Invariante `ranFullSuite: false`
+  SEMPRE. Runner ausente → `skipped` (NÃO conta como pass); runner que falha/lança → `failed`.
+- **Testes** `step_close_incremental`: superfície de risco gateia (docs-only não); **invariante**
+  (diff de 500 arquivos NÃO roda a suíte); runner ausente=skipped≠pass; runner falho/exceção reprova
+  (controle negativo); frontend seleciona `visual-evidence`. QG strict 0; lint 0; typecheck limpo.
+
 ## [4.16.0] - 2026-07-14 — Runtime manifest v3 + preview health-gated (PRD42 S42.6) — FECHA A FASE 1
 
 Fecha a Fase 1 (produto). O manifest de runtime ganha campos de PROJETO (corroborados pela
