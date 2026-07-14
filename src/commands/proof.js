@@ -5,6 +5,7 @@ import { buildReadiness } from "../tools/readiness.js"
 import { routeDefaultOn, headroomPendency } from "../tools/headroom-policy.js"
 import { evaluateSkillGateRelease } from "../skills/evidence.js"
 import { resolveGateOutcomes, buildGateRegistry } from "../skills/gate-registry.js"
+import { explainProof } from "../skills/acceptance-demo.js"
 import { success, warn, error, info, section } from "../cli/index.js"
 
 /**
@@ -141,10 +142,37 @@ const profileFrom = (args) => {
   const i = args.indexOf("--profile")
   return i >= 0 ? args[i + 1] : "release"
 }
+
+// PRD42 S42.12: `--explain` mostra a MESMA evidência em visão leiga + técnica.
+function renderExplain(demo) {
+  section(`proof --explain (${demo.schema})`)
+  info("  — Visão leiga —")
+  ;(demo.ready ? success : error)(`  ${demo.lay.veredito}`)
+  info(`  placar: ${demo.lay.placar}`)
+  demo.lay.oQueFunciona.forEach((w) => success(`  ✓ ${w}`))
+  demo.lay.oQueFalta.forEach((g) => error(`  ✗ falta: ${g}`))
+  demo.lay.naoAvaliado.forEach((n) => info(`  – não avaliado: ${n.item} (${n.motivo})`))
+  info("  — Visão técnica —")
+  info(`  verdict=${demo.technical.verdict} · score ${demo.technical.score.passed}/${demo.technical.score.total} · gates ${demo.technical.gateRegistry}`)
+  demo.technical.checks.forEach((c) => info(`    ${c.id}: ${c.status}${c.p0 ? " [P0]" : ""}`))
+  demo.technical.blockers.forEach((b) => error(`  bloqueio: ${b}`))
+}
+
+const buildDemo = (proof, args, opts) =>
+  args.includes("--explain") ? explainProof(proof, { deploy: opts.deploy || {} }) : null
+
+function emitJson(proof, demo) {
+  const payload = demo ? { ...proof, acceptanceDemo: demo } : proof
+  process.stdout.write(JSON.stringify(payload) + "\n")
+  return payload
+}
+
 export async function proofCommand(args = [], opts = {}) {
   const proof = buildProof({ cwd: opts.cwd || process.cwd(), profile: profileFrom(args), deps: opts.deps })
   process.exitCode = proof.ready ? 0 : 1
-  if (args.includes("--json")) { process.stdout.write(JSON.stringify(proof) + "\n"); return proof }
+  const demo = buildDemo(proof, args, opts)
+  if (args.includes("--json")) return emitJson(proof, demo)
+  if (demo) { renderExplain(demo); return proof }
   renderProof(proof)
   return proof
 }

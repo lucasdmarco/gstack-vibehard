@@ -1,5 +1,25 @@
 # Changelog - gstack-vibehard
 
+## [4.22.0] - 2026-07-14 — Acceptance Demo + scorecard + health pós-deploy (PRD42 S42.12)
+
+Fecha a Fase 3. `proof --explain` mostra a MESMA evidência do proof em duas visões — uma **leiga**
+(fundador/usuário final) e uma **técnica** (auditoria de gates) — que nunca divergem no veredito.
+
+- **`src/skills/delivery-scorecard.js`** (schema `gstack.delivery-scorecard.v1`): placar de entrega
+  com invariante inegociável — a **MÉDIA NUNCA ESCONDE UM P0**. Existindo qualquer item P0
+  reprovado, o veredito é `blocked`, por mais alto que seja o score dos demais. **Health pós-deploy
+  SEM deploy = `not_applicable`** — nunca conta como aprovado nem entra na média (N/A não é verde;
+  herda a lição do S42.8). `scorecardFromProof` adapta um `gstack.proof.v1` em itens do placar.
+- **`src/skills/acceptance-demo.js`** (schema `gstack.acceptance-demo.v1`): `explainProof` deriva as
+  visões leiga+técnica da MESMA evidência. Invariante fail-closed: `lay.ready === technical.ready ===
+  proof.ready` — a visão leiga JAMAIS diz "PRONTO" com a técnica bloqueada (lança se divergir).
+- **`src/commands/proof.js`**: flag `--explain` (aditiva) renderiza/serializa as duas visões;
+  `proofCommand` decomposto (`buildDemo`/`emitJson`) para cc≤6.
+- **Testes** `acceptance_demo`: média 90% NÃO vira "ready" com um P0 quebrado (controle negativo);
+  sem deploy→health not_applicable (nunca passed); deploy quebrado→health P0→blocked; visões não
+  divergem; **proof bloqueado ⇒ visão leiga nunca diz pronto** (controle negativo). QG strict 0;
+  lint 0; typecheck limpo.
+
 ## [4.21.0] - 2026-07-14 — Paralelismo adaptativo (PRD42 S42.11)
 
 Estende o preflight de DAG (`analyzeParallelSafety`) com decisões honestas de quando paralelizar.
