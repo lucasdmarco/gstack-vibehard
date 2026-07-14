@@ -27,10 +27,23 @@ import { DEFAULT_LOOP_BUDGET } from "../loop-budget/policy.js"
 import { writeProjectMarker } from "../project/identity.js"
 import { buildAtomicPlan, executePlan } from "../installer/operation-plan.js"
 import { runTransaction } from "../installer/journal.js"
+import { ADAPTER_MATRIX } from "../agents/adapter-matrix.js"
 
 const HOME = resolve(homedir() || process.env.USERPROFILE || process.env.HOME || "/tmp")
 
-const OMNIHARNESS_MAP = [
+// PRD42 S42.0A: o `mode` do harness deve ser HONESTO — só quem tem enforcement
+// `real_hooks` na matriz canônica pode ser rotulado "agent-hooks". Instrucional/rules/
+// partial NUNCA aparecem como agent-hooks. Delivery-only (fora da matriz) mantém o fallback.
+const ENFORCEMENT_TO_MODE = Object.freeze({
+  real_hooks: "agent-hooks", partial: "partial-hooks",
+  rules_only: "rules", instructional: "instructional", detection_only: "detection-only",
+})
+const honestMode = (id, fallback) => {
+  const info = ADAPTER_MATRIX[id]
+  return info ? ENFORCEMENT_TO_MODE[info.enforcement] || fallback : fallback
+}
+
+export const OMNIHARNESS_MAP = [
   { id: "claude", label: "Claude Code", configDir: join(HOME, ".claude"), hooksFile: "settings.json", mode: "agent-hooks" },
   { id: "cursor", label: "Cursor", configDir: join(HOME, ".cursor"), hooksFile: "hooks.json", mode: "agent-hooks" },
   { id: "codex", label: "OpenAI Codex CLI", configDir: join(HOME, ".codex"), hooksFile: "hooks.json", mode: "agent-hooks" },
@@ -42,7 +55,7 @@ const OMNIHARNESS_MAP = [
   { id: "zed", label: "Zed Editor", configDir: join(HOME, ".zed"), hooksFile: "settings.json", mode: "zed" },
   { id: "hermes", label: "Hermes CLI", configDir: join(HOME, ".hermes", "skills"), hooksFile: null, mode: "graphify" },
   { id: "trae", label: "Trae", configDir: null, hooksFile: null, mode: "graphify" },
-]
+].map((h) => ({ ...h, mode: honestMode(h.id, h.mode) }))
 
 const defaultLogger = {
   info:   (m) => console.log(`  ${m}`),
@@ -433,7 +446,7 @@ function bootHeadroom(logger, projectDir) {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  PHASE 4: Omniharness (agent-hooks & Skills)
+//  PHASE 4: Omniharness (hooks reais só onde a matriz confirma; senão orientação)
 // ─────────────────────────────────────────────────────────────
 
 function writeSkillsDir(projectDir) {
@@ -636,22 +649,23 @@ const TEMPLATE_MANIFEST = {
 
 const resolvePort = (tpl) =>
   (tpl.ports.length === 1 ? tpl.ports[0].port : (tpl.ports.find((p) => p.name === "web")?.port || tpl.ports[0].port))
-// app.json reflete as CAPACIDADES REAIS (P0.5): em lite não há Atomic/Casdoor/ECC.
+// app.json reflete as CAPACIDADES REAIS (P0.5 + PRD42 S42.0A). Tabela por MODO = fonte
+// única do que cada modo materializa (lite exclui Atomic/Casdoor/ECC/OpenHands/paperclip);
+// mantém buildAppManifest com CC baixo e a verdade do Lite num só lugar.
+const MODE_CAPABILITIES = Object.freeze({
+  lite: { vcs: "git", sandbox: "none", controlPlane: null, mcpGateway: null, meshFederation: false, ticketOrchestration: null, iam: "none" },
+  full: { vcs: "atomic", sandbox: "openhands", controlPlane: "ecc-universal", mcpGateway: "casdoor", meshFederation: true, ticketOrchestration: "paperclip", iam: "casdoor-local" },
+})
 function buildAppManifest({ projectName, now, isLite, tpl }) {
+  const mode = isLite ? "lite" : "full"
   return {
     name: projectName,
     runtime: "gstack-workspace",
-    mode: isLite ? "lite" : "full",
+    mode,
     createdAt: now(),
     packageManager: "pnpm",
     harnesses: OMNIHARNESS_MAP.map((h) => h.id),
-    vcs: isLite ? "git" : "atomic",
-    sandbox: "openhands",
-    controlPlane: isLite ? null : "ecc-universal",
-    mcpGateway: isLite ? null : "casdoor",
-    meshFederation: !isLite,
-    ticketOrchestration: "paperclip",
-    iam: isLite ? "none" : "casdoor-local",
+    ...MODE_CAPABILITIES[mode],
     run_command: tpl.run_command,
     build_command: tpl.build_command,
     env: tpl.env,
@@ -859,7 +873,9 @@ globs: ["**/*"]
 alwaysApply: true
 ---
 Sempre passe pelo Quality Gate local antes de finalizar o codigo.
-Eventos de ferramentas devem ser logados via agent-hooks.
+O bloqueio real vem do Quality Gate e dos hooks de projeto quando instalados; estas
+regras sao orientacao (nao bloqueiam por si). Veja o nivel de enforcement por harness
+em: gstack_vibehard agents doctor --json.
 `)
 
     // NOTA: `create` é PROJECT-SCOPED. A config GLOBAL de harness (Claude
@@ -1419,11 +1435,15 @@ async function scaffoldOrchestration(c, projectDir) {
   writeHarnessFiles(projectDir, projectName, { isLite })
   if (!isLite) await tryHarnessBridge(projectDir, options, logger)
   writeTeamMatrix(projectDir, projectName)
-  writeGatewayMcpConfig(projectDir)
-  writePaperclipManifest(projectDir, projectName)
-  // Casdoor/IAM não existe em lite — não escrever config apontando p/ serviço offline.
-  if (!isLite) writeCasdoorProjectConfig(projectDir)
-  bootHeadroom(logger, projectDir) // non-critical, try/catch interno
+  // PRD42 S42.0A: Casdoor/Headroom (MCP) e a orquestração de tickets (paperclip/symphony,
+  // que invoca openhands.validate) são capacidades do FULL. Em Lite não se materializa
+  // config apontando p/ backend excluído — o modo Lite fica honestamente sem esses artefatos.
+  if (!isLite) {
+    writeGatewayMcpConfig(projectDir)
+    writePaperclipManifest(projectDir, projectName)
+    writeCasdoorProjectConfig(projectDir)
+    bootHeadroom(logger, projectDir) // non-critical, try/catch interno
+  }
 }
 
 function writeLinkVaultScripts(projectDir, vaultProjectDir) {

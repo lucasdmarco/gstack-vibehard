@@ -1,5 +1,25 @@
 # Changelog - gstack-vibehard
 
+## [4.10.0] - 2026-07-14 — Capability Truth: verdade do Lite e dos claims (PRD42 S42.0A)
+
+Abre o programa PRD42 pela verdade operacional (antes de qualquer feature nova). Corrige três
+divergências claim-vs-código confirmadas na auditoria da v4.9.0.
+
+- **Vazamento do modo LITE (bug de usuário final).** `create` escrevia, em QUALQUER modo,
+  `.mcp.json` com `casdoor-gateway`+`headroom`, os manifestos `paperclip.toml`/`symphony.yml`
+  (que invocam `openhands.validate`) e bootava o Headroom; o `app.json` declarava
+  `sandbox:"openhands"` fixo. Agora esses artefatos são exclusivos do **Full**; o `app.json`
+  deriva de uma tabela `MODE_CAPABILITIES` (fonte única por modo → Lite: `sandbox:"none"`,
+  `ticketOrchestration:null`, sem Casdoor/Headroom/OpenHands).
+- **Metadata de harness honesto.** `OMNIHARNESS_MAP.mode` passa a derivar da matriz canônica
+  (`adapter-matrix`): só enforcement `real_hooks` é rotulado `agent-hooks`; cursor/codex/windsurf/
+  opencode não. O `.mdc` gerado deixa de prometer bloqueio via `agent-hooks`.
+- **Claims sem medição removidos.** "até 95%" (`instructional.js`, texto ao usuário) e "60-80%"
+  (`printing-press/registry.js`) — economia só é afirmada por ledger medido.
+- **Testes:** `create_lite_capabilities` (Lite sem MCP/paperclip/OpenHands + controle negativo
+  Full) e `create_full_claims` (guidance sem `%`; `agent-hooks` só para `real_hooks`). Suíte JS
+  1036 + Py 84 verdes; QG strict `blocking_severity_count:0`; lint 0; typecheck limpo.
+
 ## [4.9.0] - 2026-07-13 — Release Candidate (fecha o programa PRD41)
 
 ### Sprint S41.9 — Templates vivos, honestidade do Dream Audit e RC (PRD41 / PRD40 P1.6+P1.7+P1.8)

@@ -36,9 +36,10 @@ cargo test / go test). Nao entregue codigo com testes vermelhos.
 - Antes de reexplorar o codigo, consulte a topologia via Graphify
   (graphify-out/graph.json) em vez de reler arquivos — economia de tokens.
 
-## Economia extrema de tokens
+## Economia de tokens
 - Graphify: le a AST/topologia do projeto sem custo de API.
-- Headroom: comprime RAG/logs em ate 95% no proxy MCP.
+- Headroom: comprime RAG/logs no proxy MCP (economia MEDIDA por ledger; sem numero
+  cravado sem benchmark reproduzido nesta maquina).
 - Prefira ler o grafo a reler arquivos inteiros.
 
 ## Seguranca
