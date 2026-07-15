@@ -151,17 +151,19 @@ function safeDownloadAndRun(url, logger, label, opts = {}) {
 //  PHASE 1: Identity & IAM Local (Casdoor)
 // ─────────────────────────────────────────────────────────────
 
-function writeCasdoorCompose(projectDir) {
-  const composeDir = join(projectDir, ".gstack")
-  mkdirSync(composeDir, { recursive: true })
-  writeFileSync(join(composeDir, "docker-compose.yml"),
-`version: "3.8"
+// PRD45 P0.4: imagem FIXADA POR DIGEST (nunca `:latest` mutável — supply chain) e publicada
+// SÓ em loopback `127.0.0.1` (nunca `0.0.0.0`, que exporia a credencial-padrão conhecida na
+// rede local). Digest do índice multi-arch de casbin/casdoor (imutável, verificado 2026-07-14).
+export const CASDOOR_IMAGE = "casbin/casdoor@sha256:70ca9e1af2e4b39247a9c331b08c8b3f29d24c5b371c56817b1f55797ce21fc3"
+
+export function casdoorComposeYaml() {
+  return `version: "3.8"
 services:
   casdoor:
-    image: casbin/casdoor:latest
+    image: ${CASDOOR_IMAGE}
     container_name: casdoor
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
       driver: "sqlite"
       dataSource: "/var/lib/casdoor/casdoor.db"
@@ -171,7 +173,13 @@ services:
 
 volumes:
   casdoor-data:
-`)
+`
+}
+
+function writeCasdoorCompose(projectDir) {
+  const composeDir = join(projectDir, ".gstack")
+  mkdirSync(composeDir, { recursive: true })
+  writeFileSync(join(composeDir, "docker-compose.yml"), casdoorComposeYaml())
 }
 
 const casdoorExists = (name) => !!name && name.toString().trim() === "casdoor"
@@ -199,7 +207,9 @@ function composeCasdoorUp(logger, projectDir) {
   }
   if (out) {
     logger.success("Casdoor IAM rodando em http://localhost:8000")
-    logger.info("  User: admin / Password: 123 (mude apos primeiro login)")
+    logger.warn("  SEGURANCA: credencial-padrao INSEGURA admin/123 (Casdoor demo).")
+    logger.warn("  Publicado SO em 127.0.0.1 (loopback) — TROQUE a senha antes de qualquer")
+    logger.warn("  uso real/compartilhado; nunca exponha esta instancia na rede.")
     return "http://localhost:8000"
   }
   logger.warn("Casdoor nao iniciou — IAM local indisponivel. Projeto continua sem gateway de identidade.")
@@ -516,9 +526,12 @@ function writeGatewayMcpConfig(projectDir) {
           GATEWAY_MODE: "local-iam",
         },
       },
+      // PRD45 P0.1: usa o BINÁRIO REAL `headroom mcp` (idêntico ao caminho de install em
+      // src/harness/headroom.js) — NUNCA `npx -y @gstack/headroom-proxy` (pacote fantasma,
+      // E404 no registry). Nunca `npx -y` sem pin em config gerada (baixaria da rede ao abrir).
       headroom: {
-        command: "npx",
-        args: ["-y", "@gstack/headroom-proxy"],
+        command: "headroom",
+        args: ["mcp"],
         env: {
           HEADROOM_CACHE_SIZE: "500mb",
           HEADROOM_COMPRESSION: "gzip",
@@ -979,7 +992,7 @@ ${isLite ? "\n> Modo lite: sem Casdoor/IAM, Atomic VCS, ECC (ecc-universal) ou A
 - Quality gate: npx fallow audit --format json
 - Coverage gaps: pnpm coverage:gaps
 - Tickets: paperclip status
-${isLite ? "" : "- IAM: http://localhost:8000 (admin/123)\n"}- Workflows: /effort ultracode (para tarefas complexas)
+${isLite ? "" : "- IAM: http://127.0.0.1:8000 (loopback; credencial-padrao INSEGURA admin/123 — TROQUE antes de uso real)\n"}- Workflows: /effort ultracode (para tarefas complexas)
 
 ## auto_fixable
 A IA corrige automaticamente bugs estruturais detectados pelo fallow.
@@ -1520,7 +1533,7 @@ function printCreateSummary(c, projectDir, phases, vaultProjectDir) {
   logger.info(`  Diretorio: ${projectDir}`)
   logger.info(`  Template: ${templateName}`)
   if (!isLite) printFullComponents(phases, logger)
-  if (!isLite) logger.info(`  IAM: http://localhost:8000 (admin/123)`)
+  if (!isLite) logger.warn(`  IAM: http://127.0.0.1:8000 (loopback) — credencial-padrao INSEGURA admin/123; TROQUE antes de uso real`)
   if (vaultProjectDir) logger.info(`  Vault: ${vaultProjectDir}`)
   else logger.info(`  Modo lite: projeto isolado em ./${projectName} (sem escrita global). Use --full ou --vault para o vault Obsidian.`)
   logger.info(`  Quality gate: npx fallow audit --format json`)
