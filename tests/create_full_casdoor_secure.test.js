@@ -24,3 +24,14 @@ test("Casdoor compose: imagem por digest e bind só em loopback (nunca :latest /
   assert.ok(!/^\s*-\s*"?8000:8000"?\s*$/m.test(yaml), "CONTROLE NEGATIVO: nunca `8000:8000` (0.0.0.0)")
   assert.match(yaml, /127\.0\.0\.1:\d+:8000/, "publica só em loopback 127.0.0.1")
 })
+
+test("Casdoor: nome de container POR PROJETO (anti-colisão) e slug seguro", async () => {
+  const { casdoorContainerName, casdoorComposeYaml } = await import(`${pathToFileURL(modulePath)}?t=${Date.now()}`)
+  // Slug determinístico e seguro (sem colisão entre projetos, sem chars perigosos).
+  assert.equal(casdoorContainerName("My App!"), "casdoor-my-app")
+  assert.equal(casdoorContainerName("api-backend"), "casdoor-api-backend")
+  assert.equal(casdoorContainerName(""), "casdoor-app", "fallback quando vazio")
+  // O compose usa o nome por projeto — dois projetos ⇒ containers distintos.
+  assert.match(casdoorComposeYaml("casdoor-my-app"), /container_name:\s*casdoor-my-app/)
+  assert.notEqual(casdoorContainerName("a"), casdoorContainerName("b"))
+})
