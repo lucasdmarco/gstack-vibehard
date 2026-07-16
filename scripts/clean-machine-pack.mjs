@@ -79,6 +79,10 @@ const httpBody = (url, body) => {
     { encoding: "utf-8", timeout: 20000, stdio: ["ignore", "pipe", "pipe"], shell: false })
   try { return JSON.parse(String(r.stdout || "")) } catch { return null }
 }
+const httpGetJson = (url) => {
+  const r = spawnSync(curlBin(), ["-s", "--max-time", "15", url], { encoding: "utf-8", timeout: 20000, stdio: ["ignore", "pipe", "pipe"], shell: false })
+  try { return JSON.parse(String(r.stdout || "")) } catch { return null }
+}
 
 /**
  * PRD45 S45.0 — E2E REAL de RBAC do Casdoor. Antes esta capacidade era `passed` só porque
@@ -129,10 +133,15 @@ async function runCasdoorRbacE2E() {
 }
 // (a) CONTROLE NEGATIVO: sem sessão, a API tem que RECUSAR. @returns erro ou null.
 const anonMessage = (r) => String(r.msg || r.data || "")
+// A negação legítima do Casdoor tem duas formas conforme o verbo: GET sem sessão responde
+// "Please login first"; POST responde "Unauthorized operation". Ambas SÃO negação — aceitar
+// só uma reprovava um RBAC que estava funcionando (pego no 1º run real do pack).
+const DENIED_RX = /login|unauthorized|forbidden/i
 function rbacDeniesAnon() {
-  const anon = httpBody(`${CASDOOR_CM_URL}/api/get-account`, "{}")
+  // GET é o caminho real da UI — foi assim que a negação foi verificada à mão.
+  const anon = httpGetJson(`${CASDOOR_CM_URL}/api/get-account`)
   if (!anon) return "RBAC: /api/get-account não respondeu JSON"
-  if (anon.status === "error" && /login/i.test(anonMessage(anon))) return null
+  if (anon.status === "error" && DENIED_RX.test(anonMessage(anon))) return null
   return `RBAC não negou anônimo (resposta: ${JSON.stringify(anon).slice(0, 80)})`
 }
 // (b) credencial válida tem que ser ACEITA — senão um IAM que nega TUDO passaria como RBAC.
