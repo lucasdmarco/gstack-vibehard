@@ -163,7 +163,46 @@ export function casdoorContainerName(projectName) {
   return `casdoor-${slug || "app"}`
 }
 
+// PRD45 P0.5: o Casdoor NUNCA subia (crash-loop `dial tcp [::1]:3306`). As envs
+// `driver`/`dataSource` que o compose usava não existem para ele: a config real vem de
+// /conf/app.conf (Beego), cujo default aponta para MySQL. Montamos o conf da própria
+// imagem com 2 linhas trocadas. `driverName = sqlite` (NÃO `sqlite3`): o driver embutido
+// é modernc.org/sqlite, registrado como `sqlite` — só o ormer normaliza sqlite3→sqlite,
+// o adapter do Casbin passa o nome cru e morre em `unknown driver "sqlite3"`.
+export const CASDOOR_APP_CONF_FILE = "casdoor-app.conf"
+// DB em /home/casdoor: dir que JÁ EXISTE na imagem com dono uid1000 (o processo roda como
+// casdoor:1000). Volume nomeado só herda o dono quando o mountpoint existe na imagem — em
+// /var/lib/casdoor ele nasce root:root e o SQLite falha com CANTOPEN(14).
+export function casdoorAppConf() {
+  // join("\n") — nunca template literal: em checkout Windows o fonte pode vir CRLF, e
+  // CRLF quebra o parser do Beego dentro do container Linux.
+  return [
+    "appname = casdoor", "httpport = 8000", "runmode = dev", "copyrequestbody = true",
+    "driverName = sqlite",
+    "dataSourceName = file:/home/casdoor/casdoor.db?cache=shared",
+    "dbName = casdoor", "tableNamePrefix =", "showSql = false", "redisEndpoint =",
+    "defaultStorageProvider =", "isCloudIntranet = false", 'authState = "casdoor"',
+    'socks5Proxy = "127.0.0.1:10808"', "verificationCodeTimeout = 10", "initScore = 0",
+    "logPostOnly = true", "isUsernameLowered = false", "origin =", "originFrontend =",
+    'staticBaseUrl = "https://cdn.casbin.org"', "isDemoMode = false", "batchSize = 100",
+    "showGithubCorner = false", 'forceLanguage = ""', 'defaultLanguage = "en"',
+    'aiAssistantUrl = "https://ai.casbin.com"', 'defaultApplication = "app-built-in"',
+    "maxItemsForFlatMenu = 7", "enableErrorMask = false", "enableGzip = true",
+    "inactiveTimeoutMinutes =", "ldapServerPort = 389", 'ldapsCertId = ""',
+    "ldapsServerPort = 636", "radiusServerPort = 1812",
+    'radiusDefaultOrganization = "built-in"', 'radiusSecret = "secret"',
+    'quota = {"organization": -1, "user": -1, "application": -1, "provider": -1}',
+    'logConfig = {"adapter":"file", "filename": "logs/casdoor.log", "maxdays":99999, "perm":"0770"}',
+    "initDataNewOnly = false", 'initDataFile = "./init_data.json"', 'frontendBaseDir = "../cc_0"',
+    "",
+  ].join("\n")
+}
+
 export function casdoorComposeYaml(containerName = "casdoor") {
+  // `version` preservado de propósito: o fallback docker-compose (v1) depende dele.
+  // Volume nomeado POR PROJETO: o compose mora sempre em `.gstack/`, então o project-name
+  // default seria "gstack" para todo projeto — dois projetos compartilhariam o MESMO banco
+  // de identidade. O `name:` explícito elimina o vazamento cruzado.
   return `version: "3.8"
 services:
   casdoor:
@@ -171,15 +210,14 @@ services:
     container_name: ${containerName}
     ports:
       - "127.0.0.1:8000:8000"
-    environment:
-      driver: "sqlite"
-      dataSource: "/var/lib/casdoor/casdoor.db"
     volumes:
-      - casdoor-data:/var/lib/casdoor
+      - ./${CASDOOR_APP_CONF_FILE}:/conf/app.conf:ro
+      - casdoor-data:/home/casdoor
     restart: unless-stopped
 
 volumes:
   casdoor-data:
+    name: ${containerName}-data
 `
 }
 
@@ -187,55 +225,91 @@ function writeCasdoorCompose(projectDir, projectName) {
   const composeDir = join(projectDir, ".gstack")
   mkdirSync(composeDir, { recursive: true })
   writeFileSync(join(composeDir, "docker-compose.yml"), casdoorComposeYaml(casdoorContainerName(projectName)))
+  writeFileSync(join(composeDir, CASDOOR_APP_CONF_FILE), casdoorAppConf())
 }
 
 // Match EXATO do nome (filtro `name=X` do docker é substring; ancoro p/ não casar outro projeto).
 const casdoorExists = (out, name) => !!out && out.toString().trim().split("\n").map((s) => s.trim()).includes(name)
-// Container do projeto já existe: reusa se rodando, senão reinicia. @returns URL.
-function reuseCasdoor(logger, name) {
-  const running = safeExec("docker", ["ps", "--filter", `name=^${name}$`, "--format", "{{.Names}}"])
-  if (casdoorExists(running, name)) {
-    logger.success("Casdoor IAM ja rodando em 127.0.0.1:8000")
-    return "http://127.0.0.1:8000"
+const CASDOOR_URL = "http://127.0.0.1:8000"
+const nullDevice = () => (process.platform === "win32" ? "NUL" : "/dev/null")
+// Sleep SÍNCRONO (o create é síncrono; não dá p/ await aqui).
+const sleepSync = (ms) => { if (ms > 0) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms) }
+
+// PRD45 P0.5 (fail-closed): container "Up" NÃO é prova de saúde — o Casdoor crash-loopava
+// enquanto o `docker compose up -d` devolvia sucesso, e o create afirmava "rodando".
+// Só afirmamos que o IAM está no ar depois de um HTTP 2xx REAL. `/api/get-account` responde
+// 200 com "Please login first" mesmo sem sessão: prova que o app (não só a porta) subiu —
+// e chegar até aí significa que o boot passou pela criação de tabelas no SQLite.
+export function casdoorHealthy(url, exec = safeExec, { attempts = 40, delayMs = 3000 } = {}) {
+  for (let i = 0; i < attempts; i++) {
+    const out = exec(curlBinary(), ["-s", "-o", nullDevice(), "-w", "%{http_code}", "--max-time", "5", `${url}/api/get-account`])
+    if (out && /^2\d\d$/.test(out.toString().trim())) return true
+    if (i < attempts - 1) sleepSync(delayMs)
   }
-  logger.info("Casdoor container existe, reiniciando...")
-  safeExec("docker", ["start", name])
-  logger.success("Casdoor reiniciado em 127.0.0.1:8000")
-  return "http://127.0.0.1:8000"
+  return false
+}
+
+// Avisos de segurança do P0.4 — só fazem sentido quando o IAM está de fato no ar.
+function warnCasdoorDefaults(logger) {
+  logger.warn("  SEGURANCA: credencial-padrao INSEGURA admin/123 (Casdoor demo).")
+  logger.warn("  Publicado SO em 127.0.0.1 (loopback) — TROQUE a senha antes de qualquer")
+  logger.warn("  uso real/compartilhado; nunca exponha esta instancia na rede.")
+}
+// Verdade final sobre o IAM: probe verde => URL; senão `null` => phases.casdoor=degraded.
+function casdoorVerdict(logger, probe) {
+  if (!probe()) {
+    logger.warn("Casdoor nao respondeu ao health check — IAM local indisponivel (degraded).")
+    logger.warn("  Diagnostico: `docker logs <container-casdoor>`. O projeto segue sem gateway de identidade.")
+    return null
+  }
+  logger.success(`Casdoor IAM rodando em ${CASDOOR_URL} (health check OK)`)
+  warnCasdoorDefaults(logger)
+  return CASDOOR_URL
+}
+// Container do projeto já existe: reusa se rodando, senão reinicia. @returns URL ou null.
+function reuseCasdoor(logger, name, deps) {
+  const running = deps.exec("docker", ["ps", "--filter", `name=^${name}$`, "--format", "{{.Names}}"])
+  if (!casdoorExists(running, name)) {
+    logger.info("Casdoor container existe, reiniciando...")
+    deps.exec("docker", ["start", name])
+  }
+  logger.info("Verificando saude do Casdoor...")
+  return casdoorVerdict(logger, deps.probe)
 }
 // Sobe o Casdoor via compose (v2 → fallback v1). @returns URL ou null.
-function composeCasdoorUp(logger, projectDir, projectName) {
+function composeCasdoorUp(logger, projectDir, projectName, deps) {
   logger.info("Iniciando Casdoor IAM local via docker-compose...")
-  writeCasdoorCompose(projectDir, projectName)
+  deps.write(projectDir, projectName)
   const composeFile = join(projectDir, ".gstack", "docker-compose.yml")
-  let out = safeExec("docker", ["compose", "-f", composeFile, "up", "-d"], { timeout: 120000 })
+  let out = deps.exec("docker", ["compose", "-f", composeFile, "up", "-d"], { timeout: 120000 })
   if (!out) {
     logger.info("docker compose (v2) falhou. Tentando docker-compose (v1)...")
-    out = safeExec("docker-compose", ["-f", composeFile, "up", "-d"], { timeout: 120000 })
+    out = deps.exec("docker-compose", ["-f", composeFile, "up", "-d"], { timeout: 120000 })
   }
-  if (out) {
-    logger.success("Casdoor IAM rodando em http://127.0.0.1:8000")
-    logger.warn("  SEGURANCA: credencial-padrao INSEGURA admin/123 (Casdoor demo).")
-    logger.warn("  Publicado SO em 127.0.0.1 (loopback) — TROQUE a senha antes de qualquer")
-    logger.warn("  uso real/compartilhado; nunca exponha esta instancia na rede.")
-    return "http://127.0.0.1:8000"
+  if (!out) {
+    logger.warn("Casdoor nao iniciou — IAM local indisponivel. Projeto continua sem gateway de identidade.")
+    return null
   }
-  logger.warn("Casdoor nao iniciou — IAM local indisponivel. Projeto continua sem gateway de identidade.")
-  return null
+  logger.info("Aguardando o Casdoor responder (primeiro boot cria o schema; pode levar ~1min)...")
+  return casdoorVerdict(logger, deps.probe)
 }
-function startCasdoor(logger, projectDir, projectName) {
+export function startCasdoor(logger, projectDir, projectName, deps = {}) {
+  const d = {
+    exec: safeExec, hasDocker: () => Boolean(findBinary("docker")), write: writeCasdoorCompose,
+    probe: () => casdoorHealthy(CASDOOR_URL), ...deps,
+  }
   if (process.env.GSTACK_SKIP_PREFLIGHT) {
     logger.info("GSTACK_SKIP_PREFLIGHT set — skipping Casdoor")
     return null
   }
-  if (!findBinary("docker")) {
+  if (!d.hasDocker()) {
     logger.warn("Docker nao encontrado — Casdoor IAM local nao iniciado. Instale Docker para IAM local.")
     return null
   }
   const name = casdoorContainerName(projectName)
-  const existing = safeExec("docker", ["ps", "-a", "--filter", `name=^${name}$`, "--format", "{{.Names}}"])
-  if (casdoorExists(existing, name)) return reuseCasdoor(logger, name)
-  return composeCasdoorUp(logger, projectDir, projectName)
+  const existing = d.exec("docker", ["ps", "-a", "--filter", `name=^${name}$`, "--format", "{{.Names}}"])
+  if (casdoorExists(existing, name)) return reuseCasdoor(logger, name, d)
+  return composeCasdoorUp(logger, projectDir, projectName, d)
 }
 
 function ensureGstackDir(projectDir) {
