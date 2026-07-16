@@ -1,5 +1,54 @@
 # Changelog - gstack-vibehard
 
+## [5.1.0] - 2026-07-16 — PRD45 S45.0: o Casdoor do Full sobe DE VERDADE (P0.1/P0.4/P0.5)
+
+Sprint de congelamento dos P0 de configuração do PRD45. O achado central não estava no PRD:
+**o Casdoor nunca subiu**. Ele crash-loopava com `panic: dial tcp [::1]:3306` desde sempre —
+provado com Docker real que **não é regressão** (o compose original, com `:latest` e
+`8000:8000`, crash-loopa idêntico). O Full prometia IAM local e entregava um container morto,
+enquanto o `create` afirmava "Casdoor IAM rodando".
+
+- **P0.5 — o Casdoor sobe (`src/cli/create.js`)**. Três bugs empilhados, cada um só visível
+  depois de corrigir o anterior:
+  1. **Envs fantasma** — o compose passava `driver`/`dataSource`; essas chaves não existem no
+     Casdoor. Ele lê `driverName`/`dataSourceName` de `/conf/app.conf` (Beego), cujo default é
+     MySQL literal. As envs eram silenciosamente ignoradas. Agora o `app.conf` real é montado.
+  2. **Nome do driver** — o sqlite embutido é `modernc.org/sqlite` (Go puro), registrado como
+     **`sqlite`**. Com `sqlite3` o ormer até funciona (normaliza sqlite3→sqlite), mas o adapter
+     do Casbin passa o nome cru e morre em `unknown driver "sqlite3"`.
+  3. **Dono do volume** — em `/var/lib/casdoor` (inexistente na imagem) o volume nomeado nasce
+     `root:root`, mas o processo roda como uid1000 → SQLite `CANTOPEN(14)`. Em `/home/casdoor`
+     (existe na imagem com dono 1000) o volume herda o dono e grava.
+
+  Validado end-to-end com o compose **gerado pelo código**: HTTP 200, `POST /api/login`
+  admin/123 → `built-in/admin`, `casdoor.db` de 630KB no volume, bind só em `127.0.0.1:8000`.
+
+- **P0.5 — health check fail-closed**. `docker compose up -d` devolver output **não é prova de
+  saúde** — era exatamente nisso que o `create` se baseava para dizer "Casdoor IAM rodando"
+  enquanto o container crash-loopava. Agora só afirma após **HTTP 2xx real** em
+  `/api/get-account`; sem isso, reporta `degraded` honesto com dica de diagnóstico
+  (`phases.casdoor.status`).
+
+- **Vazamento entre projetos (achado fora do PRD45)** — o compose mora sempre em `.gstack/`,
+  então o project-name default do Docker Compose seria `gstack` para **todo** projeto: dois
+  projetos GStack compartilhariam o **mesmo banco de identidade**. O volume passa a ter nome
+  explícito por projeto (`casdoor-<slug>-data`).
+
+- **P0.1 — headroom MCP real**. O `.mcp.json` do Full apontava para `npx -y @gstack/headroom-proxy`,
+  um **pacote fantasma** (E404 no registry). Agora usa o binário real (`headroom mcp`), idêntico
+  ao caminho de install em `src/harness/headroom.js`. Regra: nunca `npx -y` sem pin em config
+  gerada (baixaria da rede ao abrir o harness).
+
+- **P0.4 — Casdoor não nasce inseguro**. Imagem fixada **por digest** (nunca `:latest`, mutável);
+  publicado **só em loopback** `127.0.0.1` (nunca `0.0.0.0`, que exporia a credencial-padrão
+  conhecida na rede local); **container por projeto** (era o global `casdoor`, que fazia dois
+  projetos disputarem o mesmo container); aviso de segurança explícito sobre o `admin/123`.
+
+Notas: `version: "3.8"` preservado de propósito no compose (o fallback `docker-compose` v1
+depende dele). O `app.conf` é gerado via `join("\n")` — checkout Windows pode trazer CRLF no
+fonte, e CRLF quebra o parser do Beego no container Linux. A rotação da senha `admin/123` via
+Secrets Broker fica para o restante do S45.0, agora que o Casdoor de fato responde.
+
 ## [5.0.1] - 2026-07-14 — CI verde: golden cross-OS + capability-e2e invocation
 
 Corrige duas falhas de CI que só apareceram no primeiro push do trilho PRD42 ao GitHub (rodavam
