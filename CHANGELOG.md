@@ -1,5 +1,57 @@
 # Changelog - gstack-vibehard
 
+## [5.2.0] - 2026-07-17 — PRD45 S45.0 fechado: credencial rotacionada + fim do falso-verde
+
+Fecha o Sprint 45.0. Depois de fazer o Casdoor **bootar** (v5.1.0), este ciclo remove a
+credencial-padrão conhecida e mata um falso-verde de capacidade — os dois últimos itens do
+escopo do sprint ("substituir credencial conhecida", "sem placeholder", "publish guard para
+dream NOT_PROVED required e teste E2E falho").
+
+- **Rotação da credencial-padrão (`src/cli/create.js`)**. `admin/123` é público (demo data do
+  Casdoor); IAM no ar com credencial conhecida faz de qualquer processo local um admin. O
+  `create` agora **rotaciona** (antes só avisava) para uma senha de 32 chars
+  (`randomBytes` base64url) e a guarda no **keychain do SO** via Secrets Broker — nunca no
+  repo/state.
+  - **Ordem é segurança**: grava no keychain **antes** de trocar. Se gravasse depois e o
+    keychain falhasse, a senha nova estaria ativa e perdida (usuário trancado fora do próprio
+    IAM). Sem keychain disponível ⇒ **não rotaciona** (guardar seria impossível) + aviso.
+  - **Controle negativo em produção**: reconfirma que `admin/123` parou de autenticar; a API
+    dizer "ok" não basta (`rotation_failed` sem essa prova).
+  - A senha **nunca vai no argv** (legível via `ps`): o curl a lê de arquivo
+    (`--data-urlencode newPassword@file`).
+  - Declarada em `required` no schema de secrets **só no Full** — `secrets run` injeta apenas
+    os required, então é assim que o usuário a recupera
+    (`gstack_vibehard secrets run -- node -e "console.log(process.env.CASDOOR_ADMIN_PASSWORD)"`).
+  - Provado contra Casdoor real: após rotacionar, `admin/123` → "password or code is
+    incorrect"; a senha do keychain → "built-in/admin"; e o comando impresso devolve
+    exatamente a senha guardada.
+
+- **Fim do falso-verde de capacidade (`scripts/clean-machine-pack.mjs` + agregador)**. O pack
+  marcava `casdoor-rbac`/`atomic-merge`/`agentmemory-persist` como **passed** só porque
+  `docker info` respondia (`dockerAvailable() ? "passed" : ...`). Prova de que era mentira:
+  `casdoor-rbac` esteve "passed" durante todo o período em que o Casdoor crash-loopava e nem
+  subia.
+  - `casdoor-rbac` agora tem **E2E real**: sobe o compose gerado pelo próprio `create`, espera
+    health, exige **anônimo negado E credencial válida aceita** (só negar tudo também passaria
+    como "RBAC"), confere a UI, e derruba tudo.
+  - Novo status **`not_proved`** (engine presente, E2E não executado) — distinto de
+    `blocked_missing_engine` (sem engine) e de `failed` (E2E rodou e reprovou).
+    `atomic-merge`/`agentmemory-persist`/`openhands-sandbox` o declaram (E2E deles: S45.8).
+  - Novo veredito **`capabilities_unproven`** (exit 1), abaixo de `ready_engines_blocked`: sem
+    engine a culpa é da máquina; com engine e sem E2E a culpa é nossa.
+
+- **Publish guard: 2 checks HARD novos (`src/project-plan/publish-guard.js`)**.
+  - `dream-required`: claim com **contrato comportamental declarado** que não está `REAL`
+    reprova (promessa sem prova); RISK/PLACEBO nunca publicam. Claim sem contrato pode ser
+    `NOT_PROVED` honesto — travar em todos tornaria o gate insatisfazível.
+  - `capability-e2e`: capacidade `required` fora de `passed`/`not_applicable` reprova (cobre
+    `failed`, `not_proved`, `blocked_missing_engine`). Sem relatório ⇒ `not_applicable` com ação.
+
+Notas: o fail-closed se provou na prática — diante de uma asserção de teste errada minha (regex
+de negação só aceitava "login", mas o POST do Casdoor nega com "Unauthorized operation"), o
+pack **reprovou** em vez de dar verde falso. `publishGuard` foi decomposto (cc 30→4) para caber
+no QG (cc≤6), dívida pré-existente que o Fallow diff-scoped puxou ao escopo.
+
 ## [5.1.0] - 2026-07-16 — PRD45 S45.0: o Casdoor do Full sobe DE VERDADE (P0.1/P0.4/P0.5)
 
 Sprint de congelamento dos P0 de configuração do PRD45. O achado central não estava no PRD:

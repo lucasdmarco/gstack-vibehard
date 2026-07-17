@@ -1,4 +1,5 @@
 import { execSync as defaultExecSync, execFileSync } from "node:child_process"
+import { randomBytes } from "node:crypto"
 import {
   chmodSync,
   copyFileSync,
@@ -18,6 +19,7 @@ import { fileURLToPath } from "node:url"
 import { homedir, tmpdir } from "node:os"
 import { deepMerge } from "../installer/merge.js"
 import { checkRemoteDownload } from "../installer/remote-policy.js"
+import { setSecret as defaultSetSecret, brokerStatus as defaultBrokerStatus } from "../secrets/broker.js"
 import { npxArgv, npmArgv } from "../installer/deps.js"
 import { buildRuntimeManifest } from "../runtime/manifest.js"
 import { nextStepsContent } from "../runtime/workspace.js"
@@ -249,11 +251,106 @@ export function casdoorHealthy(url, exec = safeExec, { attempts = 40, delayMs = 
   return false
 }
 
-// Avisos de segurança do P0.4 — só fazem sentido quando o IAM está de fato no ar.
+// Só sobra como aviso quando NÃO conseguimos rotacionar (ver rotateCasdoorCredential).
 function warnCasdoorDefaults(logger) {
-  logger.warn("  SEGURANCA: credencial-padrao INSEGURA admin/123 (Casdoor demo).")
+  logger.warn("  SEGURANCA: credencial-padrao INSEGURA admin/123 (Casdoor demo) SEGUE ATIVA.")
   logger.warn("  Publicado SO em 127.0.0.1 (loopback) — TROQUE a senha antes de qualquer")
   logger.warn("  uso real/compartilhado; nunca exponha esta instancia na rede.")
+}
+
+// ── PRD45 S45.0: rotação da credencial-padrão conhecida ──────────────────────
+// `admin/123` é PÚBLICO (é o demo data do Casdoor). Deixá-lo ativo faz de qualquer
+// processo local um admin do IAM. Rotacionamos para senha de entropia criptográfica e
+// guardamos no keychain do SO via Secrets Broker — nunca no repo, nunca no state.
+export const CASDOOR_DEFAULT_PASSWORD = "123"
+export const CASDOOR_SECRET_NAME = "CASDOOR_ADMIN_PASSWORD" // [A-Za-z_][A-Za-z0-9_]* (regra do broker)
+
+export const generateCasdoorPassword = () => randomBytes(24).toString("base64url")
+
+const casdoorApiOk = (out) => {
+  if (!out) return false
+  try { return JSON.parse(out.toString()).status === "ok" } catch { return false }
+}
+const casdoorLoginBody = (password) =>
+  JSON.stringify({ application: "app-built-in", organization: "built-in", username: "admin", password, autoSignin: true, type: "login" })
+
+// Login real. @returns caminho do cookie jar (sessão) ou null. O corpo vai por ARQUIVO
+// (`-d @file`) e não por argv: argv é legível por qualquer usuário via `ps`.
+function casdoorLogin(url, password, exec, dir, tag) {
+  const body = join(dir, `login-${tag}.json`)
+  const jar = join(dir, `jar-${tag}.txt`)
+  writeFileSync(body, casdoorLoginBody(password), { mode: 0o600 })
+  const out = exec(curlBinary(), ["-s", "-c", jar, "--max-time", "15", "-X", "POST", `${url}/api/login`,
+    "-H", "Content-Type: application/json", "-d", `@${body}`])
+  rmSync(body, { force: true })
+  return casdoorApiOk(out) ? jar : null
+}
+// `newPassword@file` faz o curl LER a senha do arquivo — nunca entra no argv.
+// oldPassword é o `123` público, então argv aqui não vaza nada.
+function casdoorSetPassword(url, jar, newPwFile, exec) {
+  return casdoorApiOk(exec(curlBinary(), ["-s", "-b", jar, "--max-time", "15", "-X", "POST", `${url}/api/set-password`,
+    "--data-urlencode", "userOwner=built-in", "--data-urlencode", "userName=admin",
+    "--data-urlencode", `oldPassword=${CASDOOR_DEFAULT_PASSWORD}`, "--data-urlencode", `newPassword@${newPwFile}`]))
+}
+const brokerReady = (d) => { try { return Boolean(d.brokerStatus().available) } catch { return false } }
+
+// CONTROLE NEGATIVO EM PRODUÇÃO: se o admin/123 ainda autentica, a rotação foi teatro.
+function confirmCasdoorRotation(logger, url, d, dir) {
+  if (casdoorLogin(url, CASDOOR_DEFAULT_PASSWORD, d.exec, dir, "confirm")) {
+    logger.warn("Casdoor: admin/123 AINDA autentica apos a troca — rotacao NAO comprovada.")
+    warnCasdoorDefaults(logger)
+    return "rotation_failed"
+  }
+  logger.success("Casdoor: credencial-padrao ROTACIONADA (admin/123 nao autentica mais).")
+  logger.info(`  Senha no keychain do SO (${CASDOOR_SECRET_NAME}). Para ver:`)
+  logger.info(`  gstack_vibehard secrets run -- node -e "console.log(process.env.${CASDOOR_SECRET_NAME})"`)
+  return "rotated"
+}
+function doRotate(logger, url, projectDir, d, dir) {
+  const pw = d.generate()
+  // GRAVA ANTES de trocar: se gravássemos depois e o keychain falhasse, a senha nova
+  // estaria ATIVA e PERDIDA — usuário trancado fora do próprio IAM. Segredo órfão é
+  // inofensivo; senha ativa e desconhecida, não.
+  try { d.setSecret(projectDir, CASDOOR_SECRET_NAME, pw) }
+  catch (e) {
+    logger.warn(`Casdoor: keychain recusou guardar a senha (${e.message || e}) — rotacao ABORTADA.`)
+    warnCasdoorDefaults(logger)
+    return "insecure_default"
+  }
+  const pwFile = join(dir, "newpw")
+  writeFileSync(pwFile, pw, { mode: 0o600 })
+  try {
+    if (!casdoorSetPassword(url, casdoorLogin(url, CASDOOR_DEFAULT_PASSWORD, d.exec, dir, "rot"), pwFile, d.exec)) {
+      logger.warn("Casdoor: troca de senha FALHOU (API recusou).")
+      warnCasdoorDefaults(logger)
+      return "rotation_failed"
+    }
+  } finally { rmSync(pwFile, { force: true }) }
+  return confirmCasdoorRotation(logger, url, d, dir)
+}
+function rotateInDir(logger, url, projectDir, d, dir) {
+  // Estado real manda: se o admin/123 já não loga, alguém (nós, num create anterior)
+  // já rotacionou. Não confiamos em "existe segredo guardado" — o container pode ter
+  // sido recriado do zero com o demo data de volta.
+  if (!casdoorLogin(url, CASDOOR_DEFAULT_PASSWORD, d.exec, dir, "probe")) {
+    logger.info("Casdoor: credencial-padrao ja rotacionada (admin/123 recusado).")
+    return "already_rotated"
+  }
+  if (!brokerReady(d)) {
+    logger.warn("Casdoor: sem keychain do SO — NAO rotacionamos (guardar a senha seria impossivel).")
+    warnCasdoorDefaults(logger)
+    return "insecure_default"
+  }
+  return doRotate(logger, url, projectDir, d, dir)
+}
+/** Rotaciona o admin/123 do Casdoor. @returns rotated|already_rotated|insecure_default|rotation_failed */
+export function rotateCasdoorCredential(logger, url, projectDir, deps = {}) {
+  const d = { exec: safeExec, setSecret: defaultSetSecret, brokerStatus: defaultBrokerStatus, generate: generateCasdoorPassword, ...deps }
+  // Dir PRIVADO (mkdtemp → 0700 no POSIX): cookie jar de sessão admin e senha em claro
+  // passam por aqui. Removido sempre, mesmo em exceção.
+  const dir = mkdtempSync(join(tmpdir(), "gstack-casdoor-"))
+  try { return rotateInDir(logger, url, projectDir, d, dir) }
+  finally { rmSync(dir, { recursive: true, force: true }) }
 }
 // Verdade final sobre o IAM: probe verde => URL; senão `null` => phases.casdoor=degraded.
 function casdoorVerdict(logger, probe) {
@@ -263,7 +360,8 @@ function casdoorVerdict(logger, probe) {
     return null
   }
   logger.success(`Casdoor IAM rodando em ${CASDOOR_URL} (health check OK)`)
-  warnCasdoorDefaults(logger)
+  // O aviso de credencial-padrão NÃO vive aqui: quem boota não sabe o desfecho da
+  // rotação. Só `rotateCasdoorCredential` avisa — e só quando de fato não conseguiu.
   return CASDOOR_URL
 }
 // Container do projeto já existe: reusa se rodando, senão reinicia. @returns URL ou null.
@@ -769,11 +867,18 @@ function buildAppManifest({ projectName, now, isLite, tpl }) {
   }
 }
 // Secrets schema v2 (PRD 12 §10): nomes + metadados, NUNCA valores (valor no keychain).
-const SECRETS_SCHEMA = {
+// PRD45 S45.0: no Full, a senha rotacionada do Casdoor entra em `required` — `secrets run`
+// injeta SÓ os required (allRequiredNames), então em `optional` o usuário ficaria sem
+// caminho de recuperação (não existe `secrets get`, por design: nunca imprimir segredo).
+// Ausente não quebra nada: resolveSecrets ignora o que falta. No Lite não entra — o Lite
+// não sobe Casdoor, e exigir o segredo seria pedir o que o modo nunca cria.
+const casdoorSecretEntry = () => ({ name: CASDOOR_SECRET_NAME, scope: "runtime", services: ["casdoor"], sensitive: true })
+export const buildSecretsSchema = (isLite) => ({
   schemaVersion: 2,
   provider: "os-keychain",
   required: [
     { name: "DATABASE_URL", scope: "runtime", services: ["api"], sensitive: true },
+    ...(isLite ? [] : [casdoorSecretEntry()]),
   ],
   optional: [
     "CASDOOR_CLIENT_SECRET",
@@ -782,14 +887,14 @@ const SECRETS_SCHEMA = {
     "AGENTMEMORY_FED_TOKEN",
     "PAPERCLIP_API_KEY",
   ],
-}
+})
 function writeGstackManifests(gstackDir, { projectName, now, isLite, tpl, templateName }) {
   writeJson(join(gstackDir, "app.json"), buildAppManifest({ projectName, now, isLite, tpl }))
   writeJson(join(gstackDir, "services.json"), { services: tpl.services })
   writeJson(join(gstackDir, "ports.json"), { version: 1, ports: tpl.ports })
   // Runtime Manifest V2 (PRD 12 PR3): contrato consumido pelo supervisor (`dev`).
   writeJson(join(gstackDir, "runtime.json"), buildRuntimeManifest({ services: tpl.services }))
-  writeJson(join(gstackDir, "secrets.schema.json"), SECRETS_SCHEMA)
+  writeJson(join(gstackDir, "secrets.schema.json"), buildSecretsSchema(isLite))
   // Registry declarativo (dual-lane Composio + Printing Press); NÃO instala nada.
   writeJson(join(gstackDir, "integrations.json"), buildIntegrationsRegistry(templateName))
   // Context docs + loop budget (governança de workflows agênticos; delegação opt-in).
@@ -1503,6 +1608,9 @@ function runFullProvisioning(c, projectDir) {
   mkdirSync(projectDir, { recursive: true })
   const casdoorUrl = startCasdoor(logger, projectDir, projectName)
   phases.casdoor = { status: casdoorUrl ? "online" : "degraded", url: casdoorUrl }
+  // PRD45 S45.0: IAM no ar com credencial PÚBLICA não é backend seguro. Só rotaciona
+  // com o Casdoor de fato respondendo (sem URL não há API p/ trocar a senha).
+  if (casdoorUrl) phases.casdoor.credential = rotateCasdoorCredential(logger, casdoorUrl, projectDir)
   console.log(`\n  === Fase 2/5: Atomic VCS ===`)
   writeAtomicConfig(projectDir)
   phases.atomic = { status: initAtomic(logger, projectDir, { allowRemote: args.includes("--allow-remote-downloads") }) }

@@ -13,6 +13,10 @@
  *     verde) — jamais "passa por omissão".
  *   • Backend REQUIRED com engine ausente ⇒ `blocked_missing_engine` ⇒ veredito
  *     `ready_engines_blocked` (parcial honesto), NUNCA "ready" liso nem "not_ready" por engine.
+ *   • (PRD45 S45.0) Engine PRESENTE mas E2E real não executado ⇒ `not_proved` ⇒ veredito
+ *     `capabilities_unproven`. Antes o pack fazia `dockerAvailable() ? "passed" : ...` —
+ *     daemon de pé virava prova de RBAC/merge/persistência. Era falso-verde: `casdoor-rbac`
+ *     ficava "passed" com o Casdoor em crash-loop. Presença de engine não prova capacidade.
  *   • Qualquer jornada FALHA ⇒ `not_ready`, por mais alto que seja o resto (a média não esconde P0).
  *   • Qualquer jornada `not_run` ⇒ `incomplete` — não rodar tudo não é "pronto".
  *
@@ -24,6 +28,9 @@ export const CAP_STATUS = {
   PASSED: "passed",
   FAILED: "failed",
   BLOCKED_MISSING_ENGINE: "blocked_missing_engine",
+  // PRD45 S45.0: engine PRESENTE, E2E real não executado. Distinto de
+  // `blocked_missing_engine` (sem engine) e de `failed` (E2E rodou e reprovou).
+  NOT_PROVED: "not_proved",
   NOT_APPLICABLE: "not_applicable",
 }
 export const JOURNEY_STATUS = { PASSED: "passed", FAILED: "failed", NOT_RUN: "not_run" }
@@ -53,6 +60,7 @@ function summarize(caps, journeys) {
       passed: countBy(caps, CAP_STATUS.PASSED),
       failed: countBy(caps, CAP_STATUS.FAILED),
       blockedMissingEngine: countBy(caps, CAP_STATUS.BLOCKED_MISSING_ENGINE),
+      notProved: countBy(caps, CAP_STATUS.NOT_PROVED),
       notApplicable: countBy(caps, CAP_STATUS.NOT_APPLICABLE),
       total: caps.length,
     },
@@ -67,12 +75,19 @@ function summarize(caps, journeys) {
 
 const hasRequiredFailure = (caps) => caps.some((c) => c.required && c.status === CAP_STATUS.FAILED)
 const hasRequiredBlockedEngine = (caps) => caps.some((c) => c.required && c.status === CAP_STATUS.BLOCKED_MISSING_ENGINE)
+const hasRequiredNotProved = (caps) => caps.some((c) => c.required && c.status === CAP_STATUS.NOT_PROVED)
 
-/** Veredito fail-closed. Falha real > incompletude > engine bloqueado > pronto. */
+/**
+ * Veredito fail-closed. Falha real > incompletude > engine bloqueado > NÃO PROVADO > pronto.
+ * `capabilities_unproven` fica ABAIXO de `ready_engines_blocked` de propósito: sem engine a
+ * culpa é da máquina (parcial honesto); COM engine e sem E2E a culpa é nossa — o produto não
+ * provou o que promete, e isso nunca pode sair como "ready".
+ */
 function overallVerdict(caps, journeys) {
   if (journeys.some((j) => j.status === JOURNEY_STATUS.FAILED) || hasRequiredFailure(caps)) return "not_ready"
   if (journeys.some((j) => j.status === JOURNEY_STATUS.NOT_RUN)) return "incomplete"
   if (hasRequiredBlockedEngine(caps)) return "ready_engines_blocked"
+  if (hasRequiredNotProved(caps)) return "capabilities_unproven"
   return "ready"
 }
 

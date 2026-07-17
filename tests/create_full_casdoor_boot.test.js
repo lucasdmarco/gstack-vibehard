@@ -106,8 +106,11 @@ test("FAIL-CLOSED: com health real verde, reporta online e devolve a URL de loop
   })
   assert.equal(url, "http://127.0.0.1:8000", "probe verde => URL real")
   assert.ok(lines.some((l) => l.startsWith("success:") && /rodando/i.test(l)), "só aqui pode afirmar 'rodando'")
-  // O aviso de credencial insegura (P0.4) continua obrigatório.
-  assert.ok(lines.some((l) => /admin\/123/.test(l) && l.startsWith("warn:")), "mantém o aviso de credencial-padrão")
+  // O aviso de credencial-padrão NÃO pertence mais a quem boota: o create agora ROTACIONA
+  // (S45.0) e só avisa quando não conseguiu. Quem boota não conhece o desfecho da rotação,
+  // então avisar aqui seria ruído (ou mentira) num projeto já rotacionado. A propriedade de
+  // segurança está coberta em create_full_casdoor_rotate.test.js.
+  assert.ok(!lines.some((l) => /admin\/123/.test(l)), "boot não opina sobre credencial — quem rotaciona avisa")
 })
 
 test("casdoorHealthy: só aceita HTTP 2xx; erro de curl/porta morta = false", async () => {
