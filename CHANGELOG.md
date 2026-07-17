@@ -1,5 +1,34 @@
 # Changelog - gstack-vibehard
 
+## [5.3.0] - 2026-07-17 — PRD45 S45.1: supervisor seguro + ownership de PID fail-closed
+
+Sprint 45.1 — fecha os dois achados de segurança do supervisor de runtime (P0.2 e P1.1). O
+`stop` nunca mais mata processo alheio nem perde o estado de um processo ainda vivo.
+
+- **P0.2 — `stop` perdia controle de processo vivo (`src/runtime/supervisor.js`,
+  `src/commands/runtime-supervisor.js`)**.
+  - Qualquer erro de kill virava `already-gone`, escondendo acesso negado e sinal falho. Agora
+    o status é **tipado por errno**: `ESRCH` → `already_gone`, `EPERM`/`EACCES` →
+    `access_denied`, resto → `signal_failed`. Nunca colapsa em "sumiu".
+  - `stopCommand` chamava `clearState` **incondicionalmente** — apagava o state mesmo com PID
+    vivo, impossibilitando o retry (órfão/porta/handle presos). Agora `stopOutcome` só declara
+    `clearable` quando **nada** ficou pendente (vivo, negado, sinal-falho ou pulado); o state é
+    **preservado** para retry idempotente, e o `stop` devolve **exit code não-zero** quando não
+    encerrou tudo.
+
+- **P1.1 — ownership de PID falhava aberto (`isProcessOurs`)**. Retornava `true` (matava)
+  quando o baseline não era verificável — um state adulterado podia fazer o GStack matar um PID
+  reusado. Novo `ownershipVerdict` **tipado**: baseline ausente/inválido = `unverified_baseline`
+  ⇒ **não-nosso** (fail-closed, pulado como `skipped_unverified`); idade ilegível
+  (permissão/SO) = `unverified_age` ⇒ procede **porém auditado** (decisão de produto: não
+  trancar o `stop` legítimo onde ler a idade do processo é impossível); idade divergente =
+  `foreign` (pid reusado). `isProcessOurs` permanece como wrapper booleano compatível.
+
+Nota: os testes que cristalizavam o contrato antigo foram atualizados coerentemente (status com
+hífen → underscore; `{}` sem `startedAt` passa de `true` para `false` fail-closed; erros de kill
+de teste passaram a popular `.code`, mais fiéis ao `process.kill` real). `stopService`
+decomposto (`skipRow` + `attemptKill`) para caber no QG (cc≤6).
+
 ## [5.2.0] - 2026-07-17 — PRD45 S45.0 fechado: credencial rotacionada + fim do falso-verde
 
 Fecha o Sprint 45.0. Depois de fazer o Casdoor **bootar** (v5.1.0), este ciclo remove a
