@@ -1,5 +1,28 @@
 # Changelog - gstack-vibehard
 
+## [5.5.0] - 2026-07-17 — PRD45 S45.3: workflow fail-closed + journal sem secrets
+
+Sprint 45.3 — nenhuma tarefa falha vira `passed` e nenhum segredo entra no replay do journal.
+
+- **P0.3 — workflow podia aprovar implementação que falhou (`src/workflow-graph/runner.js`)**.
+  Um worker com `ok:false` só logava `node_failed` e o **verifier rodava em seguida**, podendo
+  marcar o run como `passed` — testes pré-existentes passavam sem a tarefa ter sido feita (falso
+  verde). Agora o worker falho **não chega ao verifier**: é tratado pela mesma máquina de
+  retry/handoff/cap, e o verifier só roda sobre trabalho de fato executado. `planner`/`rubric`
+  que **lançam** abortam o run **fail-closed**, nunca seguindo para worker/verifier.
+
+- **P1.5 — journal persistia segredo em campo não literal (`src/workflow-graph/journal.js`)**.
+  O `appendEvent` só apagava as chaves **exatas** `secret`/`transcript` no top-level; um token em
+  `task`/`summary`/`signature`, aninhado em objeto/array ou embutido numa URL era gravado em
+  `journal.jsonl`. Novo `src/workflow-graph/redact-event.js` faz **redação recursiva** antes de
+  qualquer escrita — chave sensível por nome (`token`/`password`/`apiKey`…), `redactSecrets` em
+  toda string (padrões `sk_`/`ghp_`/URL com token), objetos/arrays aninhados, com limites de
+  profundidade e tamanho. Reusa `src/security/redact.js` (redactor único) — não reimplementa
+  padrões.
+
+Nota: `runWorkflow` foi decomposto (`buildRunContext`/`prepareRun`/`runLoop` + helpers de step)
+para caber no QG — dívida de complexidade pré-existente que o Fallow diff-scoped trouxe ao escopo.
+
 ## [5.4.0] - 2026-07-17 — PRD45 S45.2: policy de execução + contenção do Runtime Manifest
 
 Sprint 45.2 — fecha o achado P1.2: um repositório **clonado** não executa mais comando
