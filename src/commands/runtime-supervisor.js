@@ -4,7 +4,7 @@ import { join } from "path"
 import { loadRuntimeManifest, validateRuntimeManifest } from "../runtime/manifest.js"
 import { classifyWorkspace } from "../runtime/workspace.js"
 import {
-  planStart, stopAll, pollReadiness, killTreeCommand, isAlive, waitPidsExit,
+  planStart, stopAll, stopOutcome, pollReadiness, killTreeCommand, isAlive, waitPidsExit,
   writeServiceState, readAllState, clearState, logsDir,
 } from "../runtime/supervisor.js"
 import { resolveSecrets } from "../secrets/broker.js"
@@ -200,13 +200,20 @@ function stopExecOpts(opts) {
   const onWin = process.platform === "win32"
   return { getAgeSec: opts.getAgeSec || procAgeSec, ...(onWin ? { exec: (file, a) => execFileSync(file, a, { stdio: "ignore" }) } : {}) }
 }
-function renderStop(results, stillAlive, opts) {
-  section("stop — encerrando o runtime")
-  for (const r of results) info(`  • ${r.name}: ${r.status}${r.pid ? ` (pid ${r.pid})` : ""}`)
-  if (stillAlive.length) warn(`  ⚠ pid(s) ainda finalizando após ${opts.waitTimeoutMs || 5000}ms: ${stillAlive.join(", ")}`)
-  else success("Runtime parado.")
+const stopLine = (r) => `  • ${r.name}: ${r.status}${r.pid ? ` (pid ${r.pid})` : ""}${r.note ? ` [${r.note}]` : ""}`
+function renderStopUnresolved(outcome) {
+  // P0.2: state PRESERVADO — o retry (`stop` de novo) é seguro e idempotente.
+  warn(`  ⚠ não encerrado(s): ${outcome.unresolved.map((u) => `${u.name}:${u.status}`).join(", ")}`)
+  warn("  state PRESERVADO para retry — rode `stop` de novo (ou investigue o pid).")
 }
-/** `gstack_vibehard stop` — encerra a árvore de processos. Idempotente. */
+function renderStop(results, outcome, opts) {
+  section("stop — encerrando o runtime")
+  for (const r of results) info(stopLine(r))
+  if (outcome.stillAlive.length) warn(`  ⚠ pid(s) ainda finalizando após ${opts.waitTimeoutMs || 5000}ms: ${outcome.stillAlive.join(", ")}`)
+  if (outcome.unresolved.length) renderStopUnresolved(outcome)
+  else if (outcome.clearable) success("Runtime parado.")
+}
+/** `gstack_vibehard stop` — encerra a árvore de processos. Idempotente. @returns exitCode. */
 export async function stopCommand(args = [], opts = {}) {
   const cwd = opts.cwd || process.cwd()
   const json = args.includes("--json")
@@ -215,12 +222,16 @@ export async function stopCommand(args = [], opts = {}) {
   const results = stopAll(state, stopExecOpts(opts))
   // `stop` só reporta "parado" quando os processos MORRERAM de verdade (senão remover
   // o dir do projeto logo após dá EBUSY no Windows — PRD14 §4.14). Espera TODOS os
-  // pids do state, não só status "stopped": um "already-gone" pode ainda estar em
+  // pids do state, não só status "stopped": um "already_gone" pode ainda estar em
   // teardown de handles (cwd/log) — isAlive filtra os já mortos de graça.
   const stillAlive = await waitPidsExit(results.map((r) => r.pid), { timeoutMs: opts.waitTimeoutMs || 5000 })
-  clearState(cwd)
-  if (json) return process.stdout.write(JSON.stringify({ stopped: results, stillAlive }) + "\n")
-  renderStop(results, stillAlive, opts)
+  // P0.2: só limpa o state quando NADA ficou pendente (vivo/negado/não-verificado). Apagar
+  // com pid vivo era o bug que impedia a 2ª tentativa e deixava órfão/porta/handle presos.
+  const outcome = stopOutcome(results, stillAlive)
+  if (outcome.clearable) clearState(cwd)
+  if (json) process.stdout.write(JSON.stringify({ stopped: results, stillAlive, cleared: outcome.clearable, exitCode: outcome.exitCode }) + "\n")
+  else renderStop(results, outcome, opts)
+  return outcome.exitCode
 }
 
 const noLogFile = (t) => !t || !t.log || !existsSync(t.log)

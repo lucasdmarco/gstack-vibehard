@@ -66,11 +66,12 @@ test("killTreeCommand: Windows usa taskkill /T /F; POSIX mata o GRUPO (-pid)", a
 test("stopAll: mata cada pid; lida com no-pid e processo já encerrado", async () => {
   const { stopAll } = await imp(supMod)
   const calls = []
-  const exec = (file, args) => { if (args.includes("999")) throw new Error("not found"); calls.push([file, ...args].join(" ")) }
+  // taskkill de pid inexistente sai com erro; ESRCH-like ⇒ status tipado already_gone (S45.1).
+  const exec = (file, args) => { if (args.includes("999")) throw Object.assign(new Error("not found"), { code: "ESRCH" }); calls.push([file, ...args].join(" ")) }
   const r = stopAll([{ name: "web", pid: 123 }, { name: "x", pid: null }, { name: "gone", pid: 999 }], { exec, platform: "win32" })
   assert.equal(r[0].status, "stopped")
-  assert.equal(r[1].status, "no-pid")
-  assert.equal(r[2].status, "already-gone")
+  assert.equal(r[1].status, "no_pid")
+  assert.equal(r[2].status, "already_gone")
   assert.deepEqual(calls, ["taskkill /PID 123 /T /F"])
 })
 
@@ -78,10 +79,10 @@ test("stopAll: mata cada pid; lida com no-pid e processo já encerrado", async (
 test("stopAll: POSIX sem exec usa process.kill(-pid) (grupo), não o binário", async () => {
   const { stopAll } = await imp(supMod)
   const calls = []
-  const kill = (pid, sig) => { if (pid === -999) throw new Error("ESRCH"); calls.push(`${pid}/${sig}`) }
+  const kill = (pid, sig) => { if (pid === -999) throw Object.assign(new Error("ESRCH"), { code: "ESRCH" }); calls.push(`${pid}/${sig}`) }
   const r = stopAll([{ name: "web", pid: 5760 }, { name: "gone", pid: 999 }], { kill, platform: "linux" })
   assert.equal(r[0].status, "stopped")
-  assert.equal(r[1].status, "already-gone", "grupo inexistente vira already-gone")
+  assert.equal(r[1].status, "already_gone", "grupo inexistente vira already_gone (ESRCH tipado)")
   assert.deepEqual(calls, ["-5760/SIGTERM"], "mata o GRUPO (-pid), nunca o binário kill")
 })
 
@@ -186,8 +187,11 @@ test("isProcessOurs + stopAll: pid reusado (idade divergente) é PULADO, não mo
   const ours = { startedAt: "2026-06-25T12:00:00Z" }
   assert.equal(isProcessOurs(ours, 10, now), true, "idade ~10s bate com o esperado")
   assert.equal(isProcessOurs(ours, 99999, now), false, "processo MUITO mais velho = pid reusado")
-  assert.equal(isProcessOurs(ours, null, now), true, "sem leitura → procede (honesto)")
-  assert.equal(isProcessOurs({}, 5, now), true, "sem startedAt → procede")
+  assert.equal(isProcessOurs(ours, null, now), true, "idade ilegível → procede AUDITADO (unverified_age)")
+  // PRD45 S45.1 (P1.1): sem startedAt = baseline não-verificável ⇒ fail-closed (antes era true).
+  // O comportamento foi ENDURECIDO de propósito; a cobertura do caso vive em
+  // tests/runtime_stop_ownership.test.js (skipped_unverified).
+  assert.equal(isProcessOurs({}, 5, now), false, "sem startedAt → NÃO-nosso (fail-closed)")
 
   const killed = []
   const r = stopAll(
@@ -198,7 +202,7 @@ test("isProcessOurs + stopAll: pid reusado (idade divergente) é PULADO, não mo
       // now padrão; tolera diferença real — o teste usa idade absurda p/ 200
     },
   )
-  assert.equal(r.find((x) => x.name === "old").status, "skipped-foreign", "pid foreign pulado")
+  assert.equal(r.find((x) => x.name === "old").status, "skipped_foreign", "pid foreign pulado")
   assert.ok(!killed.includes(200), "NÃO matou o foreign")
 })
 

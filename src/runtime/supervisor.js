@@ -140,17 +140,33 @@ export function isAlive(pid, opts = {}) {
 }
 
 /**
- * O processo do PID ainda é o NOSSO? Compara a idade real do processo (segundos,
- * tz-free) com a idade esperada pelo `startedAt` registrado. PID reusado seria bem
- * mais novo → diverge → não é nosso. Sem baseline ou sem leitura → procede (honesto).
+ * PRD45 S45.1 (P1.1) — veredito TIPADO de ownership do PID. Antes falhava ABERTO (matava)
+ * sempre que o baseline não era verificável, o que permitia matar um PID reusado a partir de
+ * um state adulterado. Agora distingue:
+ *   • baseline ausente/inválido (`!startedAt` ou timestamp lixo) = adulteração óbvia ⇒
+ *     `unverified_baseline`, NÃO-nosso (fail-closed: o stop pula, não mata);
+ *   • idade ILEGÍVEL (`liveAgeSec == null`: permissão/SO) = ambiente, não ataque ⇒ procede
+ *     matando, MAS auditado (`unverified_age`) — nunca silencioso (decisão de produto);
+ *   • idade legível: compara com a esperada por `startedAt` (tz-free). Divergência > tol =
+ *     pid reusado ⇒ `foreign`, não-nosso.
+ * @returns {{ ours:boolean, verified:boolean, reason:string }}
+ */
+export function ownershipVerdict(svc, liveAgeSec, nowMs = Date.now(), tolSec = 10) {
+  const recorded = svc && svc.startedAt ? Date.parse(svc.startedAt) : NaN
+  if (Number.isNaN(recorded)) return { ours: false, verified: false, reason: "unverified_baseline" }
+  if (liveAgeSec == null) return { ours: true, verified: false, reason: "unverified_age" }
+  const expectedAgeSec = (nowMs - recorded) / 1000
+  if (Math.abs(liveAgeSec - expectedAgeSec) <= tolSec) return { ours: true, verified: true, reason: "verified" }
+  return { ours: false, verified: true, reason: "foreign" }
+}
+
+/**
+ * Compat: contrato booleano preservado para chamadores existentes. `true` = pode prosseguir
+ * (nosso OU idade ilegível-porém-auditada); `false` = não-nosso comprovado ou não-verificável.
+ * O motivo detalhado (fail-closed vs auditado) vem de `ownershipVerdict`.
  */
 export function isProcessOurs(svc, liveAgeSec, nowMs = Date.now(), tolSec = 10) {
-  if (!svc || !svc.startedAt) return true
-  if (liveAgeSec == null) return true
-  const recorded = Date.parse(svc.startedAt)
-  if (Number.isNaN(recorded)) return true
-  const expectedAgeSec = (nowMs - recorded) / 1000
-  return Math.abs(liveAgeSec - expectedAgeSec) <= tolSec
+  return ownershipVerdict(svc, liveAgeSec, nowMs, tolSec).ours
 }
 
 /**
@@ -167,27 +183,64 @@ function doKill(svc, exec, kill, platform) {
   kill(platform === "win32" ? svc.pid : -svc.pid, "SIGTERM")
 }
 const svcName = (svc) => svc && svc.name
-// Encerra UM serviço. Idempotente; pid reusado/foreign é PULADO, não morto.
-function stopService(svc, ctx) {
-  if (!svc || !svc.pid) return { name: svcName(svc), status: "no-pid" }
-  if (ctx.getAgeSec && !isProcessOurs(svc, ctx.getAgeSec(svc.pid))) {
-    return { name: svc.name, status: "skipped-foreign", pid: svc.pid }
-  }
+// Erro de kill → status TIPADO (P0.2). ESRCH = já sumiu; EPERM/EACCES = acesso negado;
+// resto = falha de sinal. NUNCA colapsa tudo em "already-gone" (que escondia o access_denied).
+function killErrorStatus(code) {
+  if (code === "ESRCH") return "already_gone"
+  if (code === "EPERM" || code === "EACCES") return "access_denied"
+  return "signal_failed"
+}
+// Decide o ownership ANTES de matar (P1.1). Sem getAgeSec, mantém o caminho legado (procede).
+function ownershipFor(svc, ctx) {
+  if (!ctx.getAgeSec) return { ours: true, verified: false, reason: "no_age_probe" }
+  return ownershipVerdict(svc, ctx.getAgeSec(svc.pid), ctx.now || Date.now())
+}
+// Ownership não-nosso → status de "pulado" (fail-closed ou reusado). @returns row ou null.
+function skipRow(svc, own) {
+  if (own.ours) return null
+  const status = own.reason === "unverified_baseline" ? "skipped_unverified" : "skipped_foreign"
+  return { name: svc.name, status, pid: svc.pid }
+}
+function attemptKill(svc, ctx, own) {
   try {
     doKill(svc, ctx.exec, ctx.kill, ctx.platform)
-    return { name: svc.name, status: "stopped", pid: svc.pid }
+    // Idade ilegível-porém-auditada carimba o motivo no resultado (nunca silencioso).
+    const note = own.reason === "unverified_age" ? { note: "unverified_age" } : {}
+    return { name: svc.name, status: "stopped", pid: svc.pid, ...note }
   } catch (e) {
-    return { name: svc.name, status: "already-gone", pid: svc.pid, detail: e.message }
+    return { name: svc.name, status: killErrorStatus(e && e.code), pid: svc.pid, detail: e.message }
   }
+}
+// Encerra UM serviço. Idempotente. Não-verificável (fail-closed) e reusado são PULADOS.
+function stopService(svc, ctx) {
+  if (!svc || !svc.pid) return { name: svcName(svc), status: "no_pid" }
+  const own = ownershipFor(svc, ctx)
+  return skipRow(svc, own) || attemptKill(svc, ctx, own)
 }
 export function stopAll(state, opts = {}) {
   const ctx = {
     exec: opts.exec,
     kill: opts.kill || ((pid, sig) => process.kill(pid, sig)),
     getAgeSec: opts.getAgeSec,
+    now: opts.now,
     platform: opts.platform || process.platform,
   }
   return (state || []).map((svc) => stopService(svc, ctx))
+}
+
+// PRD45 S45.1 (P0.2) — só é seguro apagar o state quando NADA ficou pendente: nem pid vivo,
+// nem acesso negado, nem sinal falho, nem pulado por não-verificação. Preservar o state é o
+// que torna o retry idempotente possível — apagar cedo era o bug que impedia a 2ª tentativa.
+const STOP_UNRESOLVED = new Set(["access_denied", "signal_failed", "skipped_unverified", "skipped_foreign"])
+export function stopOutcome(results, stillAlive) {
+  const unresolved = (results || []).filter((r) => STOP_UNRESOLVED.has(r.status))
+  const clearable = unresolved.length === 0 && (stillAlive || []).length === 0
+  return {
+    clearable,
+    exitCode: clearable ? 0 : 1,
+    unresolved: unresolved.map((r) => ({ name: r.name, status: r.status, pid: r.pid })),
+    stillAlive: stillAlive || [],
+  }
 }
 
 /**
