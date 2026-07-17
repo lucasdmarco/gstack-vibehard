@@ -2,6 +2,7 @@ import { spawn, execFileSync } from "child_process"
 import { openSync, closeSync, mkdirSync, existsSync, readFileSync } from "fs"
 import { join } from "path"
 import { loadRuntimeManifest, validateRuntimeManifest } from "../runtime/manifest.js"
+import { evaluateManifestExec, evaluateManifestExecForProject, manifestTrustDigest, writeTrustedDigest } from "../runtime/exec-policy.js"
 import { classifyWorkspace } from "../runtime/workspace.js"
 import {
   planStart, stopAll, stopOutcome, pollReadiness, killTreeCommand, isAlive, waitPidsExit,
@@ -42,11 +43,40 @@ function explainNoManifest(cwd) {
   info("  O que fazer:")
   ws.actions.forEach((a) => info(`    • ${a}`))
 }
-function loadValidDevManifest(cwd) {
+// PRD45 S45.2 (P1.2): antes de spawnar qualquer coisa, o manifest passa pela policy de
+// execução. Um repo clonado com `node -e`/`cwd:../..` é BLOQUEADO fail-closed; um binário fora
+// da allowlist pede trust do digest exato (`gstack_vibehard dev --trust`).
+function enforceExecPolicy(m, cwd) {
+  const verdict = evaluateManifestExecForProject(m, cwd)
+  if (verdict.ok) return true
+  error("Runtime manifest REPROVADO pela policy de execução (P1.2) — nada foi executado.")
+  for (const v of verdict.violations) warn(`  ✗ ${v.at}: ${v.reason}`)
+  if (verdict.needsTrust) {
+    warn("  Este manifest usa binário fora da allowlist. Se você CONFIA neste repositório,")
+    warn(`  aprove ESTE conteúdo com: gstack_vibehard dev --trust  (digest ${verdict.digest.slice(0, 12)}…)`)
+  }
+  return false
+}
+function loadValidDevManifest(cwd, args = []) {
   const m = loadRuntimeManifest(cwd)
   if (!m) { explainNoManifest(cwd); return null }
   const v = validateRuntimeManifest(m)
   if (!v.valid) { v.errors.forEach((e) => warn(`  ✗ ${e}`)); error("Runtime manifest inválido — corrija antes do `dev`."); return null }
+  if (args.includes("--trust")) return trustAndLoad(m, cwd)
+  if (!enforceExecPolicy(m, cwd)) return null
+  return m
+}
+// `--trust`: o usuário aprova EXPLICITAMENTE o conteúdo atual do manifest (digest). deny/escape
+// de cwd NUNCA são destraváveis por trust — só o `ask` (binário fora da allowlist).
+function trustAndLoad(m, cwd) {
+  const verdict = evaluateManifestExec(m, cwd, { trustedDigest: manifestTrustDigest(m) })
+  if (!verdict.ok) {
+    error("`--trust` NÃO aprova este manifest: há violações que trust não cobre (código inline / escape de cwd).")
+    for (const v of verdict.violations) warn(`  ✗ ${v.at}: ${v.reason}`)
+    return null
+  }
+  writeTrustedDigest(cwd, verdict.digest, { by: "dev --trust" })
+  success(`Manifest aprovado e confiado (digest ${verdict.digest.slice(0, 12)}…).`)
   return m
 }
 // Reinicia (--force): mata a árvore antiga e ESPERA a morte real (senão o antigo
@@ -149,7 +179,7 @@ function openPreview(args, started) {
 export async function devCommand(args = [], opts = {}) {
   const cwd = opts.cwd || process.cwd()
   const json = args.includes("--json")
-  const m = loadValidDevManifest(cwd)
+  const m = loadValidDevManifest(cwd, args)
   if (!m) return
   if (!(await ensureNotAlreadyRunning(cwd, args.includes("--force"), json))) return
   clearState(cwd)

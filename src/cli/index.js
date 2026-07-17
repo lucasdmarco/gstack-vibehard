@@ -212,7 +212,7 @@ const COMMANDS = [
   { name: "state", group: "advanced", desc: "State Store operacional do projeto (resumo por entidade)", usage: "gstack_vibehard state summary [--json]" },
   { name: "monitor", group: "advanced", desc: "TUI: agentes, tokens, QG, ROI", usage: "gstack_vibehard monitor" },
   { name: "runtime", group: "common", desc: "Runtime do projeto (status do manifest)", usage: "gstack_vibehard runtime status [--json]" },
-  { name: "dev", group: "common", desc: "Sobe os serviços do projeto (port alloc + health)", usage: "gstack_vibehard dev [--open] [--json]" },
+  { name: "dev", group: "common", desc: "Sobe os serviços do projeto (port alloc + health)", usage: "gstack_vibehard dev [--open] [--trust] [--json]" },
   { name: "stop", group: "common", desc: "Encerra o runtime (árvore de processos)", usage: "gstack_vibehard stop [--json]" },
   { name: "logs", group: "common", desc: "Logs de um serviço do runtime", usage: "gstack_vibehard logs [serviço] [--follow]" },
   { name: "open", group: "common", desc: "Abre o preview do serviço web", usage: "gstack_vibehard open" },

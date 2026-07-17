@@ -1,6 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { mkdtemp, rm, writeFile, mkdir, readFile, readdir, rename } from "node:fs/promises"
+import { existsSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
@@ -150,11 +151,14 @@ async function mkProject(services) {
   return dir
 }
 
-// ── ABUSO fix3: spawn de binário inexistente NÃO derruba o CLI; marca failed ──
-test("e2e: spawn de binário inexistente não derruba o CLI (status failed)", async () => {
+// ── ABUSO fix3: spawn falho NÃO derruba o CLI; marca failed ──
+// O binário é um RUNNER allow (npm) com subcomando inexistente — assim o spawn de fato
+// acontece e falha (o caso que este teste protege). Um binário DESCONHECIDO agora é barrado
+// ANTES pelo gate P1.2 (coberto no teste logo abaixo), não chega ao spawn.
+test("e2e: spawn falho (runner com subcomando inexistente) não derruba o CLI (status failed)", async () => {
   const { devCommand, stopCommand } = await import(`${pathToFileURL(cmdMod)}?t=${Date.now()}`)
   const dir = await mkProject([{
-    name: "web", command: ["binario-que-nao-existe-zzz"], cwd: ".",
+    name: "web", command: ["npm", "run", "subcomando-que-nao-existe-zzz"], cwd: ".",
     port: { preferred: 7301, env: "E2E_PORT", autoAllocate: true },
     health: { readiness: { type: "http", path: "/", timeoutSeconds: 3 } },
   }])
@@ -164,6 +168,24 @@ test("e2e: spawn de binário inexistente não derruba o CLI (status failed)", as
     const state = JSON.parse(await readFile(path.join(dir, ".gstack", "runtime", "web.json"), "utf-8"))
     assert.equal(state.status, "failed", "spawn falho vira status failed (sem crash)")
     assert.ok(!state.pid, "serviço falho não tem pid running")
+  } finally {
+    await cleanupProject(dir, stopCommand)
+  }
+})
+
+// ── PRD45 S45.2 (P1.2): manifest hostil de repo clonado é BLOQUEADO antes de qualquer spawn ──
+test("e2e: dev RECUSA manifest com código inline (node -e) — nada é executado", async () => {
+  const { devCommand, stopCommand } = await import(`${pathToFileURL(cmdMod)}?t=${Date.now()}`)
+  const dir = await mkProject([{
+    name: "evil", command: ["node", "-e", "require('fs').writeFileSync('PWNED.txt','x')"], cwd: ".",
+    port: { preferred: 7302, env: "E2E_PORT", autoAllocate: true },
+    health: { readiness: { type: "http", path: "/", timeoutSeconds: 3 } },
+  }])
+  try {
+    await devCommand(["--json"], { cwd: dir })
+    // CONTROLE NEGATIVO: o efeito colateral do código inline NÃO aconteceu.
+    assert.equal(existsSync(path.join(dir, "PWNED.txt")), false, "node -e foi BLOQUEADO antes do spawn")
+    assert.equal(existsSync(path.join(dir, ".gstack", "runtime", "evil.json")), false, "nenhum serviço iniciado")
   } finally {
     await cleanupProject(dir, stopCommand)
   }
