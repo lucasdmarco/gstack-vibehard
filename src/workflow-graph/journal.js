@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, appendFileSync, readFileSync, readdirSync } from "fs"
 import { join } from "path"
+import { redactEvent } from "./redact-event.js"
 
 /**
  * Journal por run em .gstack/workflows/runs/<runId>/journal.jsonl.
@@ -23,10 +24,10 @@ function journalPath(baseDir, runId) {
 export function appendEvent(baseDir, runId, event) {
   const dir = runDir(baseDir, runId)
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-  const rec = { ts: event.ts || new Date().toISOString(), ...event }
-  // Nunca persistir campos sensíveis
-  delete rec.secret
-  delete rec.transcript
+  // PRD45 S45.3 (P1.5): redação RECURSIVA antes de QUALQUER escrita — segredo em campo não
+  // literal (task/summary/aninhado/URL) nunca chega ao disco. `ts` fica fora da varredura
+  // (não é sensível e a chave não deve ser mascarada por nome).
+  const rec = { ts: event.ts || new Date().toISOString(), ...redactEvent(event) }
   appendFileSync(journalPath(baseDir, runId), JSON.stringify(rec) + "\n", "utf-8")
   return rec
 }
