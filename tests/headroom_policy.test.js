@@ -33,6 +33,7 @@ test("ensureRoutedChildEnv: Full → sobe proxy (se preciso) e devolve env child
     cwd: "/proj", baseEnv, mode: "full", env: {},
     status: async () => ({ state: "none" }),
     start: async () => ({ started: true, ready: true, port: 8787 }),
+    probe: async () => ({ ok: true }), // PRD45 S45.4: routed agora exige prova de tráfego
   })
   assert.equal(r.routed, true)
   assert.equal(r.env.ANTHROPIC_BASE_URL, "http://127.0.0.1:8787")
@@ -46,6 +47,7 @@ test("ensureRoutedChildEnv: proxy já rodando → reusa (não sobe outro)", asyn
     cwd: "/proj", mode: "full", env: {},
     status: async () => ({ state: "running", host: "127.0.0.1", port: 8790 }),
     start: async () => { started++; return { started: true, ready: true } },
+    probe: async () => ({ ok: true }),
   })
   assert.equal(started, 0)
   assert.equal(r.proxyUrl, "http://127.0.0.1:8790")

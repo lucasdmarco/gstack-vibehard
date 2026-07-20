@@ -98,6 +98,9 @@ function buildServicePlan(s, env, port) {
 const routingArgs = (r) => ({
   cwd: r.cwd || process.cwd(), baseEnv: {}, mode: r.mode || "full",
   env: r.env || process.env, start: r.start, status: r.status,
+  // P1.4: repassa o probe de tráfego injetável (default real: socket loopback). `routed` só
+  // é afirmado após o probe — sem isso o dev roda sem routing (fail-safe).
+  ...(r.probe ? { probe: r.probe } : {}),
 })
 async function resolveChildRoutingOverlay(opts) {
   const r = opts.routing
