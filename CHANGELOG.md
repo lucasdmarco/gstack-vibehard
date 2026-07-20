@@ -1,5 +1,33 @@
 # Changelog - gstack-vibehard
 
+## [5.7.0] - 2026-07-17 — PRD45 S45.5: install/create transacional + dry-run fiel
+
+Sprint 45.5 — Full é tudo-ou-restaura; o dry-run mostra os efeitos reais.
+
+- **Motor transacional `src/installer/provision-txn.js`** (núcleo do P1.7). Operation plan único
+  que o dry-run descreve e o executor usa como registro de compensadores; journal **write-ahead
+  em disco** (crash-safe, ao contrário do `InstallJournal` em memória); compensação automática em
+  **ordem reversa** quando uma op falha; ownership por recurso (a op que falhou não é compensada);
+  estados `committed | rolled_back | rollback_failed`; `recoverPlan` retoma o rollback de um
+  processo morto (o doctor recupera). Complementa `operation-plan.js`/`journal.js` (que cobrem
+  escritas de arquivo) — containers/globais/processos ganham a transação que faltava.
+
+- **P1.8 — `create --full --dry-run` omitia os efeitos reais**. Listava basicamente o projeto e
+  `~/.atomic`, mas o caminho real provisiona Docker/Casdoor (container + rede + volume), ECC,
+  AgentMemory. Consentimento informado falso. Agora `buildFullProvisionPlan` é a fonte única e o
+  dry-run expõe cada operação — container Casdoor por **digest** (nunca `latest`), rede loopback
+  `127.0.0.1:8000`, escopo global, e o comando exato de rollback. Lite mostra `operations: []`
+  (não suja a máquina).
+
+- **P1.7 — install/create Full não eram transacionais**. Falha tardia deixava a máquina
+  parcialmente modificada, terminando em `partial_with_restore_available` com restore **manual**.
+  Agora `createFullTransactional` envolve os passos pós-provisionamento: uma falha depois do
+  Casdoor no ar **derruba o container automaticamente** (`docker compose down -v`). O journal
+  write-ahead em `.gstack/` permite o `doctor` recuperar um create que morreu no meio.
+
+Nota: o contrato de fases de `runFullProvisioning` ficou intacto (sem regressão nos testes de
+create); o golden foi regenerado legitimamente (dry-run mais rico, ordem de chaves preservada).
+
 ## [5.6.0] - 2026-07-17 — PRD45 S45.4: Headroom e Output Guard operacionalmente honestos
 
 Sprint 45.4 — roteamento child-scoped real sem quebrar harness nem expor proxy.
