@@ -1,3 +1,4 @@
+import { connect } from "net"
 import { startProxy, proxyStatus, DEFAULT_PROXY_PORT } from "./headroom-proxy.js"
 import { buildRoutedEnv } from "./headroom-traffic.js"
 
@@ -55,18 +56,47 @@ async function ensureProxyUp({ cwd, port, start, status }) {
   return start({ cwd, port })
 }
 
+/**
+ * PRD45 S45.4 (P1.4): PROBE DE TRÁFEGO real do proxy. `startProxy` marcava `ready` só porque a
+ * porta abriu (waitPortReady) ou o PID estava vivo (alreadyRunning) — nunca provou que o proxy
+ * ACEITA conexão. Aqui abrimos um socket loopback de verdade; sem isso, não afirmamos `routed`
+ * (o achado central: "expor routed apenas após probe de tráfego"). Injetável para testes.
+ */
+export function defaultTrafficProbe({ host = "127.0.0.1", port, timeoutMs = 1500 } = {}) {
+  return new Promise((resolve) => {
+    const sock = connect({ host, port })
+    const done = (ok, reason) => { sock.destroy(); resolve({ ok, reason }) }
+    sock.setTimeout(timeoutMs, () => done(false, "probe timeout — proxy não respondeu"))
+    sock.once("connect", () => done(true))
+    sock.once("error", (e) => done(false, `probe falhou: ${e.code || e.message}`))
+  })
+}
+
+const notRouted = (reason, baseEnv, proxy) => ({ routed: false, reason, env: baseEnv, ...(proxy ? { proxy } : {}) })
+const proxyIsUp = (up) => up.ready === true || up.alreadyRunning === true
+const trafficOk = (t) => Boolean(t) && t.ok === true
+const failReason = (obj, fallback) => (obj && obj.reason) || fallback
+
+// Sobe o proxy e prova tráfego. @returns { ok, up, reason? } — ok:true só com probe verde.
+async function ensureProvenProxy({ cwd, port, start, status, probe }) {
+  const up = await ensureProxyUp({ cwd, port, start, status })
+  if (!proxyIsUp(up)) return { ok: false, up, reason: failReason(up, "proxy não ficou pronto") }
+  const traffic = await probe({ host: up.host || "127.0.0.1", port: up.port || port })
+  if (!trafficOk(traffic)) return { ok: false, up, reason: failReason(traffic, "proxy não provou tráfego") }
+  return { ok: true, up }
+}
+
 export async function ensureRoutedChildEnv({
   cwd = process.cwd(), baseEnv = {}, mode = "full", env = process.env,
   port = DEFAULT_PROXY_PORT, harnesses = ["claude", "codex"],
-  start = startProxy, status = proxyStatus, build = buildRoutedEnv,
+  start = startProxy, status = proxyStatus, build = buildRoutedEnv, probe = defaultTrafficProbe,
 } = {}) {
-  if (!routeDefaultOn({ mode, env })) return { routed: false, reason: offReason(env), env: baseEnv }
-
-  const up = await ensureProxyUp({ cwd, port, start, status })
-  if (up.ready !== true && up.alreadyRunning !== true) {
-    return { routed: false, reason: up.reason || "proxy não ficou pronto", env: baseEnv, proxy: up }
-  }
-  const proxyUrl = `http://127.0.0.1:${up.port || port}`
+  // opt-out / não-Full curto-circuitam ANTES de subir/probar qualquer coisa.
+  if (!routeDefaultOn({ mode, env })) return notRouted(offReason(env), baseEnv)
+  // Fail-safe: sem proxy up + prova de tráfego, o env do FILHO fica intocado (dev sem routing).
+  const proven = await ensureProvenProxy({ cwd, port, start, status, probe })
+  if (!proven.ok) return notRouted(proven.reason, baseEnv, proven.up)
+  const proxyUrl = `http://127.0.0.1:${proven.up.port || port}`
   const routed = build({ baseEnv, proxyUrl, harnesses })
-  return { routed: true, env: routed.env, applied: routed.applied, proxyUrl, proxy: up, note: "child-scoped; aplicar SÓ ao processo que o GStack spawna" }
+  return { routed: true, env: routed.env, applied: routed.applied, proxyUrl, proxy: proven.up, note: "child-scoped; aplicar SÓ ao processo que o GStack spawna" }
 }

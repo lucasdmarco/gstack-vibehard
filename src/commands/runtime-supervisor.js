@@ -4,6 +4,8 @@ import { join } from "path"
 import { loadRuntimeManifest, validateRuntimeManifest } from "../runtime/manifest.js"
 import { evaluateManifestExec, evaluateManifestExecForProject, manifestTrustDigest, writeTrustedDigest } from "../runtime/exec-policy.js"
 import { classifyWorkspace } from "../runtime/workspace.js"
+import { routeDefaultOn } from "../tools/headroom-policy.js"
+import { readProjectMarker } from "../project/identity.js"
 import {
   planStart, stopAll, stopOutcome, pollReadiness, killTreeCommand, isAlive, waitPidsExit,
   writeServiceState, readAllState, clearState, logsDir,
@@ -175,7 +177,21 @@ function openPreview(args, started) {
   info("  Logs: `gstack_vibehard logs <serviço>` · Parar: `gstack_vibehard stop`")
 }
 
-/** `gstack_vibehard dev [--open] [--force] [--json]` — sobe os serviços do manifest. */
+// Tier de instalação do projeto (lite|full) pelo marcador. Default full (mais roteável) só se
+// o marcador não declara — mas o routing ainda depende de proxy+probe reais (fail-safe).
+function devMode(cwd) {
+  const marker = readProjectMarker(cwd)
+  return marker && marker.mode === "lite" ? "lite" : "full"
+}
+/**
+ * Opções de routing child-scoped para o `dev` (P1.4). Habilita SÓ no Full sem opt-out; o
+ * overlay real (ensureRoutedChildEnv) ainda exige proxy up + probe de tráfego, então isto
+ * apenas LIGA a possibilidade — nunca força routing nem toca config global.
+ */
+export function devRoutingOptions({ mode = "full", env = process.env, cwd = process.cwd() } = {}) {
+  return { enabled: routeDefaultOn({ mode, env }), mode, env, cwd }
+}
+/** `gstack_vibehard dev [--open] [--force] [--trust] [--json]` — sobe os serviços do manifest. */
 export async function devCommand(args = [], opts = {}) {
   const cwd = opts.cwd || process.cwd()
   const json = args.includes("--json")
@@ -188,7 +204,13 @@ export async function devCommand(args = [], opts = {}) {
   const brokerSecrets = resolveDevSecrets(m, cwd, opts)
   // envSource = env do shell + segredos do broker (precedência). O plano só repassa
   // ao serviço a base OS-essencial, a porta e os secretRefs — nunca tudo.
-  const plans = await planStart(m, { envSource: { ...process.env, ...brokerSecrets }, allocatePort: opts.allocatePort })
+  const plans = await planStart(m, {
+    envSource: { ...process.env, ...brokerSecrets }, allocatePort: opts.allocatePort,
+    // PRD45 S45.4 (P1.4): routing Headroom child-scoped no caminho real do dev. Default-on no
+    // Full (opt-out GSTACK_HEADROOM_ROUTE=off), fail-safe (proxy/probe falho ⇒ env intocado),
+    // NUNCA config global. O overlay só aplica ao processo que o GStack spawna.
+    routing: devRoutingOptions({ mode: devMode(cwd), env: process.env, cwd }),
+  })
   const started = await startAllServices(plans, cwd, json)
   await checkAllReadiness(started, cwd, json)
   if (json) return process.stdout.write(JSON.stringify({ services: readAllState(cwd) }) + "\n")

@@ -78,11 +78,13 @@ test("planStart COM routing (Full+opt-in) → child recebe env roteado; global i
   const { planStart } = await imp("src/runtime/supervisor.js")
   const manifest = { services: [{ name: "web", command: ["node", "server.js"], secretRefs: [] }] }
   const before = { ...process.env }
-  // stubs: proxy já rodando → ensureRoutedChildEnv devolve env roteado child-scoped
+  // stubs: proxy já rodando + probe de tráfego OK → env roteado child-scoped.
+  // PRD45 S45.4 (P1.4): `routed` agora exige prova de tráfego (probe injetável).
   const routing = {
     enabled: true, mode: "full", env: {}, cwd: repoRoot,
     status: async () => ({ state: "running", host: "127.0.0.1", port: 8787 }),
     start: async () => ({ ready: true, port: 8787 }),
+    probe: async () => ({ ok: true }),
   }
   const plans = await planStart(manifest, { env: {}, routing })
   assert.equal(plans[0].env.ANTHROPIC_BASE_URL, "http://127.0.0.1:8787", "child roteado (child-scoped)")
