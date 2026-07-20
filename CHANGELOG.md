@@ -1,5 +1,24 @@
 # Changelog - gstack-vibehard
 
+## [5.8.0] - 2026-07-17 — PRD45 S45.6: artifact lock (supply chain verificada, não declarada)
+
+Sprint 45.6 — troca garantia declarativa por verificação criptográfica na cadeia de suprimento.
+
+- **P1.9 — o Supply Chain Doctor declarava `hashes: ok` sem verificar hash nenhum**
+  (`src/installer/supply-chain.js`). Era uma string de recomendação hardcoded: uma dependência
+  alterada a montante (imagem `latest`, clone sem commit fixo, download sem digest) mudava o
+  produto instalado sem o doctor notar. Novo **`src/installer/artifact-lock.js`**: cada artefato
+  declara um pin **imutável** e é classificado — **image** exige `@sha256:<64hex>` (nunca
+  `latest`/tag), **git** exige commit fixo de 40 hex, **url** exige sha256 publicado (sem hash →
+  `unknown` honesto), **npm** exige version exata + integrity. Estados `verified | unknown |
+  blocked` — **nunca `ok` sem prova**; agregação fail-closed. Adulterar um byte do digest ⇒
+  `blocked`. `GSTACK_ARTIFACT_LOCK` reusa o `CASDOOR_IMAGE` já fixado por digest em `create.js`.
+  O doctor agora reporta a verificação **real** no lugar da garantia inexistente.
+
+Nota: o outro item do DoD do sprint — "restore não sobrescreve arquivo alterado pelo usuário" —
+já estava implementado e testado (`restore.js:driftBlocks` pula o restore quando o hash atual
+diverge do `installedHash`, exigindo `--resolve-drift`); confirmado, sem alteração.
+
 ## [5.7.0] - 2026-07-17 — PRD45 S45.5: install/create transacional + dry-run fiel
 
 Sprint 45.5 — Full é tudo-ou-restaura; o dry-run mostra os efeitos reais.
