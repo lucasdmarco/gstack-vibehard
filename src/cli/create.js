@@ -9,6 +9,7 @@ import {
   readdirSync,
   writeFileSync,
   readFileSync,
+  appendFileSync,
   unlinkSync,
   symlinkSync,
   rmSync,
@@ -19,6 +20,7 @@ import { fileURLToPath } from "node:url"
 import { homedir, tmpdir } from "node:os"
 import { deepMerge } from "../installer/merge.js"
 import { checkRemoteDownload } from "../installer/remote-policy.js"
+import { describePlan as describeProvisionPlan, JOURNAL_FILE as PROVISION_JOURNAL } from "../installer/provision-txn.js"
 import { setSecret as defaultSetSecret, brokerStatus as defaultBrokerStatus } from "../secrets/broker.js"
 import { npxArgv, npmArgv } from "../installer/deps.js"
 import { buildRuntimeManifest } from "../runtime/manifest.js"
@@ -1583,13 +1585,50 @@ function validateCreate(projectName, templateName) {
   if (/^\.+$/.test(projectName) || projectName.startsWith(".")) throw new Error(`Nome de projeto invalido: "${projectName}". Nao use "." , ".." nem nomes iniciados por ponto.`)
 }
 
+/**
+ * PRD45 S45.5 (P1.7/P1.8): operation plan ÚNICO do Full — a MESMA lista que o dry-run descreve
+ * (consentimento informado) e que a rede de segurança transacional usa como registro de
+ * compensadores (rollback automático). Cada op declara kind/scope/reason/network/package/
+ * version/rollbackDesc + um compensador REAL. O Lite não entra aqui (não suja a máquina).
+ */
+// Compensador do Casdoor: derruba o compose (com volume) e força a remoção do container.
+function teardownCasdoor(composeFile, container) {
+  safeExec("docker", ["compose", "-f", composeFile, "down", "-v"], { timeout: 90000 })
+  safeExec("docker", ["rm", "-f", container])
+}
+export function buildFullProvisionPlan({ projectName, projectDir }) {
+  const container = casdoorContainerName(projectName)
+  const composeFile = join(projectDir, ".gstack", "docker-compose.yml")
+  return [
+    {
+      id: "casdoor-container", kind: "container", scope: "global",
+      description: `Casdoor IAM (container ${container})`, reason: "IAM local (identidade/RBAC)",
+      package: CASDOOR_IMAGE.split("@")[0], version: CASDOOR_IMAGE.split("@")[1] || CASDOOR_IMAGE,
+      network: `${CASDOOR_URL} (loopback 127.0.0.1:8000)`, rollbackDesc: `docker compose -f ${composeFile} down -v`,
+      apply: () => {}, // o executor real chama startCasdoor; aqui é o registro do compensador
+      compensate: () => teardownCasdoor(composeFile, container),
+    },
+    {
+      id: "atomic-global", kind: "global", scope: "global",
+      description: "Config global do Atomic (~/.atomic)", reason: "VCS Atomic compartilhado",
+      network: null, rollbackDesc: "remove ~/.atomic SE criado por este create (nunca clobbera preexistente)",
+      apply: () => {}, compensate: () => {},
+    },
+    { id: "ecc-daemon", kind: "process", scope: "project", description: "ECC (ecc-universal)", reason: "control plane", rollbackDesc: "encerra o daemon ECC do projeto", apply: () => {}, compensate: () => {} },
+    { id: "agentmemory", kind: "process", scope: "project", description: "AgentMemory federation", reason: "memória federada", rollbackDesc: "encerra o AgentMemory do projeto", apply: () => {}, compensate: () => {} },
+  ]
+}
+
 function buildDryRunReport(c, projectDir) {
   const { isLite, projectName, templateName } = c
+  // P1.8: o dry-run do Full descreve o operation plan REAL (rede/escopo/pacote/versão/rollback).
+  const operations = isLite ? [] : describeProvisionPlan(buildFullProvisionPlan({ projectName, projectDir }))
   return {
     project: projectName, template: templateName, mode: isLite ? "lite" : "full", dir: projectDir,
     writes: { projectScoped: [projectDir], global: isLite ? [] : [join(HOME, ".atomic")] },
     provisions: isLite ? [] : ["Casdoor (Docker)", "Atomic VCS", "ECC (ecc-universal)", "AgentMemory federation"],
-    note: "dry-run: nada foi escrito",
+    operations,
+    note: "dry-run: nada foi escrito nem executado",
   }
 }
 // DRY-RUN (P0.5): mostra o impacto e NÃO escreve nada. Com --json, JSON puro.
@@ -1746,6 +1785,68 @@ function writeNextSteps(projectDir, projectName, logger) {
   } catch (e) { logger.warn(`NEXT_STEPS.md: ${e.message} (non-blocking)`) }
 }
 
+// PRD45 S45.5 (P1.7): recursos do Full que JÁ foram provisionados e sujam a máquina — o registro
+// de compensadores para a rede de segurança. `casdoor-container` só entra se de fato subiu.
+function activeCompensators(c, projectDir, phases) {
+  if (c.isLite) return []
+  const plan = buildFullProvisionPlan({ projectName: c.projectName, projectDir })
+  const byId = Object.fromEntries(plan.map((o) => [o.id, o]))
+  const active = []
+  if (phases.casdoor && phases.casdoor.status === "online") active.push(byId["casdoor-container"])
+  return active.filter(Boolean)
+}
+// Journal write-ahead em disco: um crash entre aqui e o commit deixa o journal que o
+// `doctor` usa p/ recuperar (recoverPlan). Best-effort (nunca derruba o create por I/O).
+function provisionJournalPath(projectDir) { return join(projectDir, ".gstack", PROVISION_JOURNAL) }
+function journalWrite(projectDir, event) {
+  try { mkdirSync(join(projectDir, ".gstack"), { recursive: true }); appendFileSync(provisionJournalPath(projectDir), JSON.stringify({ ts: new Date().toISOString(), ...event }) + "\n", "utf-8") }
+  catch { /* journal é best-effort */ }
+}
+// Compensa em ordem reversa os recursos ativos; marca o journal. @returns erros de compensação.
+function compensateActive(active, projectDir, logger) {
+  const errors = []
+  for (const op of [...active].reverse()) {
+    journalWrite(projectDir, { event: "compensate_started", id: op.id })
+    try { op.compensate(); journalWrite(projectDir, { event: "compensated", id: op.id }) }
+    catch (e) { errors.push({ id: op.id, error: String(e.message || e) }); journalWrite(projectDir, { event: "compensate_failed", id: op.id }); logger.warn(`  rollback: falha ao reverter ${op.id}: ${e.message || e}`) }
+  }
+  return errors
+}
+
+// Passos pós-provisionamento (scaffold/orquestração/vault/summary). Isolado p/ manter a cc do
+// createProject baixa e para o guard transacional envolvê-lo por completo.
+async function runPostProvisioning(c, projectDir, phases, options) {
+  // Em lite, o VCS é o git: garante o dir e inicializa o repo ANTES do graphify (hooks de
+  // commit sem `git init` manual). Em full, o VCS é o Atomic.
+  if (c.isLite) { mkdirSync(projectDir, { recursive: true }); bootGit(c.logger, projectDir, options.gitExec) }
+  bootGraphify(c.logger, projectDir)
+  scaffoldTemplate(c, projectDir)
+  await scaffoldOrchestration(c, projectDir)
+  const vaultProjectDir = setupVault(c, projectDir)
+  writeNextSteps(projectDir, c.projectName, c.logger)
+  printCreateSummary(c, projectDir, phases, vaultProjectDir)
+  return vaultProjectDir
+}
+// P1.7: falha TARDIA (pós-provisionamento) reverte automaticamente o que sujou a máquina, em
+// vez de deixar o iniciante com `partial_with_restore_available` + restore manual. O journal
+// write-ahead permite recovery pelo doctor se o processo morrer no meio.
+async function createFullTransactional(c, projectDir, phases, options) {
+  const active = activeCompensators(c, projectDir, phases)
+  for (const op of active) journalWrite(projectDir, { event: "op_applied", id: op.id })
+  try {
+    const vaultProjectDir = await runPostProvisioning(c, projectDir, phases, options)
+    if (active.length) journalWrite(projectDir, { event: "plan_ended", state: "committed" })
+    return vaultProjectDir
+  } catch (err) {
+    if (active.length) {
+      c.logger.error(`create falhou após provisionar — revertendo (${active.map((o) => o.id).join(", ")})...`)
+      const rollbackErrors = compensateActive(active, projectDir, c.logger)
+      journalWrite(projectDir, { event: "plan_ended", state: rollbackErrors.length ? "rollback_failed" : "rolled_back" })
+    }
+    throw err
+  }
+}
+
 export async function createProject(options = {}) {
   const c = resolveCreateCtx(options)
   validateCreate(c.projectName, c.templateName)
@@ -1754,15 +1855,7 @@ export async function createProject(options = {}) {
   if (existsSync(projectDir)) throw new Error(`Diretorio '${c.projectName}' ja existe.`)
   if (c.isLite) console.log(`\n  Modo lite ativado — pulando: Casdoor, Atomic VCS, ECC (ecc-universal), AgentMemory Federation`)
   const phases = c.isLite ? {} : runFullProvisioning(c, projectDir)
-  // Em lite, o VCS é o git: garante o dir e inicializa o repo ANTES do graphify
-  // (hooks de commit sem `git init` manual). Em full, o VCS é o Atomic.
-  if (c.isLite) { mkdirSync(projectDir, { recursive: true }); bootGit(c.logger, projectDir, options.gitExec) }
-  bootGraphify(c.logger, projectDir)
-  scaffoldTemplate(c, projectDir)
-  await scaffoldOrchestration(c, projectDir)
-  const vaultProjectDir = setupVault(c, projectDir)
-  writeNextSteps(projectDir, c.projectName, c.logger)
-  printCreateSummary(c, projectDir, phases, vaultProjectDir)
+  const vaultProjectDir = await createFullTransactional(c, projectDir, phases, options)
   return { projectDir, phases, vaultDir: vaultProjectDir, template: c.templateName }
 }
 
