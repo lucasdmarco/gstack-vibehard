@@ -1,5 +1,36 @@
 # Changelog - gstack-vibehard
 
+## [5.6.0] - 2026-07-17 — PRD45 S45.4: Headroom e Output Guard operacionalmente honestos
+
+Sprint 45.4 — roteamento child-scoped real sem quebrar harness nem expor proxy.
+
+- **P1.6 — o redact-proxy não era seguro para tráfego real (`src/security/redact-proxy.js`)**.
+  - `server.listen(port)` fazia bind em **todas as interfaces**. Agora bind **exclusivo em
+    `127.0.0.1`** (nunca `0.0.0.0` — não exposto na rede local).
+  - Health endpoint `/__gstack/health` com **nonce**: outro processo na porta não é confundido
+    com o proxy.
+  - `setEncoding("utf8")` preservando `content-encoding` **corrompia body gzip** no cliente.
+    Agora força `accept-encoding: identity` ao upstream + strip de `content-encoding`/
+    `content-length`.
+  - Filtra headers **hop-by-hop** (RFC 7230) na ida e na volta. A credencial de API do cliente
+    segue repassada — é como o harness autentica, não é vazamento.
+  - Redação com **rolling-window** (cauda de 512 B entre chunks): segredo partido no boundary
+    não atravessa mais (antes era por linha). Limite de buffer + timeouts (anti-DoS).
+
+- **P1.4 — Headroom default-on não chegava ao caminho real de `dev`**
+  (`src/tools/headroom-policy.js`, `src/commands/runtime-supervisor.js`).
+  - `ensureRoutedChildEnv` dizia `routed:true` só porque a porta abriu ou o PID estava vivo —
+    **nunca provou tráfego**. Agora exige um **probe de tráfego real** (`defaultTrafficProbe`:
+    socket loopback de verdade) antes de afirmar `routed`. Probe falho ⇒ `routed:false`, env do
+    filho **intocado** (fail-safe: o `dev` roda sem routing).
+  - `devRoutingOptions` liga o routing **child-scoped** no `dev`: default-on no Full, opt-out
+    `GSTACK_HEADROOM_ROUTE=off` preservado, **nunca config global**. O overlay só se aplica ao
+    processo que o GStack spawna.
+
+Nota: neste ambiente o headroom está `callable_not_routed`, então o probe falha ⇒ `routed:false`
+⇒ o `dev` roda exatamente como antes. O caminho fica ligado para quando o headroom estiver
+funcional, e `routed` nunca é reivindicado sem prova.
+
 ## [5.5.0] - 2026-07-17 — PRD45 S45.3: workflow fail-closed + journal sem secrets
 
 Sprint 45.3 — nenhuma tarefa falha vira `passed` e nenhum segredo entra no replay do journal.
