@@ -1,8 +1,37 @@
 {
   "schemaVersion": 2,
   "generatedBy": "gstack_vibehard agents build",
-  "compilerVersion": "3.64.0",
+  "compilerVersion": "5.8.0",
   "agents": 22,
+  "specialization": {
+    "total": 22,
+    "counts": {
+      "generic_adapter": 19,
+      "specialized": 3,
+      "verified": 0
+    },
+    "generic": [
+      "backend-specialist",
+      "code-archaeologist",
+      "database-architect",
+      "debugger",
+      "documentation-writer",
+      "explorer-agent",
+      "game-developer",
+      "orchestrator",
+      "penetration-tester",
+      "performance-optimizer",
+      "product-manager",
+      "product-owner",
+      "project-planner",
+      "qa-automation-engineer",
+      "security-auditor",
+      "seo-specialist",
+      "test-engineer",
+      "deployer",
+      "gstack-aidd-guided-delivery"
+    ]
+  },
   "source": {
     "coreHash": "sha256:8c97845ab37a81d191671c8d90f4831442261de077dc01fd946d4948fc11aeb9",
     "knowledgeHash": "sha256:965344454b2b59df6d31ed62302b457ec41b8997ded2d49e4f1dada8eac63d44",

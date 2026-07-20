@@ -251,13 +251,48 @@ function claimGovernance(has, read) {
   }
 }
 
+// PRD45 S45.7 (P1.11): claims que faltavam para os contratos comportamentais VINCULAREM. As
+// capacidades existem e têm teste de controle negativo (declarado no contrato) — sem o claim,
+// `contractFor()` nunca as alcançava e viravam config morta. Com o claim + contrato completo,
+// graduam REAL (prova comportamental de verdade, não presença de arquivo).
+// 22. QA Lens visual (S41.6) — REAL: screenshot/a11y/500 reprovam por motivos distintos.
+function claimQaLens(has, read) {
+  const ok = has("src/skills/visual-gate.js") && cliHasCommand(read, "loop")
+  return {
+    id: "qa-lens", claim: "QA Lens visual (screenshot + a11y + status HTTP; 500/a11y/screenshot ausente falham distinto)",
+    status: ok ? "REAL" : "PARTIAL", severity: "P1",
+    evidence: ["src/skills/visual-gate.js", "src/commands/loop.js"].filter(has),
+    missing: ok ? [] : ["visual-gate + comando loop observe"],
+  }
+}
+// 23. Action Kernel (S41.5) — REAL: ação governada negada NÃO executa (Gate Registry).
+function claimActionKernel(has, read) {
+  const ok = has("src/skills/action-kernel.js") && cliHasCommand(read, "actions")
+  return {
+    id: "action-kernel", claim: "Action Kernel: ação governada (task/workflow/delegate); ação negada NÃO executa",
+    status: ok ? "REAL" : "PARTIAL", severity: "P1",
+    evidence: ["src/skills/action-kernel.js", "src/commands/actions.js"].filter(has),
+    missing: ok ? [] : ["action-kernel + Gate Registry"],
+  }
+}
+// 24. Loop Checkpoint (S41.7) — REAL: tamper/traversal/.env abortam o restore.
+function claimLoopCheckpoint(has, read) {
+  const ok = has("src/skills/loop-checkpoint.js") && cliHasCommand(read, "loop")
+  return {
+    id: "loop-checkpoint", claim: "Loop Checkpoint/rollback seguro (tamper/traversal/.env abortam)",
+    status: ok ? "REAL" : "PARTIAL", severity: "P1",
+    evidence: ["src/skills/loop-checkpoint.js", "src/commands/loop.js"].filter(has),
+    missing: ok ? [] : ["loop-checkpoint + containment"],
+  }
+}
+
 // Ordem preservada (o placar e os testes dependem dela).
 const CLAIM_BUILDERS = [
   claimAutoDream, claimOutputGuard, claimVerify, claimRollback, claimCrossHarnessTrust,
   claimOpencodeSafe, claimTaskLoop, claimRuntimeSupervisor, claimSecretsBroker, claimRuntimeManifest,
   claimPackageManager, claimFullContract, claimAgentFactory, claimAgentShield, claimAdapterMatrix,
   claimQaMultiLens, claimVfaProvenance, claimChallengeResponse, claimMetaHarness, claimTypeCoverage,
-  claimGovernance,
+  claimGovernance, claimQaLens, claimActionKernel, claimLoopCheckpoint,
 ]
 function tallySummary(claims) {
   const summary = { REAL: 0, PARTIAL: 0, PLACEBO: 0, ROADMAP: 0, RISK: 0 }

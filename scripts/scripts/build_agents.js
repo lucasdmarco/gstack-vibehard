@@ -458,6 +458,8 @@ async function generate(options) {
 
   const cursorIndex = []
   const adapterFiles = { claude: [], codex: [], cursor: [] }
+  // P1.12: status honesto de especialização por agente (nº de knowledge packs casados).
+  const agentSpecialization = []
   let changed = 0
 
   for (const agent of agents) {
@@ -477,6 +479,7 @@ async function generate(options) {
     adapterFiles.codex.push(rel(root, codexPath))
     adapterFiles.cursor.push(rel(root, cursorRulePath))
     cursorIndex.push({ ...agent, source })
+    agentSpecialization.push({ id: agent.id, knowledgePacks: matchedKnowledge.length })
     log(`${agent.id}: ${matchedKnowledge.length} knowledge pack(s)`)
   }
 
@@ -505,7 +508,7 @@ async function generate(options) {
   // Fonte dos packs entra no hash de agentes: editar um pack ⇒ --check acusa drift.
   const packFiles = await collectSourceFiles(root, path.join(root, "agent-packs"))
   const security = await builtinSecuritySummary(root)
-  const manifest = buildManifestV2({ compilerVersion, coreFiles, knowledgeFiles, agentFiles: [...agentFiles, ...packFiles], agentsCount: agents.length, adapters: adapterFiles, security })
+  const manifest = buildManifestV2({ compilerVersion, coreFiles, knowledgeFiles, agentFiles: [...agentFiles, ...packFiles], agentsCount: agents.length, agents: agentSpecialization, adapters: adapterFiles, security })
   // Manifest com tratamento especial no --check: `compilerVersion` é INFORMATIVO
   // (versão do package) e NÃO conta como drift — senão todo bump de versão quebraria
   // o --check sem mudar a fonte. Compara o resto por igualdade.
