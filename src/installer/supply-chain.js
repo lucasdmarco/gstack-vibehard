@@ -3,6 +3,7 @@ import { delimiter, join, resolve } from "path"
 import { existsSync } from "fs"
 import { tmpdir } from "os"
 import { ALLOWED_REMOTE_ORIGINS } from "./remote-policy.js"
+import { verifyArtifactLock, GSTACK_ARTIFACT_LOCK } from "./artifact-lock.js"
 
 /**
  * Supply Chain Doctor (PRD14 §4.7): checagens OFFLINE-FIRST e determinísticas
@@ -79,6 +80,17 @@ function allowlistCheck() {
   }
 }
 
+// PRD45 S45.6 (P1.9): substitui o `hashes: ok` mentiroso pela verificação REAL do artifact lock.
+// `verified` = todos os artefatos fixados por digest/commit/integrity; `unknown` = há download
+// opt-in sem sha publicado (honesto, não bloqueia); `blocked` = artefato mutável/malformado.
+const LOCK_STATUS_MAP = Object.freeze({ verified: "ok", unknown: "warning", blocked: "critical" })
+function artifactLockCheck() {
+  const lock = verifyArtifactLock(GSTACK_ARTIFACT_LOCK)
+  const blockedOrUnknown = lock.artifacts.filter((a) => a.status !== "verified")
+  const suffix = blockedOrUnknown.length ? ` — pendências: ${blockedOrUnknown.map((a) => `${a.id}:${a.status}`).join(", ")}` : ""
+  return { id: "artifact-lock", status: LOCK_STATUS_MAP[lock.status] || "warning", detail: `integridade da cadeia: ${lock.status} (${lock.artifacts.length} artefato(s))${suffix}` }
+}
+
 /** Nível de risco agregado a partir dos checks. */
 export function riskLevel(checks) {
   if (checks.some((c) => c.status === "critical")) return "high"
@@ -99,7 +111,7 @@ export function buildSupplyChainReport(opts = {}) {
     ...CRITICAL_BINS.map((b) => binCheck(b, true, { exec, env, cwd })),
     ...OPTIONAL_BINS.map((b) => binCheck(b, false, { exec, env, cwd })),
     allowlistCheck(),
-    { id: "hashes", status: "ok", detail: "integridade de pacote: use npm ci (lockfile) e `npm run sbom` (CycloneDX) — hash por download remoto quando a fonte publica" },
+    artifactLockCheck(),
   ]
   return {
     schemaVersion: "gstack.supplychain.v1",
