@@ -1,1 +1,1 @@
-{"project":"goldenapp","template":"fullstack-monorepo","mode":"lite","dir":"<CWD>/goldenapp","writes":{"projectScoped":["<CWD>/goldenapp"],"global":[]},"provisions":[],"note":"dry-run: nada foi escrito"}
+{"project":"goldenapp","template":"fullstack-monorepo","mode":"lite","dir":"<CWD>/goldenapp","writes":{"projectScoped":["<CWD>/goldenapp"],"global":[]},"provisions":[],"operations":[],"note":"dry-run: nada foi escrito nem executado"}
