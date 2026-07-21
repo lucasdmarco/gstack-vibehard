@@ -59,6 +59,27 @@
       "role": "replit_workspace_runtime_schema",
       "addedOn": "2026-07-14",
       "note": "Dump bruto de workspace Replit (35.789 entradas) curado em .docs/RESEARCH/replit-project-evidence/ (manifest.md + findings.json). O schema .replit ([workflows]/[postMerge]/[deployment]/[[ports]]) CORROBORA o runtime manifest v3 do GStack (S42.6) como espelho de design — NUNCA dependencia runtime; nenhum plugin @replit/* ou node_modules vendorizado. Motivou deny-patterns novos no scout (.npmrc/.netrc/.git-credentials/.pgpass/*.tfstate/.aws)."
+    },
+    {
+      "url": "https://github.com/kulaxyz/self-learning-skills",
+      "status": "active_reference",
+      "role": "learning_pipeline_methodology",
+      "addedOn": "2026-07-21",
+      "note": "Disciplina de captura de golden path (triagem skill|memory|skip, dedupe antes de criar, campos de evidencia Verified by/Failure pattern/What did not work, progressive disclosure) que motivou o PRD46. Referencia metodologica; NUNCA instalado nem vira dependencia runtime do GStack. Ancora obrigatoria: batch-6-aidd-methodology quando o tema for skills/onboarding/methodology."
+    },
+    {
+      "url": "https://github.com/vercel-labs/skills",
+      "status": "active_reference",
+      "role": "skill_discovery_lock_conformance",
+      "addedOn": "2026-07-21",
+      "note": "Padroes de discovery/lock/conformance de skills comparados no PRD46 (source-lock deterministico, discovery read-only). Referencia metodologica; NUNCA instalado nem vira dependencia runtime do GStack."
+    },
+    {
+      "url": "https://github.com/vercel-labs/agent-skills",
+      "status": "active_reference",
+      "role": "skill_marketplace_reference",
+      "addedOn": "2026-07-21",
+      "note": "Citado pela skill find-skills como fonte popular do ecossistema (skills.sh leaderboard). Referencia de catalogo/instalacao; NUNCA instalado automaticamente nem vira dependencia runtime do GStack — find-skills exige consentimento e auditoria de fonte/licenca/hash antes de recomendar instalacao, e nunca instala global com -y por default."
     }
   ]
 }

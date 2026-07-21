@@ -185,6 +185,58 @@ Include file paths, naming conventions, preferred libraries, API patterns — th
 
 Skills can reference other skills. Use this to compose complex workflows from simpler building blocks when it makes sense.
 
+## Aprendizado Verificável (Golden Path → Skill)
+
+`skill-creator` é a **única fonte canônica de autoria de skills** (`skill-authoring` é um alias
+fino que encaminha para cá — não duplicar o processo em dois lugares). Antes de propor uma
+skill a partir de um run real, siga esta disciplina: memória persistente e editável é superfície
+de prompt injection quando não passa por evidência e revisão.
+
+### Sinais de golden path
+
+Um run só vira candidato a skill quando há evidência concreta: retry resolvido, fail→pass
+comprovado, correção explícita do usuário, comando não óbvio verificado, ou um dead end com
+assinatura registrada — o que **não** funcionou também é aprendizado.
+
+### Triagem obrigatória: skill | memory | skip
+
+Classifique deterministicamente antes de escrever qualquer coisa:
+
+- **skill** — procedimento reutilizável entre sessões/projetos.
+- **memory** — fato isolado, project-scoped, sem generalização.
+- **skip** — evento descartável, sem valor de reuso.
+
+### Dedupe antes de criar
+
+Nunca crie uma skill nova sem antes checar o catálogo (`skills catalog`) e o drift doctor por
+nome normalizado, trigger tokens e assinatura de comando. Se já existe algo equivalente,
+atualize-o — não duplique (ver `skill-authoring` vs `skill-creator` como exemplo do problema).
+
+### Campos de evidência (obrigatórios ao propor)
+
+- `Verified by:` — como a promoção foi comprovada (teste, comando real, run id).
+- `Failure pattern:` — o que falhou antes de chegar ao caminho vencedor, se houver.
+- `What did not work:` — dead ends descartados, para não serem re-tentados no futuro.
+
+### Staging, nunca escrita direta a partir de um run automatizado
+
+Não escreva SKILL.md diretamente em `.agents/skills/` a partir de um run automatizado. Use os
+comandos do produto (`dream learn --from-run`, `dream propose-skill --from-run`) que colocam o
+candidato em staging para revisão humana (`dream promote <id> --reviewed`) antes de qualquer
+escrita definitiva. Escrita manual guiada por conversa (este fluxo, com o usuário confirmando)
+continua permitida — o que é vedado é promoção automática sem evidência nem revisão.
+
+### Secrets apenas por referência
+
+Nunca copie um valor de segredo (token, senha, chave) para dentro de um SKILL.md. Referencie
+onde o segredo vive (variável de ambiente, secret manager) — nunca o valor.
+
+### Freshness e supersession
+
+Skills promovidas podem ficar `stale_unverified` quando o comando/arquivo que citam muda
+(ver `skills doctor`/drift doctor). Prefira atualizar uma skill existente (supersession) a
+deixar duas versões conflitantes ativas.
+
 ## Rules
 
 - **Frontmatter is required.** Every SKILL.md must have `name`and`description` in YAML frontmatter.

@@ -91,6 +91,22 @@ gh pr create --fill
 - learnings.jsonl: registrar pattern, pitfall, architecture, etc
 - chronicle: resumo salvo automaticamente no Stop hook
 
+### 8. LEARNING CLOSEOUT (opcional, nunca bloqueante)
+
+Ao final de Test/Review/Ship, avalie sinais tipados do run (retry resolvido, fail→pass, correção
+explícita do usuário, comando não óbvio verificado, dead end com assinatura). Se houver sinal
+suficiente, pergunte ao usuário — nunca decida sozinho e nunca bloqueie a entrega por ausência
+de aprendizado:
+
+```text
+Aprendemos um caminho reutilizável nesta rodada.
+Salvar como memória, propor uma skill ou descartar?
+```
+
+Só bloqueie a entrega se o usuário tentar promover um candidato inválido (sem evidência, sem
+`Verified by`). Para a disciplina completa de captura e promoção, consulte a skill
+`skill-creator`.
+
 ## Gatilhos por tamanho de tarefa
 
 | Tamanho | Arquivos | Subagentes | Exemplo |

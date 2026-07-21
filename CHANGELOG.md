@@ -1,5 +1,40 @@
 # Changelog - gstack-vibehard
 
+## [5.11.0] - 2026-07-21 — PRD46 S46.0: verdade, referências e consolidação documental
+
+Primeiro sprint do PRD46 (aprendizado verificável de skills) — elimina contratos concorrentes
+antes de criar código novo. Sprint só de documentação/governança; nenhum motor novo ainda.
+
+- **`skill-creator` vira a única fonte canônica de autoria.** Ganha a disciplina de aprendizado
+  verificável: sinais de golden path, triagem obrigatória `skill|memory|skip`, dedupe antes de
+  criar, campos de evidência (`Verified by:`, `Failure pattern:`, `What did not work:`), staging
+  via `dream learn`/`dream propose-skill` em vez de escrita direta a partir de um run
+  automatizado, secrets apenas por referência, e freshness/supersession.
+- **`skill-authoring` vira alias fino.** Não duplica mais template, checklist ou a disciplina de
+  aprendizado — encaminha para `skill-creator`, preservando o ID para não quebrar triggers
+  existentes.
+- **`project-lifecycle` ganha learning closeout opcional e não bloqueante.** Ao final de
+  Test/Review/Ship, oferece salvar memória/propor skill/descartar; nunca bloqueia entrega por
+  ausência de aprendizado, só bloqueia promoção de candidato sem evidência.
+- **`find-skills` passa a respeitar governança.** Consulta catálogo local, skills
+  promovidas/vendoradas e memória/FTS antes de qualquer busca externa; exige consentimento
+  explícito antes de pesquisar na rede; audita licença/proveniência antes de recomendar; e
+  **nunca mais recomenda `-g -y` como default** — instalação é project-scoped por padrão, com
+  confirmação interativa preservada.
+- **`create-rule` vira adapter project-scoped por default.** Escrita global em
+  `~/.codex/rules/default.rules` passa a exigir consentimento separado, backup prévio e caminho
+  de restore explícito; nunca mais anexa conteúdo arbitrário — só gera regra a partir de fonte
+  canônica já aprovada, com proveniência registrada.
+- **`.docs/RESEARCH/repository-registry.json`** ganha `kulaxyz/self-learning-skills`,
+  `vercel-labs/skills` e `vercel-labs/agent-skills` como referências metodológicas — nunca
+  dependência runtime do GStack, mesmo padrão do `batch-6-aidd-methodology`.
+- **`tests/skill_learning_governance.test.js`** (novo) trava as 6 mudanças acima por conteúdo,
+  não por vibe: falha se qualquer skill voltar a divergir ou o registry perder as referências.
+
+QG strict 0, `agents:check` sem drift (0 arquivos alterados), suíte JS 1258/1259 (1 skip
+pré-existente) + Py 84/84 verdes. Corrige achado do PRD46 §2.2 (`find-skills` recomendava
+`npx skills add -g -y` como default, incompatível com project-only e consentimento).
+
 ## [5.10.0] - 2026-07-17 — PRD45 S45.8: RC checklist — fechamento do programa
 
 Sprint 45.8, o último do PRD45 — prova a física do produto e consolida a release candidate. As 7
