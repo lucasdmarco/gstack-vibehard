@@ -152,19 +152,21 @@ async function mkProject(services) {
 }
 
 // ── ABUSO fix3: spawn falho NÃO derruba o CLI; marca failed ──
-// O binário é um RUNNER allow (npm) com subcomando inexistente — assim o spawn de fato
-// acontece e falha (o caso que este teste protege). Um binário DESCONHECIDO agora é barrado
-// ANTES pelo gate P1.2 (coberto no teste logo abaixo), não chega ao spawn.
-test("e2e: spawn falho (runner com subcomando inexistente) não derruba o CLI (status failed)", async () => {
+// Binário que NÃO EXISTE em lugar nenhum → ENOENT no spawn, determinístico CROSS-OS (a variante
+// `npm run x` passava só no Windows, onde `npm.cmd` não spawna com shell:false; no ubuntu `npm`
+// existe e o spawn não falha). Como o binário fica fora da allowlist (P1.2 = `ask`), aprovamos
+// o manifest com `--trust` (o override auditado): aí o spawn ACONTECE e falha em ENOENT. Sem
+// `--trust`, o exec-policy barraria antes (coberto no teste logo abaixo).
+test("e2e: spawn falho (binário ENOENT, manifest confiado) não derruba o CLI (status failed)", async () => {
   const { devCommand, stopCommand } = await import(`${pathToFileURL(cmdMod)}?t=${Date.now()}`)
   const dir = await mkProject([{
-    name: "web", command: ["npm", "run", "subcomando-que-nao-existe-zzz"], cwd: ".",
+    name: "web", command: ["gstack-binario-inexistente-zzz"], cwd: ".",
     port: { preferred: 7301, env: "E2E_PORT", autoAllocate: true },
     health: { readiness: { type: "http", path: "/", timeoutSeconds: 3 } },
   }])
   try {
     // se derrubasse o CLI, isto lançaria (Unhandled 'error') e o teste falharia
-    await devCommand(["--json"], { cwd: dir })
+    await devCommand(["--trust", "--json"], { cwd: dir })
     const state = JSON.parse(await readFile(path.join(dir, ".gstack", "runtime", "web.json"), "utf-8"))
     assert.equal(state.status, "failed", "spawn falho vira status failed (sem crash)")
     assert.ok(!state.pid, "serviço falho não tem pid running")
