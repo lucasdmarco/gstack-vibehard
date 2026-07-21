@@ -159,29 +159,109 @@ function casdoorRbacVerdict() {
   return { status: "passed", reason: "E2E real: anônimo NEGADO + credencial válida ACEITA (built-in/admin) + UI 200" }
 }
 
-async function capabilities(offlineOk) {
-  const engineUp = dockerAvailable()
-  // PRD45 S45.0: engine presente ≠ capacidade provada. Sem E2E real ⇒ `not_proved`
-  // (nunca `passed`). Os E2E de atomic-merge/agentmemory-persist são do S45.8; até lá o
-  // pack DECLARA que não provou, em vez de fingir que provou.
-  const unproven = (id, why) => ({
-    id, required: true, platformSupport: { win32: "supported", darwin: "supported", linux: "supported" },
-    result: engineUp
-      ? { status: "not_proved", reason: `engine disponível, mas SEM E2E real aqui (${why})` }
-      : { status: "blocked_missing_engine", reason: "docker daemon ausente — E2E roda em job de CI" },
-  })
-  const casdoor = {
-    id: "casdoor-rbac", required: true, platformSupport: { win32: "supported", darwin: "supported", linux: "supported" },
-    result: engineUp ? await runCasdoorRbacE2E() : { status: "blocked_missing_engine", reason: "docker daemon ausente — E2E roda em job de CI" },
-  }
+/**
+ * PRD45 S45.8 — E2E REAL do AgentMemory (write→search→persist). Boota o iii-engine via Docker
+ * (`AGENTMEMORY_USE_DOCKER=1`, cross-platform), semeia sessões e roda smart-search: se a busca
+ * ENCONTRA o que foi escrito, a memória persistiu e é recuperável de verdade. `demo --serve`
+ * é o auto-teste que o próprio pacote provê: boota, semeia, busca e derruba num comando.
+ */
+// Cada exigência do E2E de memória: regex que PRECISA aparecer no output + o motivo se faltar.
+const AGENTMEMORY_CHECKS = [
+  [/agentmemory is working/i, "demo não confirmou funcionamento"],
+  [/Seeded \d+ observation/i, "demo não semeou observações (write falhou)"],
+  [/\d+ hit\(s\)/i, "smart-search não encontrou nada (recall falhou)"],
+  [/persisted to disk/i, "engine não confirmou persistência em disco"],
+]
+// npm/npx no Windows é shim → cmd.exe /c. Devolve { file, args } cross-OS.
+const npxSpawn = (pkgArgs) => (isWin
+  ? { file: process.env.ComSpec || "cmd.exe", args: ["/c", "npx", ...pkgArgs] }
+  : { file: "npx", args: pkgArgs })
+function runAgentMemoryE2E() {
+  const { file, args } = npxSpawn(["--yes", "@agentmemory/agentmemory@0.9.28", "demo", "--serve"])
+  const r = spawnSync(file, args, { encoding: "utf-8", timeout: 300000, stdio: ["ignore", "pipe", "pipe"], shell: false, env: { ...process.env, AGENTMEMORY_USE_DOCKER: "1" } })
+  const out = String(r.stdout || "") + String(r.stderr || "")
+  const missing = AGENTMEMORY_CHECKS.find(([rx]) => !rx.test(out))
+  if (missing) return { status: "failed", reason: `${missing[1]}: ${out.slice(-100).replace(/\s+/g, " ")}` }
+  return { status: "passed", reason: "E2E real (Docker): seed→smart-search com hits→persisted to disk" }
+}
+
+const atomicBin = () => {
+  const probe = spawnSync(isWin ? "where" : "which", ["atomic"], { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"], shell: false })
+  const p = String(probe.stdout || "").split("\n").map((s) => s.trim()).filter(Boolean)[0]
+  return p || null
+}
+const atomicRun = (bin, args, cwd, env) => spawnSync(bin, args, { cwd, encoding: "utf-8", timeout: 60000, stdio: ["ignore", "pipe", "pipe"], shell: false, env })
+/**
+ * PRD45 S45.8 — E2E REAL do Atomic (merge concorrente de 2 views). init → change1 → split view2
+ * → change2 concorrente no dev → change3 concorrente no dev2 → `insert from-view dev2 --to-view
+ * dev` (o merge) → o log do dev tem que conter AS DUAS mudanças concorrentes. É a prova do merge
+ * matematicamente sólido (mudanças independentes se unificam sem conflito).
+ */
+// Monta o cenário concorrente: change1 base, split dev2, change2 no dev, change3 no dev2.
+async function atomicSetupConcurrent(bin, repo, env) {
+  const { writeFileSync, mkdirSync } = await import("node:fs")
+  const { join } = await import("node:path")
+  mkdirSync(repo, { recursive: true })
+  atomicRun(bin, ["identity", "new", "alice", "--email", "alice@example.com"], repo, env)
+  if ((atomicRun(bin, ["init"], repo, env).status || 0) !== 0) return "atomic init falhou"
+  writeFileSync(join(repo, "base.txt"), "base\n"); atomicRun(bin, ["add", "base.txt"], repo, env); atomicRun(bin, ["record", "-m", "change1"], repo, env)
+  atomicRun(bin, ["split", "dev2"], repo, env)
+  writeFileSync(join(repo, "fileA.txt"), "A\n"); atomicRun(bin, ["add", "fileA.txt"], repo, env); atomicRun(bin, ["record", "-m", "change2-dev"], repo, env)
+  atomicRun(bin, ["view", "switch", "dev2"], repo, env)
+  writeFileSync(join(repo, "fileB.txt"), "B\n"); atomicRun(bin, ["add", "fileB.txt"], repo, env); atomicRun(bin, ["record", "-m", "change3-dev2"], repo, env)
+  atomicRun(bin, ["view", "switch", "dev"], repo, env)
+  return null
+}
+// O log do dev unifica as DUAS mudanças concorrentes? (prova do merge sólido). @returns bool.
+const logUnifiesBoth = (log) => /change2-dev/.test(log) && /change3-dev2/.test(log)
+// Executa o merge (insert cross-view) e prova que o log unifica as 2 mudanças concorrentes.
+function atomicMergeVerdict(bin, repo, env) {
+  const merge = String(atomicRun(bin, ["insert", "from-view", "dev2", "--to-view", "dev"], repo, env).stdout || "")
+  if (!/Inserted \d+ change/i.test(merge)) return { status: "failed", reason: `merge (insert) não confirmou: ${merge.slice(0, 100)}` }
+  const log = String(atomicRun(bin, ["log"], repo, env).stdout || "")
+  if (!logUnifiesBoth(log)) return { status: "failed", reason: "log do dev NÃO unificou as 2 mudanças concorrentes (merge falhou)" }
+  return { status: "passed", reason: "E2E real: merge concorrente 2 views — insert unifica change2(dev)+change3(dev2) no log" }
+}
+async function runAtomicMergeE2E(bin) {
+  const { mkdtempSync, rmSync } = await import("node:fs")
+  const { tmpdir } = await import("node:os")
+  const { join } = await import("node:path")
+  const baseDir = mkdtempSync(join(tmpdir(), "gstack-atomic-"))
+  const repo = join(baseDir, "repo")
+  const env = { ...process.env, ATOMIC_CONFIG_DIR: join(baseDir, "cfg") }
+  try {
+    const setupErr = await atomicSetupConcurrent(bin, repo, env)
+    if (setupErr) return { status: "failed", reason: setupErr }
+    return atomicMergeVerdict(bin, repo, env)
+  } catch (e) {
+    return { status: "failed", reason: `E2E Atomic quebrou: ${String(e.message || e).slice(0, 100)}` }
+  } finally { try { rmSync(baseDir, { recursive: true, force: true }) } catch { /* best-effort */ } }
+}
+
+const ALL_OS = { win32: "supported", darwin: "supported", linux: "supported" }
+const noEngine = { status: "blocked_missing_engine", reason: "docker daemon ausente — E2E roda em job de CI" }
+const cap = (id, result, required = true, platformSupport = ALL_OS) => ({ id, required, platformSupport, result })
+const offlineCap = (id, offlineOk, reason) => cap(id, { status: offlineOk ? "passed" : "failed", reason })
+
+// Backends required com E2E REAL. Sem engine/binário ⇒ blocked/not_proved honesto, nunca passed.
+async function backendCaps(engineUp) {
+  const atomicPath = atomicBin()
   return [
-    { id: "lite-no-global-leak", required: true, platformSupport: { win32: "supported", darwin: "supported", linux: "supported" }, result: { status: offlineOk ? "passed" : "failed", reason: "Lite não vaza Casdoor/Headroom/OpenHands nem escreve global" } },
-    { id: "opencode-config-sacred", required: true, platformSupport: { win32: "supported", darwin: "supported", linux: "supported" }, result: { status: offlineOk ? "passed" : "failed", reason: "config OpenCode read-only byte-a-byte" } },
-    casdoor,
-    unproven("atomic-merge", "E2E de merge concorrente: S45.8"),
-    unproven("agentmemory-persist", "E2E write→restart→search: S45.8"),
-    { id: "openhands-sandbox", required: false, platformSupport: { win32: "unsupported", darwin: "wsl_only", linux: "supported" },
-      result: engineUp ? { status: "not_proved", reason: "engine disponível, mas SEM E2E de sandbox aqui (S45.8)" } : { status: "blocked_missing_engine", reason: "docker daemon ausente — E2E roda em job de CI" } },
+    cap("casdoor-rbac", engineUp ? await runCasdoorRbacE2E() : noEngine),
+    cap("atomic-merge", atomicPath ? await runAtomicMergeE2E(atomicPath) : { status: "not_proved", reason: "binário `atomic` não instalado (create instala via cargo) — E2E precisa dele" }),
+    cap("agentmemory-persist", engineUp ? runAgentMemoryE2E() : noEngine),
+    cap("openhands-sandbox", engineUp ? { status: "not_proved", reason: "engine disponível, mas SEM E2E de sandbox aqui (S45.8)" } : noEngine,
+      false, { win32: "unsupported", darwin: "wsl_only", linux: "supported" }),
+  ]
+}
+
+async function capabilities(offlineOk) {
+  // PRD45 S45.0/S45.8: engine presente ≠ capacidade provada — cada backend required roda um E2E
+  // REAL (casdoor RBAC, agentmemory recall via Docker, atomic merge concorrente).
+  return [
+    offlineCap("lite-no-global-leak", offlineOk, "Lite não vaza Casdoor/Headroom/OpenHands nem escreve global"),
+    offlineCap("opencode-config-sacred", offlineOk, "config OpenCode read-only byte-a-byte"),
+    ...(await backendCaps(dockerAvailable())),
   ]
 }
 
