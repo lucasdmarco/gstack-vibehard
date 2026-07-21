@@ -58,3 +58,18 @@ export const CLAIM_CONTRACTS = Object.freeze({
 export function contractFor(claimId) {
   return CLAIM_CONTRACTS[claimId] || null
 }
+
+/**
+ * PRD45 S45.7 (P1.11): guarda fail-closed contra CONFIG MORTA — toda chave de CLAIM_CONTRACTS
+ * DEVE corresponder a um claim real do auditor. Um contrato órfão (id sem claim) nunca é
+ * alcançado por `contractFor()`, então declararia prova comportamental que ninguém consome —
+ * o bug que deixou qa-lens/action-kernel/loop-checkpoint mortos. Lança em qualquer órfão.
+ */
+export function assertContractsBindToClaims(claimIds) {
+  const known = new Set(claimIds || [])
+  const orphans = Object.keys(CLAIM_CONTRACTS).filter((id) => !known.has(id))
+  if (orphans.length) {
+    throw new Error(`CLAIM_CONTRACTS órfão(s) (contrato sem claim correspondente = config morta): ${orphans.join(", ")}`)
+  }
+  return true
+}
