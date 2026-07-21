@@ -1,5 +1,30 @@
 # Changelog - gstack-vibehard
 
+## [5.14.0] - 2026-07-21 — PRD46 S46.3: dedupe, conflito e memória tentative
+
+Quarto sprint do PRD46 — impede skill duplicada e regra contraditória. Estratégia
+determinística (nome normalizado, trigger tokens, command signatures, failure id) — sem
+modelo remoto/embedding, como o PRD exige.
+
+- **`src/dream/dedupe.js`** (novo): `normalizeName`/`triggerTokens`/`tokenOverlap` (Jaccard)
+  + `classifyDedupe` decide `new|update|merge` entre um candidate e os já conhecidos
+  (peer-level): assinatura idêntica → `update`; mesmo `failurePattern.id` ou título muito
+  similar → `merge`; caso contrário → `new`. Nunca duplica sem necessidade, nunca funde à
+  força.
+- **`src/dream/conflicts.js`** (novo): `detectConflict` bloqueia um candidate cujo nome colide
+  com uma das 5 skills de governança consolidadas no S46.0 (`skill-creator`,
+  `skill-authoring`, `project-lifecycle`, `find-skills`, `create-rule`) — precedência §6.2:
+  policy/core sempre vence, nunca é mesclado.
+- **`src/dream/learning.js`**: novo `resolveCandidateRouting` combina os dois — conflito sempre
+  vence primeiro; candidates com `classification:"memory"` (schema do S46.1) nunca disputam
+  merge com uma skill parecida — só viram `update` se a assinatura for IDÊNTICA a algo já
+  visto, senão é sempre `new` (memória independente, project-scoped, tentative).
+- 21 testes novos. QG strict 0 de primeira (nenhuma função passou do limite desta vez).
+  Suíte JS 1323/1324 (1 skip pré-existente) confirmada limpa em 2 rodadas — 1 flake isolado
+  de `tests/doctor_json.test.js` (ENOTEMPTY no cleanup de temp dir, Windows, sob carga) não
+  relacionado a este sprint, root-caused e confirmado limpo isolado. `verify --profile full`
+  → `ready:true`.
+
 ## [5.13.0] - 2026-07-21 — PRD46 S46.2: detector de golden path no closeout
 
 Terceiro sprint do PRD46 — identifica golden paths em runs completos, sem transcript bruto.

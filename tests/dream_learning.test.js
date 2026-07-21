@@ -105,3 +105,38 @@ test("reject marca a proposta; learningSummary conta por status", async () => {
     assert.equal(s.proposed, 1)
   } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
 })
+
+// PRD46 S46.3 — resolveCandidateRouting combina conflict (§6.2) + dedupe (peer-level).
+const cand = (over = {}) => ({
+  id: over.id || "lc_x", title: over.title || "Resolver retry no deploy",
+  classification: over.classification || "skill",
+  dedupe: { signature: over.signature || "sha256:x", matches: [], decision: "unknown" },
+})
+
+test("resolveCandidateRouting: conflito com skill de governança SEMPRE vence, mesmo sem similaridade textual", async () => {
+  const { resolveCandidateRouting } = await imp("src/dream/learning.js")
+  const r = resolveCandidateRouting({ candidate: cand({ title: "skill-creator" }), existingCandidates: [] })
+  assert.equal(r.decision, "conflict")
+  assert.match(r.reason, /governança protegida/i)
+})
+
+test("resolveCandidateRouting: classification memory nunca vira merge — cada fato é independente", async () => {
+  const { resolveCandidateRouting } = await imp("src/dream/learning.js")
+  const existing = [cand({ id: "lc_old", title: "Resolver retry no deploy do Docker", signature: "sha256:different" })]
+  const r = resolveCandidateRouting({ candidate: cand({ classification: "memory", title: "Resolver retry no deploy do Docker em prod" }), existingCandidates: existing })
+  assert.equal(r.decision, "new", "memory nunca funde com skill parecida — só update por assinatura idêntica")
+})
+
+test("resolveCandidateRouting: memory com assinatura IDÊNTICA -> update (não duplica o mesmo fato)", async () => {
+  const { resolveCandidateRouting } = await imp("src/dream/learning.js")
+  const existing = [cand({ id: "lc_old", classification: "memory", signature: "sha256:same" })]
+  const r = resolveCandidateRouting({ candidate: cand({ classification: "memory", signature: "sha256:same" }), existingCandidates: existing })
+  assert.equal(r.decision, "update")
+  assert.equal(r.matchId, "lc_old")
+})
+
+test("resolveCandidateRouting: skill sem conflito e sem duplicata -> new; delega pro dedupe.js", async () => {
+  const { resolveCandidateRouting } = await imp("src/dream/learning.js")
+  const r = resolveCandidateRouting({ candidate: cand({ title: "Migrar banco para Postgres" }), existingCandidates: [] })
+  assert.equal(r.decision, "new")
+})
