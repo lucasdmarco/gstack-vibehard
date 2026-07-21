@@ -140,3 +140,52 @@ test("resolveCandidateRouting: skill sem conflito e sem duplicata -> new; delega
   const r = resolveCandidateRouting({ candidate: cand({ title: "Migrar banco para Postgres" }), existingCandidates: [] })
   assert.equal(r.decision, "new")
 })
+
+// PRD46 S46.4 — promoteCandidateStaged: escrita PROJECT-SCOPED, fail-closed via promotion-gate.
+async function proposedCandidateForStaging(cwd, runId) {
+  const { recordAction, lastHashForRun } = await imp("src/vfa/provenance.js")
+  const { buildCandidate, transition } = await imp("src/dream/candidate.js")
+  recordAction(cwd, { runId, intent: "orchestrate:execute", actor: { harness: "claude" }, policy: { decision: "allow" } })
+  const c = buildCandidate({ runId, chainHash: lastHashForRun(cwd, runId), title: "Resolver retry no deploy", procedure: { steps: ["a", "b"] } })
+  return transition(transition(c, "eligible"), "proposed")
+}
+
+test("promoteCandidateStaged: sem --reviewed -> error ask, NADA é escrito no disco", async () => {
+  const cwd = await mkdtemp(path.join(tmpdir(), "gstack-stage-"))
+  try {
+    const { promoteCandidateStaged } = await imp("src/dream/learning.js")
+    const candidate = await proposedCandidateForStaging(cwd, "runA")
+    const r = promoteCandidateStaged(cwd, candidate, { reviewed: false })
+    assert.equal(r.error, "ask")
+    assert.equal(existsSync(path.join(cwd, ".gstack", "dream", "promoted", `${candidate.id}.md`)), false)
+  } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
+})
+
+test("promoteCandidateStaged: reviewed com atestação fresca -> grava .md PROJECT-SCOPED (nunca global)", async () => {
+  const cwd = await mkdtemp(path.join(tmpdir(), "gstack-stage-"))
+  try {
+    const { promoteCandidateStaged } = await imp("src/dream/learning.js")
+    const { attestReview } = await imp("src/dream/promotion-gate.js")
+    const candidate = await proposedCandidateForStaging(cwd, "runB")
+    const attestation = attestReview(candidate)
+    const r = promoteCandidateStaged(cwd, candidate, { reviewed: true, attestation })
+    assert.equal(r.promoted, candidate.id)
+    assert.ok(existsSync(r.to))
+    assert.ok(r.to.startsWith(cwd), "escrita ficou DENTRO do projeto — nunca global")
+    assert.equal(r.candidate.status, "promoted")
+  } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
+})
+
+test("promoteCandidateStaged: proposta EDITADA após review -> volta pra ask, nada é escrito", async () => {
+  const cwd = await mkdtemp(path.join(tmpdir(), "gstack-stage-"))
+  try {
+    const { promoteCandidateStaged } = await imp("src/dream/learning.js")
+    const { attestReview } = await imp("src/dream/promotion-gate.js")
+    const candidate = await proposedCandidateForStaging(cwd, "runC")
+    const attestation = attestReview(candidate)
+    const edited = { ...candidate, title: "Mudou depois da revisão" }
+    const r = promoteCandidateStaged(cwd, edited, { reviewed: true, attestation })
+    assert.equal(r.error, "ask")
+    assert.equal(existsSync(path.join(cwd, ".gstack", "dream", "promoted", `${candidate.id}.md`)), false)
+  } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
+})

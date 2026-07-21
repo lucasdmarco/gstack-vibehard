@@ -1,10 +1,12 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from "fs"
-import { join } from "path"
+import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync, readdirSync } from "fs"
+import { join, dirname } from "path"
 import { readRun, lastHashForRun, recordAction } from "../vfa/provenance.js"
 import { scanContent, evaluateScan } from "../agents/scanner.js"
 import { stripBom } from "../util/json.js"
 import { classifyDedupe } from "./dedupe.js"
 import { detectConflict } from "./conflicts.js"
+import { evaluatePromotion, promoteCandidate } from "./promotion-gate.js"
+import { sha256, versionedBackup } from "../installer/safe-write.js"
 
 /**
  * Continuous Learning SEGURO (PRD14 §4.5): o dream aprende de runs REAIS mas
@@ -124,6 +126,54 @@ export function createProposal(cwd, { kind, fromRun }) {
 
 /** Diretórios PROIBIDOS ao auto-learning (o corpus é sagrado). */
 export const FORBIDDEN_TARGETS = Object.freeze(["core", "knowledge", join("agents", "agents")])
+
+// PRD46 S46.4: escrita PROJECT-SCOPED do candidate promovido. Reusa os primitivos
+// hash/backup do Safe Write (`sha256`/`versionedBackup`, já provados no PRD45) —
+// NUNCA o wrapper `safeWriteFile`, que registra no manifest GLOBAL de uninstall.
+// "nenhuma escrita global" é estrutural aqui: este caminho nunca toca o manifest.
+function projectSafeWrite(filePath, content) {
+  mkdirSync(dirname(filePath), { recursive: true })
+  const backup = existsSync(filePath) ? versionedBackup(filePath) : null
+  const buf = Buffer.from(String(content))
+  const tmp = `${filePath}.gstack-tmp-${process.pid}`
+  writeFileSync(tmp, buf)
+  renameSync(tmp, filePath)
+  return { backup, hash: sha256(buf) }
+}
+
+const stepsMd = (candidate) => (candidate.procedure?.steps || []).map((s) => `- ${s}`).join("\n")
+const failureMd = (candidate) => (candidate.failurePattern ? `\n## Failure pattern\n${candidate.failurePattern.summary}\n` : "")
+const runIdOf = (candidate) => candidate.source?.runId || "?"
+
+function renderCandidateMarkdown(candidate) {
+  const steps = stepsMd(candidate)
+  return [
+    "---", `name: ${candidate.id}`,
+    `description: "Golden path promovido do run ${runIdOf(candidate)}"`, "---", "",
+    `# ${candidate.title}`, failureMd(candidate),
+    "## Procedure", steps || "(sem passos registrados)", "",
+  ].join("\n")
+}
+
+/**
+ * Promove um candidate (schema S46.1) para staging PROJECT-SCOPED — nunca escreve
+ * global. Fail-closed via `evaluatePromotion` (provenance/scanner/atestação de
+ * review); só escreve quando o veredito é `promotable`.
+ */
+export function promoteCandidateStaged(cwd, candidate, { reviewed = false, attestation = null } = {}) {
+  const verdict = evaluatePromotion({ candidate, reviewed, attestation, cwd })
+  if (!verdict.ok) return { error: verdict.status, reason: verdict.reason, id: candidate.id }
+  const promoted = promoteCandidate(candidate)
+  const outFile = join(promotedDir(cwd), `${candidate.id}.md`)
+  const written = projectSafeWrite(outFile, renderCandidateMarkdown(promoted))
+  try {
+    recordAction(cwd, {
+      runId: candidate.source?.runId, intent: "dream:promote-candidate", target: { kind: "file", pathOrName: outFile },
+      policy: { decision: "allow", rules: ["human-reviewed", "agentshield-clean", "provenance-verified"] },
+    })
+  } catch { /* provenance best-effort */ }
+  return { promoted: candidate.id, to: outFile, hash: written.hash, candidate: promoted }
+}
 
 /**
  * Promove uma proposta: exige review humano, roda AgentShield (CRITICO bloqueia)

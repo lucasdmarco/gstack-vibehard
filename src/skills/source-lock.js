@@ -27,6 +27,18 @@ export const SOURCE_LOCK_TRANSITIONS = Object.freeze({
 const GIT_COMMIT_RX = /^[0-9a-f]{40}$/
 const TRAVERSAL_RX = /(^|[\\/])\.\.([\\/]|$)/
 
+// PRD46 S46.4: licenças permitidas para vendoring (SPDX). Fora desta lista é
+// `unsupported license` — bloqueado, nunca instalado silenciosamente.
+export const SUPPORTED_LICENSES = Object.freeze([
+  "MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "0BSD", "Unlicense",
+])
+const licenseSupported = (license) => SUPPORTED_LICENSES.includes(license)
+
+/** Drift de conteúdo: hash atual difere do `originalHash` travado -> nunca reinstalação silenciosa. */
+export function hashDrifted(lock, currentContent) {
+  return hashContent(currentContent) !== lock.content?.originalHash
+}
+
 function sha256Hex(s) {
   return createHash("sha256").update(String(s)).digest("hex")
 }
@@ -68,6 +80,7 @@ function validateLockSource(lock) {
   const src = lockSource(lock)
   if (!commitValid(src)) reasons.push(`commit deve ser sha completo (40 hex), nunca branch/tag: ${src.commit}`)
   if (!src.license) reasons.push("license ausente — SPDX obrigatório")
+  else if (!licenseSupported(src.license)) reasons.push(`license não suportada para vendoring: ${src.license}`)
   if (!pathSafe(src)) reasons.push(`path com travessia ou absoluto: ${src.path}`)
   return reasons
 }
