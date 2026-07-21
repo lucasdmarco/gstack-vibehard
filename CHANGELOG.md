@@ -1,5 +1,39 @@
 # Changelog - gstack-vibehard
 
+## [5.12.0] - 2026-07-21 — PRD46 S46.1: candidate schema e triage
+
+Segundo sprint do PRD46 — representa aprendizado sem LLM e sem transcript bruto (greenfield
+confirmado pela auditoria pré-execução). Quatro módulos novos, puros e injetáveis:
+
+- **`src/dream/candidate.js`** (`gstack.learning-candidate.v1`). Schema validator + máquina de
+  estados (§7.2 — só as arestas literais são permitidas, nenhum salto: `observed` nunca pula
+  direto pra `promoted`; `revoked` é sempre terminal). `stableCandidateId` e
+  `candidateSignature` são determinísticos (mesmos receipts → sempre o mesmo id/assinatura).
+  `validateCandidate` é fail-closed: nenhum campo aceita **valor** de segredo (varredura
+  recursiva, nested/array incluídos) — bloqueia na origem, não só mascara; `secretRefs` só
+  aceita nome de variável. `buildCandidate` redige com o redactor compartilhado
+  (`src/security/redact.js`) antes mesmo da validação, como defesa em profundidade.
+- **`src/dream/triage.js`** — triagem determinística (§7.3): `skill|memory|skip|undetermined`
+  a partir de sinais tipados (has evidence, step count, recurring, verifiable, one-off) —
+  **nunca** popularidade, tamanho de texto ou "opinião" de LLM. Sem evidência ou sem passing
+  check verificável, o candidate nunca chega a `eligible`.
+- **`src/skills/source-lock.js`** (`gstack.skill-source-lock.v1`) — representa conteúdo externo
+  (skill/rule_pack/reference_pack) sem obrigar instalação. Determinístico (mesmo
+  repo+commit+path+conteúdo → mesmo id/hash); `validateSourceLock` exige commit como sha
+  completo (nunca branch/tag mutável), license SPDX, e path sem travessia/absoluto.
+- **`src/skills/discovery.js`** (`gstack.skill-discovery.v1`) — descoberta READ-ONLY de
+  `SKILL.md`/`plugin.json`/`marketplace.json`; nunca copia, executa ou confia no conteúdo.
+  Bloqueia profundidade excessiva, symlink escape do root, nome malformado/travessia declarado
+  no manifest, e shadowing ambíguo (dois artefatos reivindicando o mesmo nome).
+- 4 testes novos (33 casos) cobrindo o DoD do sprint: determinismo, bounds, bloqueio de
+  segredo, e os 4 vetores adversariais de discovery (traversal/symlink/nome malformado/shadow).
+
+QG strict 0 (após decompor 5 funções com complexidade acima do limite — a extração de
+predicados nomeados também revelou que operadores `||`/`?.`/ternário dentro do corpo de uma
+função contam para a complexidade ciclomática tanto quanto os próprios `if`s, não só as
+decisões óbvias), `agents:check` sem drift, suíte JS 1291/1292 (1 skip pré-existente) verde,
+`verify --profile full` → `ready:true`.
+
 ## [5.11.0] - 2026-07-21 — PRD46 S46.0: verdade, referências e consolidação documental
 
 Primeiro sprint do PRD46 (aprendizado verificável de skills) — elimina contratos concorrentes
