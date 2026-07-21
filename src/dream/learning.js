@@ -3,6 +3,8 @@ import { join } from "path"
 import { readRun, lastHashForRun, recordAction } from "../vfa/provenance.js"
 import { scanContent, evaluateScan } from "../agents/scanner.js"
 import { stripBom } from "../util/json.js"
+import { classifyDedupe } from "./dedupe.js"
+import { detectConflict } from "./conflicts.js"
 
 /**
  * Continuous Learning SEGURO (PRD14 §4.5): o dream aprende de runs REAIS mas
@@ -17,6 +19,28 @@ import { stripBom } from "../util/json.js"
  *  - auto-learning NUNCA escreve em core/, knowledge/ ou agents/agents/ —
  *    o destino é staging; mover para o corpus é decisão humana + agents build.
  */
+
+// PRD46 S46.3: fato curto (classification "memory") nunca disputa merge com uma
+// skill — cada memória é independente, project-scoped e tentative, a menos que a
+// assinatura seja IDÊNTICA a algo já visto (aí é update, não nova entrada).
+function memoryRouting(candidate, existing) {
+  const exact = existing.find((o) => o.dedupe?.signature && o.dedupe.signature === candidate.dedupe?.signature)
+  return exact ? { decision: "update", matchId: exact.id, reason: null } : { decision: "new", matchId: null, reason: null }
+}
+
+/**
+ * Combina conflito (policy/core, precedência mais alta — §6.2) + dedupe (peer-level,
+ * S46.3) para decidir o destino de um candidate NOVO (schema do S46.1). Conflito
+ * sempre vence: nunca mescla contra camada superior, mesmo que o texto seja parecido.
+ * @returns {{decision: "new"|"update"|"merge"|"conflict", matchId: string|null, reason: string|null}}
+ */
+export function resolveCandidateRouting({ candidate, existingCandidates = [], protectedNames } = {}) {
+  const conflict = detectConflict({ candidate, protectedNames })
+  if (conflict.conflict) return { decision: "conflict", matchId: null, reason: conflict.reason }
+  if (candidate.classification === "memory") return memoryRouting(candidate, existingCandidates)
+  const d = classifyDedupe({ candidate, existing: existingCandidates })
+  return { decision: d.decision, matchId: d.matchId, reason: null }
+}
 
 export function proposalsDir(cwd) { return join(cwd, ".gstack", "dream", "proposals") }
 export function promotedDir(cwd) { return join(cwd, ".gstack", "dream", "promoted") }
