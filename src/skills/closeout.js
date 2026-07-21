@@ -17,15 +17,22 @@ export const CLOSEOUT_SCHEMA = "gstack.closeout.v1"
 // readiness/contexto foram atualizados). Transacional: sem prova, sem claim.
 const isFresh = (r) => r.ran === true && r.state === "ok"
 
-export function buildCloseout({ runId, command, status, changed = [], toolsRefresh = null, proof = null } = {}) {
-  const refresh = toolsRefresh || { ran: false, state: "not_run" }
+const NOT_RUN = Object.freeze({ ran: false, state: "not_run" })
+const orNull = (v) => v ?? null
+const defaultRefresh = (r) => r || NOT_RUN
+const defaultProof = (p) => p || NOT_RUN
+const defaultLearning = (l) => l || { candidate: null }
+
+export function buildCloseout({ runId, command, status, changed = [], toolsRefresh = null, proof = null, learning = null } = {}) {
+  const refresh = defaultRefresh(toolsRefresh)
   return {
     schemaVersion: CLOSEOUT_SCHEMA, generatedAt: new Date().toISOString(),
-    runId: runId ?? null, command: command ?? null, status: status ?? "unknown",
+    runId: orNull(runId), command: orNull(command), status: status ?? "unknown",
     changedFiles: [...changed],
     toolsRefresh: refresh,
     fresh: isFresh(refresh),
-    proof: proof || { ran: false, state: "not_run" },
+    proof: defaultProof(proof),
+    learning: defaultLearning(learning),
   }
 }
 
@@ -54,7 +61,8 @@ const defaultIo = Object.freeze({
 })
 
 const normalizeRefresh = (r) => (r ? { ran: true, state: r.state || "ok", ...r } : { ran: true, state: "ok" })
-const bestEffortError = (e) => ({ ran: true, state: "degraded", error: e && e.message ? e.message : String(e) })
+const errorMessage = (e) => (e && e.message ? e.message : String(e))
+const bestEffortError = (e) => ({ ran: true, state: "degraded", error: errorMessage(e) })
 // Refresh bounded best-effort: falha vira `degraded` (nunca esconde), nunca lança.
 function safeRefresh(refresh, cwd, changed) {
   if (!refresh) return { ran: false, state: "not_run" }
@@ -79,11 +87,25 @@ function safeAutoProof(proof, status, cwd) {
   } catch (e) { return bestEffortError(e) }
 }
 
-/** Fecha o run: grava closeout.{json,md}, sincroniza ferramentas E roda proof (sucesso). */
-export function runCloseoutSync({ cwd, runId, command, status, changed = [], refresh = null, proof = null, io = defaultIo } = {}) {
+// PRD46 S46.2: detecção de golden path é OPCIONAL, best-effort e bounded a UM
+// candidate — nunca esconde erro (degrada pra `candidate:null`), nunca lança.
+function safeDetect(detect, cwd, runId, status, changed) {
+  if (!detect) return { candidate: null }
+  try {
+    const r = detect({ cwd, runId, status, changed }) || {}
+    return { candidate: r.candidate || null }
+  } catch (e) {
+    return { candidate: null, error: errorMessage(e) }
+  }
+}
+
+/** Fecha o run: grava closeout.{json,md}, sincroniza ferramentas, roda proof (sucesso)
+ * e detecta golden path (bounded, nunca promove — só observa). */
+export function runCloseoutSync({ cwd, runId, command, status, changed = [], refresh = null, proof = null, detect = null, io = defaultIo } = {}) {
   const toolsRefresh = safeRefresh(refresh, cwd, changed)
   const proofResult = safeAutoProof(proof, status, cwd)
-  const closeout = buildCloseout({ runId, command, status, changed, toolsRefresh, proof: proofResult })
+  const learning = safeDetect(detect, cwd, runId, status, changed)
+  const closeout = buildCloseout({ runId, command, status, changed, toolsRefresh, proof: proofResult, learning })
   const dir = join(cwd, ".gstack", "runs", runId || "adhoc")
   io.write(join(dir, "closeout.json"), JSON.stringify(closeout, null, 2) + "\n")
   io.write(join(dir, "closeout.md"), renderCloseoutMarkdown(closeout))

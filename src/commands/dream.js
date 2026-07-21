@@ -1,3 +1,5 @@
+import { existsSync, readdirSync, readFileSync } from "node:fs"
+import { join } from "node:path"
 import { audit } from "../dream/auditor.js"
 import { HARNESS_CAPABILITIES } from "../dream/capabilities.js"
 import { createProposal, promoteProposal, rejectProposal, listProposals, learningSummary } from "../dream/learning.js"
@@ -105,6 +107,31 @@ function improveCmd(ctx) {
   return emit(ctx.json, r, () => renderImprove(r))
 }
 
+// PRD46 S46.2: candidates detectados pelo closeout (src/dream/detector.js) vivem
+// embutidos em cada .gstack/runs/<runId>/closeout.json — read-only, sem persistência
+// própria ainda (dedupe/promotion chegam em sprints seguintes). `candidates` só lê.
+function loadCloseout(cwd, runId) {
+  const p = join(cwd, ".gstack", "runs", runId, "closeout.json")
+  if (!existsSync(p)) return null
+  try { return JSON.parse(readFileSync(p, "utf-8")) } catch { return null }
+}
+
+function detectedCandidates(cwd) {
+  const dir = join(cwd, ".gstack", "runs")
+  if (!existsSync(dir)) return []
+  const runIds = readdirSync(dir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name)
+  return runIds.map((id) => loadCloseout(cwd, id)).filter((c) => c?.learning?.candidate).map((c) => c.learning.candidate)
+}
+
+function candidatesCmd(ctx) {
+  const candidates = detectedCandidates(ctx.cwd)
+  return emit(ctx.json, { candidates }, () => {
+    section("dream candidates")
+    if (!candidates.length) info("  (nenhum candidato detectado ainda — rode `start` até um closeout com sinal de golden path)")
+    candidates.forEach((c) => info(`  • ${c.id} [${c.classification}/${c.validity.status}] ${c.title}`))
+  })
+}
+
 function trustLabel(level) {
   return level === "strong" ? "✓ forte" : level === "partial" ? "~ parcial" : "⚠ best-effort"
 }
@@ -131,6 +158,7 @@ const SUBCOMMANDS = {
   promote: (ctx) => promoteCmd(ctx.cwd, ctx.args, ctx.json),
   reject: rejectCmd,
   proposals: proposalsCmd,
+  candidates: candidatesCmd,
   plan: notImplementedCmd,
   improve: improveCmd,
   inspect: notImplementedCmd,

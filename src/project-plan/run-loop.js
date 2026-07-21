@@ -12,6 +12,8 @@ import { recordEvidence, writeTaskMd } from "./evidence-ledger.js"
 import { buildContextPack } from "../skills/context-pack.js"
 import { runCloseoutSync } from "../skills/closeout.js"
 import { LoopEngine } from "../skills/loop-engine.js"
+import { readPlanJournal } from "./journal.js"
+import { detectGoldenPath } from "../dream/detector.js"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const CLI_ENTRY = join(__dirname, "..", "index.js")
@@ -364,7 +366,10 @@ function finishPipeline(ctx, stages, status, failedStage) {
   // Run Closeout Sync (F4-A) + proof automático no encerramento (36.10): a prontidão
   // é DERIVADA do gate verify que já rodou no pipeline — síncrono, bounded, sem
   // relançar a suíte (evita lentidão/EBUSY por run). best-effort, não derruba.
-  try { runCloseoutSync({ cwd: ctx.cwd, runId: ctx.runId, command: "start", status, proof: () => closeoutReadiness(stages) }) } catch { /* closeout best-effort */ }
+  // PRD46 S46.2: detecção de golden path lê o MESMO journal.jsonl que appendRunEvent
+  // já grava neste run — wiring canônico, sem 2ª fonte de eventos nem transcript bruto.
+  const detect = () => detectGoldenPath({ status, events: readPlanJournal(ctx.runDir), runId: ctx.runId })
+  try { runCloseoutSync({ cwd: ctx.cwd, runId: ctx.runId, command: "start", status, proof: () => closeoutReadiness(stages), detect }) } catch { /* closeout best-effort */ }
   return { runId: ctx.runId, status, stages, attempts: ctx.attempts, execResult: ctx.execResult, engine, ...(handoffPath ? { handoffPath } : {}) }
 }
 
