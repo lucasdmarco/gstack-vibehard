@@ -286,13 +286,26 @@ function claimLoopCheckpoint(has, read) {
   }
 }
 
+// 25. Freshness/revogação (S46.6) — conhecimento aprendido expira; revogação preserva
+// provenance. Sem contrato comportamental ainda (nenhum comando CLI de revoke/stale
+// wired de ponta a ponta) — vira NOT_PROVED em modo comportamental, honestamente.
+function claimDreamFreshness(has, read) {
+  const ok = has("src/dream/freshness.js") && cliHasCommand(read, "dream") && read("src/commands/dream.js").includes("metrics")
+  return {
+    id: "dream-freshness", claim: "Conhecimento aprendido expira (freshness) e revogação preserva provenance",
+    status: ok ? "REAL" : "PARTIAL", severity: "P2",
+    evidence: ["src/dream/freshness.js", "src/commands/dream.js"].filter(has),
+    missing: ok ? [] : ["freshness.js + dream metrics"],
+  }
+}
+
 // Ordem preservada (o placar e os testes dependem dela).
 const CLAIM_BUILDERS = [
   claimAutoDream, claimOutputGuard, claimVerify, claimRollback, claimCrossHarnessTrust,
   claimOpencodeSafe, claimTaskLoop, claimRuntimeSupervisor, claimSecretsBroker, claimRuntimeManifest,
   claimPackageManager, claimFullContract, claimAgentFactory, claimAgentShield, claimAdapterMatrix,
   claimQaMultiLens, claimVfaProvenance, claimChallengeResponse, claimMetaHarness, claimTypeCoverage,
-  claimGovernance, claimQaLens, claimActionKernel, claimLoopCheckpoint,
+  claimGovernance, claimQaLens, claimActionKernel, claimLoopCheckpoint, claimDreamFreshness,
 ]
 function tallySummary(claims) {
   const summary = { REAL: 0, PARTIAL: 0, PLACEBO: 0, ROADMAP: 0, RISK: 0 }

@@ -1,5 +1,31 @@
 # Changelog - gstack-vibehard
 
+## [5.17.0] - 2026-07-21 — PRD46 S46.6: freshness, revogação e métricas honestas (fecha o PRD46)
+
+Sétimo e ÚLTIMO sprint do PRD46 — conhecimento aprendido não fica autoritativo para sempre.
+**Programa PRD46 fechado (S46.0→S46.6, v5.11.0→v5.17.0)**: aprendizado verificável de skills,
+do candidate schema à promoção fail-closed até freshness/revogação — pipeline completo,
+auditável, com controle negativo em cada capacidade.
+
+- **`src/dream/freshness.js`** (novo): `evaluateFreshness` invalida por comando citado que
+  sumiu do CLI OU hash de source lock divergente do conteúdo atual — nunca baixa, reinstala ou
+  sobrescreve automaticamente (só diagnóstico). `isRoutable` — só `eligible|proposed|promoted`
+  são roteáveis; `markStale`/`revokeCandidate` usam a máquina de estados real do S46.1
+  (`transition()`), preservando `source`/`runId`/`chainHash` intactos na revogação.
+- **`src/skills/drift-doctor.js`** ampliado: `candidateCommandDrift` reusa
+  `citedCommands`/`staleCommands` já existentes para um CANDIDATE aprendido, não só skills
+  instaladas.
+- **`src/commands/dream.js`** ampliado: `dream metrics --json` — candidates, tentative,
+  promoted, rejected, blocked, stale, revoked, reuse hits, dead ends avoided, token estimate
+  (sempre `estimated`, nunca REAL sem benchmark A/B reproduzível). Só conta o que o wiring de
+  HOJE permite medir — zero número inventado.
+- **`src/dream/auditor.js`** ampliado: claim `dream-freshness` registrada — honestamente
+  `NOT_PROVED` em modo comportamental (ainda não há comando CLI de revoke/stale wired
+  ponta-a-ponta), `REAL` em modo arquivo (código existe de verdade). Nenhuma claim forçada.
+- **`scripts/clean-machine-pack.mjs`**: nova jornada `dream-metrics` no pacote limpo.
+- 15 testes novos, QG strict 0 de primeira, `agents:check` sem drift, suíte JS 1375/1376 (1
+  skip pré-existente), `verify --profile full` → `ready:true`.
+
 ## [5.16.0] - 2026-07-21 — PRD46 S46.5: template, behavioral conformance e Agent Factory
 
 Sexto sprint do PRD46 — prova comportamento, compila artefatos aprovados sem drift e cruza

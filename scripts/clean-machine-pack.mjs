@@ -58,8 +58,16 @@ function runDreamBehavioral() {
   const ok = !!s && s.RISK === 0 && s.PLACEBO === 0
   return { id: "dream-behavioral", status: ok ? "passed" : "failed", detail: s ? `RISK=${s.RISK} PLACEBO=${s.PLACEBO}` : `exit ${r.status}` }
 }
+// PRD46 S46.6: `dream metrics` roda de verdade num pacote limpo — schema válido,
+// nunca crash mesmo sem nenhum run/candidate detectado ainda.
+function runDreamMetrics() {
+  const r = cli(["dream", "metrics", "--json"])
+  const m = parseJson(r)
+  const ok = !!m && m.schemaVersion === "gstack.dream.learning-metrics.v1" && typeof m.candidates === "number"
+  return { id: "dream-metrics", status: ok ? "passed" : "failed", detail: m ? `candidates=${m.candidates} promoted=${m.promoted}` : `exit ${r.status}` }
+}
 
-const JOURNEYS = [runPackageLifecycle, runOfflineInvariants, runProofFull, runDreamBehavioral]
+const JOURNEYS = [runPackageLifecycle, runOfflineInvariants, runProofFull, runDreamBehavioral, runDreamMetrics]
 
 // ── capacidades: backends locais sem engine ⇒ blocked_missing_engine (honesto) ───
 function dockerAvailable() {

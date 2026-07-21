@@ -123,6 +123,42 @@ function detectedCandidates(cwd) {
   return runIds.map((id) => loadCloseout(cwd, id)).filter((c) => c?.learning?.candidate).map((c) => c.learning.candidate)
 }
 
+// PRD46 S46.6 — métricas honestas do pipeline de aprendizado. Só conta o que
+// dá pra medir com o wiring de HOJE (candidates embutidos no closeout.json,
+// S46.2) — nunca inventa número. Token savings sempre `estimated` até
+// benchmark A/B reproduzível (nenhum aqui vira REAL sem ele).
+const BLOCKED_STATUSES = Object.freeze(["blocked_secret", "blocked_shield", "blocked_conflict"])
+const countByStatus = (candidates, status) => candidates.filter((c) => c.status === status).length
+
+function learningMetrics(cwd) {
+  const candidates = detectedCandidates(cwd)
+  const deadEndsAvoided = candidates.reduce((sum, c) => sum + (c.deadEnds || []).length, 0)
+  const reuseHits = candidates.filter((c) => ["update", "merge"].includes(c.dedupe?.decision)).length
+  return {
+    schemaVersion: "gstack.dream.learning-metrics.v1",
+    candidates: candidates.length,
+    tentative: candidates.filter((c) => c.validity?.status === "tentative").length,
+    promoted: countByStatus(candidates, "promoted"),
+    rejected: countByStatus(candidates, "rejected"),
+    blocked: BLOCKED_STATUSES.reduce((sum, s) => sum + countByStatus(candidates, s), 0),
+    stale: countByStatus(candidates, "stale"),
+    revoked: countByStatus(candidates, "revoked"),
+    reuseHits,
+    deadEndsAvoided,
+    tokenEstimate: { value: candidates.length * 40, unit: "tokens", basis: "estimated", note: "estimado por candidate — nunca REAL até benchmark A/B reproduzível" },
+  }
+}
+
+function metricsCmd(ctx) {
+  const m = learningMetrics(ctx.cwd)
+  return emit(ctx.json, m, () => {
+    section("dream metrics — pipeline de aprendizado (honesto, S46.6)")
+    info(`  candidates:${m.candidates} tentative:${m.tentative} promoted:${m.promoted} rejected:${m.rejected}`)
+    info(`  blocked:${m.blocked} stale:${m.stale} revoked:${m.revoked} reuseHits:${m.reuseHits} deadEndsAvoided:${m.deadEndsAvoided}`)
+    info(`  token estimate: ${m.tokenEstimate.value} ${m.tokenEstimate.unit} (${m.tokenEstimate.basis})`)
+  })
+}
+
 function candidatesCmd(ctx) {
   const candidates = detectedCandidates(ctx.cwd)
   return emit(ctx.json, { candidates }, () => {
@@ -159,6 +195,7 @@ const SUBCOMMANDS = {
   reject: rejectCmd,
   proposals: proposalsCmd,
   candidates: candidatesCmd,
+  metrics: metricsCmd,
   plan: notImplementedCmd,
   improve: improveCmd,
   inspect: notImplementedCmd,
