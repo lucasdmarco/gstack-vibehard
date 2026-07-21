@@ -78,6 +78,52 @@ test("runCloseoutSync: proof que quebra → degraded honesto (nunca esconde, nun
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })
 
+test("buildCloseout: sem learning informado -> candidate:null por default (nunca ausente)", async () => {
+  const { buildCloseout } = await imp("src/skills/closeout.js")
+  const c = buildCloseout({ runId: "r1", command: "start", status: "done" })
+  assert.deepEqual(c.learning, { candidate: null })
+})
+
+test("runCloseoutSync: detect injetado produz candidate no closeout.json (PRD46 S46.2)", async () => {
+  const { runCloseoutSync } = await imp("src/skills/closeout.js")
+  const dir = mk("gstack-closeout-detect-")
+  try {
+    const fakeCandidate = { id: "lc_test", status: "observed", validity: { status: "eligible" } }
+    const c = runCloseoutSync({ cwd: dir, runId: "rdetect", command: "start", status: "done", detect: () => ({ candidate: fakeCandidate }) })
+    assert.deepEqual(c.learning.candidate, fakeCandidate)
+    const onDisk = JSON.parse(readFileSync(path.join(dir, ".gstack", "runs", "rdetect", "closeout.json"), "utf-8"))
+    assert.equal(onDisk.learning.candidate.id, "lc_test")
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+test("runCloseoutSync: sem sinal, detect retorna candidate:null (sem ruído)", async () => {
+  const { runCloseoutSync } = await imp("src/skills/closeout.js")
+  const dir = mk("gstack-closeout-nodetect-")
+  try {
+    const c = runCloseoutSync({ cwd: dir, runId: "rnull", command: "start", status: "done", detect: () => ({ candidate: null }) })
+    assert.equal(c.learning.candidate, null)
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+test("runCloseoutSync: detect que quebra -> degraded honesto (nunca lança, candidate:null)", async () => {
+  const { runCloseoutSync } = await imp("src/skills/closeout.js")
+  const dir = mk("gstack-closeout-detectdeg-")
+  try {
+    const c = runCloseoutSync({ cwd: dir, runId: "rdeg", command: "start", status: "done", detect: () => { throw new Error("journal corrompido") } })
+    assert.equal(c.learning.candidate, null)
+    assert.match(c.learning.error, /journal corrompido/)
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+test("runCloseoutSync: sem detect injetado -> candidate:null (compat retroativa, nada quebra)", async () => {
+  const { runCloseoutSync } = await imp("src/skills/closeout.js")
+  const dir = mk("gstack-closeout-nodetectarg-")
+  try {
+    const c = runCloseoutSync({ cwd: dir, runId: "rcompat", command: "start", status: "done" })
+    assert.deepEqual(c.learning, { candidate: null })
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
 test("start: o pipeline grava closeout.json no run (wiring run-loop)", async () => {
   const { startCommand } = await imp("src/commands/start.js")
   const dir = mk("gstack-closeout-start-")
@@ -92,6 +138,31 @@ test("start: o pipeline grava closeout.json no run (wiring run-loop)", async () 
     assert.equal(r.executed, true)
     const cp = path.join(dir, ".gstack", "runs", r.pipeline.runId, "closeout.json")
     assert.ok(existsSync(cp), "closeout.json escrito pelo pipeline")
-    assert.equal(JSON.parse(readFileSync(cp, "utf-8")).command, "start")
+    const written = JSON.parse(readFileSync(cp, "utf-8"))
+    assert.equal(written.command, "start")
+    assert.ok(written.learning, "wiring do detector (S46.2) presente no closeout real")
+    assert.equal(written.learning.candidate, null, "run limpo de primeira não produz candidate")
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+test("start: retry resolvido no create -> detector produz candidate REAL via wiring run-loop (E2E)", async () => {
+  const { startCommand } = await imp("src/commands/start.js")
+  const dir = mk("gstack-closeout-retry-")
+  try {
+    let calls = 0
+    const r = await startCommand([], {
+      cwd: dir, objective: "criar landing page", projectName: "lp2", mode: "lite",
+      designSystem: "none", prompt: async () => "lp2", select: async (_q, c) => c[0], confirm: async () => true,
+      exec: () => { calls++; if (calls === 1) throw new Error("flaky"); return { ok: true } },
+      gateExec: () => ({ ok: true, code: 0 }),
+      devRunner: () => ({ services: [] }), verifyRunner: () => ({ status: "ready", ready: true, failed: [], timedOut: [] }),
+      scoutRunner: () => ({ status: "not_applicable" }),
+    })
+    assert.equal(r.executed, true)
+    assert.ok(r.pipeline.attempts >= 2, "precisou de mais de 1 tentativa (retry real)")
+    const cp = path.join(dir, ".gstack", "runs", r.pipeline.runId, "closeout.json")
+    const written = JSON.parse(readFileSync(cp, "utf-8"))
+    assert.ok(written.learning.candidate, "retry resolvido produz candidate REAL — wiring lê o journal.jsonl de verdade")
+    assert.equal(written.learning.candidate.status, "observed", "closeout nunca promove")
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })

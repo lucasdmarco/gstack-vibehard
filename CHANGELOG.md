@@ -1,5 +1,35 @@
 # Changelog - gstack-vibehard
 
+## [5.13.0] - 2026-07-21 — PRD46 S46.2: detector de golden path no closeout
+
+Terceiro sprint do PRD46 — identifica golden paths em runs completos, sem transcript bruto.
+
+- **`src/dream/detector.js`** (novo). `detectSignalsFromEvents` deriva sinais tipados de
+  eventos já redigidos do run (retry resolvido via `attempt_failed`/`node_failed`, dead end com
+  assinatura, evento explícito `remember`) — nunca lê transcript bruto. `detectGoldenPath`
+  decide se o closeout produz UM candidate bounded (nunca lista): runs de sucesso podem chegar
+  a `validity.status: "eligible"`; handoff/failure nunca passam de `tentative` (a própria
+  triagem do S46.1 garante isso via `verifiable: isSuccess`, sem lógica de "capping"
+  duplicada). Detecção nunca chama `transition()` — nenhuma promoção acontece no closeout.
+- **`src/skills/closeout.js`**: `runCloseoutSync` ganha um `detect` injetável (mesmo padrão
+  best-effort de `refresh`/`proof` — erro vira `learning.candidate:null` + `error`, nunca
+  esconde, nunca lança); `buildCloseout` grava o resultado em `closeout.json` como
+  `learning.candidate`.
+- **`src/project-plan/run-loop.js`**: wiring canônico — `finishPipeline` passa um `detect` real
+  que lê o MESMO `journal.jsonl` que o pipeline já grava (via `readPlanJournal`, reaproveitado
+  de `src/project-plan/journal.js`), sem 2ª fonte de eventos.
+- **`src/commands/dream.js`**: novo subcomando `dream candidates [--json]` (read-only) lista os
+  candidates já detectados, lendo o `closeout.json` de cada run em `.gstack/runs/`.
+- Prova end-to-end real: um `start` com uma falha de `exec` seguida de sucesso produz um
+  candidate de verdade no `closeout.json` do pipeline (não apenas via injeção de fake em
+  teste unitário) — 2 tentativas reais, `status: "observed"` confirmado (nunca promovido).
+- 24 testes novos (detector + closeout ampliado + `dream candidates`).
+
+QG strict 0 (mais 3 funções decompostas por complexidade — `detectSignalsFromEvents`,
+`buildCloseout`, `safeDetect` — mesma lição do S46.1 sobre `||`/`??` contarem como branch),
+`agents:check` sem drift, suíte JS 1308/1309 (1 skip pré-existente), `verify --profile full`
+→ `ready:true`.
+
 ## [5.12.0] - 2026-07-21 — PRD46 S46.1: candidate schema e triage
 
 Segundo sprint do PRD46 — representa aprendizado sem LLM e sem transcript bruto (greenfield
