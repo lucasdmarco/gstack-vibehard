@@ -1,5 +1,34 @@
 # Changelog - gstack-vibehard
 
+## [5.16.0] - 2026-07-21 — PRD46 S46.5: template, behavioral conformance e Agent Factory
+
+Sexto sprint do PRD46 — prova comportamento, compila artefatos aprovados sem drift e cruza
+os registros de harness que nunca tinham sido comparados.
+
+- **`skills/skills/skill-creator/assets/SKILL.template.md`** (novo): template canônico mínimo
+  (What/When, Failure pattern, Verified by, Procedure, Verification, Gotchas, What did not
+  work, Secret refs, Provenance, Freshness probes).
+- **`src/skills/behavioral-conformance.js`**: `learnedSkillActivationSpec` +
+  `evaluateLearnedSkillActivation` — uma skill promovida prova ATIVAÇÃO (não lógica própria):
+  falha se não ativar em algum caso positivo OU ativar em algum caso negativo; sem cobertura
+  dos dois lados, nunca `conformant` (reusa o runner RED/GREEN/REFACTOR do PRD42 S42.4 sem
+  duplicar).
+- **`src/skills/source-lock.js`**: `projectArtifactKind`/`appearsAsInstalledSkill` — projeção
+  honesta por `artifactKind`: só `skill` aparece como skill instalada; `rule_pack` funde em
+  gates/agentes, `reference_pack` só carrega por progressive disclosure — nenhum dos dois vira
+  skill pública, comando ou processo.
+- **`src/dream/harness-registry.js`** (novo): `buildHarnessRegistry` cruza pela primeira vez
+  `HARNESS_CAPABILITIES` (capabilities.js) com `ADAPTER_MATRIX` (adapter-matrix.js) — **achado
+  real, não fabricado**: `droid`/`kilocode`/`kimi`/`vscode`/`zed` existem só em capabilities.js
+  e `devin` só em adapter-matrix.js. Documentado e testado como drift conhecido, não
+  silenciado nem "corrigido" às pressas sem evidência de qual enforcement cada um mereceria.
+- **`src/agents/factory.js`**: `promotedSourceHash` — hash das fontes promovidas/aprovadas
+  (staging do dream pipeline) elegíveis a entrar no manifest v2, filtrando por
+  `artifactKind` (`rule_pack`/`reference_pack` nunca contam como fonte de skill instalada).
+  `sourceHashes` ganha o campo `promotedHash`, aditivo — nenhum consumidor existente quebra.
+- 22 testes novos (4 arquivos). QG strict 0 de primeira, suíte JS 1360/1361 (1 skip
+  pré-existente), `verify --profile full` → `ready:true`.
+
 ## [5.15.0] - 2026-07-21 — PRD46 S46.4: Promotion Gate e segurança
 
 Quinto sprint do PRD46 — torna a promoção de um candidate fail-closed e atestada. Reusa

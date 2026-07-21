@@ -89,3 +89,29 @@ export function p0ConformanceSpecs() {
 export function runP0Conformance(bounds = DEFAULT_BOUNDS) {
   return aggregateRelease(p0ConformanceSpecs().map((s) => runConformance(s, bounds)))
 }
+
+// ── Conformance de skill APRENDIDA (PRD46 S46.5) ─────────────────────────────
+// Uma skill promovida do pipeline dream não tem verificador próprio — o
+// comportamento a provar é ATIVAÇÃO: dispara nos casos positivos, NUNCA nos
+// negativos. "red" aqui = casos negativos que NÃO podem ativar (violação =
+// ativar); "green" = casos positivos que DEVEM ativar; "refactor" = invariante
+// de que o candidato tem cobertura real dos dois lados (sem isso, nunca conformant).
+const matchesTrigger = (triggerTokens, text) => triggerTokens.some((t) => String(text || "").toLowerCase().includes(String(t).toLowerCase()))
+
+/** Monta a spec de conformance de ativação para uma skill aprendida e promovida. */
+export function learnedSkillActivationSpec({ id, triggerTokens = [], positiveCases = [], negativeCases = [] } = {}) {
+  const activates = (text) => matchesTrigger(triggerTokens, text)
+  return {
+    skill: id, priority: "P1",
+    scenarios: [
+      { phase: "red", run: () => ({ pass: negativeCases.every((c) => !activates(c)) }) },
+      { phase: "green", run: () => ({ pass: positiveCases.every((c) => activates(c)) }) },
+      { phase: "refactor", run: () => ({ pass: positiveCases.length > 0 && negativeCases.length > 0 }) },
+    ],
+  }
+}
+
+/** Roda a conformance de ativação de UMA skill aprendida. */
+export function evaluateLearnedSkillActivation(spec, bounds = DEFAULT_BOUNDS) {
+  return runConformance(learnedSkillActivationSpec(spec), bounds)
+}
