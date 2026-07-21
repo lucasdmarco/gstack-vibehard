@@ -1,5 +1,26 @@
 # Changelog - gstack-vibehard
 
+## [5.10.0] - 2026-07-17 — PRD45 S45.8: RC checklist — fechamento do programa
+
+Sprint 45.8, o último do PRD45 — prova a física do produto e consolida a release candidate. As 7
+golden workflows já estavam provadas individualmente nos sprints anteriores (RBAC E2E real em
+S45.0, worker-fail em S45.3, segredo-no-journal em S45.3, tamper→halt em S45.2/S45.6, install
+transacional em S45.5). Este sprint entrega a fonte-verdade de prontidão.
+
+- **`src/dream/rc-checklist-prd45.js`** (espelha o `rc-checklist.js` do PRD41 S41.9). Mapeia
+  **cada** achado do PRD45 (4 P0 + 12 P1) → sprint → versão → o teste de prova que reprova se a
+  capacidade sumir. `prd45Readiness()` só declara `ready:true` com **todos os P0 delivered**.
+  Sem enfeite: o teste verifica que cada item `delivered` aponta um arquivo de teste que **existe
+  de verdade** — um item mentiroso reprova a própria suíte.
+- **P1.3 (loader V3 canônico) marcado `partial`** de forma transparente: o schema e a migração V3
+  existem (desde S42.6), mas o loader e o `create` ainda emitem v2 (campos v3 dormentes — nenhum
+  usuário recebe manifest v3 hoje). Não bloqueia o RC (o gate é P0); declarado como incremento,
+  exatamente como o S41.9 tratou o P1.7 (matriz CI incremental).
+
+**Programa PRD45 fechado (S45.0–S45.8, v5.1.0 → v5.10.0)**: os 4 P0 e 11 dos 12 P1 `delivered`;
+P1.3 `partial` honesto. RC `ready:true`. Cada sprint: proof full ready:true, QG strict 0, suíte
+verde, controle negativo em cada capacidade.
+
 ## [5.9.0] - 2026-07-17 — PRD45 S45.7: claims verificáveis + especialização honesta de agentes
 
 Sprint 45.7 — alinhar os claims e os 22 agentes ao que realmente fazem.
