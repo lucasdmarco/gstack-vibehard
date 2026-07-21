@@ -14,6 +14,7 @@ import { runCloseoutSync } from "../skills/closeout.js"
 import { LoopEngine } from "../skills/loop-engine.js"
 import { readPlanJournal } from "./journal.js"
 import { detectGoldenPath } from "../dream/detector.js"
+import { finalizeGoldenRun } from "./golden-run.js"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const CLI_ENTRY = join(__dirname, "..", "index.js")
@@ -359,9 +360,19 @@ function finishPipeline(ctx, stages, status, failedStage) {
     handoffPath = join(ctx.runDir, "handoff.md")
     writeFileSync(handoffPath, renderHandoff({ runId: ctx.runId, plan: ctx.plan, stages, attempts: ctx.attempts, failedStage }))
   }
+  // PRD47 S47.1: reconcilia as duas derivações de "done" — o motor (LoopEngine)
+  // sempre teve os 4 portões mais estritos (allGatesGreen) mas finalize() nunca
+  // era chamado (dead code). Aqui ele passa a rodar de VERDADE, e o veredito
+  // tipado fica visível em `goldenRun` — ao lado do `status` solto existente,
+  // NUNCA o substituindo ainda (acceptance real/proof sempre-ligado chegam em
+  // sprints seguintes; substituir hoje declarararia handoff em todo pipeline
+  // verde de hoje, uma regressão de UX que o motor não pode causar sozinho).
+  const goldenRun = finalizeGoldenRun(ctx.engine, {
+    stages, proof: closeoutReadiness(stages), acceptance: ctx.engine.acceptance, cancelled: status === "cancelled",
+  })
   const engine = engineSnapshot(ctx.engine)
-  appendRunEvent(ctx.runDir, { event: "pipeline_ended", status, failedStage: failedStage || null, attempts: ctx.attempts, enginePhase: engine.phase, engineCapped: engine.capped })
-  writeRunStatus(ctx.runDir, { runId: ctx.runId, planId: ctx.plan.id, status, stages, attempts: ctx.attempts, engine })
+  appendRunEvent(ctx.runDir, { event: "pipeline_ended", status, failedStage: failedStage || null, attempts: ctx.attempts, enginePhase: engine.phase, engineCapped: engine.capped, goldenRunStatus: goldenRun.status })
+  writeRunStatus(ctx.runDir, { runId: ctx.runId, planId: ctx.plan.id, status, stages, attempts: ctx.attempts, engine, goldenRun })
   try { writePipelineEvidence(ctx, stages) } catch { /* evidence best-effort — não derruba o run */ }
   // Run Closeout Sync (F4-A) + proof automático no encerramento (36.10): a prontidão
   // é DERIVADA do gate verify que já rodou no pipeline — síncrono, bounded, sem
@@ -370,7 +381,7 @@ function finishPipeline(ctx, stages, status, failedStage) {
   // já grava neste run — wiring canônico, sem 2ª fonte de eventos nem transcript bruto.
   const detect = () => detectGoldenPath({ status, events: readPlanJournal(ctx.runDir), runId: ctx.runId })
   try { runCloseoutSync({ cwd: ctx.cwd, runId: ctx.runId, command: "start", status, proof: () => closeoutReadiness(stages), detect }) } catch { /* closeout best-effort */ }
-  return { runId: ctx.runId, status, stages, attempts: ctx.attempts, execResult: ctx.execResult, engine, ...(handoffPath ? { handoffPath } : {}) }
+  return { runId: ctx.runId, status, stages, attempts: ctx.attempts, execResult: ctx.execResult, engine, goldenRun, ...(handoffPath ? { handoffPath } : {}) }
 }
 
 /** Roda dev→test→verify→preview. Retorna o nome do gate que falhou, ou null. */

@@ -1,5 +1,30 @@
 # Changelog - gstack-vibehard
 
+## [5.19.0] - 2026-07-21 — PRD47 S47.1: Golden Run Controller sobre o Loop Engine
+
+Segundo sprint do PRD47 — conecta handlers existentes a uma única execução persistente,
+reconciliando as duas derivações de "done" achadas na auditoria pré-execução.
+
+- **`src/project-plan/golden-run.js`** (novo, agregador FINO — não duplica `replit-loop.js`,
+  journal, state store ou closeout): `deriveEngineGates` traduz os stages reais do pipeline nos
+  4 portões que o `LoopEngine` (PRD41 S41.4) sempre exigiu para `completed`
+  (`acceptanceResolved`/`observationFresh`/`checkpointGreen`/`proofReady`); `finalizeGoldenRun`
+  chama `engine.finalize()` **de verdade** — deixou de ser dead code.
+- **`src/project-plan/run-loop.js`**: `finishPipeline` agora chama `finalizeGoldenRun` e expõe
+  o veredito tipado do motor em `goldenRun`, **ao lado** do `status` solto existente — sem
+  substituí-lo ainda. Substituir hoje declarararia `handoff` em todo pipeline verde (acceptance
+  real só chega no S47.2; proof sempre-ligado é gap separado do S47.0/P0-D) — uma regressão de
+  UX que a reconciliação sozinha não pode causar. `goldenRun.status` nunca é `completed` sem os
+  4 portões — confirmado que hoje (sem acceptance resolvida) nunca falsifica sucesso.
+- Prova real: `start_wizard.test.js` ampliado confirma `pipeline.goldenRun` presente e nunca
+  `completed` num pipeline padrão de teste (GAP-3 do S47.0 ainda de pé, honestamente refletido).
+- 10 testes novos (`golden_run_controller.test.js`), incluindo transição inválida do motor real
+  falhando fechado (`InvalidTransitionError`).
+
+QG strict 0, `agents:check` sem drift, suíte JS 1397/1398 (1 skip pré-existente; 2 flakes
+isolados de `doctor_json.test.js`/`doctor_terminal.e2e.test.js` sob carga, root-caused,
+confirmados limpos isolados e numa 2ª rodada completa), `verify --profile full` → `ready:true`.
+
 ## [5.18.0] - 2026-07-21 — PRD47 S47.0: baseline de integração e testes negativos
 
 Primeiro sprint do PRD47 (Golden Path — controlador único do `start`) — prova as 12 lacunas
