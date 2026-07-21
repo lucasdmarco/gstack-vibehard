@@ -33,6 +33,23 @@ The Skills CLI (`npx skills`) is the package manager for the open agent skills e
 
 ## How to Help Users Find Skills
 
+### Step 0: Consult Local Governance First
+
+Before searching the network, always check — in this order — whether the need is already
+covered locally:
+
+1. **Local catalog** — `skills catalog --json` (or `skills doctor`) lists everything already
+   installed in this repo.
+2. **Promoted/vendored skills** — anything already promoted via the `dream` learning pipeline
+   or vendored under `.docs/RESEARCH` provenance.
+3. **Memory/FTS by signature** — project-scoped memory or context search
+   (`node src/index.js context search "<query>" --json`) may already answer the need without
+   installing anything.
+
+Only proceed to an external search if none of the above covers it. **Ask the user for explicit
+consent before running any external/network search** ("I don't see this covered locally — want
+me to search the public skills ecosystem?"). Do not silently reach out to the network.
+
 ### Step 1: Understand What They Need
 
 When a user asks for help with something, identify:
@@ -70,6 +87,7 @@ For example:
 1. **Install count** — Prefer skills with 1K+ installs. Be cautious with anything under 100.
 2. **Source reputation** — Official sources (`vercel-labs`, `anthropics`, `microsoft`) are more trustworthy than unknown authors.
 3. **GitHub stars** — Check the source repository. A skill from a repo with <100 stars should be treated with skepticism.
+4. **License and provenance** — check the license and that the source repo/hash you're pointing the user to is what it claims to be, before recommending it.
 
 ### Step 5: Present Options to the User
 
@@ -93,15 +111,19 @@ npx skills add vercel-labs/agent-skills@react-best-practices
 Learn more: https://skills.sh/vercel-labs/agent-skills/react-best-practices
 ```
 
-### Step 6: Offer to Install
+### Step 6: Offer to Install (project-scoped by default)
 
-If the user wants to proceed, you can install the skill for them:
+If the user wants to proceed, install it **project-scoped by default** — never global, never
+unattended:
 
 ```bash
-npx skills add <owner/repo@skill> -g -y
+npx skills add <owner/repo@skill>
 ```
 
-The `-g` flag installs globally (user-level) and `-y` skips confirmation prompts.
+Let the confirmation prompt run; do not pass `-y` to skip it. Only use `-g` (global, user-level
+install) if the user explicitly asks for a global install — that is a separate, deliberate
+decision, not the default path. Never combine `-g` with `-y`: a global write always deserves an
+explicit look at what is being confirmed.
 
 ## Common Skill Categories
 
