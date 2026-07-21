@@ -1,5 +1,27 @@
 # Changelog - gstack-vibehard
 
+## [5.9.0] - 2026-07-17 — PRD45 S45.7: claims verificáveis + especialização honesta de agentes
+
+Sprint 45.7 — alinhar os claims e os 22 agentes ao que realmente fazem.
+
+- **P1.11 — claims sem prova comportamental / 3 CLAIM_CONTRACTS mortos**. Três dos quatro
+  contratos comportamentais (`qa-lens`/`action-kernel`/`loop-checkpoint`) não correspondiam a
+  nenhum claim — `contractFor()` nunca os alcançava, então o Dream Audit só reconhecia `verify`
+  como REAL, embora essas capacidades (visual-gate, action-kernel, loop-checkpoint) existam e
+  tenham teste de controle negativo. Declarei os **3 claims faltantes** em `src/dream/auditor.js`;
+  com o contrato completo, graduam **REAL** (prova comportamental de verdade, não presença de
+  arquivo). Claims REAL subiram de **1 → 4**; o publish-guard `dream-required` segue verde.
+  Nova guarda `assertContractsBindToClaims` (`src/dream/claim-contract.js`): toda chave de
+  `CLAIM_CONTRACTS` **deve** corresponder a um claim real — impede config morta no futuro.
+
+- **P1.12 — a fábrica anunciava especialistas sem knowledge pack**. Dos 22 agentes, só 3
+  (devops/frontend/mobile) receberam pack; os outros 19, zero — e todos eram anunciados igual.
+  Novo status honesto por agente (`src/agents/factory.js`): **`generic_adapter`** (0 packs, não é
+  especialista) · **`specialized`** (≥1 pack) · **`verified`** (pack + prova comportamental). O
+  manifest V2 passa a declarar `specialization` — estado real `{generic_adapter: 19,
+  specialized: 3, verified: 0}`. Um agente sem pack **não pode** ser anunciado como especialista
+  verificado.
+
 ## [5.8.0] - 2026-07-17 — PRD45 S45.6: artifact lock (supply chain verificada, não declarada)
 
 Sprint 45.6 — troca garantia declarativa por verificação criptográfica na cadeia de suprimento.
