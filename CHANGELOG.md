@@ -1,5 +1,32 @@
 # Changelog - gstack-vibehard
 
+## [5.15.0] - 2026-07-21 — PRD46 S46.4: Promotion Gate e segurança
+
+Quinto sprint do PRD46 — torna a promoção de um candidate fail-closed e atestada. Reusa
+scanner/redactor/VFA provenance do produto (PRD45) — nada duplicado.
+
+- **`src/dream/promotion-gate.js`** (novo): `attestReview`/`reviewStale` gravam e verificam o
+  hash do conteúdo NO MOMENTO da revisão — uma edição pós-review invalida a atestação e a
+  decisão volta para `ask`, nunca promove conteúdo não revisado. `evaluatePromotion` encadeia
+  4 checagens fail-closed (reviewed → atestação fresca → provenance real do run de origem →
+  AgentShield limpo) antes de considerar `promotable`. `promoteCandidate` é a ÚNICA função que
+  de fato transiciona o estado para `promoted` (via `transition()` do S46.1) — nunca chamada
+  no closeout/detector.
+- **`src/dream/learning.js`**: `promoteCandidateStaged` escreve o candidate promovido em
+  staging **project-scoped** (`.gstack/dream/promoted/<id>.md`) reusando só os primitivos
+  `sha256`/`versionedBackup` do Safe Write (nunca o wrapper `safeWriteFile`, que registraria
+  no manifest GLOBAL de uninstall) — "nenhuma escrita global" fica estrutural, não uma
+  promessa solta.
+- **`src/skills/gate-matrix.js`**: novo gate `candidate-promotion-gate` documentando o fluxo.
+- **`src/skills/source-lock.js`**: `SUPPORTED_LICENSES` (allowlist SPDX) rejeita licença não
+  suportada; `hashDrifted` detecta conteúdo mudado desde o lock — nunca reinstalação silenciosa.
+- 29 testes novos (promotion-gate + learning ampliado + `tests/skill_source_security.test.js`,
+  suíte adversarial integrando discovery.js + source-lock.js: path traversal, symlink escape,
+  nome duplicado, manifest malformado, licença não suportada, hash divergente).
+
+QG strict 0 (2 funções decompostas), suíte JS 1341/1342 (1 skip pré-existente), `verify
+--profile full` → `ready:true`.
+
 ## [5.14.0] - 2026-07-21 — PRD46 S46.3: dedupe, conflito e memória tentative
 
 Quarto sprint do PRD46 — impede skill duplicada e regra contraditória. Estratégia

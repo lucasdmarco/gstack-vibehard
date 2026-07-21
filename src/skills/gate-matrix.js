@@ -146,6 +146,17 @@ export const SKILL_GATES = Object.freeze([
     implementedBy: "src/skills/route.js buildSkillRoute (wired no start, F2-A)",
     note: "vira blocking quando o wiring do start chegar (F2-A/29.2)",
   },
+  {
+    id: "candidate-promotion-gate", phase: "test-preview", severity: "P1", mode: "blocking",
+    skills: ["skill-creator"],
+    appliesWhen: { promotesLearnedCandidate: true },
+    preconditions: ["candidate.reviewed in true", "candidate.attestation in fresh", "provenance.status in verified", "agentShield.status in clean"],
+    requiredQuestions: ["Confirma a promoção deste candidato aprendido para staging?"],
+    requiredEvidence: [".gstack/dream/proposals/<id>.json"],
+    verifier: "command (dream promote --reviewed --json)", fallback: "ask",
+    implementedBy: "src/dream/promotion-gate.js evaluatePromotion (PRD46 S46.4)",
+    provedBy: { test: "tests/dream_promotion_gate.test.js", name: "evaluatePromotion: reviewed+atestação fresca+provenance ok+shield limpo → promotable" },
+  },
 ])
 
 // ── Compilação: valida skills contra o catálogo e detecta conflitos ──────────────
