@@ -53,6 +53,11 @@ test("start: executa o plano após confirmação (UI+exec injetados) e persiste"
       exec: (c) => ran.push(c.join(" ")),
     })
     assert.equal(r.result.status, "done")
+    // PRD47 S47.1: Golden Run Controller — engine.finalize() agora roda de VERDADE
+    // (deixou de ser dead code); o veredito tipado fica visível ao lado do status solto.
+    assert.ok(r.pipeline.goldenRun, "golden-run.js wired — veredito do motor presente")
+    assert.ok(["completed", "handoff", "planned_only", "not_executed", "blocked", "cancelled"].includes(r.pipeline.goldenRun.status))
+    assert.notEqual(r.pipeline.goldenRun.status, "completed", "sem acceptance real resolvida (GAP-3), motor NUNCA finge completed hoje")
     assert.ok(ran.some((c) => c.includes("create loja") && c.includes("--lite")))
     assert.ok(existsSync(path.join(tmp, ".gstack", "plans", r.plan.id, "plan.json")), "plano persistido")
     // S42.1: Product Brief persistido como artefato vivo (decisões + aceites com verificador/pending)
