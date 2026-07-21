@@ -39,6 +39,27 @@ export function hashDrifted(lock, currentContent) {
   return hashContent(currentContent) !== lock.content?.originalHash
 }
 
+// PRD46 S46.5 — projeção honesta por tipo de artefato (§9/§11 do PRD): `rule_pack`
+// é fundido em gates/agentes existentes; `reference_pack` só é carregado por
+// progressive disclosure. NENHUM dos dois vira skill instalada/comando/processo —
+// só `skill` projeta como skill de verdade. Docs/doctor/Agent Factory devem
+// consultar esta função, nunca inventar a própria regra de projeção.
+export const ARTIFACT_PROJECTIONS = Object.freeze({
+  skill: "installed_skill",
+  rule_pack: "merged_into_gates",
+  reference_pack: "progressive_disclosure_only",
+})
+
+/** @returns a projeção honesta de um artifactKind, ou null se desconhecido. */
+export function projectArtifactKind(artifactKind) {
+  return ARTIFACT_PROJECTIONS[artifactKind] || null
+}
+
+/** True só quando o artefato de fato aparece como skill instalada. */
+export function appearsAsInstalledSkill(artifactKind) {
+  return projectArtifactKind(artifactKind) === "installed_skill"
+}
+
 function sha256Hex(s) {
   return createHash("sha256").update(String(s)).digest("hex")
 }
