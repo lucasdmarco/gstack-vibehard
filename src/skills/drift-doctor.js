@@ -96,6 +96,18 @@ export function staleCommands(cited, known = KNOWN_COMMANDS) {
   return cited.filter((c) => !knownSet.has(c))
 }
 
+const candidateText = (candidate) => [candidate.title || "", ...(candidate.procedure?.steps || [])].join("\n")
+
+/**
+ * PRD46 S46.6 — mesma disciplina de comando citado/stale (§ acima), aplicada a um
+ * CANDIDATE aprendido (não uma skill instalada) — reusa `citedCommands`/
+ * `staleCommands`, nunca duplica a lógica de detecção.
+ */
+export function candidateCommandDrift(candidate, known = KNOWN_COMMANDS) {
+  const cited = citedCommands(candidateText(candidate))
+  return { cited, stale: staleCommands(cited, known) }
+}
+
 function findStale(catalog, io, known) {
   const out = []
   for (const s of catalog.skills) {
