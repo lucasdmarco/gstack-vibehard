@@ -78,12 +78,15 @@ test("CLI loop observe: sem state → erro; com state + driver injetável avanç
   const { loopCommand } = await imp("src/commands/loop.js")
   const { buildLoopState, persistLoopState } = await imp("src/skills/replit-loop.js")
   const cwd = await mkdtemp(path.join(tmpdir(), "gstack-obscli-"))
+  // `loopCommand` sinaliza falha pelo VALOR DE RETORNO (null) — asserção determinística. Não
+  // dependemos de `process.exitCode`: é um GLOBAL do processo e lê/escrevê-lo aqui deixava o
+  // node --test marcar o ARQUIVO inteiro como falho sob carga (flake de concorrência). Ainda
+  // assim salvamos/restauramos o exitCode para não vazar o efeito colateral do comando.
+  const savedExitCode = process.exitCode
   try {
-    process.exitCode = 0
-    await loopCommand(["observe", "--run", "nope", "--url", "http://x", "--json"], { cwd })
-    assert.equal(process.exitCode, 1, "sem loop.json falha")
-    process.exitCode = 0
+    const noState = await loopCommand(["observe", "--run", "nope", "--url", "http://x", "--json"], { cwd })
+    assert.equal(noState, null, "sem loop.json → retorna null (falha honesta)")
     persistLoopState({ root: cwd, state: { ...buildLoopState({ runId: "c1", intent: "implementar x" }), phase: "observe" } })
     assert.ok(existsSync(path.join(cwd, ".gstack", "runs", "c1", "loop.json")))
-  } finally { process.exitCode = 0; await rm(cwd, { recursive: true, force: true }) }
+  } finally { process.exitCode = savedExitCode; await rm(cwd, { recursive: true, force: true }) }
 })
