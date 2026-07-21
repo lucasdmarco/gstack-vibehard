@@ -1,5 +1,34 @@
 # Changelog - gstack-vibehard
 
+## [5.18.0] - 2026-07-21 — PRD47 S47.0: baseline de integração e testes negativos
+
+Primeiro sprint do PRD47 (Golden Path — controlador único do `start`) — prova as 12 lacunas
+ANTES de mudar qualquer wiring, com evidência de arquivo:linha real, não suposição.
+
+- **`tests/prd47_baseline_negative_controls.test.js`** (novo, 12 testes): confirma com evidência
+  real os 4 P0 já auditados (preview nunca gateia `done`; `review` sempre advisory;
+  `feature-behavior`/integrations sempre `pending_verifier`; `proof` só roda com `--proof`) +
+  8 lacunas adicionais — 5 GAPs reais e 3 GUARDs preventivos:
+  - **GAP-5**: `run-loop.js` nunca chama `advanceExecution`/`recordApplied`/`verifyExecution` —
+    o Execution Contract só é dirigido por fixture sintética em `behavioral-conformance.js`,
+    nunca pela execução real de skills.
+  - **GAP-6**: gate falho vai direto pra `handoff` — `diagnose-loop.js` existe e é usado por
+    `loop diagnose` (manual), mas nunca é consultado no caminho automático do pipeline.
+  - **GAP-7 (achado real desta sessão)**: `checkInstallIntegrity` (`src/installer/integrity.js`)
+    tem um ponto cego real — nunca verifica existência de itens `kind:"dir"`. **Isso já havia
+    contaminado o manifest global REAL desta máquina com 330 itens órfãos de testes antigos**
+    (`safeToUninstall:false`); manifest limpo com autorização do usuário usando as próprias
+    funções do produto (`loadManifest`/`saveManifest`), backup preservado antes da limpeza.
+  - **GAP-8**: `doctor.js` resolve Headroom via PATH global (`toolVer("headroom")`); `readiness.js`
+    resolve o venv LOCAL do projeto (`.gstack/tools/headroom-venv/`) — alvos diferentes, podem
+    divergir sem que nenhum dos dois saiba do outro.
+  - **GUARD-9/10/11/12**: auto-consistência do manifest de agentes, MCP sempre project-scoped,
+    progresso já emitido por tentativa (não é gap), e nenhum harness instrucional rotulado como
+    `real_hooks` (reusa `harness-registry.js` do S46.5).
+
+QG strict 0, `agents:check` sem drift, suíte JS 1387/1388 (1 skip pré-existente), `verify
+--profile full` → `ready:true`.
+
 ## [5.17.0] - 2026-07-21 — PRD46 S46.6: freshness, revogação e métricas honestas (fecha o PRD46)
 
 Sétimo e ÚLTIMO sprint do PRD46 — conhecimento aprendido não fica autoritativo para sempre.
