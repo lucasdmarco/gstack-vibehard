@@ -1,5 +1,36 @@
 # Changelog - gstack-vibehard
 
+## [5.20.0] - 2026-07-21 — PRD47 S47.2: Product Brief v2 e Design Direction guiada
+
+Terceiro sprint do PRD47 — elimina ambiguidade de estilo relevante antes da escrita, sem
+inventar arte (isso é escopo do PRD49): apenas rotula opções derivadas do tipo de produto.
+
+- **`src/project-plan/design-direction.js`** (novo): catálogo de 4 direções + `custom` +
+  `none` (opt-out explícito), cada uma com tokens MÍNIMOS mas verificáveis (colors +
+  typography não-vazios — passam em `validateDesignContent` de verdade, não são decorativos).
+- **`src/project-plan/question-registry.js`**: nova decisão `designDirection`, condicional a
+  `detectCapabilities(objetivo).touchesFrontend` (mesmo detector que `start.js` já usa) — teto
+  de 5 perguntas bloqueantes continua respeitado (já estava OK antes, achado da auditoria
+  pré-execução confirmado). Default sem interação é sempre `"none"` (opt-out) — `--yes` NUNCA
+  chuta gosto por conta própria.
+- **`src/project-plan/product-brief.js`** migrado **v1 → v2**: `designDirection` (value + fonte
+  rastreada + tokens) entra no brief; `assertDirectionHonest` lança se o objetivo toca frontend
+  e a direção não foi resolvida — brief incompleto nunca vira plano executável (DoD).
+  `migrateProductBrief` upgrada briefs v1 antigos com opt-out explícito, nunca inventando
+  escolha.
+- **`src/skills/design-system.js`**: `designSystemFromDirection` — ponte PURA (não persiste
+  nada) entre a direção escolhida no brief e um design-system v2 válido, pronta pra um sprint
+  futuro decidir religar ao gate real (`start.js` mantém seu mecanismo `--design-system`
+  separado por ora — reconciliar os dois é risco de regressão num gate P0, fora do escopo
+  desta sprint).
+- 22 testes novos, incluindo o controle negativo do brief incompleto e a prova de que os
+  tokens do catálogo passam `validateDesignContent` de verdade (achei e corrigi uma
+  inconsistência real durante a implementação: tokens iniciais não tinham colors/typography
+  não-vazios — teriam falhado a própria validação se alguém tentasse registrá-los).
+
+QG strict 0, `agents:check` sem drift, suíte JS 1411/1412 (1 skip pré-existente), `verify
+--profile full` → `ready:true`.
+
 ## [5.19.0] - 2026-07-21 — PRD47 S47.1: Golden Run Controller sobre o Loop Engine
 
 Segundo sprint do PRD47 — conecta handlers existentes a uma única execução persistente,

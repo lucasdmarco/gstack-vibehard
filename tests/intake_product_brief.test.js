@@ -75,3 +75,81 @@ test("slugFromObjective: determinístico, sem acento, sem símbolo", () => {
   assert.equal(slugFromObjective("SaaS com Login & Pagamentos (Stripe)!"), "saas-com-login-pagamentos-stripe")
   assert.equal(slugFromObjective(""), "meu-projeto")
 })
+
+// PRD47 S47.2 — Product Brief v2: designDirection elimina ambiguidade de estilo antes da escrita.
+test("intake: objetivo que toca frontend inclui designDirection nas decisões bloqueantes", async () => {
+  const r = await runIntake({ objective: "landing page para o meu produto", nonInteractive: true })
+  const dd = r.decisions.find((d) => d.id === "designDirection")
+  assert.ok(dd, "designDirection deve aparecer quando o objetivo toca frontend")
+  assert.equal(dd.source, "recommended_default")
+  assert.equal(dd.value, "none", "sem interação, default é opt-out explícito — nunca chuta gosto")
+})
+
+test("intake: objetivo que NÃO toca frontend (api pura) nunca pergunta designDirection", async () => {
+  const r = await runIntake({ objective: "api backend de pagamentos", nonInteractive: true })
+  assert.equal(r.decisions.find((d) => d.id === "designDirection"), undefined)
+})
+
+test("intake: teto de 5 continua respeitado mesmo com designDirection + integrations juntos", async () => {
+  const r = await runIntake({ objective: "landing page com stripe", nonInteractive: true })
+  assert.ok(r.decisions.length <= 5, `${r.decisions.length} decisões`)
+})
+
+test("product brief v2: schema é v2, designDirection presente com value/source/tokens", async () => {
+  const intake = await runIntake({ objective: "landing page para produto novo", nonInteractive: true })
+  const brief = buildProductBrief(intake)
+  assert.equal(brief.schema, "gstack.product-brief.v2")
+  assert.ok(brief.designDirection)
+  assert.equal(brief.designDirection.value, "none")
+  assert.equal(brief.designDirection.source, "recommended_default")
+  assert.equal(brief.designDirection.tokens, null, "opt-out não tem tokens")
+})
+
+test("product brief v2: direção do catálogo escolhida persiste os tokens verificáveis", async () => {
+  const ui = { prompt: async () => "x", select: async (_q, opts) => opts.find((o) => /minimalista/i.test(o)) || opts[0] }
+  const intake = await runIntake({ objective: "landing page bonita", ui })
+  const brief = buildProductBrief(intake)
+  assert.equal(brief.designDirection.value, "minimal-editorial")
+  assert.equal(brief.designDirection.source, "user_answer")
+  assert.ok(brief.designDirection.tokens.colors)
+})
+
+test("CONTROLE NEGATIVO: brief incompleto (frontend sem direção resolvida) lança — nunca vira plano executável", async () => {
+  const { buildProductBrief: build } = await import("../src/project-plan/product-brief.js")
+  const fakeIntake = {
+    objective: "landing page sem direção", recipe: { id: "landing-page", optionalSteps: [] },
+    decisions: [
+      { id: "projectName", value: "x" }, { id: "mode", value: "lite" },
+      { id: "designDirection", value: "" }, // valor inválido/vazio — nunca deveria chegar aqui, mas se chegar, reprova
+    ],
+  }
+  assert.throws(() => build(fakeIntake), /designDirection incompleta/)
+})
+
+test("migrateProductBrief: brief v1 antigo ganha designDirection opt-out (nunca inventa escolha)", async () => {
+  const { migrateProductBrief } = await import("../src/project-plan/product-brief.js")
+  const v1 = { schema: "gstack.product-brief.v1", objective: "x", acceptances: [] }
+  const migrated = migrateProductBrief(v1)
+  assert.equal(migrated.schema, "gstack.product-brief.v2")
+  assert.equal(migrated.designDirection.value, "none")
+  assert.equal(migrated.designDirection.source, "migrated_v1")
+})
+
+test("migrateProductBrief: brief já v2 passa intacto (idempotente)", async () => {
+  const { migrateProductBrief, PRODUCT_BRIEF_SCHEMA } = await import("../src/project-plan/product-brief.js")
+  const v2 = { schema: PRODUCT_BRIEF_SCHEMA, designDirection: { value: "custom", source: "user_answer", tokens: null } }
+  assert.deepEqual(migrateProductBrief(v2), v2)
+})
+
+test("designSystemFromDirection (design-system.js ponte): direção do catálogo produz DS que PASSA validateDesignContent", async () => {
+  const { designSystemFromDirection, validateDesignContent } = await import("../src/skills/design-system.js")
+  const ds = designSystemFromDirection({ value: "dark-technical", tokens: { colors: { primary: "#00d9ff" }, typography: { body: "JetBrains Mono" } } })
+  assert.equal(validateDesignContent(ds).ok, true)
+})
+
+test("designSystemFromDirection: none/custom -> null (nada a registrar automaticamente)", async () => {
+  const { designSystemFromDirection } = await import("../src/skills/design-system.js")
+  assert.equal(designSystemFromDirection({ value: "none" }), null)
+  assert.equal(designSystemFromDirection({ value: "custom" }), null)
+  assert.equal(designSystemFromDirection(null), null)
+})

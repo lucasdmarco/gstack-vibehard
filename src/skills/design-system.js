@@ -1,5 +1,6 @@
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from "fs"
 import { join, dirname } from "path"
+import { tokensForDirection } from "../project-plan/design-direction.js"
 
 /**
  * Design System Gate — universal, harness-agnostic (PRD29 29.3 + PRD28 28.11 + PRD34 F2-B).
@@ -130,6 +131,25 @@ export function resolveDesignSystem({ root, bypass = null, io = defaultIo, impor
  * Grava o artefato canônico E sincroniza o session_state legado, para o hook
  * Python do Claude continuar coerente com a decisão feita na CLI.
  */
+
+/**
+ * PRD47 S47.2 — ponte PURA entre a `designDirection` do Product Brief (intake) e um
+ * design-system v2 válido. NÃO persiste nada (o caller decide quando registrar via
+ * `registerDesignSystem`/`io.writeJson`) — só traduz vocabulário sem duplicar a
+ * lógica de gate. `none`/`custom` sem tokens do catálogo → null (nada a registrar
+ * ainda; opt-out explícito continua sendo decisão do usuário, não um DS fabricado).
+ */
+export function designSystemFromDirection(designDirection) {
+  if (!designDirection || designDirection.value === "none" || designDirection.value === "custom") return null
+  const tokens = tokensForDirection(designDirection.value)
+  if (!tokens) return null
+  return {
+    schemaVersion: DESIGN_SYSTEM_SCHEMA_V2, status: "generated",
+    direction: designDirection.value, tokens,
+    generatedAt: new Date().toISOString(), source: "product-brief-direction",
+  }
+}
+
 export function registerDesignSystem({ root, choice, io = defaultIo } = {}) {
   const gdir = join(root, ".gstack")
   const dsPath = join(gdir, "design-system.json")
