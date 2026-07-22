@@ -1,3 +1,6 @@
+import { detectCapabilities } from "../skills/route.js"
+import { proposeDesignDirections } from "./design-direction.js"
+
 /**
  * Registry das DECISÕES de intake (PRD42 S42.1). No máximo 5 decisões BLOQUEANTES; cada uma
  * carrega `why` (por que importa) + `consequence` (o que muda conforme a escolha) + um default
@@ -59,6 +62,13 @@ export const INTAKE_DECISIONS = Object.freeze([
     consequence: "'none' mantém local; 'preview' agenda deploy verificável (S42.12).",
     options: [{ value: "none", label: "Nenhum (local)" }, { value: "preview", label: "Preview" }],
   },
+  {
+    id: "designDirection",
+    kind: "choice",
+    prompt: "Sem design system ainda — qual direção de estilo seguir?",
+    why: "Frontend não deve começar sob ambiguidade de estilo — isso é retrabalho garantido.",
+    consequence: "Direção do catálogo grava tokens mínimos verificáveis; 'none' é opt-out explícito.",
+  },
 ])
 
 const DEFAULTERS = {
@@ -66,14 +76,19 @@ const DEFAULTERS = {
   mode: ({ recipe }) => (recipe && recipe.recommendedMode) || "lite",
   integrations: ({ recipe }) => integrationOptions(recipe),
   deployTarget: () => "none",
+  // Default conservador: nunca assume uma direção de estilo por conta própria — sem
+  // interação (--yes), o registro honesto é "opt-out explícito", nunca um chute de gosto.
+  designDirection: () => "none",
 }
 
 /**
  * Resolve default + opções concretas de UMA decisão a partir do contexto (objetivo + recipe).
  * Devolve `{ default, options }`. Para `integrations`, options = todas; default = recomendadas.
+ * Para `designDirection`, options = catálogo derivado do tipo de produto + custom + opt-out.
  */
 export function resolveDecision(decision, ctx) {
   const def = (DEFAULTERS[decision.id] || (() => null))(ctx)
+  if (decision.id === "designDirection") return { default: def, options: proposeDesignDirections() }
   if (decision.id === "integrations") {
     const all = integrationOptions(ctx.recipe).map((v) => ({ value: v, label: v }))
     return { default: def, options: all }
@@ -81,9 +96,14 @@ export function resolveDecision(decision, ctx) {
   return { default: def, options: decision.options || null }
 }
 
-/** Lista de decisões bloqueantes (cap MAX). `integrations` some se o recipe não tem nenhuma. */
+const hasIntegrations = (ctx) => integrationOptions(ctx.recipe).length > 0
+const touchesFrontend = (ctx) => Boolean(detectCapabilities(ctx.objective || "").touchesFrontend)
+const APPLIES_WHEN = { integrations: hasIntegrations, designDirection: touchesFrontend }
+
+/** Lista de decisões bloqueantes (cap MAX). `integrations`/`designDirection` só aparecem quando
+ * o contexto realmente pede (recipe com integração real; objetivo que toca frontend). */
 export function blockingDecisions(ctx) {
-  const list = INTAKE_DECISIONS.filter((d) => d.id !== "integrations" || integrationOptions(ctx.recipe).length > 0)
+  const list = INTAKE_DECISIONS.filter((d) => !APPLIES_WHEN[d.id] || APPLIES_WHEN[d.id](ctx))
   if (list.length > MAX_BLOCKING_DECISIONS) throw new Error(`intake: ${list.length} decisões excede o teto de ${MAX_BLOCKING_DECISIONS}`)
   return list
 }
