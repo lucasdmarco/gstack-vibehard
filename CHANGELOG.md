@@ -1,5 +1,36 @@
 # Changelog - gstack-vibehard
 
+## [5.26.0] - 2026-07-21 — PRD47 S47.9: Golden Workflow vertical `saas-auth-stripe`
+
+Nono sprint do PRD47 — executado ANTES do 47.8 por decisão explícita do usuário: o PRD47 §19
+diz "Não executar 47.8 antes de provar a jornada sequencial", e a única prova que existia até
+aqui era com exec injetado (fake) em testes unitários, nunca um E2E real. Prova a trilha
+completa `saas-auth-stripe` num E2E REAL (scaffold, deps, runtime, falha semeada, repair,
+rollback, resume) antes de generalizar (47.10) ou paralelizar (47.8).
+
+- **`src/project-plan/golden-workflow-vertical.js`** (novo, `gstack.golden-workflow-vertical.v1`):
+  `credentialStatus`/`stripeGate`/`supabaseGate` — placeholder de scaffold (`sk_test_change-me`)
+  NUNCA vira credencial "present"; sem credencial real, a evidência fica `blocked`, nunca verde
+  por omissão (DoD linha 6 do sprint). `buildVerticalReport` agrega as 14 evidências
+  obrigatórias — `overall` só é `proved` com as 14 presentes E `proved`; qualquer lacuna vira
+  `partial` (mesma disciplina do `delivery-verdict.js`, S47.6).
+- **`scripts/vertical-saas-auth-stripe.mjs`** (novo, `npm run test:vertical` — fora do `npm test`
+  padrão, como `test:pack`/`test:golden`, por ser pesado): E2E REAL nesta máquina (Windows) —
+  scaffold real via `create --template saas-auth-stripe --lite`, `pnpm install` real em
+  `apps/api` (leve, sem Next.js), processo REAL (`tsx`) respondendo `/health`, falha REAL
+  semeada, `runtime-repair-cycle.js` (S47.4) decidindo REAL a partir do health observado,
+  rollback REAL via `restoreLastGreen`/`loop-checkpoint.js` (S41.7), recovery REAL confirmada,
+  `Context Delta` REAL (S47.7) construído do run, e prova REAL (hash antes/depois) de que o
+  manifest global do usuário não foi tocado. **7/14 evidências `proved` de verdade nesta
+  sessão**; as demais (`brief_persisted`/`design_direction` — cobertas por outros testes;
+  `login_exercised`/`stripe_test_mode`/`panel_observed_browser`/`console_network_a11y_clean`/
+  `unhappy_path` — bloqueadas por falta de credencial Stripe/Supabase real e por Next.js estar
+  fora do escopo desta prova) ficam `not_executed`/`blocked`, declarado — nunca fingido. "5
+  execuções frias × 3 SOs" do DoD original é `partial honesto`: só Windows, só 1 execução
+  cold nesta sessão (sem runners macOS/Linux disponíveis).
+- 13 testes unitários novos (`tests/golden_workflow_vertical.test.js`), QG strict
+  `blocking_severity_count:0`, `verify --profile full` → `ready:true`.
+
 ## [5.25.0] - 2026-07-21 — PRD47 S47.7: Context Delta e retomada sem recontextualização total
 
 Oitavo sprint do PRD47 — pacote mínimo para a próxima rodada/agente retomar um run sem reler
