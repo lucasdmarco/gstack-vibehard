@@ -1,5 +1,27 @@
 # Changelog - gstack-vibehard
 
+## [5.23.0] - 2026-07-21 — PRD47 S47.5: QA, review e aceites executáveis
+
+Sexto sprint do PRD47 — fecha a diferença entre infraestrutura verde e produto funcionando.
+Boa parte do DoD já estava satisfeita por infraestrutura existente do PRD42/PRD47 anterior
+(reviewer≠producer em `artifact-review.js`; `acceptanceResolved` do `golden-run.js` do S47.1 já
+bloqueia "completed" com qualquer `pending_verifier`); o trabalho novo genuíno é a conversão
+CONTROLADA de `pending_verifier` para `verifier` real.
+
+- **`src/project-plan/acceptance-verification.js`** (novo,
+  `gstack.acceptance-verification.v1`): `mapJourney` liga um aceite a um método verificável
+  concreto (`playwright|api|command|schema`). `resolvePendingVerifier` só converte
+  `pending_verifier` → `verifier` quando existe journey mapeada — SEM journey, o aceite
+  continua pending para sempre (DoD: login/pagamento/painel nunca são declarados funcionais
+  por scaffold). `checkCompliance`/`complianceReport`: um aceite só é `compliant` se o diff
+  tocou os arquivos relevantes da journey E há resultado de teste correspondente que passou —
+  um único aceite `pending`/`unverified`/`failed` derruba `allCompliant` do produto inteiro.
+- 12 testes novos, incluindo prova de reuso direto de `artifact-review.js`
+  (`validateReview` já impede produtor de aprovar o próprio artefato desde o PRD42 S42.5).
+
+QG strict 0 (1 função decomposta), `agents:check` sem drift, suíte JS 1449/1450 (1 skip
+pré-existente), `verify --profile full` → `ready:true`.
+
 ## [5.22.0] - 2026-07-21 — PRD47 S47.4: runtime, observação e autocorreção bounded
 
 Quinto sprint do PRD47 — faz o app rodar e ser observado automaticamente. Agregador fino
