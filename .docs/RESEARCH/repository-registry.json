@@ -2,6 +2,7 @@
   "schemaVersion": 1,
   "purpose": "Fonte unica versionada dos repositorios de referencia comparados pelo GStack. Consultar ANTES de qualquer comparacao com projetos externos. Referencia metodologica NUNCA vira dependencia runtime do GStack.",
   "usage": "Antes de comparar o GStack com um repo externo, leia este arquivo. Se o tema envolver metodologia, skills, onboarding, marketplace, cross-harness ou AI-driven dev, o batch-6-aidd-methodology e obrigatorio na comparacao. Documentos de comparacao devem usar .docs/RESEARCH/comparison-template.md e citar este registry.",
+  "vendorGovernanceNote": "Candidatos de vendoring governado (codigo que PODE virar dependencia runtime, ex.: Impeccable, Obsidian Skills) NAO entram aqui -- ver .docs/RESEARCH/prd49-source-manifest.json (PRD49 S49.0). Este arquivo e exclusivamente para referencia metodologica pura.",
   "statusLegend": {
     "active_reference": "Referencia viva; consultar para comparacoes e decisoes de metodologia/onboarding.",
     "archived_reference": "Referencia historica; ler apenas como contexto de origem, nao como fonte atual."

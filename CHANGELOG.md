@@ -1,5 +1,33 @@
 # Changelog - gstack-vibehard
 
+## [5.37.0] - 2026-07-22 — PRD49 S49.0: baseline, registry, licenças e controles negativos
+
+Primeiro sprint do PRD49 (design/mídia/conhecimento governados — Impeccable, Graphify,
+Obsidian, Ponytail, Scroll World, Vercel Skills/Agent Skills, Claude Video, NotebookLM).
+Nenhuma linha de código de terceiro é copiada ainda — isso é Sprint 49.2A. Este sprint só
+estabelece os controles que DEVEM barrar qualquer integração real antes dela acontecer.
+
+- **`src/skills/vendor-governance.js`** (novo, `gstack.vendor-governance.v1`): 7 controles
+  negativos exigidos pelo DoD — `canPromoteSource` (sem commit+license+sha256, nunca
+  promovível), `vendorSafetyCheck` (reusa `external-audit.js` do PRD29/34, sem duplicar
+  detecção de segredo/exec-remoto/instalação), `canMutateHookManifest` (sem plano de
+  backup/restore, bloqueado), `costGateStatus` (`--yes` de execução NUNCA confirma custo),
+  `canClaimEnforced` (só evidência de fixture prova, nunca doc/omissão),
+  `externalContentPromotionStatus` (conteúdo externo nunca vira policy/memória sem
+  promoção humana), `resolveRulePrecedence` (mesmo ruleId de fontes diferentes sem
+  precedência declarada → quarentena, nunca as duas ativas).
+- **`.docs/RESEARCH/prd49-source-manifest.json`** (novo): registro de proveniência dos 9
+  repos externos auditados no PRD49 — distinto de `repository-registry.json` (referência
+  metodológica pura, NUNCA runtime): este rastreia candidatos que PODEM virar código
+  vendorizado. `verifiedByThisSession:false` em TODAS as 9 entradas — os commits/licenças
+  vêm da auditoria documentada em `.docs/PLANS/prd49.md`, citados mas não re-verificados
+  por esta sessão até um mirror real acontecer (Sprint 49.2A+).
+- `.docs/RESEARCH/repository-registry.json`: nota apontando pro novo manifest, sem misturar
+  os dois propósitos.
+- `tests/fixtures/prd49/{safe,secret,malformed-config,ui}`: fixtures mínimas pros sprints
+  futuros do detector de design.
+- 11 testes novos, QG strict `blocking_severity_count:0`.
+
 ## [5.36.0] - 2026-07-22 — PRD48 S48.7: terminal E2E, usabilidade e fechamento do programa
 
 Oitavo e ÚLTIMO sprint do PRD48 — fecha o programa (8 sprints, S48.0→S48.7, v5.29.0→v5.36.0).
