@@ -10,6 +10,7 @@ import { listSessions, refStatus } from "../state/session-index.js"
 import { presentCheckpoints, diffCheckpoints, restoreWithProvenance } from "../skills/checkpoint-presenter.js"
 import { listCheckpoints } from "../skills/loop-checkpoint.js"
 import { buildSessionSummary } from "../usage/session-summary.js"
+import { t, resolveLocale } from "../cli/i18n.js"
 
 /**
  * `task "<pedido>"` — Loop Engineer MVP. Gera (e persiste) um plano de feature/bugfix
@@ -73,8 +74,9 @@ function inspectCmd(cwd, sessionId, json) {
   store.close()
   const session = sessions.find((s) => s.sessionId === sessionId)
   if (!session) {
-    if (json) process.stdout.write(JSON.stringify({ error: "session_not_found", sessionId }) + "\n")
-    else error(`sessão não encontrada: ${sessionId}`)
+    // PRD48 S48.6 — messageId estável no JSON (contrato de máquina); texto humano localizado.
+    if (json) process.stdout.write(JSON.stringify({ error: "session_not_found", messageId: "task.session_not_found", sessionId }) + "\n")
+    else error(t("task.session_not_found", { sessionId }, resolveLocale({})))
     return
   }
   const refs = { proofRef: refStatus(session.proofRef, existsSync), contextDeltaRef: refStatus(session.contextDeltaRef, existsSync) }
@@ -120,13 +122,14 @@ function checkpointsCmd(cwd, runId, args, json) {
 }
 
 function emitConfirmationRequired(seq, runId, json) {
-  if (json) return process.stdout.write(JSON.stringify({ error: "confirmation_required", hint: "rode de novo com --yes pra confirmar" }) + "\n")
-  warn(`  restaurar pro checkpoint ${seq} do run ${runId}? rode de novo com --yes pra confirmar.`)
+  if (json) return process.stdout.write(JSON.stringify({ error: "confirmation_required", messageId: "task.checkpoint.confirmation_required" }) + "\n")
+  warn(`  ${t("task.checkpoint.confirmation_required", { seq, runId }, resolveLocale({}))}`)
 }
 function emitRestoreResult(r, seq, json) {
   if (json) return process.stdout.write(JSON.stringify(r) + "\n")
-  if (!r.ok) return error(`restore falhou: ${r.reason}`)
-  success(`  restaurado pro checkpoint ${seq} (${r.restored.length} arquivo(s); recibo ${r.provenanceReceipt})`)
+  const loc = resolveLocale({})
+  if (!r.ok) return error(t("task.checkpoint.restore_failed", { reason: r.reason }, loc))
+  success(`  ${t("task.checkpoint.restored", { seq, count: r.restored.length, receipt: r.provenanceReceipt }, loc)}`)
 }
 // `task restore <runId> --checkpoint <n> [--yes]` — restore COM provenance (nunca apaga
 // audit trail); exige `--yes` explícito (nunca por decreto).

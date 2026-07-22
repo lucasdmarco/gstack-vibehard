@@ -1,5 +1,29 @@
 # Changelog - gstack-vibehard
 
+## [5.35.0] - 2026-07-22 — PRD48 S48.6: localização e ajuda contextual
+
+Sétimo sprint do PRD48 — CLI compreensível em PT-BR e inglês, sem duplicar contratos.
+Escopo calibrado com honestidade: infraestrutura real de i18n construída e provada
+ponta-a-ponta num caminho real (`task inspect`/`task restore`); retrofit completo de TODAS
+as strings em português espalhadas pelo resto da CLI (dezenas de arquivos de PRDs
+anteriores) fica para migração incremental futura — não é seguro reescrever isso tudo numa
+única sprint sem risco de regressão.
+
+- **`src/cli/i18n.js`** (novo, `gstack.i18n.v1`): `resolveLocale` — `GSTACK_LANG` explícito
+  vence, depois `config.local.json` (`.locale`, camada já real de `policy/layers.js`),
+  fallback PT-BR (default desta migração). Locale não suportado nunca quebra, só cai pro
+  fallback. `t(messageId, params, locale)` — messageId desconhecido NUNCA lança, devolve
+  `[missing:id]` explícito (nunca esconde o erro).
+- **`src/cli/messages/pt-BR.js`** + **`src/cli/messages/en.js`** (novos): catálogos com os
+  MESMOS ids estáveis nos dois idiomas (testado: nenhum órfão de um lado).
+- **`src/commands/task.js`**: `task inspect`/`task restore` retrofitados como prova real —
+  JSON (`--json`) ganha `messageId` estável ao lado do `error` enum (contrato de máquina
+  IMUTÁVEL — nunca traduz keys/enums); texto humano (stderr/stdout sem `--json`) usa `t()`.
+- 9 testes novos (`tests/cli_i18n.test.js`). QG strict `blocking_severity_count:0`.
+- **Deferido, declarado sem enfeite**: retrofit do resto da CLI (dezenas de comandos com
+  texto em português direto no código, construídos ao longo de todo o programa);
+  `ampliar tests/public_docs_packaged.test.js e command lint` do DoD original.
+
 ## [5.34.0] - 2026-07-22 — PRD48 S48.5: contexto, quota e custo acionáveis
 
 Sexto sprint do PRD48 — mostra o que será gasto e por que a execução será sequencial ou
