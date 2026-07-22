@@ -1,5 +1,32 @@
 # Changelog - gstack-vibehard
 
+## [5.25.0] - 2026-07-21 — PRD47 S47.7: Context Delta e retomada sem recontextualização total
+
+Oitavo sprint do PRD47 — pacote mínimo para a próxima rodada/agente retomar um run sem reler
+o repositório inteiro. Reusa Context Pack, handoff (S42.10), Graphify readiness, Source Lock
+(PRD46 S46.1) e o Skill Context Pack (S47.3) — nada duplicado.
+
+- **`src/project-plan/context-delta.js`** (novo, `gstack.context-delta.v1`):
+  `buildContextDelta` monta objetivo/escopo, decisões aprovadas com hash estável
+  (`hashDecision`), arquitetura por referência (não o grafo inteiro), arquivos tocados
+  (excluindo `.env*` sempre), checkpoint atual, aceites provados/falhos/pendentes (reusa
+  `complianceReport` do S47.5), diagnóstico + próxima ação, capacidades por ID/hash de lock
+  (reusa `capability-plan.js`/`source-lock.js` do S47.3/PRD46 — nunca o corpus integral da
+  skill) e gotchas/dead-ends estruturados. `extractGotchas` lê `dead_end`/`remember` do
+  journal.jsonl no MESMO formato que o detector do PRD46 (S46.2) já consome no closeout —
+  entrega o evento sem promover aprendizado aqui. `buildContextDelta` lança se o caller tentar
+  injetar `transcript` bruto — nunca aceito, nunca silenciosamente ignorado.
+- `validateContextDelta`: fail-closed — nenhum campo pode carregar VALOR de segredo (mesma
+  disciplina do `candidate.js`, PRD46 S46.1).
+- `resolveContextDeltaLoad`: decide `reuse|regenerate|block` na retomada — capacidade com lock
+  revogado/hash divergente (reusa `validateFragmentEligibility` do S47.3) sempre bloqueia;
+  grafo `fresh` reusa; qualquer outro estado regenera — nunca reuso silencioso de frescor
+  velho.
+- Economia de retomada permanece `estimated` — prova direta reusando `resumeBenchmark` do
+  `handoff.js` (S42.10), sem telemetria medida nova.
+- 14 testes novos (`tests/context_delta.test.js`), QG strict `blocking_severity_count:0`
+  (1 achado MODERATE CC=6 em `buildContextDelta`, não-bloqueante).
+
 ## [5.24.0] - 2026-07-21 — PRD47 S47.6: proof obrigatório e demonstração de aceite
 
 Sétimo sprint do PRD47 — termina com UMA resposta única e compreensível. Reusa
