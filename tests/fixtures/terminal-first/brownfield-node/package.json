@@ -1,0 +1,8 @@
+{
+  "name": "brownfield-fixture",
+  "private": true,
+  "scripts": {
+    "dev": "node index.js",
+    "test": "node --test"
+  }
+}

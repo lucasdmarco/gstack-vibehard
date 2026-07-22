@@ -1,5 +1,34 @@
 # Changelog - gstack-vibehard
 
+## [5.29.0] - 2026-07-22 — PRD48 S48.0: baseline pós-PRD47 e controles negativos
+
+Primeiro sprint do PRD48 (terminal-first) — garante que o programa parte do produto
+REALMENTE entregue pelos PRD45/46/47 (comportamento, não texto de PRD). Nenhuma alteração
+de motor de produção neste sprint, conforme DoD.
+
+- **`tests/prd48_baseline_contract.test.js`** (novo, 11 testes): prova por comportamento que
+  readiness (PRD45), governança de skill fail-closed (PRD46), Golden Run Controller
+  realmente ligado em `run-loop.js` e Context Delta (PRD47) existem e funcionam — nenhum
+  import mockado. `start --dry-run --json` a partir da árvore fonte confirma JSON puro e
+  zero escrita.
+- **5 controles negativos exigidos pelo DoD**: auth/modelo `unknown` nunca promovido a
+  `known` sem evidência (`model-preflight.js`); Context Delta nunca reusa frescor velho em
+  run interrompido (`resolveContextDeltaLoad`, S47.7); checkpoint adulterado detecta tamper
+  e ABORTA sem restaurar nada (`loop-checkpoint.js`, prova real com blob adulterado fora do
+  fluxo normal); projeto existente sujo é detectável via git real e a alteração do usuário
+  NUNCA é descartada; policy `ask` nunca resolve silenciosamente para `allow`
+  (`policy/schema.js`).
+- **`tests/fixtures/terminal-first/brownfield-node/`** (novo): fixture mínima de projeto
+  Node existente, reutilizável pelo Sprint 48.2 (onboarding brownfield).
+- **Escopo deliberadamente deferido**: a prova completa "tarball instalado em HOME
+  temporária, 5 execuções frias por SO" é explicitamente responsabilidade do Sprint 48.7
+  (Terminal E2E/usabilidade/RC) — este sprint prova o comportamento a partir da árvore fonte,
+  suficiente para o baseline.
+- 11 testes novos, QG strict `blocking_severity_count:0`.
+- **Achado confirmado da auditoria prévia**: `src/agents/detector.js`, citado pelo Sprint
+  48.1 como reutilizável, **não existe** (só `adapter-matrix.js`/`factory.js`/`scanner.js`)
+  — 48.1 será greenfield, não extensão.
+
 ## [5.28.0] - 2026-07-22 — PRD47 S47.10: generalização, release gate e fechamento do programa
 
 Décimo-primeiro e ÚLTIMO sprint do PRD47 — fecha o programa (11 sprints, S47.0→S47.10,
