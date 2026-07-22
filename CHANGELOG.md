@@ -1,5 +1,27 @@
 # Changelog - gstack-vibehard
 
+## [5.31.0] - 2026-07-22 — PRD48 S48.2: onboarding brownfield seguro
+
+Terceiro sprint do PRD48 — adota projeto existente sem scaffold destrutivo nem comandos npm
+improvisados. Discovery 100% read-only.
+
+- **`src/onboarding/project-discovery.js`** (novo, `gstack.project-discovery.v1`):
+  `discoverProject` compõe `classifyWorkspace` (PRD28) + `resolvePackageManager` (PRD12) —
+  nenhum dos dois duplicado — e acrescenta linguagem (Node/Python/Go/Rust por arquivo-sinal),
+  monorepo (`workspaces`/`pnpm-workspace.yaml`/`lerna.json`), comandos dev/test/build por
+  nome conhecido de script, e fatos de git (branch/dirty) via `git` real read-only. NUNCA lê
+  `.env*` — prova direta com segredo real no fixture. Repo sem sinal nenhum recebe
+  `recognized:false`, nunca chute.
+- **`src/onboarding/brownfield-plan.js`** (novo): `proposeBrownfieldChoices` sempre oferece
+  as 3 opções do DoD (`plan_only|activate_with_backup|cancel`) — nunca decide sozinho.
+  `buildActivationPlan` deriva operações no formato Operation Plan do PRD45
+  (`kind/scope/description/reason`), escopo sempre `project`; projeto já ativado não gera
+  operação (idempotente); `dirtyTreePreserved:true` sempre, nunca descartada.
+  `decideBrownfieldOrNew` roteia `new` vs `brownfield` a partir do discovery.
+- **`src/commands/start.js`**: `--dry-run --json` ganhou `brownfield` (discovery + rota +
+  proposta) — aditivo, read-only, mesma disciplina do `harnessSession` (S48.1).
+- 12 testes novos + extensão do E2E existente. QG strict `blocking_severity_count:0`.
+
 ## [5.30.0] - 2026-07-22 — PRD48 S48.1: harness e modelo no primeiro uso
 
 Segundo sprint do PRD48 — escolhe executor real ANTES de reservar budget ou iniciar o

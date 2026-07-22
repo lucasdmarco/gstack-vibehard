@@ -14,6 +14,8 @@ import { registerDesignSystem, evaluatePreWriteGate, resolveDesignSystem } from 
 import { resolveLoopDecision, LOOP_MODES } from "../skills/loop-router.js"
 import { contractsForRoute } from "../skills/execution-contract.js"
 import { detectTargetProfiles, decideFirstRun } from "../onboarding/first-run.js"
+import { discoverProject } from "../onboarding/project-discovery.js"
+import { proposeBrownfieldChoices, decideBrownfieldOrNew } from "../onboarding/brownfield-plan.js"
 
 /**
  * `start` — entrada Replit-like (PRD18 Sprint 1). Orquestra o wizard (objetivo →
@@ -49,6 +51,13 @@ function harnessSessionReport() {
   return { profiles, decision: decideFirstRun({ profiles, requiresLlm: true }) }
 }
 
+// PRD48 S48.2 — brownfield: read-only, escolhe new|brownfield sem executar nada.
+function brownfieldReport(cwd) {
+  const discovery = discoverProject(cwd)
+  const route = decideBrownfieldOrNew(discovery)
+  return { discovery, route, ...(route === "brownfield" ? { proposal: proposeBrownfieldChoices(discovery) } : {}) }
+}
+
 /** Dry-run JSON puro: plano + comandos que SERIAM chamados. Nada é escrito. */
 function dryRunReport(flags, cwd) {
   const { plan, validation } = buildPlan({ objective: flags.objective, projectName: flags.projectName, mode: flags.mode })
@@ -64,6 +73,7 @@ function dryRunReport(flags, cwd) {
     pipeline: { stages: [...PIPELINE_STAGES], commands },
     designSystem: { status: ds.status, source: ds.source, wouldBlockUi: !["complete", "generated", "bypassed"].includes(ds.status) },
     harnessSession: harnessSessionReport(),
+    brownfield: brownfieldReport(cwd),
     warnings: validation.ok ? [] : validation.errors,
     note: "dry-run: nenhum comando executado, nada foi escrito",
     cwd,
