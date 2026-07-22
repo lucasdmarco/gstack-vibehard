@@ -51,3 +51,32 @@ export function packReference(pack) {
   const json = JSON.stringify(pack || {})
   return { schema: ADAPTIVE_PARALLEL_SCHEMA, ref: createHash("sha256").update(json).digest("hex").slice(0, 16), bytes: json.length, inlined: false }
 }
+
+/**
+ * Reserva ATÔMICA de budget de fan-out (PRD47 S47.8). NUNCA reserva duas vezes pro
+ * MESMO runId — dupla reserva estouraria a quota real sem detecção (contabilidade
+ * fantasma). `ledger` é PURO/imutável: o caller decide onde persistir.
+ */
+export function reserveFanoutBudget(ledger = {}, { runId, needed } = {}) {
+  if (Object.prototype.hasOwnProperty.call(ledger, runId)) {
+    return { ok: false, reason: "budget já reservado para este fan-out — nunca reserva duas vezes", ledger }
+  }
+  return { ok: true, ledger: { ...ledger, [runId]: needed } }
+}
+
+/** Libera a reserva de um fan-out concluído — permite reservar de novo pro mesmo runId. */
+export function releaseFanoutBudget(ledger = {}, runId) {
+  const { [runId]: _released, ...rest } = ledger
+  return rest
+}
+
+/** Só as branches que FALHARAM precisam re-rodar — `passed` NUNCA é obrigada a repetir (DoD). */
+export function branchesToRetry(branchResults = []) {
+  return branchResults.filter((b) => b.status === "failed").map((b) => b.branch)
+}
+
+/** Usuário SEMPRE pode forçar sequencial, mesmo quando a análise recomendaria paralelo. */
+export function applyUserChoice(plan, userChoice = null) {
+  if (userChoice !== "sequential") return plan
+  return { ...plan, mode: "sequential", reason: "usuário escolheu sequencial", userOverride: true }
+}

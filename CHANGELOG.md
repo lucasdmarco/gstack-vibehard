@@ -1,5 +1,24 @@
 # Changelog - gstack-vibehard
 
+## [5.27.0] - 2026-07-21 — PRD47 S47.8: paralelismo adaptativo dentro do Golden Path
+
+Décimo sprint do PRD47 — executado após o S47.9 (gate "Golden Path sequencial aprovado em
+E2E" satisfeito pelo vertical real). Fecha o que faltava em `adaptive-parallel.js` (PRD42
+S42.11, já real: `quotaSufficient`/`planParallelism`/`mergeBarrier`/`packReference`) sem
+duplicar nada.
+
+- **`src/project-plan/adaptive-parallel.js`**: `reserveFanoutBudget`/`releaseFanoutBudget` —
+  reserva ATÔMICA de budget de fan-out; NUNCA reserva duas vezes pro MESMO runId (dupla reserva
+  estouraria a quota real sem detecção). `branchesToRetry` — isola falha por branch: só quem
+  falhou precisa re-rodar, `passed` nunca é obrigada a repetir. `applyUserChoice` — usuário
+  sempre pode forçar `sequential`, mesmo com análise favorável a paralelo.
+- Escopo desta sprint: módulo de decisão puro e testado, mesma disciplina aditiva de
+  `golden-run.js` (S47.1)/`design-system.js` (S47.2) — NÃO forçado o wiring em `orchestrate.js`
+  (comando `--parallel` já maduro e testado) nesta passada, para não introduzir risco de
+  regressão num comando existente sem escopo dedicado; é o próximo ponto de integração natural.
+- 8 testes novos em `tests/adaptive_parallel.test.js` (15 total no arquivo), QG strict
+  `blocking_severity_count:0`.
+
 ## [5.26.0] - 2026-07-21 — PRD47 S47.9: Golden Workflow vertical `saas-auth-stripe`
 
 Nono sprint do PRD47 — executado ANTES do 47.8 por decisão explícita do usuário: o PRD47 §19
