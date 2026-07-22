@@ -1,5 +1,27 @@
 # Changelog - gstack-vibehard
 
+## [5.21.0] - 2026-07-21 — PRD47 S47.3: skill, agente e gate realmente executados
+
+Quarto sprint do PRD47 — transforma a rota declarativa num contrato observável, com Context
+Pack de fragmentos aprovados fail-closed. Reusa `route.js`/`gate-matrix.js`/`source-lock.js`
+integralmente — nenhuma detecção ou seleção duplicada.
+
+- **`src/project-plan/capability-plan.js`** (novo): `buildCapabilityPlan` envolve
+  `buildSkillRoute` (nunca duplica detecção de capacidade/seleção de skill) e acrescenta o que
+  faltava — razão por seleção, custo de contexto sempre `estimated`, e receipts de ciclo de
+  vida (`selected|loaded|applied|verified|failed`, máquina de estados fail-closed).
+  `criticalSkillIgnored` prova o DoD: skill crítica selecionada mas nunca `applied`/`verified`
+  bloqueia a fase.
+- **`src/skills/skill-context-pack.js`** (novo, `gstack.skill-context-pack.v1`): materializa
+  SÓ conteúdo `skill|rule_pack|reference_pack` já aprovado pelo Source Lock (PRD46) em
+  `.gstack/runs/<runId>/context/skills/` — nunca HOME global, nunca instala/copia/symlink em
+  config de harness. Fail-closed em 3 frentes: lock não aprovado (`discovered`/`quarantined`/
+  `stale`/`revoked`), hash divergente do lock, e path escape (reusa `resolveContainedCwd` do
+  PRD45 S45.2). Ciclo de vida `materialized→consumed→expired→purged`; purga remove só o
+  arquivo do próprio run.
+- 18 testes novos, QG strict 0 de primeira, `agents:check` sem drift, suíte JS 1429/1430 (1
+  skip pré-existente), `verify --profile full` → `ready:true`.
+
 ## [5.20.0] - 2026-07-21 — PRD47 S47.2: Product Brief v2 e Design Direction guiada
 
 Terceiro sprint do PRD47 — elimina ambiguidade de estilo relevante antes da escrita, sem
