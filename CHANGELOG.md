@@ -1,5 +1,41 @@
 # Changelog - gstack-vibehard
 
+## [5.36.0] - 2026-07-22 — PRD48 S48.7: terminal E2E, usabilidade e fechamento do programa
+
+Oitavo e ÚLTIMO sprint do PRD48 — fecha o programa (8 sprints, S48.0→S48.7, v5.29.0→v5.36.0).
+Escopo calibrado com a mesma honestidade do S47.9/S47.10 do PRD47: prova por código real o
+que é código, declara sem enfeite o que exige seres humanos ou infraestrutura ausente.
+
+- **`tests/e2e/terminal-first/golden-scenarios.e2e.test.js`** (novo, 8 testes): exercita
+  REAL (nunca mockado) 8 dos 10 golden scenarios do sprint — detecção de harness nesta
+  máquina real (2 harnesses presentes de verdade, auth sempre `unknown`), `start --dry-run`
+  com `harnessSession`, ativação brownfield preservando dirty tree, falha→checkpoint→
+  restore com provenance→retomada, sessão interrompida retomada via Context Delta, policy
+  `ask`/`deny` explicando risco, quota `unknown` bloqueando fan-out automático, `--json`
+  IDÊNTICO entre PT-BR e inglês. Cenário 8 (OpenCode JSONC byte-for-byte) e cenário 10
+  (uninstall/restore do PRD45 íntegro) são cobertos por testes PRÉ-EXISTENTES (PRD15/PRD45)
+  que já rodam verdes em toda esta sessão — não duplicados.
+- **`src/dream/rc-checklist-prd48.js`** (novo, espelha `rc-checklist-prd47.js`): mapeia as
+  8 lacunas do PRD48 §3.2 (P1.1–P1.6, P2.1–P2.2) + baseline (P0.1) a sprint/versão/prova.
+  **Achado honesto do fechamento**: P1.1 (harness/modelo)/P1.4 (decisão de policy)/P2.1
+  (i18n) ficam `partial` — infraestrutura real construída e testada, mas o wiring
+  INTERATIVO dentro de `start.js` (prompt de escolha, approval no meio da execução,
+  retrofit total da CLI) foi deliberadamente deferido sprint a sprint pra não arriscar a
+  pipeline madura sem escopo dedicado. **P2.2 (ajuda contextual geral) fica `pending`** —
+  nenhum sprint endereçou isso além de mensagens localizadas; declarado sem proof forjado.
+  `prd48Readiness()` retorna `ready:true` (o único P0 — baseline do S48.0 — está
+  `delivered`; os P1 abertos ficam registrados como incremento honesto, não bloqueiam).
+- 13 testes novos (golden scenarios + RC checklist), QG strict `blocking_severity_count:0`.
+- **Deferido, declarado sem enfeite** (não fazível com integridade nesta sessão/máquina):
+  estudo de usabilidade com 5 iniciantes + 5 devs reais observados; matriz Windows/macOS/
+  Linux com 5 execuções frias por SO (só Windows disponível); `docs/guides/terminal-first.md`
+  PT-BR/EN e atualização de README (adiado até o wiring interativo ser fechado — não
+  publicar guia de uso de algo que ainda não está totalmente ligado); fixtures dedicadas de
+  fake harness Claude/Codex/OpenCode (a detecção real nesta máquina já prova o caminho).
+
+**PRD48 FECHADO: 8 sprints (S48.0→S48.7), v5.29.0→v5.36.0.** Ver `prd48Readiness()` para o
+resumo tipado (1 P0 delivered, 5 P1 delivered, 3 P1 partial/pending).
+
 ## [5.35.0] - 2026-07-22 — PRD48 S48.6: localização e ajuda contextual
 
 Sétimo sprint do PRD48 — CLI compreensível em PT-BR e inglês, sem duplicar contratos.
