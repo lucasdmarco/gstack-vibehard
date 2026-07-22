@@ -9,6 +9,7 @@ import { openStateStore } from "../state/store.js"
 import { listSessions, refStatus } from "../state/session-index.js"
 import { presentCheckpoints, diffCheckpoints, restoreWithProvenance } from "../skills/checkpoint-presenter.js"
 import { listCheckpoints } from "../skills/loop-checkpoint.js"
+import { buildSessionSummary } from "../usage/session-summary.js"
 
 /**
  * `task "<pedido>"` — Loop Engineer MVP. Gera (e persiste) um plano de feature/bugfix
@@ -77,11 +78,15 @@ function inspectCmd(cwd, sessionId, json) {
     return
   }
   const refs = { proofRef: refStatus(session.proofRef, existsSync), contextDeltaRef: refStatus(session.contextDeltaRef, existsSync) }
-  if (json) { process.stdout.write(JSON.stringify({ session, refs }) + "\n"); return }
+  // PRD48 S48.5 — budget/usage tipado: sessão hoje não rastreia tokens (fica "unknown",
+  // honesto), mas quota já reflete o que o caller informar — nunca fabricado.
+  const usage = buildSessionSummary({})
+  if (json) { process.stdout.write(JSON.stringify({ session, refs, usage }) + "\n"); return }
   section(`task inspect — ${sessionId}`)
   info(`  status: ${session.status}`)
   info(`  objetivo: ${session.objective || "(sem objetivo)"}`)
   info(`  proofRef: ${refs.proofRef}  contextDeltaRef: ${refs.contextDeltaRef}`)
+  info(`  usage: input=${usage.inputTokens.quality} output=${usage.outputTokens.quality} contextAvoided=${usage.contextAvoided.quality} quota=${usage.quota.quality}`)
 }
 
 const flagValue = (args, name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined }

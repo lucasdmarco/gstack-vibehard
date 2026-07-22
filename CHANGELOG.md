@@ -1,5 +1,28 @@
 # Changelog - gstack-vibehard
 
+## [5.34.0] - 2026-07-22 — PRD48 S48.5: contexto, quota e custo acionáveis
+
+Sexto sprint do PRD48 — mostra o que será gasto e por que a execução será sequencial ou
+paralela, sem inventar número nenhum.
+
+- **`src/usage/accounting.js`** (novo, `gstack.usage-accounting.v1`): `usageValue` — a
+  4ª qualidade `unknown` NUNCA carrega um número (value fica `null` sempre, mesmo se um
+  valor for passado por engano — nunca vira 0 nem ilimitado). `estimateTokenUsage` sempre
+  `estimated`; `providerReportedUsage` só `provider_reported` com valor REAL da API.
+- **`src/usage/session-summary.js`** (novo): `buildSessionSummary` monta o contrato exato
+  do PRD48 §7.5 (inputTokens/outputTokens/contextAvoided/quota/parallelRecommendation) —
+  reusa `quotaSufficient` (`adaptive-parallel.js`, PRD42 S42.11) pra quota e
+  `parallelRecommendation`, nunca duplica a regra "quota unknown nunca suficiente".
+- **`src/commands/task.js`**: `task inspect` agora mostra `usage` (budget/tokens tipados)
+  ao lado da sessão — hoje maioria `unknown` (honesto: sessão ainda não rastreia tokens),
+  mas o contrato já está pronto pra quando houver medição real.
+- Prova composta com `reserveFanoutBudget` (S47.8): risco de quota visível ANTES de
+  qualquer reserva; reserva dupla pro mesmo run continua impossível. Prova composta com
+  `context-delta.js` (S47.7) + `resumeBenchmark` (`handoff.js`, S42.10): benchmark de
+  retomada é determinístico/reproduzível e a economia SEMPRE fica rotulada `estimated`
+  — nunca "comprovada" sem A/B real (DoD: proof/README nunca publicam percentual sem isso).
+- 14 testes novos, QG strict `blocking_severity_count:0`.
+
 ## [5.33.0] - 2026-07-22 — PRD48 S48.4: approval e checkpoint como produto
 
 Quinto sprint do PRD48 — torna risco, diff e rollback compreensíveis sem enfraquecer a
