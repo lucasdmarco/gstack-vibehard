@@ -1,0 +1,97 @@
+{
+  "schemaVersion": "gstack.prd49-source-manifest.v1",
+  "purpose": "Provenance ledger dos 9 repos externos auditados pelo PRD49 (design/media/knowledge). Distinto de repository-registry.json: aquele e referencia metodologica pura (nunca vira dependencia runtime); este rastreia candidatos que PODEM virar codigo vendorizado governado (ex.: Impeccable, Obsidian Skills) ou adapter externo (ex.: Graphify, Claude Video, NotebookLM). Nenhuma entrada aqui e promovida a codigo sem commit+license+sha256 reais verificados nesta sessao (ver verifiedByThisSession).",
+  "usage": "Antes de copiar/adaptar codigo de qualquer um destes repos, confirme verifiedByThisSession:true e um mirror read-only real auditado. Ate isso acontecer, os campos commit/license vêm da auditoria documentada em .docs/PLANS/prd49.md (v1.2, 2026-07-21) — citados, não re-verificados por esta sessão.",
+  "sources": [
+    {
+      "repo": "https://github.com/pbakaus/impeccable",
+      "auditedCommit": "4d849eb75f216109ea7053ed21530a11fafcc786",
+      "license": "Apache-2.0",
+      "decision": "governed_vendor_core",
+      "sha256": null,
+      "verifiedByThisSession": false,
+      "sourceOfClaim": ".docs/PLANS/prd49.md#2.2",
+      "note": "Copiar apenas context/detector/rules/audit/feedback sob src/vendor/impeccable/ com NOTICE, mapa de modificacao e paridade Node 18 (Sprint 49.2A). Nunca o instalador, Live Mode ou config authority."
+    },
+    {
+      "repo": "https://github.com/Graphify-Labs/graphify",
+      "auditedCommit": "abff1b1ca4052fcf9d955c5f6a034088723f4536",
+      "license": "MIT",
+      "decision": "harden_adapter",
+      "sha256": null,
+      "verifiedByThisSession": false,
+      "sourceOfClaim": ".docs/PLANS/prd49.md#2.2",
+      "note": "PyPI graphifyy, executavel graphify, versao auditada 0.9.22. Adapter existente (fora deste vendor tree) — endurecer, nunca reinstalar via instalador global upstream."
+    },
+    {
+      "repo": "https://github.com/kepano/obsidian-skills",
+      "auditedCommit": "a1dc48e68138490d522c04cbf5822214c6eb1202",
+      "license": "MIT",
+      "decision": "selective_vendor",
+      "sha256": null,
+      "verifiedByThisSession": false,
+      "sourceOfClaim": ".docs/PLANS/prd49.md#2.2",
+      "note": "5 skills declarativas (obsidian-markdown/bases/json-canvas/obsidian-cli/defuddle). Vendorizar via pipeline PRD46, roteadas por intent (Sprint 49.6)."
+    },
+    {
+      "repo": "https://github.com/DietrichGebert/ponytail",
+      "auditedCommit": "16f29800fd2681bdf24f3eb4ccffe38be3baec6b",
+      "license": "MIT",
+      "decision": "adapt_principle_only",
+      "sha256": null,
+      "verifiedByThisSession": false,
+      "sourceOfClaim": ".docs/PLANS/prd49.md#2.2",
+      "note": "Nunca instalado. Só a escada de minimalidade (Sprint 49.5) — reimplementacao nativa GStack, sem always-on prompt injection por turno."
+    },
+    {
+      "repo": "https://github.com/oso95/scroll-world",
+      "auditedCommit": "2912048246d057cdfe134dfc0b4dfb7e6a12f30e",
+      "license": "MIT",
+      "decision": "distributed_capability",
+      "sha256": null,
+      "verifiedByThisSession": false,
+      "sourceOfClaim": ".docs/PLANS/prd49.md#2.2",
+      "note": "Regras/referencias distribuidas pelas capacidades existentes (Product/Design/UX/QA/FinOps) via PRD46 — nunca skill/catalogo separado, spend nunca bypassavel por --yes (Sprint 49.7)."
+    },
+    {
+      "repo": "https://github.com/vercel-labs/skills",
+      "auditedCommit": null,
+      "license": "MIT",
+      "decision": "adapt_architecture_only",
+      "sha256": null,
+      "verifiedByThisSession": false,
+      "sourceOfClaim": ".docs/PLANS/prd49.md#2.2",
+      "note": "Já referenciado em repository-registry.json (active_reference). PRD46 adapta apenas discovery/source-lock/hash/path-safety — sem instalar o CLI upstream, sem global symlink/telemetria."
+    },
+    {
+      "repo": "https://github.com/vercel-labs/agent-skills",
+      "auditedCommit": null,
+      "license": "MIT",
+      "decision": "governed_rule_packs",
+      "sha256": null,
+      "verifiedByThisSession": false,
+      "sourceOfClaim": ".docs/PLANS/prd49.md#2.2",
+      "note": "Já referenciado em repository-registry.json (active_reference). Auditar React/web/metrics-first como rule_pack|reference_pack via PRD46, dedupe contra Impeccable por rule ID — nunca novo skill publico (Sprint 49.2B)."
+    },
+    {
+      "repo": "https://github.com/bradautomates/claude-video",
+      "auditedCommit": "83da59fa78c3eee9e20f515fe75c438bb5166efd",
+      "license": "MIT",
+      "decision": "spike_then_optional",
+      "sha256": null,
+      "verifiedByThisSession": false,
+      "sourceOfClaim": ".docs/PLANS/prd49.md#2.2",
+      "note": "Adapter media-intake (Sprint 49.8) só promovido se superar Graphify/baseline em precisão de QA visual com timestamp, medido — nunca claim sem benchmark."
+    },
+    {
+      "repo": "https://github.com/teng-lin/notebooklm-py",
+      "auditedCommit": "45fd4258e608fbb9685496f26cfcea48810c44ee",
+      "license": "MIT",
+      "decision": "experimental_connector_only",
+      "sha256": null,
+      "verifiedByThisSession": false,
+      "sourceOfClaim": ".docs/PLANS/prd49.md#2.2",
+      "note": "Conector experimental cloud-disclosed (Sprint 49.9) — nunca memoria automatica, nunca gate de release, nunca claim local/gratis."
+    }
+  ]
+}
