@@ -1,5 +1,27 @@
 # Changelog - gstack-vibehard
 
+## [5.22.0] - 2026-07-21 — PRD47 S47.4: runtime, observação e autocorreção bounded
+
+Quinto sprint do PRD47 — faz o app rodar e ser observado automaticamente. Agregador fino
+reusando runtime supervisor/visual-gate/diagnose-loop/checkpoint por inteiro — nenhuma lógica
+de health/observação/diagnóstico/reparo duplicada.
+
+- **`src/project-plan/runtime-repair-cycle.js`** (novo, `gstack.runtime-repair-cycle.v1`):
+  `evaluateRepairCycle` compõe o fluxo `dev → health → observe → diagnose →
+  repair/checkpoint/handoff` numa decisão única. `servicesToRestart` só reinicia serviço com
+  `healthy:false` — o saudável nunca reinicia (DoD). App unreachable (health vazio ou
+  `reachable:false`) vira `handoff` direto, nunca é validado por omissão. UI alterada sem
+  observação (sem browser driver) reusa `evaluateVisualGate` real → `needs_browser`. Reparo
+  bounded delega a `diagnose-loop.js`/`decideNext` — budget esgotado nunca autocorrige além do
+  cap, vira `stop`/`needs_user`. `restoreLastGreen` é reexport direto de
+  `rollbackToLastGreen` (PRD41 S41.7) — não uma cópia.
+- 8 testes novos cobrindo os 4 pontos do DoD (unreachable nunca validado; needs_browser sem
+  driver; reparo nunca excede caps; serviço saudável nunca reinicia) + o caminho feliz
+  (checkpoint) e o caso de reparo dentro do budget (autocorrect).
+
+QG strict 0, `agents:check` sem drift, suíte JS 1437/1438 (1 skip pré-existente), `verify
+--profile full` → `ready:true`.
+
 ## [5.21.0] - 2026-07-21 — PRD47 S47.3: skill, agente e gate realmente executados
 
 Quarto sprint do PRD47 — transforma a rota declarativa num contrato observável, com Context
