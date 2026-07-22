@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "fs"
+import { mkdirSync, writeFileSync, existsSync } from "fs"
 import { join } from "path"
 import { runWizard } from "../project-plan/wizard.js"
 import { buildPlan } from "../project-plan/planner.js"
@@ -16,6 +16,8 @@ import { contractsForRoute } from "../skills/execution-contract.js"
 import { detectTargetProfiles, decideFirstRun } from "../onboarding/first-run.js"
 import { discoverProject } from "../onboarding/project-discovery.js"
 import { proposeBrownfieldChoices, decideBrownfieldOrNew } from "../onboarding/brownfield-plan.js"
+import { openStateStore } from "../state/store.js"
+import { listSessions, activeSession } from "../state/session-index.js"
 
 /**
  * `start` — entrada Replit-like (PRD18 Sprint 1). Orquestra o wizard (objetivo →
@@ -58,6 +60,20 @@ function brownfieldReport(cwd) {
   return { discovery, route, ...(route === "brownfield" ? { proposal: proposeBrownfieldChoices(discovery) } : {}) }
 }
 
+// PRD48 S48.3 — sessão ativa: read-only DE VERDADE — `openStateStore` cria `.gstack/` como
+// efeito colateral (mesmo só pra ler), o que violaria a garantia "dry-run não escreve nada"
+// (S48.0/S48.1/S48.2). Sem `.gstack/` ainda, não há sessão possível — nunca abre o store.
+function activeSessionReport(cwd) {
+  if (!existsSync(join(cwd, ".gstack"))) return { hasActive: false, session: null }
+  try {
+    const store = openStateStore(cwd)
+    const sessions = listSessions(store, { limit: 20 })
+    store.close()
+    const active = activeSession(sessions)
+    return { hasActive: active !== null, session: active }
+  } catch { return { hasActive: false, session: null } }
+}
+
 /** Dry-run JSON puro: plano + comandos que SERIAM chamados. Nada é escrito. */
 function dryRunReport(flags, cwd) {
   const { plan, validation } = buildPlan({ objective: flags.objective, projectName: flags.projectName, mode: flags.mode })
@@ -74,6 +90,7 @@ function dryRunReport(flags, cwd) {
     designSystem: { status: ds.status, source: ds.source, wouldBlockUi: !["complete", "generated", "bypassed"].includes(ds.status) },
     harnessSession: harnessSessionReport(),
     brownfield: brownfieldReport(cwd),
+    activeSession: activeSessionReport(cwd),
     warnings: validation.ok ? [] : validation.errors,
     note: "dry-run: nenhum comando executado, nada foi escrito",
     cwd,

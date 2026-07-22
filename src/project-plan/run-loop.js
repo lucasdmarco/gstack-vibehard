@@ -15,6 +15,8 @@ import { LoopEngine } from "../skills/loop-engine.js"
 import { readPlanJournal } from "./journal.js"
 import { detectGoldenPath } from "../dream/detector.js"
 import { finalizeGoldenRun } from "./golden-run.js"
+import { recordStateEvent } from "../state/store.js"
+import { sessionIdFor, statusForSession, buildSessionRecord } from "../state/session-index.js"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const CLI_ENTRY = join(__dirname, "..", "index.js")
@@ -353,6 +355,18 @@ function engineSnapshot(engine) {
   }
 }
 
+// PRD48 S48.3: índice unificado de sessão — refs bounded (nunca journal/transcript
+// inteiro), best-effort (produtor nunca quebra o run por causa do State Store).
+function recordSessionIndex(ctx, status) {
+  try {
+    recordStateEvent(ctx.cwd, "sessions", buildSessionRecord({
+      sessionId: sessionIdFor(ctx.runId), runId: ctx.runId, planId: ctx.plan.id,
+      objective: ctx.plan.objective || ctx.plan.id, status: statusForSession(status),
+      proofRef: join(ctx.runDir, "status.json"),
+    }))
+  } catch { /* session index best-effort */ }
+}
+
 /** Fecha o run: handoff.md quando aplicável + journal + status.json. */
 function finishPipeline(ctx, stages, status, failedStage) {
   let handoffPath
@@ -381,6 +395,7 @@ function finishPipeline(ctx, stages, status, failedStage) {
   // já grava neste run — wiring canônico, sem 2ª fonte de eventos nem transcript bruto.
   const detect = () => detectGoldenPath({ status, events: readPlanJournal(ctx.runDir), runId: ctx.runId })
   try { runCloseoutSync({ cwd: ctx.cwd, runId: ctx.runId, command: "start", status, proof: () => closeoutReadiness(stages), detect }) } catch { /* closeout best-effort */ }
+  recordSessionIndex(ctx, status)
   return { runId: ctx.runId, status, stages, attempts: ctx.attempts, execResult: ctx.execResult, engine, goldenRun, ...(handoffPath ? { handoffPath } : {}) }
 }
 

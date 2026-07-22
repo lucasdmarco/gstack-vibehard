@@ -1,5 +1,34 @@
 # Changelog - gstack-vibehard
 
+## [5.32.0] - 2026-07-22 — PRD48 S48.3: índice unificado de sessões e retomada
+
+Quarto sprint do PRD48 — responde num lugar só "o que rodou, onde parou, como retomo",
+sobre o State Store já real (PRD14 §4.4) que só tinha UM produtor (`workflow_runs`,
+`executor.js`) e NENHUM pra `sessions`.
+
+- **`src/state/session-index.js`** (novo, `gstack.session.v1`): `sessionIdFor` deriva um id
+  CANÔNICO determinístico do `runId` (sha256, mesmo run sempre produz o mesmo id).
+  `statusForSession` mapeia o status do run-loop pro enum de sessão — desconhecido NUNCA
+  vira `passed` por omissão (fail-closed → `blocked`). `activeSession` acha a sessão mais
+  recente NÃO terminal (candidata a retomada). `refStatus` marca ref quebrada como `stale`,
+  nunca sucesso silencioso.
+- **`src/project-plan/run-loop.js`**: `finishPipeline` agora grava um evento `sessions` real
+  (best-effort, refs bounded — `proofRef` aponta pro `status.json` do run, nunca copia
+  journal/transcript inteiro).
+- **`src/commands/task.js`**: `task history [--json]` / `task inspect <id> [--json]` novos —
+  mesma verdade operacional do State Store que `start` consulta.
+- **`src/commands/start.js`**: `--dry-run --json` ganhou `activeSession` — **achado real
+  corrigido antes do merge**: `openStateStore` cria `.gstack/` como efeito colateral mesmo
+  só pra LER, o que quebraria a garantia "dry-run não escreve nada" (S48.0/48.1/48.2); a
+  E2E que já afirma isso pegou o problema — corrigido checando `existsSync(.gstack)` antes
+  de abrir o store (sem `.gstack/`, não há sessão possível, `hasActive:false` honesto).
+- 15 testes novos + extensões de E2E. QG strict 0 (2 HIGH pré-existentes trazidos ao escopo
+  por tocar os arquivos — `finishPipeline` decomposto em `recordSessionIndex`;
+  `dispatchTaskSub` decomposto em tabela `SIMPLE_TASK_HANDLERS`/`WORKTREE_TASK_SUBS`).
+- **Escopo deferido**: `task cancel`/`task resume` (sessão, distinto do `task resume`
+  existente que é por-step do Evidence Ledger) tocam ownership de processo (PRD45) — fica
+  pra decisão futura dedicada, mesma cautela do wiring interativo em `start.js`.
+
 ## [5.31.0] - 2026-07-22 — PRD48 S48.2: onboarding brownfield seguro
 
 Terceiro sprint do PRD48 — adota projeto existente sem scaffold destrutivo nem comandos npm

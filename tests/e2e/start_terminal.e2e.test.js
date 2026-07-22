@@ -28,6 +28,9 @@ test("E2E start --dry-run --json: JSON puro e NADA é escrito no disco", () => {
     // PRD48 S48.2: brownfield discovery read-only anexado ao dry-run — tmp dir vazio -> "new".
     assert.equal(d.brownfield.route, "new")
     assert.equal(existsSync(path.join(cwd, ".gstack")), false, "discovery também não escreve nada")
+    // PRD48 S48.3: sessão ativa read-only anexada ao dry-run — sem sessão prévia -> hasActive:false.
+    assert.equal(d.activeSession.hasActive, false)
+    assert.equal(existsSync(path.join(cwd, ".gstack")), false, "consulta de sessão também não escreve nada")
   } finally { rmSync(cwd, { recursive: true, force: true }) }
 })
 
