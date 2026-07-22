@@ -4,6 +4,7 @@ import { execFileSync as defaultExec } from "child_process"
 import { checkSourceParity } from "../release/source-parity.js"
 import { contractFor } from "../dream/claim-contract.js"
 import { audit as defaultAudit } from "../dream/auditor.js"
+import { CORE_EVIDENCE_IDS } from "./golden-workflow-vertical.js"
 
 /**
  * publish-guard — check determinístico de checkpoint para publicar um pacote.
@@ -84,6 +85,7 @@ const listTags = (git) => (git("tag", "--list") || "").split("\n").map((t) => t.
 const dreamOf = (opts) => (opts.dream ? opts.dream() : safeAudit())
 const capsOf = (opts, cwd) => (opts.capabilityReport ? opts.capabilityReport() : readCapabilityReport(cwd))
 const qgOf = (opts, cwd) => (opts.readQgVersion ? opts.readQgVersion(cwd) : readQgVersion(cwd))
+const goldenWorkflowOf = (opts, cwd) => (opts.goldenWorkflow ? opts.goldenWorkflow() : readGoldenWorkflowReport(cwd))
 
 function buildChecks({ opts, cwd, exec, git, version, tags }) {
   return [
@@ -98,6 +100,9 @@ function buildChecks({ opts, cwd, exec, git, version, tags }) {
     // PRD45 S45.0 — não publicar prometendo o que não foi provado.
     checkDreamRequired(dreamOf(opts)),
     checkCapabilityE2E(capsOf(opts, cwd)),
+    // PRD47 S47.10 — Golden Workflow (vertical saas-auth-stripe, S47.9): as evidências CORE
+    // (offline, sem credencial de terceiro) precisam estar provadas antes de publicar.
+    checkGoldenWorkflow(goldenWorkflowOf(opts, cwd)),
     checkTagExists(version, tags),
     checkCiGreen(opts, exec, cwd, git),
   ]
@@ -116,6 +121,8 @@ const HARD = new Set([
   "package-version", "tree-clean", "version-bump", "changelog-entry", "qg-version", "release-source-parity",
   // PRD45 S45.0: publicar prometendo prova inexistente é o pior defeito possível — HARD.
   "dream-required", "capability-e2e",
+  // PRD47 S47.10: Golden Workflow real também é HARD — mas só nas evidências CORE.
+  "golden-workflow",
 ])
 
 const safeAudit = () => { try { return defaultAudit({ behavioral: true }) } catch { return null } }
@@ -170,6 +177,25 @@ function checkCapabilityE2E(report) {
 }
 function readCapabilityReport(cwd) {
   return readJson(join(cwd, ".gstack", "reports", "cleanmachine.json"))
+}
+
+/**
+ * PRD47 S47.10 — só as evidências CORE (offline, sem credencial de terceiro) do
+ * Golden Workflow (`golden-workflow-vertical.js`, S47.9) podem travar publish.
+ * Stripe/Supabase/painel-browser ficam `blocked`/`not_executed` em QUALQUER
+ * máquina sem credencial real e NUNCA são exigidos aqui (DoD linha 6 do S47.9).
+ */
+function checkGoldenWorkflow(report) {
+  const id = "golden-workflow"
+  if (!report || !Array.isArray(report.items)) {
+    return row(id, "not_applicable", "sem relatório do Golden Workflow — rode `npm run test:vertical`")
+  }
+  const notCore = CORE_EVIDENCE_IDS.filter((cid) => report.items.find((i) => i.id === cid)?.status !== "proved")
+  if (notCore.length) return row(id, "failed", `evidência(s) core não provada(s): ${notCore.join(", ")}`)
+  return row(id, "passed", `${CORE_EVIDENCE_IDS.length} evidência(s) core do Golden Workflow provadas`)
+}
+function readGoldenWorkflowReport(cwd) {
+  return readJson(join(cwd, ".gstack", "reports", "vertical.json"))
 }
 
 /**

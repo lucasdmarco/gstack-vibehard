@@ -1,5 +1,42 @@
 # Changelog - gstack-vibehard
 
+## [5.28.0] - 2026-07-22 — PRD47 S47.10: generalização, release gate e fechamento do programa
+
+Décimo-primeiro e ÚLTIMO sprint do PRD47 — fecha o programa (11 sprints, S47.0→S47.10,
+v5.18.0→v5.28.0). Escopo calibrado com honestidade sobre o que é genuinamente fazível nesta
+sessão/máquina vs o que fica declarado para um programa futuro — mesma disciplina do S47.9.
+
+- **`src/dream/rc-checklist-prd47.js`** (novo, espelha `rc-checklist-prd45.js`): mapeia os 4 P0
+  originais (S47.0) + 10 P1 de todo o programa a sprint/versão/prova. **Achado honesto do
+  fechamento**: os 4 P0 (preview gating, observe/diagnose no `start`, pending_verifier
+  resolvido, proof obrigatório) têm a LÓGICA DE DECISÃO real e testada (S47.1/S47.4/S47.5/
+  S47.6), mas o pipeline padrão `run-loop.js`/`start.js` nunca foi cortado pra usá-la como
+  autoridade — cada sprint escolheu deliberadamente o caminho aditivo pra não arriscar
+  regressão sem escopo dedicado. `prd47Readiness()` retorna `ready:false` — resultado HONESTO,
+  não um defeito. A generalização/cutover real do pipeline padrão fica para um programa futuro.
+- **`src/dream/harness-conformance-matrix.js`** (novo): projeta os vocabulários internos já
+  reais (`ADAPTER_MATRIX`, `buildHarnessRegistry()` do PRD46 S46.5) na taxonomia PÚBLICA de 5
+  valores (`native_enforced|adapter_enforced|instructional_advisory|unsupported|not_tested`).
+  Claim público só sai de `not_tested` com fixture real declarada — nunca presumido pelo
+  enforcement interno.
+- **`src/project-plan/publish-guard.js`** + **`src/project-plan/golden-workflow-vertical.js`**
+  (`CORE_EVIDENCE_IDS`, novo): publish guard agora exige as 7 evidências CORE (offline, sem
+  credencial de terceiro) do Golden Workflow (S47.9) antes de publicar — HARD, mas só nas
+  evidências que não dependem de Stripe/Supabase/browser (essas continuam legitimamente
+  `blocked`/`not_executed` em qualquer máquina). `scripts/vertical-saas-auth-stripe.mjs` agora
+  persiste o relatório em `.gstack/reports/vertical.json` (gitignored) pro publish-guard ler.
+- 21 testes novos (`tests/rc_checklist_prd47.test.js`, `tests/harness_conformance_matrix.test.js`,
+  `tests/publish_guard_prd47.test.js`), QG strict `blocking_severity_count:0`.
+- **Deferido, declarado sem enfeite** (não fazível com integridade nesta sessão/máquina):
+  profiles `minimal|standard|strict` como presets formais; fixtures reais em
+  OpenCode/Cursor/Codex (só Claude Code é medido nesta sessão); matriz Windows/macOS/Linux
+  (só Windows disponível); benchmark de tokens/bytes/tempo/repair-rate medido (handoff.js
+  já estima, nunca mede); docs PT-BR/EN sincronizadas com teste de link/versão; contagens de
+  skills/agentes/hooks reconciliadas entre catálogo/docs/build.
+
+**PRD47 FECHADO: 11 sprints (S47.0→S47.10), v5.18.0→v5.28.0.** Ver `prd47Readiness()` para o
+resumo tipado (4 P0 partial, 9 P1 delivered, 1 P1 partial).
+
 ## [5.27.0] - 2026-07-21 — PRD47 S47.8: paralelismo adaptativo dentro do Golden Path
 
 Décimo sprint do PRD47 — executado após o S47.9 (gate "Golden Path sequencial aprovado em

@@ -44,6 +44,17 @@ export const EVIDENCE_IDS = Object.freeze([
   "rollback_to_green", "no_global_writes",
 ])
 
+/**
+ * Subconjunto das 14 evidências que NÃO depende de credencial de terceiro
+ * (Stripe/Supabase) nem de painel no browser — só estas o publish guard (S47.10)
+ * pode exigir em qualquer máquina/CI; as demais são legitimamente `blocked`/
+ * `not_executed` sem credencial real e nunca deveriam travar publish por isso.
+ */
+export const CORE_EVIDENCE_IDS = Object.freeze([
+  "scaffold_deps_installed", "runtime_started", "repair_loop_proved",
+  "rollback_to_green", "verify_proof_acceptance", "resume_via_context_delta", "no_global_writes",
+])
+
 const VALID_STATUSES = new Set(["proved", "blocked", "not_executed"])
 
 /** UM item de evidência — id/status TIPADOS, sem meio-termo silencioso. */

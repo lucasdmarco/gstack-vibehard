@@ -199,6 +199,14 @@ try {
   const { buildVerticalReport } = await imp("src/project-plan/golden-workflow-vertical.js")
   const report = buildVerticalReport([...evidenceById.values()])
   console.log(`\n  relatório: overall=${report.overall} missing=${JSON.stringify(report.missing)} notProved=${JSON.stringify(report.notProved)}`)
+
+  // Persiste no PRÓPRIO repo (não no tmp) — publish-guard.js (S47.10) lê daqui pra
+  // exigir as evidências CORE do Golden Workflow antes de publicar.
+  const reportsDir = join(repoRoot, ".gstack", "reports")
+  const { mkdirSync } = await import("node:fs")
+  mkdirSync(reportsDir, { recursive: true })
+  writeFileSync(join(reportsDir, "vertical.json"), JSON.stringify({ ...report, ranAt: new Date().toISOString(), platform: process.platform }, null, 2) + "\n")
+  ok(`relatório persistido em .gstack/reports/vertical.json`)
 } catch (e) {
   bad(`erro fatal: ${e.message}`)
 } finally {
