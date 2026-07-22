@@ -1,5 +1,26 @@
 # Changelog - gstack-vibehard
 
+## [5.24.0] - 2026-07-21 — PRD47 S47.6: proof obrigatório e demonstração de aceite
+
+Sétimo sprint do PRD47 — termina com UMA resposta única e compreensível. Reusa
+`delivery-scorecard.js` (score nunca esconde P0, PRD42 S42.12) e `acceptance-demo.js`
+(visão leiga=técnica) por inteiro — nada duplicado.
+
+- **`src/project-plan/delivery-verdict.js`** (novo, `gstack.delivery-verdict.v1`):
+  `deriveDeliveryVerdict` decide `delivered|checkpoint_ready|blocked` — `delivered` só quando
+  TUDO está verde simultaneamente: nenhum P0 reprovado, preview saudável, readiness sem
+  contradição, proof pronto E intenção de entrega. Qualquer um faltando vira
+  `checkpoint_ready` (ciclo de dev); P0 reprovado vira `blocked` (nunca contornável).
+  `readinessContradicts` fecha o GAP-8 do S47.0 (doctor via PATH global × readiness via venv
+  local podiam discordar sobre a mesma ferramenta sem que ninguém soubesse) — agora é uma
+  checagem real que bloqueia `delivered`.
+- `verifyProgressPolicy`: nenhum intervalo entre eventos de progresso pode exceder a policy —
+  silêncio numa operação longa vira uma falha detectável, nunca passa despercebido.
+- 12 testes novos cobrindo os 4 pontos do DoD.
+
+QG strict 0 (1 função decomposta), `agents:check` sem drift, suíte JS 1461/1462 (1 skip
+pré-existente), `verify --profile full` → `ready:true`.
+
 ## [5.23.0] - 2026-07-21 — PRD47 S47.5: QA, review e aceites executáveis
 
 Sexto sprint do PRD47 — fecha a diferença entre infraestrutura verde e produto funcionando.
