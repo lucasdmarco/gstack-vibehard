@@ -31,6 +31,11 @@ test("E2E start --dry-run --json: JSON puro e NADA é escrito no disco", () => {
     // PRD48 S48.3: sessão ativa read-only anexada ao dry-run — sem sessão prévia -> hasActive:false.
     assert.equal(d.activeSession.hasActive, false)
     assert.equal(existsSync(path.join(cwd, ".gstack")), false, "consulta de sessão também não escreve nada")
+    // PRD49 S49.1: preview das projeções de design context (PRODUCT.md/DESIGN.md/
+    // .impeccable/design.json) anexado ao dry-run — read-only, mesma disciplina.
+    assert.match(d.designContext.sourceHash, /^sha256:/)
+    assert.deepEqual(d.designContext.files.sort(), ["DESIGN.md", "PRODUCT.md", ".impeccable/design.json"].sort())
+    assert.equal(existsSync(path.join(cwd, "PRODUCT.md")), false, "dry-run não escreve as projeções")
   } finally { rmSync(cwd, { recursive: true, force: true }) }
 })
 

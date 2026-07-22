@@ -18,6 +18,7 @@ import { discoverProject } from "../onboarding/project-discovery.js"
 import { proposeBrownfieldChoices, decideBrownfieldOrNew } from "../onboarding/brownfield-plan.js"
 import { openStateStore } from "../state/store.js"
 import { listSessions, activeSession } from "../state/session-index.js"
+import { buildProjections } from "../skills/design-context.js"
 
 /**
  * `start` — entrada Replit-like (PRD18 Sprint 1). Orquestra o wizard (objetivo →
@@ -82,12 +83,16 @@ function dryRunReport(flags, cwd) {
     .map((s) => ({ id: s.id, command: sanitizeCommand(s.command), cwd: s.cwd, required: s.required !== false }))
   // Status do design system SEM efeito colateral (dry-run não escreve: importLegacy=false).
   const ds = resolveDesignSystem({ root: cwd, bypass: flags.designSystem === "none" ? "none" : null, importLegacy: false })
+  // PRD49 S49.1 — preview das projeções (PRODUCT.md/DESIGN.md/.impeccable/design.json) que
+  // SERIAM geradas a partir do estado canônico — nunca escreve nada no dry-run.
+  const designContext = buildProjections({ ds })
   return {
     ok: validation.ok,
     dryRun: true,
     plan,
     pipeline: { stages: [...PIPELINE_STAGES], commands },
     designSystem: { status: ds.status, source: ds.source, wouldBlockUi: !["complete", "generated", "bypassed"].includes(ds.status) },
+    designContext: { sourceHash: designContext.sourceHash, files: Object.keys(designContext.files) },
     harnessSession: harnessSessionReport(),
     brownfield: brownfieldReport(cwd),
     activeSession: activeSessionReport(cwd),

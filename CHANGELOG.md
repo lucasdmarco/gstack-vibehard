@@ -1,5 +1,31 @@
 # Changelog - gstack-vibehard
 
+## [5.38.0] - 2026-07-22 — PRD49 S49.1: bridge canônico de contexto de design
+
+Segundo sprint do PRD49 — gera contexto compatível com Impeccable SEM criar uma segunda
+autoridade de design. GStack continua dono único de `.gstack/design-system.json` e do
+Product Brief v2 (PRD47 S47.2).
+
+- **`src/skills/design-context-schema.js`** (novo): `classifySurface` — `brand|product|
+  mixed`; sem sinal cai em `product` (default seguro, nunca `brand` por omissão).
+- **`src/skills/design-context.js`** (novo, `gstack.design-context.v1`): `buildProjections`
+  gera `PRODUCT.md`/`DESIGN.md`/`.impeccable/design.json` a partir do estado canônico —
+  mesma decisão sempre produz o mesmo `sourceHash` determinístico (permite detectar
+  drift). Artefato canônico ausente/malformado lança — nunca projeta estado corrompido.
+  Opt-out (`--design-system none`) nunca vira claim de qualidade validada no `DESIGN.md`
+  gerado. `projectionDriftStatus`/`detectHumanEdit`/`reconciliationPlan` — edição humana
+  em uma projeção NUNCA é sobrescrita silenciosamente, sempre vira plano de reconciliação
+  de 3 vias (canônico/disco/gerado agora).
+- **`src/commands/start.js`**: `--dry-run --json` ganhou `designContext` (sourceHash +
+  lista de arquivos que seriam gerados) — aditivo, read-only, mesma disciplina dos
+  sprints do PRD48.
+- **`docs/guides/design-context.md`** (novo): guia honesto — declara explicitamente que a
+  escrita real das projeções e o gate de drift no `start` ainda não estão ligados ao
+  pipeline principal nesta sprint.
+- 12 testes novos + extensão do E2E existente. QG strict `blocking_severity_count:0`
+  (1 HIGH corrigido: `buildProjections` CC7→decomposto em `isValidCanonicalDs`/
+  `briefField`/`sourceHashFor`).
+
 ## [5.37.0] - 2026-07-22 — PRD49 S49.0: baseline, registry, licenças e controles negativos
 
 Primeiro sprint do PRD49 (design/mídia/conhecimento governados — Impeccable, Graphify,
