@@ -7,6 +7,8 @@ import { readEvidence, evidenceSummary, latestByStep } from "../project-plan/evi
 import { error, info, success, warn, section } from "../cli/index.js"
 import { openStateStore } from "../state/store.js"
 import { listSessions, refStatus } from "../state/session-index.js"
+import { presentCheckpoints, diffCheckpoints, restoreWithProvenance } from "../skills/checkpoint-presenter.js"
+import { listCheckpoints } from "../skills/loop-checkpoint.js"
 
 /**
  * `task "<pedido>"` — Loop Engineer MVP. Gera (e persiste) um plano de feature/bugfix
@@ -82,15 +84,66 @@ function inspectCmd(cwd, sessionId, json) {
   info(`  proofRef: ${refs.proofRef}  contextDeltaRef: ${refs.contextDeltaRef}`)
 }
 
+const flagValue = (args, name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined }
+
+// `task checkpoints <runId> [--diff <a> <b>] [--json]` — PRD48 S48.4: wrapper de produto
+// sobre o motor real de checkpoint (loop-checkpoint.js, PRD41 S41.7).
+function checkpointDiff(cwd, runId, args) {
+  const diffIdx = args.indexOf("--diff")
+  if (diffIdx < 0) return null
+  const all = listCheckpoints({ root: cwd, runId })
+  const a = all.find((c) => c.seq === Number(args[diffIdx + 1]))
+  const b = all.find((c) => c.seq === Number(args[diffIdx + 2]))
+  return diffCheckpoints(a, b)
+}
+function emitCheckpointsJson(list, diff) {
+  process.stdout.write(JSON.stringify({ checkpoints: list, ...(diff ? { diff } : {}) }) + "\n")
+}
+const checkpointLine = (c) => `  • seq=${c.seq} ${c.green ? "[verde]" : ""} ${c.at} — ${c.note || ""} (${c.fileCount} arquivo(s))`
+function renderCheckpointsHuman(runId, list, diff) {
+  section(`task checkpoints — ${runId}`)
+  if (!list.length) { info("  (nenhum checkpoint ainda)"); return }
+  for (const c of list) info(checkpointLine(c))
+  if (diff) info(`  diff: ${diff.changed.join(", ") || "(nenhuma mudança)"}`)
+}
+function checkpointsCmd(cwd, runId, args, json) {
+  if (!runId) { error("Uso: task checkpoints <runId>"); return }
+  const list = presentCheckpoints({ root: cwd, runId })
+  const diff = checkpointDiff(cwd, runId, args)
+  if (json) return emitCheckpointsJson(list, diff)
+  renderCheckpointsHuman(runId, list, diff)
+}
+
+function emitConfirmationRequired(seq, runId, json) {
+  if (json) return process.stdout.write(JSON.stringify({ error: "confirmation_required", hint: "rode de novo com --yes pra confirmar" }) + "\n")
+  warn(`  restaurar pro checkpoint ${seq} do run ${runId}? rode de novo com --yes pra confirmar.`)
+}
+function emitRestoreResult(r, seq, json) {
+  if (json) return process.stdout.write(JSON.stringify(r) + "\n")
+  if (!r.ok) return error(`restore falhou: ${r.reason}`)
+  success(`  restaurado pro checkpoint ${seq} (${r.restored.length} arquivo(s); recibo ${r.provenanceReceipt})`)
+}
+// `task restore <runId> --checkpoint <n> [--yes]` — restore COM provenance (nunca apaga
+// audit trail); exige `--yes` explícito (nunca por decreto).
+function restoreCmd(cwd, runId, args, json) {
+  const seq = Number(flagValue(args, "--checkpoint"))
+  if (!runId || !Number.isInteger(seq)) { error("Uso: task restore <runId> --checkpoint <n>"); return }
+  if (!args.includes("--yes")) return emitConfirmationRequired(seq, runId, json)
+  emitRestoreResult(restoreWithProvenance({ root: cwd, runId, seq }), seq, json)
+}
+
 // Handlers simples (sem delegar ao worktree lifecycle) — tabela em vez de cadeia de `if`
 // (cc baixa). `task run` executa o loop; evidence/resume são do Evidence Ledger (PRD18);
-// history/inspect são o índice unificado de sessão (PRD48 S48.3).
+// history/inspect são o índice unificado de sessão (PRD48 S48.3); checkpoints/restore são
+// o checkpoint como produto (PRD48 S48.4).
 const SIMPLE_TASK_HANDLERS = Object.freeze({
   run: (args, cwd, positional, json, opts) => taskRunCommand(args, opts),
   evidence: (args, cwd, positional, json) => evidenceCmd(cwd, positional[1], json),
   resume: (args, cwd, positional, json) => resumeCmd(cwd, positional[1], json),
   history: (args, cwd, positional, json) => historyCmd(cwd, json),
   inspect: (args, cwd, positional, json) => inspectCmd(cwd, positional[1], json),
+  checkpoints: (args, cwd, positional, json) => checkpointsCmd(cwd, positional[1], args, json),
+  restore: (args, cwd, positional, json) => restoreCmd(cwd, positional[1], args, json),
 })
 // Inspeção/aceite delegado ao worktree lifecycle (PRD14 §4.3) — branches `task/*`.
 const WORKTREE_TASK_SUBS = Object.freeze({ status: "list", diff: "diff", accept: "accept", reject: "discard" })

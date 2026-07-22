@@ -1,5 +1,32 @@
 # Changelog - gstack-vibehard
 
+## [5.33.0] - 2026-07-22 — PRD48 S48.4: approval e checkpoint como produto
+
+Quinto sprint do PRD48 — torna risco, diff e rollback compreensíveis sem enfraquecer a
+Policy DSL. Nenhum motor novo — wrappers finos sobre o que já é real e maduro.
+
+- **`src/policy/decision-presenter.js`** (novo, `gstack.decision-presenter.v1`):
+  `presentDecision` traduz a decisão REAL de `evaluate()` (`policy/schema.js`) em
+  ação/alvo/risco/policy + escolhas — nunca decide sozinho. `deny` NUNCA oferece
+  `allow_once` entre as escolhas. `canPersistChoice`/`yesFlagBypassesGate`: categorias
+  sensíveis (`destructive|secret|network_sensitive|cloud_handoff|deploy|outside_project`)
+  nunca permitem "permitir sempre" persistido nem são ultrapassadas por `--yes` de lote.
+- **`src/skills/checkpoint-presenter.js`** (novo): `presentCheckpoints`/`diffCheckpoints`
+  wrappers finos sobre `loop-checkpoint.js` (PRD41 S41.7, sem duplicar tamper-detection).
+  `restoreWithProvenance` — restore real + recibo de provenance APPEND-ONLY
+  (`vfa/provenance.js`, PRD13 §10.3, hash-chain já real) do próprio ato de restaurar —
+  audit trail nunca é apagado, só cresce. Prova real: restore nunca toca arquivo FORA do
+  checkpoint, mesmo dirty; tamper aborta sem gravar recibo de sucesso falso.
+- **`src/commands/task.js`**: `task checkpoints <runId> [--diff <a> <b>] [--json]` /
+  `task restore <runId> --checkpoint <n> [--yes]` novos — `--yes` ausente sempre exige
+  confirmação explícita, nunca restaura por decreto.
+- 20 testes novos, QG strict 0 (1 CRITICAL + 1 HIGH pré-existentes trazidos ao escopo por
+  tocar `task.js` — `checkpointsCmd`/`restoreCmd` decompostos em emit/render helpers).
+- **Escopo deferido**: wiring interativo dos presenters dentro de `start.js`
+  (`confirmAndRunPipeline`) fica pra decisão futura — os módulos são reais/testados/prontos
+  pra consumo, mas inserir o prompt no meio da execução real é mudança mais arriscada que
+  as adições read-only feitas em `--dry-run` nos sprints anteriores.
+
 ## [5.32.0] - 2026-07-22 — PRD48 S48.3: índice unificado de sessões e retomada
 
 Quarto sprint do PRD48 — responde num lugar só "o que rodou, onde parou, como retomo",
