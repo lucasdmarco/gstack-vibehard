@@ -1,5 +1,38 @@
 # Changelog - gstack-vibehard
 
+## [5.30.0] - 2026-07-22 — PRD48 S48.1: harness e modelo no primeiro uso
+
+Segundo sprint do PRD48 — escolhe executor real ANTES de reservar budget ou iniciar o
+Golden Run. **Achado real**: `src/agents/detector.js` (citado pelo PRD como reutilizável)
+não existe, mas `src/harness/detector.js` (caminho divergente, mesmo padrão de desvio já
+visto na auditoria do PRD47) já implementa `detectHarnesses()`/`getHarness(id)` reais para
+15 harnesses — reusado diretamente, não duplicado.
+
+- **`src/onboarding/harness-probes.js`** (novo): `probeCommand` classifica um probe
+  `--version`-like em `detected|not_found|timeout|error` — timeout NUNCA vira "não
+  instalado" silenciosamente (DoD).
+- **`src/onboarding/harness-session-profile.js`** (novo, `gstack.harness-session-profile.v1`):
+  `buildHarnessSessionProfile` monta o contrato normalizado read-only. `auth`/`models`
+  SEMPRE ficam `unknown` nesta sprint (verificar login/modelos de harness de terceiro exigiria
+  ler config sensível ou disparar rede/OAuth — proibido sem consentimento explícito).
+  `aptHarnesses` filtra só installed+callable.
+- **`src/onboarding/first-run.js`** (novo): `decideFirstRun` — 0 aptos + tarefa exige LLM
+  → `blocked`; 0 aptos sem exigir LLM → `local_deterministic`; exatamente 1 → `auto_selected`;
+  mais de 1 → `ask_user` (NUNCA decide sozinho). `applyFirstRunChoice` só aceita harness
+  realmente apto. `buildLocalProfileUpdate` só prepara a preferência com `consent:true`
+  explícito — `--yes` de execução nunca basta pra persistir (reusa a camada JÁ REAL
+  `.gstack/config.local.json` de `policy/layers.js`, PRD15 §7.2 — sem duplicar mecanismo).
+- **`src/dream/harness-conformance-matrix.js`**: exporta `publicLevelFor` (antes privada) —
+  reusado pelo onboarding pra traduzir o enforcement AUDITADO do adapter (fato do código),
+  distinto do gate `testedHarnesses` usado pra claims públicos (S47.10).
+- **`src/commands/start.js`**: `--dry-run --json` agora inclui `harnessSession` (profiles +
+  decisão) — aditivo, read-only, dentro da própria garantia de "dry-run não escreve nada".
+  Wiring pleno na execução real do `start` (prompt interativo) fica pra decisão futura, pra
+  não arriscar regressão na pipeline madura numa única sprint.
+- 20 testes novos (`harness_session_profile`, `start_first_run`, `model_choice_conformance`)
+  + extensão do E2E existente de `start --dry-run`. QG strict 0 (1 HIGH corrigido:
+  `probeCommand` CC7→decomposto em `wasKilledOrTimedOut`/`wasNotFound`/`classifyProbeError`).
+
 ## [5.29.0] - 2026-07-22 — PRD48 S48.0: baseline pós-PRD47 e controles negativos
 
 Primeiro sprint do PRD48 (terminal-first) — garante que o programa parte do produto

@@ -25,7 +25,13 @@ const INTERNAL_TO_PUBLIC = Object.freeze({
   detection_only: "unsupported",
 })
 
-function publicLevelFor(adapter) {
+/**
+ * Traduz o enforcement INTERNO (fato auditado do adapter, PRD46 S46.5) pro nível público —
+ * SEM o gate de `testedHarnesses`. Uso: perguntar "este harness bloqueia de fato?" sobre um
+ * adapter concreto (ex.: onboarding do PRD48 S48.1). Para CLAIMS PÚBLICOS/docs, use
+ * `buildConformanceMatrix` (exige `testedHarnesses` — claim limitado ao medido).
+ */
+export function publicLevelFor(adapter) {
   if (!adapter || !adapter.enforcement) return "not_tested"
   return INTERNAL_TO_PUBLIC[adapter.enforcement] || "not_tested"
 }

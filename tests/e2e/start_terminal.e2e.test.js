@@ -21,6 +21,10 @@ test("E2E start --dry-run --json: JSON puro e NADA é escrito no disco", () => {
     assert.equal(d.dryRun, true)
     assert.ok(d.plan && d.plan.id)
     assert.equal(existsSync(path.join(cwd, ".gstack")), false, "dry-run não escreve .gstack")
+    // PRD48 S48.1: Harness Session Profile anexado ao dry-run — read-only, mesmo perfil
+    // pro iniciante (lista curta) e pro power user (JSON).
+    assert.equal(d.harnessSession.profiles.length, 3, "claude+codex+opencode")
+    assert.ok(["blocked", "local_deterministic", "auto_selected", "ask_user"].includes(d.harnessSession.decision.status))
   } finally { rmSync(cwd, { recursive: true, force: true }) }
 })
 

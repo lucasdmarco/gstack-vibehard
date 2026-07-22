@@ -13,6 +13,7 @@ import { buildSkillRoute, buildModelIntake, MODEL_INTAKE_SOURCES } from "../skil
 import { registerDesignSystem, evaluatePreWriteGate, resolveDesignSystem } from "../skills/design-system.js"
 import { resolveLoopDecision, LOOP_MODES } from "../skills/loop-router.js"
 import { contractsForRoute } from "../skills/execution-contract.js"
+import { detectTargetProfiles, decideFirstRun } from "../onboarding/first-run.js"
 
 /**
  * `start` — entrada Replit-like (PRD18 Sprint 1). Orquestra o wizard (objetivo →
@@ -40,6 +41,14 @@ function parseStartArgs(args) {
   return out
 }
 
+// PRD48 S48.1 — Harness Session Profile: read-only, nunca escreve, nunca dispara login.
+// Anexado ao dry-run (que já promete "nada é escrito") como visão honesta do que está
+// apto ANTES de reservar budget ou iniciar o Golden Run.
+function harnessSessionReport() {
+  const profiles = detectTargetProfiles()
+  return { profiles, decision: decideFirstRun({ profiles, requiresLlm: true }) }
+}
+
 /** Dry-run JSON puro: plano + comandos que SERIAM chamados. Nada é escrito. */
 function dryRunReport(flags, cwd) {
   const { plan, validation } = buildPlan({ objective: flags.objective, projectName: flags.projectName, mode: flags.mode })
@@ -54,6 +63,7 @@ function dryRunReport(flags, cwd) {
     plan,
     pipeline: { stages: [...PIPELINE_STAGES], commands },
     designSystem: { status: ds.status, source: ds.source, wouldBlockUi: !["complete", "generated", "bypassed"].includes(ds.status) },
+    harnessSession: harnessSessionReport(),
     warnings: validation.ok ? [] : validation.errors,
     note: "dry-run: nenhum comando executado, nada foi escrito",
     cwd,
