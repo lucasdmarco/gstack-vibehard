@@ -121,6 +121,9 @@ Capacidades reais (cada uma com guia próprio — o README não tenta explicar t
 - 🧩 MCP project-scoped runtime-injected — nunca `~/.mcp.json` nem config global sem opt-in
 - 🕶️ Redaction pré-render opt-in (`proxy`) — **não** é Zero-Trust universal
 - 🌐 Agent Reach opt-in com consentimento por canal
+- 🎨 Detector nativo de design (WCAG color-contrast, motor Impeccable vendorizado com proveniência) — `visual doctor/detect/explain/hooks`
+- 📓 Skills governadas de Obsidian (4 de 5 vendorizadas com hash real) roteadas por intent — vault nunca escapa, `.env*` nunca entra
+- 🎬 Router de media-intake (transcript-first, frame bounded) + Scroll World (orçamento de mídia nunca bypassável por `--yes`)
 
 **Honestidade de enforcement:** a maturidade real de cada capacidade está em
 [capacidades](docs/guides/capabilities.md) (fonte viva: `tools readiness --json`);
@@ -142,6 +145,10 @@ não vire estrago.
 | [Reset & uninstall](docs/guides/reset-uninstall.md) | desfazer de verdade |
 | [Matriz de harnesses](docs/guides/harness-matrix.md) | enforcement real vs instrucional |
 | [Política MCP](docs/MCP-CONNECTOR-POLICY.md) | quando um MCP vira default |
+| [Detector de design](docs/guides/design-detector.md) + [hooks por harness](docs/guides/design-hooks.md) | motor Impeccable vendorizado, escopo real (1 regra) |
+| [Skills governadas de Obsidian](docs/guides/obsidian-skills.md) | 4 de 5 vendorizadas, vault nunca escapa |
+| [Media-intake](docs/guides/media-intake.md) + [Scroll World](docs/guides/scroll-world.md) | transcript-first, orçamento nunca bypassável |
+| [Graphify query-first](docs/guides/graphify-query-first.md) + [minimality gate](docs/guides/minimality-gate.md) | subcomandos reais, gates declarados honestamente |
 | [Guia completo PT-BR](docs/pt-BR/README.md) · [English](docs/en/README.md) | referência detalhada |
 | [SECURITY](SECURITY.md) · [THREAT_MODEL](THREAT_MODEL.md) · [CONTRIBUTING](CONTRIBUTING.md) | governança |
 
