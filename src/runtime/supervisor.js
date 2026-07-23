@@ -188,10 +188,33 @@ function doKill(svc, exec, kill, platform) {
 const svcName = (svc) => svc && svc.name
 // Erro de kill → status TIPADO (P0.2). ESRCH = já sumiu; EPERM/EACCES = acesso negado;
 // resto = falha de sinal. NUNCA colapsa tudo em "already-gone" (que escondia o access_denied).
+// LEGADO: mantido por compat; a autoridade real agora é `classifyKillResult` (probe).
 function killErrorStatus(code) {
   if (code === "ESRCH") return "already_gone"
   if (code === "EPERM" || code === "EACCES") return "access_denied"
   return "signal_failed"
+}
+
+// PRD51 S51.1 (achado 4.1): o `taskkill` de PID morto NÃO lança com `code:"ESRCH"` —
+// lança com `code:undefined`, `status:128`, `stderr:"...não foi encontrado"`. Classificar
+// por `e.code` mandava isso para `signal_failed` e preservava o state para sempre.
+const isAccessDeniedError = (e) =>
+  Boolean(e) && (e.code === "EPERM" || e.code === "EACCES" || /acesso negado|access denied/i.test(String(e.stderr || "")))
+const isNotFoundError = (e) =>
+  Boolean(e) && (e.code === "ESRCH" || /não foi encontrad|not found|no such process/i.test(String(e.stderr || "")))
+
+/**
+ * Classifica o resultado de um kill pela PROBE DE LIVENESS real, não pelo exit
+ * code do taskkill. A probe é a autoridade: se o processo sumiu, acabou —
+ * custe o que o taskkill disser. `access_denied` só quando o processo continua
+ * vivo E o erro foi de permissão. `signal_failed` só com erro desconhecido E
+ * processo ainda vivo. `void isNotFoundError` mantém a intenção documentada.
+ */
+export function classifyKillResult({ error = null, aliveAfter } = {}) {
+  void isNotFoundError
+  if (aliveAfter === false) return error ? "already_gone" : "stopped"
+  if (isAccessDeniedError(error)) return "access_denied"
+  return error ? "signal_failed" : "still_alive"
 }
 // Decide o ownership ANTES de matar (P1.1). Sem getAgeSec, mantém o caminho legado (procede).
 function ownershipFor(svc, ctx) {
@@ -205,14 +228,15 @@ function skipRow(svc, own) {
   return { name: svc.name, status, pid: svc.pid }
 }
 function attemptKill(svc, ctx, own) {
-  try {
-    doKill(svc, ctx.exec, ctx.kill, ctx.platform)
-    // Idade ilegível-porém-auditada carimba o motivo no resultado (nunca silencioso).
-    const note = own.reason === "unverified_age" ? { note: "unverified_age" } : {}
-    return { name: svc.name, status: "stopped", pid: svc.pid, ...note }
-  } catch (e) {
-    return { name: svc.name, status: killErrorStatus(e && e.code), pid: svc.pid, detail: e.message }
-  }
+  // PRD51 S51.1: tenta o kill, depois PROBE de liveness — a probe decide o status,
+  // não o exit code do taskkill (que no Windows mente sobre PID morto).
+  let error = null
+  try { doKill(svc, ctx.exec, ctx.kill, ctx.platform) } catch (e) { error = e }
+  const aliveAfter = ctx.isAlive(svc.pid)
+  const status = classifyKillResult({ error, aliveAfter })
+  const note = own.reason === "unverified_age" ? { note: "unverified_age" } : {}
+  const detail = error ? { detail: error.message } : {}
+  return { name: svc.name, status, pid: svc.pid, ...note, ...detail }
 }
 // Encerra UM serviço. Idempotente. Não-verificável (fail-closed) e reusado são PULADOS.
 function stopService(svc, ctx) {
@@ -221,9 +245,12 @@ function stopService(svc, ctx) {
   return skipRow(svc, own) || attemptKill(svc, ctx, own)
 }
 export function stopAll(state, opts = {}) {
+  const kill = opts.kill || ((pid, sig) => process.kill(pid, sig))
   const ctx = {
     exec: opts.exec,
-    kill: opts.kill || ((pid, sig) => process.kill(pid, sig)),
+    kill,
+    // A probe de liveness (default: process.kill(pid,0)) é a autoridade do status.
+    isAlive: opts.isAlive || ((pid) => isAlive(pid, { kill })),
     getAgeSec: opts.getAgeSec,
     now: opts.now,
     platform: opts.platform || process.platform,
@@ -234,7 +261,9 @@ export function stopAll(state, opts = {}) {
 // PRD45 S45.1 (P0.2) — só é seguro apagar o state quando NADA ficou pendente: nem pid vivo,
 // nem acesso negado, nem sinal falho, nem pulado por não-verificação. Preservar o state é o
 // que torna o retry idempotente possível — apagar cedo era o bug que impedia a 2ª tentativa.
-const STOP_UNRESOLVED = new Set(["access_denied", "signal_failed", "skipped_unverified", "skipped_foreign"])
+// PRD51 S51.1: `still_alive` e `handle_not_released` são não-resolvidos — o
+// state nunca pode ser limpo enquanto um deles existir (senão o retry perde o pid).
+const STOP_UNRESOLVED = new Set(["access_denied", "signal_failed", "still_alive", "handle_not_released", "skipped_unverified", "skipped_foreign"])
 export function stopOutcome(results, stillAlive) {
   const unresolved = (results || []).filter((r) => STOP_UNRESOLVED.has(r.status))
   const clearable = unresolved.length === 0 && (stillAlive || []).length === 0
