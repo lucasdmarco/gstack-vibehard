@@ -1,5 +1,39 @@
 # Changelog - gstack-vibehard
 
+## [5.41.0] - 2026-07-22 — PRD49 S49.3: projeções de hook de design PROJECT-LOCAL
+
+Sprint pausada a pedido do usuário para revisão de design antes de codar (superfície
+central: hooks por harness). Investigação real do código revelou que o texto do PRD49
+subestimava o Claude ("reactive feedback, not preventive blocking") — `src/harness/
+events.js`/`src/agents/adapter-matrix.js` mostram que Claude é o único harness com
+`enforcement: "real_hooks"` e `file.write: "enforced"` de verdade — e que NENHUM harness
+tinha até agora um caminho de escrita PROJECT-LOCAL (Codex/Cursor/OpenCode só escrevem
+config GLOBAL em `~/.codex`/`~/.cursor`/`~/.config/opencode`). Escopo entregue: cada
+harness recebe exatamente o mecanismo que REALMENTE tem hoje, nada fabricado além disso.
+
+- **`src/harness/design-hooks.js`** (novo, `gstack.design-hook-projection.v1`): nunca
+  importa `homedir()` — todo caminho é relativo ao `projectRoot` passado. Quatro
+  projeções: `projectClaudeHook` (`.claude/settings.json` do projeto, hook `PostToolUse`
+  real, advisory), `projectAgentsMdBlock` (`AGENTS.md` do projeto — compartilhado por
+  Codex E OpenCode, nenhum dos dois tem hook project-local real), `projectCopilotInstructions`
+  (`.github/copilot-instructions.md`, instructional-only), `projectCursorRule`
+  (`.cursor/rules/gstack-design-detector.mdc`, regra declarativa `rules_only`).
+  `designHookStatus` é read-only (nunca escreve). Malformado aborta sem mutação (nunca
+  `--force` implícito); idempotente; preserva byte-a-byte tudo que não é do gstack.
+- **`src/commands/visual.js`**: `visual hooks install|status [--json]`, aditivo aos
+  subcomandos existentes.
+- `docs/guides/design-hooks.md` (novo): tabela por-harness com o mecanismo real de cada
+  um, garantias e limite honesto (sem sistema de waiver/exceção ainda; `verify` não roda
+  o detector fail-closed ainda — isso fica pro backlog do §49.3).
+- 27 testes novos (14 unit/CLI em `tests/design_hook_projection.test.js` incl. controle
+  negativo "nunca escreve fora do projectRoot", 1 E2E `design_hooks_clean_home.e2e.test.js`
+  provando que uma config global simulada do usuário fica byte-idêntica), QG strict
+  `blocking_severity_count:0` (1 CRITICAL introduzido por complexidade em `hooksCmd`
+  corrigido por decomposição em `hooksStatusCmd`/`hooksInstallCmd`).
+- **Backlog honesto**: sistema de waiver/exceção (escopo/motivo/ator/expiração) e
+  `verify` rodando o detector fail-closed no fechamento de fase — não implementados
+  nesta sprint, declarados em `docs/guides/design-hooks.md`.
+
 ## [5.40.0] - 2026-07-22 — PRD49 S49.2B: native design detector, audit e feedback compacto
 
 Conecta o único primitivo real vendorizado até agora (`shared/color.mjs`, S49.2A) a um
