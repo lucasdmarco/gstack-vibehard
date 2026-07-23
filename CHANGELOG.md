@@ -1,5 +1,50 @@
 # Changelog - gstack-vibehard
 
+## [5.40.0] - 2026-07-22 — PRD49 S49.2B: native design detector, audit e feedback compacto
+
+Conecta o único primitivo real vendorizado até agora (`shared/color.mjs`, S49.2A) a um
+finding nativo de design no formato GStack — sem criar um segundo CLI, hook engine, policy
+tree ou veredito final. Escopo honestamente recalibrado em relação ao plano original: o
+plano previa detector+rules+audit+feedback consumindo um motor vendorizado maior; como só
+`color.mjs` foi vendorizado em 49.2A, este sprint entrega SÓ a regra de contraste WCAG —
+as outras 7 categorias (typography/spacing/radius/responsive/motion/design-system/
+mechanical-antipatterns) ficam `not_yet_vendored` no registry, com motivo real citando
+`upstream-map.md`.
+
+- **`src/skills/design-rule-registry.js`** (novo, `gstack.design-rule-registry.v1`): 1
+  regra `active` (`impeccable-color-contrast-wcag`) + 7 regras `not_yet_vendored` com
+  motivo real (arquivo upstream + linhas).
+- **`src/skills/design-detector.js`** (novo, `gstack.design-detector.v1`):
+  `detectColorContrastFindings(elements)` — usa `parseRgb`/`contrastRatio` do vendor pra
+  computar findings de contraste WCAG AA (4.5:1 texto normal, 3:1 texto grande) contra uma
+  lista de elementos JÁ EXTRAÍDOS (sem scraping de DOM/URL ao vivo ainda — depende de
+  `browser/injected/index.mjs`, não vendorizado). Cor não-parseável vira `skipped` com
+  motivo, NUNCA um finding fabricado.
+- **`src/skills/design-feedback.js`** (novo, `gstack.design-feedback.v1`):
+  `renderCompactFeedback` — saída SEMPRE limitada (bounded output) e deduplicada por
+  regra+seletor.
+- **`src/commands/visual.js`**: 3 subcomandos novos — `visual doctor` (placar real de
+  regras ativas vs. backlog), `visual detect <elements.json>` (roda o detector), `visual
+  explain <rule-id>` (explica status/motivo de qualquer regra do registry).
+- **`src/commands/proof.js`**: novo check `designDetector` (advisory, fixture opt-in
+  `.gstack/design-elements.json`; ausente ⇒ `not_applicable`, nunca fabrica achado).
+  **Correção de path do plano**: o wiring real é em `commands/proof.js` (onde o Gate
+  Registry realmente é consumido via `resolveGateOutcomes`/`buildGateRegistry`), não em
+  `commands/verify.js` como o texto do PRD49 citava.
+- **`src/skills/gate-registry.js`**: novo gate `design-detector` (severity `advisory` —
+  nunca reprova o `proof`, mesmo padrão de `headroom-routing`/`tool-readiness`).
+- **`src/skills/gate-matrix.js`**: novo `design-detector-gate` (P2, `mode: advisory`,
+  fase `test-preview`) — vira P1/blocking quando mais regras forem portadas.
+- **`src/skills/delivery-scorecard.js`**: `designDetector` no placar como item não-P0
+  (nunca esconde nem gera um P0 falso).
+- `docs/guides/design-detector.md` (novo): guia honesto do escopo real (1 regra) e do
+  contrato de entrada de `detect` (JSON estruturado, não URL/DOM ao vivo).
+- 26 testes novos (12 em `design_detector.test.js` incl. CLI, 5 em
+  `design_feedback_budget.test.js`, 3 fixtures em `tests/fixtures/impeccable/`, + 3 novos
+  em `proof_release.test.js` para o wiring advisory), QG strict
+  `blocking_severity_count:0`, zero regressão nos testes existentes de
+  gate-matrix/gate-registry/gate-truth/delivery-scorecard/command-lint.
+
 ## [5.39.0] - 2026-07-22 — PRD49 S49.2A: governed Impeccable core snapshot (1º recorte real)
 
 Terceiro sprint do PRD49 — **primeira vez que este projeto copia código REAL de terceiro**

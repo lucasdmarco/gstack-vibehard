@@ -1,0 +1,6 @@
+{
+  "elements": [
+    { "selector": ".hero-subtitle", "color": "#777777", "backgroundColor": "#666666", "fontSize": 16, "fontWeight": 400 },
+    { "selector": ".themed-label", "color": "var(--brand-fg)", "backgroundColor": "#ffffff", "fontSize": 14, "fontWeight": 400 }
+  ]
+}

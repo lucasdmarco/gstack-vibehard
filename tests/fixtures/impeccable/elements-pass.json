@@ -1,0 +1,6 @@
+{
+  "elements": [
+    { "selector": ".body-text", "color": "#000000", "backgroundColor": "#ffffff", "fontSize": 16, "fontWeight": 400 },
+    { "selector": ".hero-headline", "color": "#ffffff", "backgroundColor": "#1a1a2e", "fontSize": 32, "fontWeight": 700 }
+  ]
+}

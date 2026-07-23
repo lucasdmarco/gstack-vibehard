@@ -76,6 +76,18 @@ export const SKILL_GATES = Object.freeze([
     provedBy: { test: "tests/visual_gate.test.js", name: "evaluateVisualGate: sem driver de navegador → needs_browser (BLOQUEIA, nunca finge verde)" },
   },
   {
+    id: "design-detector-gate", phase: "test-preview", severity: "P2", mode: "advisory",
+    skills: ["dev-preview", "testing"],
+    appliesWhen: { uiChanged: true },
+    preconditions: [],
+    requiredQuestions: [],
+    requiredEvidence: [],
+    verifier: "design-detector (WCAG color-contrast, 1 regra vendorizada — proof.js checks.designDetector)",
+    fallback: "warn_and_log",
+    implementedBy: "src/skills/design-detector.js detectColorContrastFindings (PRD49 S49.2B)",
+    note: "advisory nesta sprint — só a regra de color-contrast foi vendorizada (S49.2A); vira P1/blocking quando mais regras do motor Impeccable forem portadas.",
+  },
+  {
     id: "secret-deny-gate", phase: "security", severity: "P0", mode: "blocking",
     skills: ["environment-secrets", "security_scan"],
     appliesWhen: { touchesSecrets: true },

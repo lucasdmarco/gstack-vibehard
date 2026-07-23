@@ -1,0 +1,5 @@
+{
+  "elements": [
+    { "selector": ".hero-subtitle", "color": "#777777", "backgroundColor": "#666666", "fontSize": 16, "fontWeight": 400 }
+  ]
+}

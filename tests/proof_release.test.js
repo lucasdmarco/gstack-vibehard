@@ -143,3 +143,34 @@ test("dream audit: scope declara alvo (gstack_package vs directory) — CM-08", 
   const elsewhere = audit({ root: path.join(repoRoot, "tests") })
   assert.equal(elsewhere.scope.target, "directory", "diretório sem o pacote é 'directory'")
 })
+
+// PRD49 S49.2B — design-detector: advisory, NUNCA bloqueia (só 1 regra vendorizada).
+test("proof: sem fixture .gstack/design-elements.json -> designDetector not_applicable, nunca fabrica achado", async () => {
+  const { buildProof } = await imp("src/commands/proof.js")
+  const deps = greenDeps()
+  const p = buildProof({ cwd: "/x", deps })
+  assert.equal(p.checks.designDetector.ok, true)
+  assert.equal(p.checks.designDetector.state, "not_applicable")
+  assert.equal(p.ready, true, "ausência de fixture nunca bloqueia release")
+})
+
+test("proof: elementos injetados com contraste ruim -> designDetector.warning presente, MAS ready continua true (advisory)", async () => {
+  const { buildProof } = await imp("src/commands/proof.js")
+  const deps = greenDeps()
+  deps.designElements = () => [{ selector: ".x", color: "#777777", backgroundColor: "#666666", fontSize: 16, fontWeight: 400 }]
+  const p = buildProof({ cwd: "/x", deps })
+  assert.equal(p.checks.designDetector.state, "ran")
+  assert.equal(p.checks.designDetector.findingsCount, 1)
+  assert.match(p.warnings.join(" | "), /design-detector: 1 achado/)
+  assert.equal(p.ready, true, "achado de contraste é advisory — não pode bloquear release ainda")
+  assert.deepEqual(p.blockers, [], "design-detector nunca aparece em blockers (severity advisory no gate registry)")
+})
+
+test("proof: elementos sem findings -> designDetector.warning null, ready inalterado", async () => {
+  const { buildProof } = await imp("src/commands/proof.js")
+  const deps = greenDeps()
+  deps.designElements = () => [{ selector: ".x", color: "#000000", backgroundColor: "#ffffff", fontSize: 16, fontWeight: 400 }]
+  const p = buildProof({ cwd: "/x", deps })
+  assert.equal(p.checks.designDetector.findingsCount, 0)
+  assert.ok(!p.warnings.some((w) => w.startsWith("design-detector")))
+})
