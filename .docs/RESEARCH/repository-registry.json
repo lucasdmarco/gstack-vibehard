@@ -3,6 +3,7 @@
   "purpose": "Fonte unica versionada dos repositorios de referencia comparados pelo GStack. Consultar ANTES de qualquer comparacao com projetos externos. Referencia metodologica NUNCA vira dependencia runtime do GStack.",
   "usage": "Antes de comparar o GStack com um repo externo, leia este arquivo. Se o tema envolver metodologia, skills, onboarding, marketplace, cross-harness ou AI-driven dev, o batch-6-aidd-methodology e obrigatorio na comparacao. Documentos de comparacao devem usar .docs/RESEARCH/comparison-template.md e citar este registry.",
   "vendorGovernanceNote": "Candidatos de vendoring governado (codigo que PODE virar dependencia runtime, ex.: Impeccable, Obsidian Skills) NAO entram aqui -- ver .docs/RESEARCH/prd49-source-manifest.json (PRD49 S49.0). Este arquivo e exclusivamente para referencia metodologica pura.",
+  "epistemicSourcesNote": "As 8 fontes primarias do PRD50 (DeepMind/Aletheia/Gemini API) sao referencia metodologica pura e estao catalogadas em .docs/RESEARCH/prd50-source-manifest.json (PRD50 S50.0), com maturidade por fonte (preprint != consenso) e verifiedByThisSession:false ate o Sprint 50.2 produzir snapshot real. NENHUMA delas vira dependencia runtime, adapter de Gemini ou autoridade de verdade.",
   "statusLegend": {
     "active_reference": "Referencia viva; consultar para comparacoes e decisoes de metodologia/onboarding.",
     "archived_reference": "Referencia historica; ler apenas como contexto de origem, nao como fonte atual."
@@ -81,6 +82,13 @@
       "role": "skill_marketplace_reference",
       "addedOn": "2026-07-21",
       "note": "Citado pela skill find-skills como fonte popular do ecossistema (skills.sh leaderboard). Referencia de catalogo/instalacao; NUNCA instalado automaticamente nem vira dependencia runtime do GStack — find-skills exige consentimento e auditoria de fonte/licenca/hash antes de recomendar instalacao, e nunca instala global com -y por default."
+    },
+    {
+      "url": "https://github.com/google-deepmind/superhuman/tree/main/aletheia",
+      "status": "active_reference",
+      "role": "epistemic_protocol_reference",
+      "addedOn": "2026-07-23",
+      "note": "PRD50 S50.0: origem metodologica do protocolo gerador/verificador/revisao/reinicio. O repo publica PROMPTS E OUTPUTS, nao a implementacao do agente — o GStack mapeia a metodologia ao Loop Engine que JA existe (src/workflow-graph/runner.js), nunca cria um segundo motor, e NUNCA declara replica do Aletheia (PRD50 §17.2). Nunca vendorizado, nunca dependencia runtime. As outras 7 fontes do PRD50 (blogs/preprints/docs Gemini) estao em .docs/RESEARCH/prd50-source-manifest.json com maturidade por fonte."
     }
   ]
 }

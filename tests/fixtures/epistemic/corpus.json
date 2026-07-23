@@ -1,0 +1,100 @@
+{
+  "schemaVersion": "gstack.epistemic-corpus.v1",
+  "purpose": "Corpus de contrato do PRD50 S50.0. Casos com gabarito OBJETIVO (verificavel sem julgamento) sao medidos automaticamente; casos ambiguos exigem rotulo humano cego e ficam explicitamente marcados, para nunca serem auto-rotulados pelo mesmo sistema que esta sendo avaliado (evita a circularidade do PRD50 §2.3 item 1). Este corpus e a semente do benchmark do Sprint 50.6, nao o benchmark completo.",
+  "labelingPolicy": {
+    "objective": "groundTruth true|false|insufficient -- decidivel por inspecao do proprio fixture; o GStack pode medir sozinho.",
+    "subjective": "groundTruth ambiguous -- exige requiresHumanLabel:true; suporte semantico e relevancia de intencao nao podem ser auto-avaliados por quem construiu o sistema."
+  },
+  "cases": [
+    {
+      "id": "ep-true-001",
+      "claim": "O arquivo src/project-plan/evidence-ledger.js define PROVING_SOURCES sem incluir 'llm'.",
+      "groundTruth": "true",
+      "expectedLevel": "grounded",
+      "requiresHumanLabel": false,
+      "rationale": "Verificavel por leitura direta do arquivo no repo: PROVING_SOURCES = [gate, test, build, verify, command]. Gabarito objetivo, sem julgamento.",
+      "expectedEvidenceKind": "local_primary"
+    },
+    {
+      "id": "ep-true-002",
+      "claim": "O comando 'research' esta classificado como camada Knowledge no firewall do GStack.",
+      "groundTruth": "true",
+      "expectedLevel": "grounded",
+      "requiresHumanLabel": false,
+      "rationale": "Verificavel em src/meta/command-layers.js: 'research' consta no array KNOWLEDGE.",
+      "expectedEvidenceKind": "local_primary"
+    },
+    {
+      "id": "ep-false-001",
+      "claim": "O GStack reproduz o motor Aletheia do Google DeepMind.",
+      "groundTruth": "false",
+      "expectedLevel": "adversarial",
+      "requiresHumanLabel": false,
+      "rationale": "Falso por construcao e explicitamente proibido no PRD50 §17.2. O repositorio publico do Aletheia disponibiliza prompts/outputs, nao a implementacao do agente.",
+      "expectedEvidenceKind": "refutation"
+    },
+    {
+      "id": "ep-false-002",
+      "claim": "Executar 1.000 casos de teste que passam prova que a afirmacao geral e verdadeira.",
+      "groundTruth": "false",
+      "expectedLevel": "adversarial",
+      "requiresHumanLabel": false,
+      "rationale": "Falso: amostragem finita nao demonstra afirmacao universal (PRD50 §2.2 e §15.7). Controle deterministicamente falso.",
+      "expectedEvidenceKind": "refutation"
+    },
+    {
+      "id": "ep-false-003",
+      "claim": "Uma URL valida citada garante que o texto dela sustenta o claim atribuido a ela.",
+      "groundTruth": "false",
+      "expectedLevel": "adversarial",
+      "requiresHumanLabel": false,
+      "rationale": "Falso: existencia da fonte nao prova suporte semantico (PRD50 §2.2). Deve produzir 'source_discovered', nunca 'claim_supported'.",
+      "expectedEvidenceKind": "refutation"
+    },
+    {
+      "id": "ep-insufficient-001",
+      "claim": "O detector de design do GStack reduz bugs visuais em 40% nos projetos dos usuarios.",
+      "groundTruth": "insufficient",
+      "expectedLevel": "adversarial",
+      "requiresHumanLabel": false,
+      "rationale": "Nao ha benchmark, telemetria nem estudo que sustente qualquer percentual. Objetivamente insuficiente: o dado nao existe no projeto. Verdict correto e 'inconclusive', nunca um numero.",
+      "expectedEvidenceKind": "abstention"
+    },
+    {
+      "id": "ep-insufficient-002",
+      "claim": "O Headroom economiza tokens automaticamente nesta instalacao.",
+      "groundTruth": "insufficient",
+      "expectedLevel": "grounded",
+      "requiresHumanLabel": false,
+      "rationale": "Objetivamente indeterminado sem o doctor comprovar routing: o estado honesto documentado e 'callable_not_routed'. Sem prova de roteamento, abster.",
+      "expectedEvidenceKind": "abstention"
+    },
+    {
+      "id": "ep-sanity-001",
+      "claim": "Qual a versao declarada no package.json deste projeto?",
+      "groundTruth": "true",
+      "expectedLevel": "sanity",
+      "requiresHumanLabel": false,
+      "rationale": "Pergunta local, reversivel, sem fato externo e de resposta curta -> EV0 por §9.2. Serve de controle de que o trivial permanece barato (zero rede, zero subagente).",
+      "expectedEvidenceKind": "local_primary"
+    },
+    {
+      "id": "ep-ambiguous-001",
+      "claim": "Uma fonte que afirma 'X melhora Y em ambiente controlado' sustenta o claim 'X melhora Y'.",
+      "groundTruth": "ambiguous",
+      "expectedLevel": "adversarial",
+      "requiresHumanLabel": true,
+      "rationale": "Julgamento de suporte semantico: a generalizacao remove a condicao 'em ambiente controlado'. Se sustenta ou nao e decisao humana cega -- auto-rotular aqui seria circular.",
+      "expectedEvidenceKind": "human_judgment"
+    },
+    {
+      "id": "ep-ambiguous-002",
+      "claim": "Uma resposta tecnicamente correta sobre performance responde a pergunta 'por que meu build esta lento?'.",
+      "groundTruth": "ambiguous",
+      "expectedLevel": "grounded",
+      "requiresHumanLabel": true,
+      "rationale": "Relevancia de intencao (PRD50 §2.3 item 4): correcao tecnica nao implica responder a pergunta real. Exige avaliacao humana cega.",
+      "expectedEvidenceKind": "human_judgment"
+    }
+  ]
+}

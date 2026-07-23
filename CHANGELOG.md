@@ -1,5 +1,56 @@
 # Changelog - gstack-vibehard
 
+## [5.49.0] - 2026-07-23 — PRD50 S50.0: baseline epistêmico, fontes e controles negativos
+
+Início do PRD50 (Protocolo de Verificação Epistêmica Proporcional). Esta sprint congela
+**contratos**, não constrói motor: nada está ligado ao fluxo real, e nenhum claim de
+"resposta verificada" está autorizado (PRD50 §8 — só depois do Sprint 50.7).
+
+**Auditoria prévia do PRD (feita antes de codar, 3 achados materiais):**
+
+1. O PRD cita baseline **v5.13.0**; estamos em v5.48.0. Os 7 arquivos que ele declara
+   reusáveis **todos existem e conferem** (`workflow-graph/runner.js` tem mesmo
+   planner→rubric→worker→verifier→retry/handoff; `evidence-ledger.js` mesmo rebaixa LLM
+   a `advisory`; `research` é mesmo camada Knowledge). A premissa central "reusar, não
+   criar segundo motor" é tecnicamente correta. Mas `research.js` ganhou o subcomando
+   `notebooklm` no S49.9, que o PRD não conhece — o dispatcher precisa de 3 branches.
+2. **Gate "EV0 overhead ≤ 8%" é inmensurável como escrito**: no Claude Code o adapter é
+   texto injetado (`adapter-matrix.js:11`) e o GStack nunca vê a resposta. Será
+   re-escopado para "medido dentro dos comandos do GStack" (`research validate`,
+   `consult`), declarando o resto como instrucional — mesma honestidade de
+   `execution-contract.js:29`.
+3. **Wiring antecipado por decisão do usuário**: o passo "ligar o protocolo num comando
+   real" estava no Sprint 50.5 (penúltimo) — exatamente onde PRD47/48/49 deferiram 3
+   vezes seguidas. `consult.js` vira o 1º consumidor EV1 já no Sprint 50.1.
+
+**Entregue:**
+
+- **`src/epistemic/invariants.js`** (novo, `gstack.epistemic-invariants.v1`): 9
+  invariantes puros — `canClaimVerified` (nunca alegar verificação não executada),
+  `citationSupportsClaim`/`classifySourceOutcome` (fonte que só menciona nunca sustenta;
+  fonte alcançável sem suporte é `source_discovered`), `detectMisattribution`,
+  `canTreatAsConsensus` (preprint nunca é consenso), `testEvidenceStatus` (teste não
+  executado nunca é prova), `violatesLevelBudget` (EV0 = zero rede/subagente/model call),
+  `externalContentTrust` (**reusa `agents/scanner.js`**, não duplica detecção),
+  `epistemicVerdictToEvidenceStatus`.
+- **`tests/prd50_negative_controls.test.js`**: 11 testes. **Achado real**: o invariante
+  de ouro (`supported` nunca vira `proved`) **já existia** — `evidence-ledger.js:36`
+  coage por fonte desde o PRD41. O controle 9 virou uma guarda de regressão contra o
+  ledger REAL (via `resolveStatus`, função pura), com controle inverso provando que
+  `source:"test"` continua provando.
+- **`tests/fixtures/epistemic/corpus.json`**: 10 casos com gabarito. Separação explícita
+  entre **objetivo** (o GStack mede sozinho) e **ambíguo** (`requiresHumanLabel:true` —
+  suporte semântico e relevância de intenção nunca são auto-rotulados por quem construiu
+  o sistema, evitando a circularidade do §2.3 item 1). Testado nos dois sentidos.
+- **`.docs/RESEARCH/prd50-source-manifest.json`**: as 8 fontes primárias com maturidade
+  por fonte (`preprint`/`blog`/`vendor_docs` — nenhuma é consenso) e
+  `verifiedByThisSession: false` em todas: **registrar ≠ verificar**, nenhuma URL foi
+  buscada nesta sprint (snapshot real é o 50.2). Pointer + entrada `active_reference` no
+  `repository-registry.json`.
+- `docs/guides/epistemic-protocol.md`: contratos + **tabela de ownership** por arquivo em
+  conflito com PRD46–49 (quem chegou primeiro mantém o contrato; o PVEP só adiciona).
+- QG strict `blocking_severity_count:0`; zero regressão nos 15 testes do registry.
+
 ## [5.48.0] - 2026-07-23 — PRD49 S49.10: fechamento do programa (RC checklist, README, cross-capability)
 
 **PRD49 FECHADO** (S49.0→S49.10, v5.37.0→v5.48.0, 11 sprints) — design/mídia/conhecimento

@@ -1,0 +1,109 @@
+{
+  "schemaVersion": "gstack.prd50-source-manifest.v1",
+  "purpose": "Ledger de proveniencia das 8 fontes primarias citadas pelo PRD50 (§3). Todas sao REFERENCIA METODOLOGICA (active_reference) -- nenhuma vira dependencia runtime, adapter de Gemini, MCP global ou autoridade de verdade. Distinto de prd49-source-manifest.json, que rastreia candidatos a vendoring de codigo: aqui NENHUMA fonte sera vendorizada.",
+  "usage": "O Sprint 50.0 apenas REGISTRA a citacao. O snapshot real (URL + data de consulta + titulo + hash do conteudo + trecho de suporte) e responsabilidade do Sprint 50.2 (source ledger). Enquanto verifiedByThisSession for false, o conteudo destas fontes NAO foi recuperado nem hasheado por esta sessao -- a citacao vem do texto do PRD50, nao de leitura propria.",
+  "honestyNote": "Nenhuma destas URLs foi buscada na rede durante o Sprint 50.0. Registrar != verificar. Qualquer claim que dependa do CONTEUDO destas fontes permanece 'inconclusive' ate o Sprint 50.2 produzir snapshot com trecho de suporte.",
+  "neverClaim": [
+    "que o GStack reproduz Aletheia ou Gemini Deep Think",
+    "que Deep Think e gratuito, incluido ou obrigatorio",
+    "que scores de benchmark matematico destas fontes se transferem para engenharia de software no GStack"
+  ],
+  "sources": [
+    {
+      "url": "https://deepmind.google/blog/accelerating-mathematical-and-scientific-discovery-with-gemini-deep-think/",
+      "title": "Google DeepMind - Accelerating Mathematical and Scientific Discovery with Gemini Deep Think",
+      "kind": "vendor_blog",
+      "maturity": "blog",
+      "decision": "methodology_reference_only",
+      "sha256": null,
+      "consultedAt": null,
+      "verifiedByThisSession": false,
+      "sourceOfClaim": ".docs/PLANS/prd50.md#3",
+      "note": "Origem da tecnica de balanced prompting citada. Blog de fornecedor -- nunca tratado como consenso peer-reviewed (ver canTreatAsConsensus em src/epistemic/invariants.js)."
+    },
+    {
+      "url": "https://arxiv.org/html/2602.10177",
+      "title": "Towards Autonomous Mathematics Research",
+      "kind": "preprint",
+      "maturity": "preprint",
+      "decision": "methodology_reference_only",
+      "sha256": null,
+      "consultedAt": null,
+      "verifiedByThisSession": false,
+      "sourceOfClaim": ".docs/PLANS/prd50.md#3",
+      "note": "PREPRINT: nao e consenso estabelecido. Controle negativo 5 do S50.0 existe exatamente para impedir que preprint seja citado como consenso."
+    },
+    {
+      "url": "https://arxiv.org/abs/2602.03837",
+      "title": "Accelerating Scientific Research with Gemini: Case Studies and Common Techniques",
+      "kind": "preprint",
+      "maturity": "preprint",
+      "decision": "methodology_reference_only",
+      "sha256": null,
+      "consultedAt": null,
+      "verifiedByThisSession": false,
+      "sourceOfClaim": ".docs/PLANS/prd50.md#3",
+      "note": "PREPRINT. Fonte dos relatos de ganho contextual; o PRD50 §2.2 ja rejeita generalizar isso como prova."
+    },
+    {
+      "url": "https://github.com/google-deepmind/superhuman/tree/main/aletheia",
+      "title": "google-deepmind/superhuman - Aletheia prompts and outputs",
+      "kind": "repository",
+      "maturity": "unknown",
+      "decision": "methodology_reference_only",
+      "sha256": null,
+      "consultedAt": null,
+      "verifiedByThisSession": false,
+      "sourceOfClaim": ".docs/PLANS/prd50.md#3 e §2.2",
+      "note": "O repo publica PROMPTS E OUTPUTS, nao a implementacao integral do agente. NUNCA vendorizar e NUNCA declarar replica do Aletheia (PRD50 §17.2)."
+    },
+    {
+      "url": "https://support.google.com/gemini/answer/16345172",
+      "title": "Gemini Apps Help - Deep Think access",
+      "kind": "vendor_docs",
+      "maturity": "unknown",
+      "decision": "methodology_reference_only",
+      "sha256": null,
+      "consultedAt": null,
+      "verifiedByThisSession": false,
+      "sourceOfClaim": ".docs/PLANS/prd50.md#3",
+      "note": "Citada pelo PRD50 §2.2 para REFUTAR a afirmacao de 'Deep Think gratuito'. Acesso e associado a planos especificos."
+    },
+    {
+      "url": "https://ai.google.dev/gemini-api/docs/prompting-strategies",
+      "title": "Gemini API - Prompt design strategies",
+      "kind": "vendor_docs",
+      "maturity": "unknown",
+      "decision": "methodology_reference_only",
+      "sha256": null,
+      "consultedAt": null,
+      "verifiedByThisSession": false,
+      "sourceOfClaim": ".docs/PLANS/prd50.md#3",
+      "note": "Referencia de tecnica de prompting. O GStack permanece model-agnostic (§6.7): nenhuma dependencia de Gemini."
+    },
+    {
+      "url": "https://ai.google.dev/gemini-api/docs/code-execution",
+      "title": "Gemini API - Code execution",
+      "kind": "vendor_docs",
+      "maturity": "unknown",
+      "decision": "methodology_reference_only",
+      "sha256": null,
+      "consultedAt": null,
+      "verifiedByThisSession": false,
+      "sourceOfClaim": ".docs/PLANS/prd50.md#3",
+      "note": "No GStack a execucao NAO ocorre pela camada Knowledge: research validate so gera experimentPlan; a execucao passa por workflow/task, worktree e gates (§12.3)."
+    },
+    {
+      "url": "https://ai.google.dev/gemini-api/docs/google-search",
+      "title": "Gemini API - Grounding with Google Search",
+      "kind": "vendor_docs",
+      "maturity": "unknown",
+      "decision": "methodology_reference_only",
+      "sha256": null,
+      "consultedAt": null,
+      "verifiedByThisSession": false,
+      "sourceOfClaim": ".docs/PLANS/prd50.md#3",
+      "note": "Grounding reduz certos erros mas NAO impede misquotation (§2.2). Por isso o S50.2 exige trecho de suporte, nao so existencia da URL."
+    }
+  ]
+}
