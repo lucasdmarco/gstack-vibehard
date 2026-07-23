@@ -1,0 +1,8 @@
+{
+  "note": "Cassete VCR SINTÉTICO — nenhum dado real de notebook/conta. Nenhum cookie, token ou e-mail pessoal. Usado só para testar o parsing/validação do adaptador.",
+  "request": { "notebookId": "notebook-fixture-001", "question": "Qual é o argumento principal da fonte 2?" },
+  "response": {
+    "answer": "A fonte 2 argumenta que X reduz Y em cenários controlados.",
+    "sourceCitations": ["fonte-2.pdf p.14", "fonte-2.pdf p.16"]
+  }
+}
