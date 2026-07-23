@@ -1,5 +1,54 @@
 # Changelog - gstack-vibehard
 
+## [5.56.0] - 2026-07-23 — PRD50 S50.7: E2E cross-OS e fechamento do programa
+
+**PRD50 FECHADO** (S50.0→S50.7, v5.49.0→v5.56.0, 8 sprints). `prd50Readiness().ready
+=== true` (3 P0 entregues). `fullyValidated === false` **por design** — há claims que
+dependem de rótulo humano cego, e isso é dito, não escondido.
+
+- **`tests/e2e/epistemic_protocol.e2e.test.js`** (novo): 7 testes pelo **binário real**
+  (`execFileSync` no CLI, não import de módulo), em HOME/cwd descartáveis. Provam:
+  `research validate --json` produz review válido; sem `--network` nunca alega fonte e
+  nunca sai `supported`; **nada é escrito no HOME** (read-only de verdade); `--level` é
+  honrado; `consult --json` expõe fato vs. inferência; JSON é puro (sem ANSI).
+- **Ligado à matriz de 3 SOs do CI** (`.github/workflows/test.yml`, job `e2e`:
+  `ubuntu-latest, windows-latest, macos-latest`). Verde localmente no Windows; Linux e
+  macOS rodam no push. Há teste que falha se alguém desligar isso do workflow.
+- **`src/dream/rc-checklist-prd50.js`** (novo): 11 itens (3 P0 + 8 P1) com prova real, e
+  os claims em **dois níveis**:
+  - **`AUTHORIZED_CLAIMS`** (6) — cada um com o teste que o sustenta. Ex.: *"uma fonte
+    que apenas menciona o tema nunca é contada como suporte"*, *"amostragem finita é
+    rotulada como suporte dentro do escopo, nunca como prova geral"*.
+  - **`PENDING_CLAIMS`** (3) — com `blockedBy` e o que falta. Dois dependem de rótulo
+    humano cego; um (`overhead do EV0 no Claude Code`) é **não-medível por construção**,
+    porque lá o contrato é texto injetado e o GStack nunca vê a resposta.
+  - Controle negativo: nenhum claim proibido pelo §17.2 (reproduzir Aletheia/Deep Think,
+    eliminar alucinação, "Python prova", "busca garante citação") pode entrar como
+    autorizado.
+
+### Resumo honesto do programa
+
+| Sprint | Entrega | Estado |
+|---|---|---|
+| 50.0 | 9 invariantes + corpus objetivo/subjetivo separados | delivered |
+| 50.1 | schema + classificador + EV0 + **wiring real no `consult`** | delivered |
+| 50.2 | citation support: existir ≠ sustentar | delivered |
+| 50.3 | protocolo balanceado; `runStatus` ≠ `epistemicVerdict` | delivered |
+| 50.4 | `research validate` + firewall estrutural Knowledge/Execution | delivered |
+| 50.5 | contrato de fonte única para 22 agentes × 3 formatos | delivered |
+| 50.6 | benchmark: gates objetivos passam; fatia subjetiva pendente | **partial** |
+| 50.7 | E2E cross-OS + RC checklist com claims em 2 níveis | delivered |
+
+**Dois achados que melhoraram o plano:** (1) o invariante de ouro do PRD (`supported`
+nunca vira `proved`) **já existia** desde o PRD41 em `evidence-ledger.js:36` — virou
+guarda de regressão em vez de código novo; (2) o Loop Engine já tinha o status
+`instructed` para "nenhum worker executou trabalho real", que liguei ao adapter para que
+um run meramente instrucional jamais sustente um claim.
+
+**Correção de auditoria:** eu havia dito que o E2E em 3 SOs exigiria o usuário. Estava
+errado — o CI já tinha a matriz. Só a fatia subjetiva do benchmark precisa de gente de
+fora, e por um motivo metodológico real, não por limitação de ambiente.
+
 ## [5.55.0] - 2026-07-23 — PRD50 S50.6: benchmark medido (e o que não foi medido)
 
 O sprint que separa "acreditar no prompt" de "medir". E que declara, sem rodeio, o que
