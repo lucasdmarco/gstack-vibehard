@@ -1,9 +1,22 @@
 # Protocolo de Verificação Epistêmica (PVEP) — contratos congelados
 
-> **Estado:** Sprint 50.0 entregue — só os **contratos** e o corpus existem.
-> O motor (classificador, protocolo, `research validate`) chega nos sprints 50.1–50.4.
-> Nada aqui está ligado ao fluxo real ainda, e nenhum claim de "resposta verificada"
-> está autorizado (PRD50 §8).
+> **Estado:** Sprints 50.0–50.1 entregues. Contratos, schema, classificador e EV0
+> existem e **já estão ligados a um comando real** (`consult`). `research validate`
+> e o protocolo balanceado chegam nos sprints 50.3–50.4. Nenhum claim de "resposta
+> verificada" está autorizado (PRD50 §8).
+
+## Já funcionando: `consult` (EV1)
+
+O `consult` sempre misturou duas coisas na mesma saída. Agora elas saem rotuladas
+em `consult --json`, campo `epistemic`:
+
+| Claim | Kind | Por quê |
+|---|---|---|
+| `installState` | `fact` | sondagem read-only real do filesystem — tem suporte citável |
+| `recommendedMode` | `inference` | heurística de palavra-chave sobre o objetivo, **não** medição |
+| `recommendedPath` | `recommendation` | sugestão; execute o preview antes de aplicar |
+
+Isso é **aditivo**: todos os campos anteriores continuam idênticos.
 
 ## O problema
 
