@@ -126,3 +126,9 @@ jobs:
         env:
           GSTACK_E2E_LIFECYCLE: "1"
         timeout-minutes: 10
+      # PRD50 S50.7: protocolo epistêmico pelo BINÁRIO real, nos 3 SOs.
+      # Prova: research validate produz review válido, nunca alega fonte sem
+      # --network, não escreve no HOME, e o JSON é puro.
+      - run: node --test tests/e2e/epistemic_protocol.e2e.test.js
+        name: "E2E epistêmico (research validate / consult, cross-OS)"
+        timeout-minutes: 5
