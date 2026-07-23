@@ -1,5 +1,37 @@
 # Changelog - gstack-vibehard
 
+## [5.42.0] - 2026-07-23 — PRD49 S49.4: Graphify query-first e freshness hardening
+
+Escopo real, sem duplicar o que já existia: versão/freshness/métricas do grafo já eram
+medidas por `tools/readiness.js`; a consulta bounded (max 5 resultados) já existia em
+`context-docs/scout.js`. Este sprint fecha os gaps de verdade — subcomandos declarados,
+policy explícita, migração honesta do legado, conformance honesta por harness.
+
+- **`src/tools/graphify-adapter.js`** (novo): `GRAPHIFY_SUBCOMMANDS` (só `update`/
+  `index`/`hook install`/`--version` — sourced do código real; **não existe** subcomando
+  `query`, o GStack lê `graph.json` direto). `resolveQueryFirstPolicy`/
+  `loadProjectPolicyFile`: default `soft_query_first`; `strict_first_read` só com
+  `.gstack/policy.json` explícito. `queryGraphFirst`: reusa `graphifyBackend`/
+  `extractKeywords` de `scout.js` (não duplica), policy-aware — `strict_first_read` +
+  grafo stale recusa servir e recomenda regenerar; `soft_query_first` + stale serve com
+  aviso, nunca bloqueia. `legacyDepsJsonStatus`: detecta `.graphify/deps.json` legado,
+  nunca migra/apaga sozinho. `detectGraphifyPackage`: extrai versão do `--version` real,
+  nunca fabrica. `GRAPHIFY_QUERY_FIRST_CONFORMANCE`: nenhum harness (`claude`/`codex`/
+  `opencode`) reivindica `enforced` sem prova — todos `advisory` com motivo real (mesmo
+  invariante de `claimsFakeHooks` em `harness/capabilities.js`).
+- **`src/tools/readiness.js`**: novo campo aditivo `graphifyAdapter` (package/
+  queryFirstPolicy/legacyDeps) — não altera `tools.graphify` existente.
+- **`tests/bench/context_retrieval_bench.test.js`** (novo diretório): benchmark
+  COMPARATIVO (bounded vs. leitura ingênua de todo o corpus) — nunca uma % fixa alegada
+  como resultado do GStack (regra explícita do PRD49).
+- `docs/guides/graphify-query-first.md` (novo).
+- 14 testes novos, QG strict `blocking_severity_count:0`, zero regressão nos testes
+  existentes de readiness/proof (60/60 verdes).
+- **Backlog honesto**: nenhuma instrução nova foi injetada em `AGENTS.md`/`.claude`/
+  `.cursor` "prefira consultar o grafo" — isso tocaria a mesma superfície central
+  revisada na S49.3 e não foi objeto desta sprint; o adapter é real e testado, a
+  injeção de orientação fica para decisão futura do usuário.
+
 ## [5.41.0] - 2026-07-22 — PRD49 S49.3: projeções de hook de design PROJECT-LOCAL
 
 Sprint pausada a pedido do usuário para revisão de design antes de codar (superfície

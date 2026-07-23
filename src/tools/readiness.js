@@ -11,6 +11,7 @@ import { readCodexMcp } from "../mcp/readers/codex.js"
 import { readOpenCodeMcp } from "../mcp/readers/opencode.js"
 import { readProjectMcp } from "../mcp/readers/project.js"
 import { loadContextPolicy, remoteAllowed } from "../skills/context-confidence.js"
+import { detectGraphifyPackage, resolveQueryFirstPolicy, loadProjectPolicyFile, legacyDepsJsonStatus } from "./graphify-adapter.js"
 
 // Readers do inventário + o run context do GStack (runtime-injected).
 const mcpReaders = () => [readClaudeMcp, readCodexMcp, readOpenCodeMcp, readProjectMcp, readRuntimeMcp]
@@ -344,7 +345,17 @@ export function buildReadiness(opts = {}) {
     mcp: buildMcpScope(cwd, home, opts.mcpInventory),
     harnessDiscovery: harnessDiscovery(cwd, home),
     fastContext: fastContextReadiness(cwd),
+    graphifyAdapter: graphifyAdapterReadiness(cwd, probe),
   }
+}
+
+// PRD49 S49.4: gaps que probeGraphify não cobria — subcomandos declarados,
+// policy soft/strict explícita e migração honesta do .graphify/deps.json legado.
+// Aditivo: não substitui nem altera tools.graphify (freshness/métricas continuam lá).
+function graphifyAdapterReadiness(cwd, probe) {
+  const pkg = detectGraphifyPackage({ probe })
+  const policy = resolveQueryFirstPolicy(loadProjectPolicyFile(cwd))
+  return { package: pkg, queryFirstPolicy: policy, legacyDeps: legacyDepsJsonStatus(cwd) }
 }
 
 // Detector read-only (F3-D): estado da política FastContext. Remoto = opt-in explícito.
