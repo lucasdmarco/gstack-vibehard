@@ -106,6 +106,22 @@ export const SKILL_GATES = Object.freeze([
       "nenhum planner/reviewer popula decision-evidence hoje. protectedConcerns nunca são bloqueados.",
   },
   {
+    // Declared-only (mesmo padrão de minimality-gate): canWriteToVault existe e é
+    // testado (src/skills/obsidian-skill-routes.js), mas nenhum comando `obsidian`
+    // real chama essa função ainda — sem implementedBy/provedBy pra não fabricar
+    // enforced:true no gate-truth.js.
+    id: "obsidian-vault-boundary-gate", phase: "test-preview", severity: "P1", mode: "blocking",
+    skills: ["find-skills"],
+    appliesWhen: { writesToObsidianVault: true },
+    preconditions: ["vaultWrite.status in ok"],
+    requiredQuestions: [],
+    requiredEvidence: [],
+    verifier: "src/skills/obsidian-skill-routes.js canWriteToVault (path boundary check + exclusão de .env*/secret)",
+    fallback: "block_before_write",
+    note: "avaliador real e testado (tests/obsidian_skill_routes.test.js), mas SEM wiring real ainda — " +
+      "nenhum comando `obsidian` existe hoje que chame canWriteToVault.",
+  },
+  {
     id: "secret-deny-gate", phase: "security", severity: "P0", mode: "blocking",
     skills: ["environment-secrets", "security_scan"],
     appliesWhen: { touchesSecrets: true },

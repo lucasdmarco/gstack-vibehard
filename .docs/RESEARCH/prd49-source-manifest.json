@@ -28,10 +28,10 @@
       "auditedCommit": "a1dc48e68138490d522c04cbf5822214c6eb1202",
       "license": "MIT",
       "decision": "selective_vendor",
-      "sha256": null,
-      "verifiedByThisSession": false,
-      "sourceOfClaim": ".docs/PLANS/prd49.md#2.2",
-      "note": "5 skills declarativas (obsidian-markdown/bases/json-canvas/obsidian-cli/defuddle). Vendorizar via pipeline PRD46, roteadas por intent (Sprint 49.6)."
+      "sha256": "sha256:247619161a610ee98dbaa2337da2d2d64e84ff33d946e79a7c93ab9335cdebb1",
+      "verifiedByThisSession": true,
+      "sourceOfClaim": "skills/vendor/kepano-obsidian-skills/a1dc48e68138490d522c04cbf5822214c6eb1202/UPSTREAM.json (mirror read-only real feito nesta sessao em 2026-07-23)",
+      "note": "4 de 5 skills declarativas vendorizadas nesta sessao (obsidian-markdown/bases/json-canvas/obsidian-cli) via pipeline PRD46 real (source-lock.js). defuddle NAO vendorizado -- achado real do auditor (npm install -g no upstream), ver upstream-map.md."
     },
     {
       "repo": "https://github.com/DietrichGebert/ponytail",

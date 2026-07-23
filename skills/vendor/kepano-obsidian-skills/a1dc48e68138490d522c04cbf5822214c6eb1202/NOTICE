@@ -1,0 +1,15 @@
+kepano/obsidian-skills — vendored (governed, PRD49 S49.6)
+============================================================
+Source: https://github.com/kepano/obsidian-skills
+License: MIT (see ./LICENSE, verbatim copy)
+Copyright (c) 2026 Steph Ango (@kepano)
+Audited/mirrored commit: a1dc48e68138490d522c04cbf5822214c6eb1202
+
+This directory contains a REAL, read-only mirror of 4 of the 5 skills in the
+upstream repo, copied byte-for-byte at the commit above. See upstream-map.md
+for the full per-file provenance table and the honest backlog of what was
+NOT vendored this sprint (the `defuddle` skill — see reason there).
+
+gstack_vibehard routes these skills by intent (src/skills/obsidian-skill-routes.js);
+it never auto-opens Obsidian, never creates a vault, and never scans a vault
+implicitly. See docs/guides/obsidian-skills.md.

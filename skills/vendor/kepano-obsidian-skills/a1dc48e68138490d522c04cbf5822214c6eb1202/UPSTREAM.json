@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "gstack.obsidian-skills-vendor-upstream.v1",
+  "repo": "https://github.com/kepano/obsidian-skills",
+  "auditedCommit": "a1dc48e68138490d522c04cbf5822214c6eb1202",
+  "auditedCommitDate": "2026-06-08T09:12:01-07:00",
+  "auditedCommitSubject": "Merge pull request #59 from SDGLBL/codex/add-base-embed-example",
+  "license": "MIT",
+  "licenseFile": "./LICENSE",
+  "licenseSha256": "sha256:247619161a610ee98dbaa2337da2d2d64e84ff33d946e79a7c93ab9335cdebb1",
+  "mirroredByThisSession": true,
+  "mirroredAt": "2026-07-23",
+  "mirrorMethod": "git clone --filter=blob:none (shallow, read-only, no hooks executed) + git fetch --depth=1 origin <auditedCommit> + git checkout -f FETCH_HEAD",
+  "note": "Repo real e pequeno (5 skills declarativas, ~1777 linhas totais) -- diferente do Impeccable (S49.2A, motor de 18001 linhas). 4 das 5 skills foram vendorizadas na integra nesta sprint; ver upstream-map.md para o motivo real de defuddle ficar de fora.",
+  "safetyAudit": {
+    "tool": "src/skills/external-audit.js auditExternalSkills (reusado, nao duplicado)",
+    "realFindings": [
+      "defuddle/SKILL.md: sinal REAL de 'install' (linha 10: 'npm install -g defuddle') -- nao vendorizado nesta sprint",
+      "obsidian-bases/references/FUNCTIONS_REFERENCE.md e defuddle/SKILL.md: falso-positivo verificado do classificador de 'destructive' (regex `format\\s` casa a palavra 'Format' em tabela de referencia de API / cabecalho de tabela markdown, nao um comando de formatacao de disco -- verificado manualmente linha a linha)"
+    ]
+  }
+}

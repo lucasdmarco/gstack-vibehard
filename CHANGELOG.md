@@ -1,5 +1,42 @@
 # Changelog - gstack-vibehard
 
+## [5.44.0] - 2026-07-23 — PRD49 S49.6: Governed Obsidian skill bundle
+
+Segundo vendoring real de código/conteúdo de terceiro do projeto (depois do Impeccable,
+S49.2A). `kepano/obsidian-skills` (MIT) é um repo real pequeno — 5 skills declarativas,
+~1777 linhas totais — vendorizado através do pipeline REAL do PRD46
+(`src/skills/source-lock.js`), não um manifest inventado.
+
+- **Mirror real feito nesta sessão**: `git clone --filter=blob:none` +
+  `git fetch --depth=1 origin a1dc48e68138490d522c04cbf5822214c6eb1202` +
+  `git checkout -f FETCH_HEAD`, confirmado no commit auditado exato.
+- **`skills/vendor/kepano-obsidian-skills/a1dc48e68138490d522c04cbf5822214c6eb1202/`**
+  (novo): `LICENSE` (MIT verbatim, Steph Ango), `NOTICE`, `UPSTREAM.json`,
+  `upstream-map.md`. 4 das 5 skills upstream vendorizadas byte-a-byte
+  (`obsidian-markdown`, `obsidian-bases`, `json-canvas`, `obsidian-cli`).
+- **`defuddle` NÃO vendorizado** — achado real do auditor (`external-audit.js`, reusado):
+  o SKILL.md upstream instrui `npm install -g defuddle` (instalação global), conflitando
+  com a invariante permanente do projeto. Backlog documentado, rota existe mas
+  `status:"not_yet_vendored"`, nunca fabricada como pronta.
+- **Falso-positivo verificado do auditor**: o regex de `destructive` (`format\s`) casou
+  com a palavra "Format"/`format()` em duas tabelas de referência de API — verificado
+  manualmente linha a linha, documentado em `upstream-map.md`, regex do auditor não
+  alterado (fora de escopo).
+- **`src/skills/obsidian-skill-routes.js`** (novo, `gstack.obsidian-skill-routes.v1`):
+  `routeObsidianIntent` nunca retorna mais de 1 skill por intent; `resolveWithinVault`/
+  `isSecretOrEnvPath`/`canWriteToVault` — path traversal e `.env*` sempre recusados;
+  `buildObsidianSourceLock` usa `buildSourceLock` real do PRD46 (source-lock.js).
+- **`src/skills/gate-matrix.js`**: novo `obsidian-vault-boundary-gate` — **declarado, sem
+  `implementedBy`/`provedBy`** de propósito (mesmo cuidado do `minimality-gate`, S49.5) —
+  nenhum comando `obsidian` real existe ainda que chame `canWriteToVault`.
+- `docs/guides/obsidian-skills.md` (novo).
+- 13 testes novos (incl. prova de proveniência byte-a-byte contra `upstream-map.md` e
+  controles negativos de path traversal), QG strict `blocking_severity_count:0` (1 ajuste:
+  string do verifier reescrita para não colidir com o regex de detecção "nunca LLM" —
+  "path-containment" continha a substring "ai").
+- **Backlog honesto**: "Agent Factory source mappings" e "context Obsidian doctor/status"
+  do plano original não foram wireados — declarado, não fabricado.
+
 ## [5.43.0] - 2026-07-23 — PRD49 S49.5: minimality preflight nativo
 
 - **`src/skills/minimality-schema.js`** (novo, `gstack.minimality.v1`):
