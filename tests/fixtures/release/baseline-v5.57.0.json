@@ -1,0 +1,48 @@
+{
+  "note": "Fixture de evidência da baseline — PRD51 S51.0B. Registra o estado REAL medido nesta máquina, incluindo a evidência de FLAKE (pass E fail), nunca uma única execução. Não é aspiracional: documenta que a v5.57.0 tem proof verde MAS não é operacionalmente provada nem programaticamente completa. A calibração (PRD51CALIBRACAO.md §0) impede congelar só o verde.",
+  "commitAtFreeze": "039da5cbcc50fdd87036a1b65de81e74ed64a5e9",
+  "version": "5.57.0",
+  "measuredOn": "Windows 11, Node 24",
+  "evidence": {
+    "proof": {
+      "ready": true,
+      "note": "verify --profile full deu ready:true em execução limpa; proof --profile full também. NÃO é estável — ver flake abaixo."
+    },
+    "dreamAudit": {
+      "source": "live_audit",
+      "summary": { "REAL": 4, "PARTIAL": 1, "NOT_PROVED": 20, "RISK": 0, "PLACEBO": 0 },
+      "note": "auditor comportamental do commit. 20 NOT_PROVED = claims sem contrato comportamental. O README foi corrigido no 51.0A para não fixar número."
+    },
+    "flake": {
+      "runtimeE2E": {
+        "runs": 8,
+        "failures": 1,
+        "note": "7 execuções limpas verdes (este agente) + 1 execução sob carga vermelha (dono do projeto): signal_failed, PIDs vivos, EBUSY, 81s, 27 dirs residuais. Falha intermitente comprovada e BLOQUEANTE para produção. Alvo do 51.1: taxa de flake = 0."
+      },
+      "suiteFull": {
+        "runs": 2,
+        "failures": 1,
+        "note": "1 flake (doctor_json, conhecido, sob carga) em 2 execuções da suíte completa; doctor_json passa 4/4 isolado 3x."
+      }
+    },
+    "programCompleteness": {
+      "programComplete": false,
+      "residuals": [
+        { "prd": "PRD47", "note": "prd47Readiness().ready === false — 4 P0 parciais" },
+        { "prd": "PRD46", "note": "sem rc-checklist-prd46.js canônico" },
+        { "prd": "PRD45", "note": "1 P1 parcial (Runtime Manifest V3 dormente)" },
+        { "prd": "PRD48", "note": "3 parciais + 1 pendente" },
+        { "prd": "PRD49", "note": "4 P1 parciais" },
+        { "prd": "PRD50", "note": "1 P1 parcial (benchmark), fullyValidated:false" }
+      ]
+    }
+  },
+  "verdict": {
+    "releaseReady": true,
+    "programComplete": false,
+    "operationallyProven": false,
+    "fullyValidated": false,
+    "canRenderAsComplete": false,
+    "reason": "proof verde não é fechamento: runtime flaky (não operacionalmente provado), 6 PRDs com residuais (não completo), validação humana pendente (não plenamente validado). Publicada mesmo assim como v5.56.0 — o que o PRD51 existe para corrigir."
+  }
+}
