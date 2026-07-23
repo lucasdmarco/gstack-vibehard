@@ -1,0 +1,26 @@
+gstack_vibehard vendor snapshot — pbakaus/impeccable
+=====================================================
+
+This directory contains code copied and adapted from Impeccable
+(https://github.com/pbakaus/impeccable), licensed under the Apache License,
+Version 2.0. Copyright 2025 Paul Bakaus.
+
+Audited commit: 4d849eb75f216109ea7053ed21530a11fafcc786
+Audited on:     2026-07-22 (this session, real shallow mirror; NOT the same as
+                the PRD49 planning-document audit date of 2026-07-21)
+License file:   ./LICENSE (verbatim copy of the upstream Apache-2.0 text)
+Provenance map: ./upstream-map.md (per-file commit/path/hash and
+                unchanged|modified|rewritten status — the source of truth for
+                what was copied and what changed)
+
+This vendor snapshot is NOT the upstream Impeccable package. It does not
+include Impeccable's CLI, package/global installer, self-update behavior,
+Live Mode, telemetry, or any upstream configuration authority. gstack_vibehard
+exclusively owns the enforcement, gate, policy, and final readiness decisions
+built on top of this code — see src/skills/design-context.js and (in future
+sprints) src/skills/design-detector.js.
+
+Per Apache-2.0 §4(b): any file marked "modified" in upstream-map.md carries a
+notice of that change at the point of modification. Files marked "unchanged"
+are byte-identical to the audited upstream commit (verifiable via the sha256
+recorded in upstream-map.md).

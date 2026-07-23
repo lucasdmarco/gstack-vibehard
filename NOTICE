@@ -45,6 +45,16 @@ Third-Party Components
    Copyright (c) 2026 Tejas Chopra
    https://github.com/chopratejas/headroom
 
+9. Impeccable (src/vendor/impeccable/)
+   License: Apache License 2.0
+   Copyright 2025 Paul Bakaus
+   https://github.com/pbakaus/impeccable
+   Audited commit: 4d849eb75f216109ea7053ed21530a11fafcc786
+   Governed vendor snapshot (PRD49 S49.2A) — see src/vendor/impeccable/UPSTREAM.json
+   and src/vendor/impeccable/upstream-map.md for the full per-file provenance map.
+   gstack_vibehard does not import Impeccable's CLI, installer, or Live Mode; only
+   the audited, license-compatible detector/context modules are copied and adapted.
+
 
 Full License Texts
 ------------------
