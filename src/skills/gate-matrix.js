@@ -88,6 +88,24 @@ export const SKILL_GATES = Object.freeze([
     note: "advisory nesta sprint — só a regra de color-contrast foi vendorizada (S49.2A); vira P1/blocking quando mais regras do motor Impeccable forem portadas.",
   },
   {
+    // Declared-only de propósito (sem implementedBy/provedBy): evaluateMinimality()
+    // é real e testado (src/skills/minimality.js), mas NENHUM caminho hoje popula
+    // `decision` a partir de uma implementação real (planner/reviewer não reportam
+    // decision-evidence ainda) — citar implementedBy aqui faria gate-truth.js
+    // computar executed:true/enforced:true FALSAMENTE (mesmo padrão honesto de
+    // db-migration-gate/rls-gate: declarado, nunca fingindo enforcement que não existe).
+    id: "minimality-gate", phase: "planning-spec", severity: "P2", mode: "blocking",
+    skills: ["project-lifecycle", "guided-delivery"],
+    appliesWhen: { introducesDependencyOrAbstraction: true },
+    preconditions: ["minimality.verdict in pass|exempt"],
+    requiredQuestions: [],
+    requiredEvidence: [],
+    verifier: "src/skills/minimality.js evaluateMinimality (decision evidence puro, nunca diff/LOC)",
+    fallback: "block_before_write",
+    note: "avaliador real e testado (tests/minimality_gate.test.js), mas SEM wiring real ainda — " +
+      "nenhum planner/reviewer popula decision-evidence hoje. protectedConcerns nunca são bloqueados.",
+  },
+  {
     id: "secret-deny-gate", phase: "security", severity: "P0", mode: "blocking",
     skills: ["environment-secrets", "security_scan"],
     appliesWhen: { touchesSecrets: true },

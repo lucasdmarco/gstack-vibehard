@@ -1,5 +1,31 @@
 # Changelog - gstack-vibehard
 
+## [5.43.0] - 2026-07-23 — PRD49 S49.5: minimality preflight nativo
+
+- **`src/skills/minimality-schema.js`** (novo, `gstack.minimality.v1`):
+  `DECISION_EVIDENCE_FIELDS` (necessary/existingReuse/platformOrStdlib/
+  installedDependency/newDependencyReason/smallestCompleteApproach/protectedConcerns),
+  `PROTECTED_CONCERNS` (security/validation/tests/accessibility/observability/
+  explicit_user_scope).
+- **`src/skills/minimality.js`** (novo): `evaluateMinimality(decision)` — dependência
+  nova sem motivo → `blocked`; abstração nova quando reuse/stdlib comprovadamente
+  disponível → `blocked`; qualquer `protectedConcerns` → SEMPRE `exempt`, mesmo sem
+  motivo. `minimalityNeverOutranksCorrectness`: veredito de correção sempre vence —
+  código menor e quebrado nunca é resgatado; `blocked` de minimality nunca finge que
+  código correto falhou. `buildMinimalityReviewItem`: item de scorecard não-P0.
+- **`src/skills/gate-matrix.js`**: novo `minimality-gate` (P2, `mode:"blocking"`,
+  **declarado, sem `implementedBy`/`provedBy`** de propósito — citar isso faria
+  `gate-truth.js` computar `enforced:true` FALSAMENTE, já que nenhum planner/reviewer
+  popula decision-evidence a partir de uma implementação real ainda).
+- `scripts/bench-minimality.mjs` (novo): benchmark COMPARATIVO sobre fixtures
+  determinísticas — nunca cross-harness ao vivo, nunca uma % de economia alegada.
+- `docs/guides/minimality-gate.md` (novo).
+- 10 testes novos, QG strict `blocking_severity_count:0`, zero regressão em
+  gate-truth/gate-matrix (confirmado: nenhum harness passa a reivindicar enforcement
+  falso).
+- **Backlog honesto**: wiring real (planner/reviewer reportando decision-evidence) não
+  existe ainda — declarado explicitamente, não fabricado.
+
 ## [5.42.0] - 2026-07-23 — PRD49 S49.4: Graphify query-first e freshness hardening
 
 Escopo real, sem duplicar o que já existia: versão/freshness/métricas do grafo já eram
