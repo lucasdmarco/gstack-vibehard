@@ -1,5 +1,36 @@
 # Changelog - gstack-vibehard
 
+## [5.59.0] - 2026-07-23 — PRD51 S51.1: runtime Windows — causa raiz corrigida
+
+Corrige a **causa raiz** do achado 4.1, reproduzida com evidência: `execFileSync(
+"taskkill", ...)` de um PID já morto NÃO lança com `code:"ESRCH"` — lança com
+`code:undefined`, `status:128`, `stderr:"...não foi encontrado"`. O `killErrorStatus`
+antigo, olhando só `e.code`, classificava isso como `signal_failed` (∈ `STOP_UNRESOLVED`)
+→ o state nunca era limpo → PIDs "vivos" no state, EBUSY, diretórios residuais. O teste
+unitário antigo até **mascarava** o bug: modelava o erro do taskkill como `ESRCH`, que
+nunca acontece na vida real.
+
+- **`src/runtime/supervisor.js`**: nova `classifyKillResult({ error, aliveAfter })` — a
+  **probe de liveness é a autoridade**, não o exit code do taskkill. Se o processo sumiu,
+  é `already_gone`/`stopped` custe o que o taskkill disser. `access_denied` só com
+  processo vivo + erro de permissão (por `e.code` OU stderr "acesso negado"/"access
+  denied"). `signal_failed` só com erro desconhecido E processo ainda vivo. `still_alive`
+  quando o taskkill "passou" mas a probe mostra o processo respondendo.
+- `attemptKill` agora tenta o kill, faz a probe (`isAlive`, default `process.kill(pid,0)`),
+  e classifica pela probe. `stopAll` injeta o `isAlive` default.
+- `STOP_UNRESOLVED` ganhou `still_alive` e `handle_not_released` — o state nunca é limpo
+  enquanto um deles existir (o retry precisa do pid).
+- 9 testes novos modelando o erro **real** do taskkill; teste antigo atualizado para
+  refletir a probe (o mock de `kill` não modelava liveness). Zero regressão nos 26 testes
+  de runtime existentes.
+
+**Honestidade sobre a prova (a régua do 51.0B aplicada a mim mesmo):** 15 execuções
+sequenciais isoladas pós-fix = **0 falhas**, resíduos 27→~0. Mas 15 runs **isolados** não
+provam "resolvido sob carga concorrente" — a condição em que a falha original apareceu.
+A causa raiz está corrigida e verificada; a validação de 20-50x **sob carga** fica para o
+CI. Por isso o runtime **não** é declarado `operationallyProven` nesta entrega — seria
+repetir o erro de concluir de amostra insuficiente.
+
 ## [5.58.0] - 2026-07-23 — PRD51 S51.0B: freeze e baseline reproduzível
 
 Estabelece o que "concluído" significa (§3 do PRD). `ready:true` deixou de autorizar a

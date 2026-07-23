@@ -80,9 +80,12 @@ test("stopAll: POSIX sem exec usa process.kill(-pid) (grupo), não o binário", 
   const { stopAll } = await imp(supMod)
   const calls = []
   const kill = (pid, sig) => { if (pid === -999) throw Object.assign(new Error("ESRCH"), { code: "ESRCH" }); calls.push(`${pid}/${sig}`) }
-  const r = stopAll([{ name: "web", pid: 5760 }, { name: "gone", pid: 999 }], { kill, platform: "linux" })
+  // PRD51 S51.1: a probe de liveness decide o status. Em produção `process.kill(pid,0)`
+  // lança ESRCH se o processo morreu; aqui o `isAlive` injetado reflete que ambos
+  // morreram após o kill (caso feliz) — o mock de `kill` não modela liveness.
+  const r = stopAll([{ name: "web", pid: 5760 }, { name: "gone", pid: 999 }], { kill, platform: "linux", isAlive: () => false })
   assert.equal(r[0].status, "stopped")
-  assert.equal(r[1].status, "already_gone", "grupo inexistente vira already_gone (ESRCH tipado)")
+  assert.equal(r[1].status, "already_gone", "grupo inexistente vira already_gone (probe: morto)")
   assert.deepEqual(calls, ["-5760/SIGTERM"], "mata o GRUPO (-pid), nunca o binário kill")
 })
 
