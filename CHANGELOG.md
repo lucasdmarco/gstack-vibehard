@@ -1,5 +1,32 @@
 # Changelog - gstack-vibehard
 
+## [5.52.0] - 2026-07-23 — PRD50 S50.3: protocolo balanceado sobre o Loop Engine
+
+Sem novo motor: `src/workflow-graph/runner.js` continua sendo o único. O adapter só
+traduz o vocabulário do PVEP para os nós que já existem.
+
+- **`src/epistemic/workflow-adapter.js`** (novo): `PVEP_TO_LOOP_ENGINE` mapeia
+  decompose→`planner`, sufficiencyCriteria→`rubric`, buildSupport→`worker`,
+  seekRefutation→`verifier`, smallFix→`retry`, insufficientEvidence→`human_handoff`.
+  - **O invariante do sprint**: `toEpistemicOutcome` mantém `runStatus` e
+    `epistemicVerdict` em eixos separados — `runStatus:"passed"` **nunca** vira
+    `supported`. E o runner já distingue **`instructed`** (nenhum worker executou
+    trabalho real, delegação OFF): esse estado jamais sustenta claim, mesmo com
+    `claims[].status === "supported"` no input.
+  - Autoconcordância gerador↔verificador nunca é prova
+    (`selfReviewCountedAsProof: false`, `evidenceLedgerStatus: "advisory"`).
+  - `independentVerifierRole`: advisory em EV1/EV2, `not_used` em EV0.
+  - `resolveStopReason` determinístico com precedência: `sufficient` (early stop)
+    → `same_failure` → `cap` → `insufficient_data`; os três últimos exigem handoff.
+  - `dedupeCompletedWork`: replay não reconta fonte já hasheada nem refaz model call
+    concluído (DoD do sprint).
+- **`src/epistemic/protocol.js`** ganha `runBalancedProtocol` (EV1/EV2) no mesmo
+  arquivo do EV0 — **as duas trilhas sempre rodam**: achar suporte não encerra a busca
+  por contraexemplo (é o ponto do balanced prompting, §2.2). Contraevidência **domina**
+  suporte (→ `refuted`); `mentions_only` nunca entra como suporte; trilha que lança
+  exceção vira `notPerformed` declarado, nunca falha engolida.
+- 25 testes novos (11 protocolo + 14 adapter), QG strict 0 de primeira.
+
 ## [5.51.0] - 2026-07-23 — PRD50 S50.2: source ledger e citation support
 
 O sprint que impede o modo de falha central do PRD50: **existir não é sustentar**. Uma
