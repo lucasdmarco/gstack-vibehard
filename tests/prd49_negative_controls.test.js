@@ -84,14 +84,20 @@ test("resolveRulePrecedence: sem duplicata -> todas active, sem quarentena por e
   assert.ok(r.every((x) => x.status === "active"))
 })
 
-// --- Registry: schema real, sem código externo copiado ainda ---
-test("prd49-source-manifest.json: as 9 fontes citadas no PRD49 têm license+decision, NENHUMA verifiedByThisSession (S49.0 não copia código ainda)", async () => {
+// --- Registry: schema real. Uma fonte só é `verifiedByThisSession:true` com sha256 real
+// (nunca por decreto) — as demais permanecem honestamente não verificadas até seu mirror real. ---
+test("prd49-source-manifest.json: as 9 fontes citadas no PRD49 têm license+decision; verifiedByThisSession só com sha256 real (canPromoteSource)", async () => {
   const manifest = JSON.parse(readFileSync(path.join(repoRoot, ".docs", "RESEARCH", "prd49-source-manifest.json"), "utf-8"))
+  const { canPromoteSource } = await imp("src/skills/vendor-governance.js")
   assert.equal(manifest.sources.length, 9)
   for (const s of manifest.sources) {
     assert.ok(s.license, `${s.repo} precisa de license`)
     assert.ok(s.decision, `${s.repo} precisa de decision`)
-    assert.equal(s.verifiedByThisSession, false, `${s.repo}: nenhuma fonte é 'verificada' antes do mirror real (Sprint 49.2A+)`)
+    if (s.verifiedByThisSession) {
+      assert.ok(canPromoteSource({ commit: s.auditedCommit, license: s.license, sha256: s.sha256 }), `${s.repo}: verifiedByThisSession:true exige commit+license+sha256 reais (controle 1)`)
+    } else {
+      assert.equal(s.sha256, null, `${s.repo}: não verificado ainda -> sha256 honestamente null, nunca inventado`)
+    }
   }
 })
 

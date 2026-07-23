@@ -8,10 +8,10 @@
       "auditedCommit": "4d849eb75f216109ea7053ed21530a11fafcc786",
       "license": "Apache-2.0",
       "decision": "governed_vendor_core",
-      "sha256": null,
-      "verifiedByThisSession": false,
-      "sourceOfClaim": ".docs/PLANS/prd49.md#2.2",
-      "note": "Copiar apenas context/detector/rules/audit/feedback sob src/vendor/impeccable/ com NOTICE, mapa de modificacao e paridade Node 18 (Sprint 49.2A). Nunca o instalador, Live Mode ou config authority."
+      "sha256": "sha256:fc0673369dae07c045c46869d3d4c9113678c77fcc7d3b4e3a39ac074cfa68b6",
+      "verifiedByThisSession": true,
+      "sourceOfClaim": "src/vendor/impeccable/UPSTREAM.json (mirror read-only real feito nesta sessao em 2026-07-22)",
+      "note": "PRIMEIRO recorte real vendorizado (Sprint 49.2A): shared/color.mjs (124 linhas, byte-identico, paridade comportamental provada). O motor completo (cli/engine/, 25 arquivos, ~18001 linhas) NAO foi todo portado ainda -- ver src/vendor/impeccable/upstream-map.md para o inventario honesto do que falta. Nunca o instalador, Live Mode ou config authority."
     },
     {
       "repo": "https://github.com/Graphify-Labs/graphify",

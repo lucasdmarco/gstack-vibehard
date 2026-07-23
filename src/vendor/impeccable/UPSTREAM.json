@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "gstack.impeccable-vendor-upstream.v1",
+  "repo": "https://github.com/pbakaus/impeccable",
+  "auditedCommit": "4d849eb75f216109ea7053ed21530a11fafcc786",
+  "auditedCommitDate": "2026-07-21T01:45:13Z",
+  "auditedCommitSubject": "Sync generated provider output",
+  "license": "Apache-2.0",
+  "licenseFile": "./LICENSE",
+  "licenseSha256": "sha256:fc0673369dae07c045c46869d3d4c9113678c77fcc7d3b4e3a39ac074cfa68b6",
+  "upstreamNodeFloor": ">=22.12.0",
+  "gstackNodeFloor": ">=18",
+  "mirroredByThisSession": true,
+  "mirroredAt": "2026-07-22",
+  "mirrorMethod": "git clone --filter=blob:none (shallow, read-only, no hooks executed) + git fetch --depth=1 origin <auditedCommit> + git checkout -f FETCH_HEAD",
+  "note": "O commit auditado neste UPSTREAM.json foi verificado com um mirror read-only REAL nesta sessao (2026-07-22) -- distinto de .docs/RESEARCH/prd49-source-manifest.json (S49.0), cujas entradas so citam a auditoria documentada em .docs/PLANS/prd49.md sem re-verificacao. Apos este vendoring real, a entrada correspondente do source-manifest deve ser atualizada para verifiedByThisSession:true.",
+  "upstreamEngineSize": {
+    "path": "cli/engine/",
+    "files": 25,
+    "totalLines": 18001,
+    "note": "Tamanho real medido nesta sessao via `find cli/engine -type f ... | xargs wc -l`. Escopo vendorizado ate agora (ver upstream-map.md) e um PRIMEIRO RECORTE pequeno e real, nao o motor completo."
+  }
+}

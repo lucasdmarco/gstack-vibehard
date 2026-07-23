@@ -1,5 +1,45 @@
 # Changelog - gstack-vibehard
 
+## [5.39.0] - 2026-07-22 — PRD49 S49.2A: governed Impeccable core snapshot (1º recorte real)
+
+Terceiro sprint do PRD49 — **primeira vez que este projeto copia código REAL de terceiro**
+pra dentro de `src/vendor/`. Confirmado com o usuário antes de proceder (decisão explícita:
+"buscar o repo real e fazer o vendoring completo").
+
+- **Mirror read-only real feito nesta sessão**: `git clone --filter=blob:none` +
+  `git fetch --depth=1 origin 4d849eb75f216109ea7053ed21530a11fafcc786` +
+  `git checkout -f FETCH_HEAD` do `pbakaus/impeccable`, exatamente no commit auditado
+  citado em `.docs/PLANS/prd49.md`. Licença Apache-2.0 confirmada (LICENSE real,
+  `Copyright 2025 Paul Bakaus`). **Achado real de tamanho**: o motor real
+  (`cli/engine/`) tem 25 arquivos e ~18.001 linhas — muito maior que qualquer módulo
+  construído neste programa até aqui.
+- **`src/vendor/impeccable/`** (novo): `LICENSE` (cópia verbatim), `NOTICE`,
+  `UPSTREAM.json` (commit/licença/hash reais, `mirroredByThisSession:true`),
+  `upstream-map.md` (mapa de proveniência arquivo-a-arquivo — 1 arquivo vendorizado,
+  inventário HONESTO dos outros ~24 arquivos/~17.877 linhas ainda não portados, com
+  motivo específico por arquivo). `shared/color.mjs` (124 linhas, **byte-idêntico** ao
+  upstream, roda em Node 18 sem alteração — sem API exclusiva de Node 22).
+- **`tests/impeccable_vendor_provenance.test.js`**: hash em disco bate com o mapa;
+  LICENSE/NOTICE reais; nenhum arquivo vendorizado fora do que está documentado.
+- **`tests/impeccable_vendor_parity.test.js`**: paridade COMPORTAMENTAL real — contraste
+  WCAG branco/preto = 21:1, luminância relativa, matiz por cor primária, parsing de
+  rgb()/rgba()/gradientes — prova que o código importado FUNCIONA no Node 18 do GStack,
+  não só que importa sem erro.
+- **`NOTICE`** (raiz do GStack): entrada 9 adicionada com atribuição completa.
+- **`.docs/RESEARCH/prd49-source-manifest.json`**: entrada do Impeccable atualizada pra
+  `verifiedByThisSession:true` com sha256 real — as outras 8 fontes permanecem
+  honestamente `false` até seus próprios mirrors reais.
+- **`.fallowrc.jsonc`**: `ignorePatterns: ["src/vendor/**"]` — código vendorizado de
+  terceiro nunca é medido pelos padrões de complexidade internos do GStack (modificá-lo
+  pra satisfazer o gate quebraria a garantia de byte-identidade documentada no
+  upstream-map.md).
+- 22 testes novos (14 novos + 8 corrigidos em `prd49_negative_controls.test.js` pra
+  refletir a nova realidade verificada), QG strict `blocking_severity_count:0`.
+- **Escopo honesto**: este é um PRIMEIRO RECORTE pequeno e real (1 de 25 arquivos, 124 de
+  ~18.001 linhas). O motor completo (regras determinísticas, detector rendered, registry
+  de anti-padrões) continua fora — inventariado com motivo em `upstream-map.md`, sem
+  fingir completude.
+
 ## [5.38.0] - 2026-07-22 — PRD49 S49.1: bridge canônico de contexto de design
 
 Segundo sprint do PRD49 — gera contexto compatível com Impeccable SEM criar uma segunda

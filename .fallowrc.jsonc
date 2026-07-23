@@ -18,5 +18,11 @@
     "deadCodeBaseline": ".fallow-baselines/dead-code.json",
     "dupesBaseline": ".fallow-baselines/dupes.json",
     "healthBaseline": ".fallow-baselines/health.json"
-  }
+  },
+  // PRD49 S49.2A — código vendorizado de terceiro (Apache-2.0, pbakaus/impeccable) NÃO
+  // entra na análise de complexidade/saúde do GStack: modificar esse código pra satisfazer
+  // o gate interno quebraria a garantia de proveniência byte-idêntica (src/vendor/impeccable/
+  // upstream-map.md). Governança real é license+commit+sha256 (vendor-governance.js,
+  // tests/impeccable_vendor_provenance.test.js), não CC/CRAP.
+  "ignorePatterns": ["src/vendor/**"]
 }
