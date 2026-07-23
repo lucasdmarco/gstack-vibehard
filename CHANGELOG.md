@@ -1,5 +1,33 @@
 # Changelog - gstack-vibehard
 
+## [5.51.0] - 2026-07-23 — PRD50 S50.2: source ledger e citation support
+
+O sprint que impede o modo de falha central do PRD50: **existir não é sustentar**. Uma
+URL válida, alcançável e corretamente citada ainda pode não conter a frase atribuída a
+ela — e busca/grounding não resolvem isso sozinhos (§2.2).
+
+- **`src/epistemic/sources.js`** (novo, `gstack.epistemic-source.v1`), 100% puro (nenhuma
+  função faz rede; quem busca é a camada de cima):
+  - `evaluateCitationSupport` → `supports` | `contradicts` | `mentions_only` |
+    **`not_found`**. A ordem importa: primeiro checa se o trecho **sequer existe** na
+    fonte (misquotation), depois contradição, depois suporte por sobreposição de termos;
+    o resto é mera menção.
+  - `buildSourceSnapshot`: hash do conteúdo original (prova de identidade), `redirected`
+    + `canonicalUrl` (redirect nunca é silencioso), `temporalWarning` para fonte
+    consultada **antes** da publicação, `kind` desconhecido cai em `unknown` (nunca vira
+    `primary` por omissão).
+  - **Sanitização obrigatória** antes de persistir: reusa `security/redact.js` — segredo
+    nunca entra no ledger; conteúdo é truncado em `MAX_SNAPSHOT_CHARS` (bounded, §16).
+  - Conteúdo com prompt injection é marcado `trusted: false` (reusa `agents/scanner.js`
+    via `externalContentTrust` do S50.0).
+  - `recordSourceOutcome`: fonte alcançável sem suporte → `source_discovered` com
+    `mayRaiseConfidence: false`; **rede indisponível falha o CLAIM, nunca a CLI**
+    (`failsClaimOnly: true`, §10.1).
+  - `buildSourceLedger`: `notPerformed` é parte do contrato — o que não se consultou fica
+    dito.
+- 17 testes novos cobrindo redirect, fonte stale, misquotation, injection,
+  indisponibilidade de rede e o controle inverso de cada um. QG strict 0 de primeira.
+
 ## [5.50.0] - 2026-07-23 — PRD50 S50.1: schema, classificador e EV0 (com wiring real)
 
 Primeiro sprint do PRD50 com código que roda. **Inclui o wiring antecipado do Sprint
