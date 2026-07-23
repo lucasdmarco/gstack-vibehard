@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { audit } from "../dream/auditor.js"
+import { scoreboardFromAudit, renderScoreboardLine } from "../dream/scoreboard.js"
 import { HARNESS_CAPABILITIES } from "../dream/capabilities.js"
 import { createProposal, promoteProposal, rejectProposal, listProposals, learningSummary } from "../dream/learning.js"
 import { dreamImprove } from "../dream/runner.js"
@@ -59,14 +60,17 @@ function auditCmd(ctx) {
   // PRD42 S42.0B: o modo COMPORTAMENTAL é o default do CLI — arquivo presente não vale
   // como REAL (vira NOT_PROVED). O modo legado (por arquivo) só sob opt-in `--files-only`.
   const r = audit({ root: ctx.root, behavioral: !ctx.filesOnly })
-  return emit(ctx.json, r, () => {
+  // PRD51 S51.0A: placar vivo com proveniência — nunca um número fixo (achado 4.3).
+  const scoreboard = scoreboardFromAudit(r)
+  const withBoard = { ...r, scoreboard }
+  return emit(ctx.json, withBoard, () => {
     section("dream audit — promessas vs evidência (determinístico, sem LLM)")
     for (const c of r.claims) {
       info(`  ${claimIcon(c.status)} [${c.status}/${c.severity}] ${c.claim}`)
       c.missing.forEach((m) => info(`        falta: ${m}`))
     }
     info("")
-    info(`  Resumo: ${Object.entries(r.summary).map(([k, v]) => `${k}:${v}`).join(" · ")}`)
+    info(`  ${renderScoreboardLine(scoreboard)}`)
   })
 }
 
