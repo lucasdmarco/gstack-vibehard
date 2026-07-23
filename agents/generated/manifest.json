@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "generatedBy": "gstack_vibehard agents build",
-  "compilerVersion": "5.16.0",
+  "compilerVersion": "5.53.0",
   "agents": 22,
   "specialization": {
     "total": 22,
@@ -33,7 +33,7 @@
     ]
   },
   "source": {
-    "coreHash": "sha256:8c97845ab37a81d191671c8d90f4831442261de077dc01fd946d4948fc11aeb9",
+    "coreHash": "sha256:a7c8f2e58fb18fc4d882c490ed393a94c053922159186f74b05cd810e70f9e75",
     "knowledgeHash": "sha256:965344454b2b59df6d31ed62302b457ec41b8997ded2d49e4f1dada8eac63d44",
     "agentsHash": "sha256:5ec2be47dc176b7a20fd7859074209f46008250b40005ae3669c60999bd50750",
     "promotedHash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"

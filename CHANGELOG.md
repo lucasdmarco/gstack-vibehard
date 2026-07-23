@@ -1,5 +1,32 @@
 # Changelog - gstack-vibehard
 
+## [5.54.0] - 2026-07-23 — PRD50 S50.5: contrato epistêmico cross-harness
+
+O §8 exige **uma fonte canônica** compilada para os adapters, nunca texto duplicado à
+mão em 20 agentes. Foi assim que ficou.
+
+- **`core/03-verificacao-epistemica.md`** (novo): a fonte única. O compilador que já
+  existia (`scripts/scripts/build_agents.js`) o injeta via `coreText` em **todos** os
+  adapters — verificado por teste real nos 22 agentes Claude (`SKILL.md`), Codex
+  (`.toml`) e Cursor (`.mdc`). **Não** foi criado nenhum mecanismo novo de compilação.
+  - Um teste falha se alguém duplicar o contrato num agente-fonte (é assim que esse
+    tipo de texto começa a divergir).
+  - Controles negativos: o contrato **não** pede chain-of-thought e **não** menciona
+    Gemini/Deep Think/Aletheia (§7 / §17.2). Tamanho limitado — não vira paredão.
+- **`src/epistemic/harness-projection.js`** (novo): separa dois eixos que não se
+  misturam — **contrato entregue** (todo harness conhecido recebe o mesmo texto, o mesmo
+  `gstack.epistemic-review.v1` e os mesmos níveis EV0/EV1/EV2) e **enforcement** (só
+  `real_hooks` bloqueia). Reusa `enforcementFor` do `execution-contract.js` em vez de
+  recriar a regra. Claude sai `enforced`; Codex/Copilot/Gemini saem `advisory` — nunca
+  se afirma enforcement que o harness não tem (§5.4). Harness desconhecido não recebe
+  projeção e nunca sai `enforced` por omissão.
+- 11 testes novos. QG strict 0 de primeira. Suíte 1905, 0 falhas.
+
+**Erro meu, registrado:** dois regexes de teste falharam por não considerarem que o
+markdown quebra linha no meio da frase — o grep inicial reportou "0 adapters com o
+contrato" e pareceu falha de compilação. Era o padrão de busca, não o código;
+confirmado lendo o adapter gerado antes de mudar qualquer coisa.
+
 ## [5.53.0] - 2026-07-23 — PRD50 S50.4: `research validate` e ponte de experimentos
 
 O comando que expõe o protocolo, e a ponte Knowledge → Execution sem furar o firewall.
