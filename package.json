@@ -1,6 +1,6 @@
 {
   "name": "@gstack-vibehard/installer",
-  "version": "5.54.0",
+  "version": "5.55.0",
   "description": "gstack_vibehard — Cross-harness installer & fullstack template kit with deep agent integration (Codex, Claude Code, OpenCode)",
   "license": "MIT",
   "type": "module",
@@ -40,7 +40,8 @@
     "sync:qg": "node scripts/sync-qg-version.mjs",
     "version": "node scripts/sync-qg-version.mjs && git add hooks/hooks/qg.py",
     "sbom": "npm sbom --sbom-format cyclonedx --omit dev",
-    "proof": "node scripts/clean-machine-proof.mjs"
+    "proof": "node scripts/clean-machine-proof.mjs",
+    "bench:epistemic": "node scripts/bench-epistemic.mjs"
   },
   "engines": {
     "node": ">=18"
