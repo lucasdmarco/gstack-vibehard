@@ -52,6 +52,7 @@ const P0_CHECKS = new Set(["verify", "dreamAudit", "gitTree", "skillGates"])
 const CHECK_LABELS = {
   verify: "Verificação (verify)", dreamAudit: "Dream audit (sem RISK/PLACEBO)",
   gitTree: "Árvore git limpa", skillGates: "Skill gates", graphifyFreshness: "Grafo atualizado",
+  designDetector: "Design detector (color-contrast, advisory)",
 }
 
 const statusOf = (c) => (c && c.ok === true ? STATUS.PASSED : c && c.ok === false ? STATUS.FAILED : STATUS.NOT_APPLICABLE)

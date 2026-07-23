@@ -40,6 +40,13 @@ dependência de Node 22, e declara honestamente o que falta.
 
 **Total ainda não vendorizado nesta sprint: ~24 arquivos, ~17.877 linhas.**
 
+## Consumo nativo (S49.2B)
+
+`shared/color.mjs` agora é consumido por `src/skills/design-detector.js` (finding de
+contraste WCAG, exposto em `visual detect`/`visual doctor`/`visual explain` e como check
+advisory do `proof`). Nenhum arquivo NOVO foi vendorizado nesta sprint — só wiring do lado
+GStack sobre o que já existia desde S49.2A.
+
 ## Regra de atualização
 
 Todo novo arquivo copiado precisa de uma entrada nesta tabela ANTES do commit que o adiciona.

@@ -1,4 +1,6 @@
 import { execFileSync } from "child_process"
+import { readFileSync } from "node:fs"
+import path from "node:path"
 import { runVerify } from "../project-plan/verify-runner.js"
 import { audit } from "../dream/auditor.js"
 import { buildReadiness } from "../tools/readiness.js"
@@ -6,6 +8,7 @@ import { routeDefaultOn, headroomPendency } from "../tools/headroom-policy.js"
 import { evaluateSkillGateRelease } from "../skills/evidence.js"
 import { resolveGateOutcomes, buildGateRegistry } from "../skills/gate-registry.js"
 import { explainProof } from "../skills/acceptance-demo.js"
+import { detectColorContrastFindings } from "../skills/design-detector.js"
 import { success, warn, error, info, section } from "../cli/index.js"
 
 /**
@@ -88,6 +91,22 @@ function checkReadiness(deps, cwd, profile) {
     warnings,
   }
 }
+// PRD49 S49.2B: contraste WCAG via detector nativo (advisory, nunca bloqueia — só 1 regra
+// vendorizada ainda). Fixture opt-in `.gstack/design-elements.json`; ausente = not_applicable
+// (nunca fabrica um resultado sem sinal real, mesmo padrão de candidate:null em closeout.js).
+function defaultDesignElementsReader(cwd) {
+  try { return JSON.parse(readFileSync(path.join(cwd, ".gstack", "design-elements.json"), "utf-8")).elements || [] }
+  catch { return null }
+}
+function checkDesignDetector(deps, cwd) {
+  const elements = (deps.designElements || defaultDesignElementsReader)(cwd)
+  if (elements === null) return { ok: true, state: "not_applicable" }
+  const result = detectColorContrastFindings(elements)
+  const warning = result.counts.findings > 0
+    ? `design-detector: ${result.counts.findings} achado(s) de contraste (advisory — só 1 regra vendorizada, nunca bloqueia release ainda)`
+    : null
+  return { ok: true, state: "ran", findingsCount: result.counts.findings, warning }
+}
 function checkGitTree(deps, cwd) {
   const porcelain = (deps.git || defaultGitPorcelain)(cwd)
   if (porcelain === null) return { ok: true, state: "not_applicable" }
@@ -106,9 +125,10 @@ export function buildProof(opts = {}) {
   const readiness = checkReadiness(deps, cwd, profile)
   const gitTree = checkGitTree(deps, cwd)
   const skillGates = deps.skillGateRelease ? deps.skillGateRelease(cwd) : evaluateSkillGateRelease({ root: cwd })
+  const designDetector = checkDesignDetector(deps, cwd)
   // PRD41 S41.5 (P1.2): o proof não decide mais ad-hoc quem bloqueia — o Gate Registry
   // central declara a severidade (hard×advisory) de cada gate e resolve blockers×warnings.
-  const checks = { verify, dreamAudit: dream, graphifyFreshness: readiness.graphify, gitTree, skillGates, toolReadiness: readiness.tools, headroomRouting: readiness.headroom }
+  const checks = { verify, dreamAudit: dream, graphifyFreshness: readiness.graphify, gitTree, skillGates, toolReadiness: readiness.tools, headroomRouting: readiness.headroom, designDetector }
   const outcomes = resolveGateOutcomes({ profile, checks })
   const blockers = outcomes.blockers
   const warnings = [...outcomes.warnings, ...readiness.warnings].filter(Boolean)
