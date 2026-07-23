@@ -116,7 +116,7 @@ Capacidades reais (cada uma com guia próprio — o README não tenta explicar t
 - 🛡️ Scanner de segredos no diff; delegação bloqueia `.env` rastreado
 - 🌳 Worktree lifecycle determinístico (`list/diff/accept/discard/cleanup --dry-run`)
 - 🤖 Orquestração: executor em worktree + verifier independente + reviewer LLM **advisory** — LLM nunca aprova sozinho
-- 💭 `dream improve` (proposta isolada, nunca auto-merge) e `dream audit` (promessa vs evidência: hoje 20 REAL / 1 PARTIAL / 0 RISK)
+- 💭 `dream improve` (proposta isolada, nunca auto-merge) e `dream audit` (promessa vs evidência, comportamental) — o placar é do commit atual, não um número fixo: rode `dream audit --json`. Só `RISK`/`PLACEBO` bloqueiam o proof; `NOT_PROVED` é claim sem contrato comportamental ainda, e aparece no placar honestamente
 - 🔏 Edit guard hash-anchored: patch só se o trecho lido ainda bate com o hash
 - 🧩 MCP project-scoped runtime-injected — nunca `~/.mcp.json` nem config global sem opt-in
 - 🕶️ Redaction pré-render opt-in (`proxy`) — **não** é Zero-Trust universal

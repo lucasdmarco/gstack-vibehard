@@ -1,5 +1,34 @@
 # Changelog - gstack-vibehard
 
+## [5.57.0] - 2026-07-23 — PRD51 S51.0A: hotfix de honestidade das claims públicas
+
+Início do PRD51 (convergência/fechamento). Este é o **hotfix do achado 4.3** — o único
+com dano externo já publicado: a v5.56.0 saiu no npm com o README afirmando "hoje 20
+REAL / 1 PARTIAL / 0 RISK", quando o auditor comportamental do próprio commit retorna
+**4 REAL / 1 PARTIAL / 20 NOT_PROVED**. Número histórico apresentado como estado atual —
+exatamente o que o §3 do PRD proíbe.
+
+- **README.md**: removido o placar fixo. A linha agora aponta para a fonte viva
+  (`dream audit --json`), diz que o placar é do commit atual, e explica que só
+  `RISK`/`PLACEBO` bloqueiam o proof — `NOT_PROVED` é claim sem contrato comportamental
+  ainda e **aparece no placar honestamente**, não é escondido nem promovido a REAL.
+- **`src/dream/scoreboard.js`** (novo, `gstack.dream-scoreboard.v1`):
+  `buildDreamScoreboard`/`scoreboardFromAudit`/`renderScoreboardLine` derivam o placar do
+  summary REAL do auditor, com proveniência (commit/data). Invariante: NOT_PROVED nunca é
+  somado a REAL; o placar mostra os NOT_PROVED explicitamente.
+- **`src/commands/dream.js`**: `dream audit` (JSON e humano) agora emite o campo
+  `scoreboard` com o placar vivo. Saída real do commit: `4 REAL / 1 PARTIAL /
+  20 NOT_PROVED`.
+- **`tests/public_claims_honesty.test.js`** (novo): controle negativo que **falha** se
+  qualquer doc público de estado (README, capabilities.md) fixar um placar numérico de
+  dream audit como atual. Impede a regressão que causou o 4.3.
+- 6 testes novos, QG strict 0, zero regressão em dream/proof.
+
+**Nota honesta:** este hotfix corrige a claim, não a realidade que ela descrevia mal —
+as 20 capabilities `NOT_PROVED` continuam sem contrato comportamental. Isso é trabalho do
+Sprint 51.6 (criar contrato, rebaixar ou remover cada claim). O que muda aqui é que o
+README para de mentir sobre o número.
+
 ## [5.56.0] - 2026-07-23 — PRD50 S50.7: E2E cross-OS e fechamento do programa
 
 **PRD50 FECHADO** (S50.0→S50.7, v5.49.0→v5.56.0, 8 sprints). `prd50Readiness().ready
