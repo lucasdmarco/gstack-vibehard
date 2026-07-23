@@ -4,6 +4,7 @@ import { browserDriverAvailable, playwrightDriver, runVisualGate, VISUAL_GATE_SC
 import { detectColorContrastFindings } from "../skills/design-detector.js"
 import { renderCompactFeedback, renderFeedbackMarkdown } from "../skills/design-feedback.js"
 import { buildDesignRuleRegistry, getDesignRule } from "../skills/design-rule-registry.js"
+import { applyDesignHookProjections, designHookStatus } from "../harness/design-hooks.js"
 import { section, success, warn, error, info } from "../cli/index.js"
 
 /**
@@ -96,14 +97,46 @@ function explainCmd(args, json) {
   return rule
 }
 
+function hooksStatusCmd(cwd, json) {
+  const status = designHookStatus(cwd)
+  const payload = { results: status }
+  if (json) { process.stdout.write(JSON.stringify(payload) + "\n"); return payload }
+  section("visual hooks status (project-local, nenhum lê/escreve fora do projeto)")
+  for (const r of status) (r.installed ? success : warn)(`  ${r.installed ? "✓" : "–"} ${r.harness}: ${r.path}`)
+  return payload
+}
+
+function hooksInstallCmd(cwd, json) {
+  const result = applyDesignHookProjections(cwd)
+  if (json) { process.stdout.write(JSON.stringify(result) + "\n"); return result }
+  section("visual hooks install (project-local — advisory/instructional, nunca bloqueia)")
+  for (const r of result.results) (r.ok ? success : error)(`  ${r.ok ? "✓" : "✗"} ${r.harness}: ${r.path} (${r.ok ? r.action : r.reason})`)
+  return result
+}
+
+const HOOKS_ACTIONS = Object.freeze({
+  status: (cwd, json) => hooksStatusCmd(cwd, json),
+  install: (cwd, json) => hooksInstallCmd(cwd, json),
+})
+
+function hooksCmd(cwd, args, json) {
+  const action = HOOKS_ACTIONS[positionalAfter(args, "hooks")]
+  if (action) return action(cwd, json)
+  error("visual hooks: use `install` ou `status`")
+  process.exitCode = 1
+  return null
+}
+
 function printUsage() {
   section("visual")
   info("  visual check --url <endereço> [--run <id>] [--json]   executa o gate visual e grava evidência")
   info("  visual doctor [--json]                                 status do motor/regras nativas de design")
   info("  visual detect <elements.json> [--json]                 detecta findings (só color-contrast por ora)")
   info("  visual explain <rule-id> [--json]                      explica uma regra do registry")
+  info("  visual hooks install|status [--json]                   projeções de hook project-local por harness")
   warn("  sem playwright instalado, reporta needs_browser (blocked) — nunca finge verde.")
   warn("  visual detect lê um JSON de elementos já extraídos — não faz scraping de DOM/URL ao vivo ainda.")
+  warn("  visual hooks nunca escreve config GLOBAL (~/.claude, ~/.cursor, ...) — só dentro do projeto (cwd).")
 }
 
 const SUBCOMMANDS = Object.freeze({
@@ -111,6 +144,7 @@ const SUBCOMMANDS = Object.freeze({
   doctor: (cwd, args, json) => doctorCmd(json),
   detect: (cwd, args, json) => detectCmd(cwd, args, json),
   explain: (cwd, args, json) => explainCmd(args, json),
+  hooks: (cwd, args, json) => hooksCmd(cwd, args, json),
 })
 
 export async function visualCommand(args = [], opts = {}) {
