@@ -1,5 +1,30 @@
 # Changelog - gstack-vibehard
 
+## [5.46.0] - 2026-07-23 — PRD49 S49.8: unified media-intake router e Claude Video spike
+
+- **`src/capabilities/media-intake.js`** (novo, `gstack.media-intake-router.v1`):
+  `selectMediaBackend` — transcript/captions sempre primeira tentativa; frames só com
+  `visualTimestampNeeded:true`, sempre com `boundedFrameBudget` (cap fixo de 20, nunca
+  escala com a duração — vídeo de 10h não gera mais frames que um de 1 minuto).
+  `dedupeFrames` (hash de conteúdo). `DISALLOWED_BACKENDS` inclui `"token-burner"` —
+  nenhuma combinação de evidência seleciona esse backend. `canIngestSource`/
+  `requiresNetworkConsent`: URL nunca baixa sem consentimento explícito; arquivo local
+  nunca exige. `temporaryFileDisposition`: `delete_after_processing` por default.
+  `routeMediaIntake` registra toda a evidência de roteamento do DoD (source
+  type/question type/captions/timestamp/duração/tokens projetados/network/retention).
+- **`src/tools/claude-video.js`** (novo, `gstack.claude-video-spike.v1`):
+  `CLAUDE_VIDEO_CAPABILITY_STATUS` sempre `"documented_external_reference"` nesta
+  versão. `evaluatePromotionThreshold` só promove a `"promoted_full_capability"` com um
+  `benchmarkResult` REAL mostrando acurácia melhor que a baseline Graphify/media **e**
+  budgets de token/cleanup respeitados — nenhum benchmark foi rodado nesta sessão.
+- `scripts/bench-media-intake.mjs` (novo): comparativo sobre fixtures determinísticas,
+  nunca % fixa alegada.
+- `docs/guides/media-intake.md` (novo).
+- 17 testes novos, QG strict `blocking_severity_count:0`.
+- **Backlog honesto**: nenhuma integração real com provider de transcrição/vídeo
+  configurada nesta sessão — se algum dia for wireada, credenciais devem resolver via
+  Secrets Broker (`src/secrets/broker.js`), nunca inline.
+
 ## [5.45.0] - 2026-07-23 — PRD49 S49.7: Scroll World, capacidade distribuída governada
 
 **Distinção honesta em relação a S49.2A/S49.6**: esta sprint NÃO inclui um mirror git
