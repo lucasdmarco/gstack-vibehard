@@ -1,5 +1,37 @@
 # Changelog - gstack-vibehard
 
+## [5.53.0] - 2026-07-23 — PRD50 S50.4: `research validate` e ponte de experimentos
+
+O comando que expõe o protocolo, e a ponte Knowledge → Execution sem furar o firewall.
+
+- **`research validate "<claim>" [--level] [--network] [--strict] [--json]`** (§13.1),
+  3º subcomando do `research` (convive com `skills audit` e `notebooklm`). Camada
+  **Knowledge**: read-only, nunca executa código. **Sem `--network` as trilhas de busca
+  ficam vazias e o resultado é honestamente `inconclusive`** — jamais um `supported` sem
+  fonte. Exit codes do §13.4: `inconclusive` sai 0 (conclusão honesta, não erro); só
+  `--strict` devolve 3; uso inválido devolve 2.
+- **`src/epistemic/experiment-plan.js`** (novo, `gstack.experiment-plan.v1`): o plano
+  imutável que a camada Execution consome.
+  - **O firewall é estrutural, não convenção**: o módulo não exporta runner algum, e há
+    teste que falha se alguém adicionar `run`/`exec`/`spawn` ali.
+  - Comando em `executable` + `args` (array) — **nunca string de shell**. Args com
+    metacaractere (`;`, `&&`, `|`, `` ` ``, `$()`) são recusados.
+  - `.env*`, path absoluto e travessia (`../`) sempre recusados; timeout obrigatório e
+    limitado; rede proibida por default.
+  - `planHash`/`planWasTampered`: Execution nunca aceita plano adulterado.
+  - **`labelExperimentResult`**: mil casos passando é `supported_within_scope`, **jamais**
+    `proved` (amostragem finita não demonstra afirmação universal, §2.2). Um
+    contraexemplo, esse sim, é `refuted_by_counterexample` e **conclusivo**.
+- **`src/epistemic/render.js`** (novo): mesma evidência em saída humana (§13.3 — veredito,
+  o que falta, o que **não** foi executado, próximo passo seguro) e JSON puro.
+- 22 testes novos (12 ponte + 10 CLI), incl. regressão dos subcomandos existentes e do
+  firewall Knowledge. QG strict 0 (2 CRITICAL de complexidade resolvidos por decomposição).
+
+**Nota de processo honesta:** o `verify` do S50.3 voltou `ready:false` numa primeira
+execução porque eu o rodei em background enquanto já editava arquivos do S50.4 na mesma
+árvore — o verify testa a árvore de trabalho, não o commit. Re-executado contra árvore
+limpa: `ready:true`. A cadência voltou a ser serial (um sprint por vez).
+
 ## [5.52.0] - 2026-07-23 — PRD50 S50.3: protocolo balanceado sobre o Loop Engine
 
 Sem novo motor: `src/workflow-graph/runner.js` continua sendo o único. O adapter só

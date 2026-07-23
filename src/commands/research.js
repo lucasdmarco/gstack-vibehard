@@ -3,6 +3,10 @@ import { join, dirname, relative, isAbsolute } from "path"
 import { spawnSync } from "child_process"
 import { auditExternalSkills, renderAuditMarkdown } from "../skills/external-audit.js"
 import { notebookLmDoctor, notebookLmConnect, notebookLmQuery, notebookLmImport } from "../tools/notebooklm.js"
+import { classifyLevel, resolveLevel } from "../epistemic/classifier.js"
+import { runBalancedProtocol, runSanityReview } from "../epistemic/protocol.js"
+import { renderEpistemicHuman } from "../epistemic/render.js"
+import { exitCodeForVerdict } from "../epistemic/schema.js"
 import { section, success, warn, error, info } from "../cli/index.js"
 
 /**
@@ -175,11 +179,71 @@ function notebookLmCmd(sub, args, json) {
   return null
 }
 
+// ── PRD50 S50.4: `research validate` (§13.1) ────────────────────────────────
+// KNOWLEDGE: read-only. Nunca executa código, nunca chama rede sem autorização
+// explícita. Sem `--network`, as trilhas de busca ficam vazias e o resultado é
+// honestamente inconclusive — jamais um `supported` sem fonte.
+
+// Sinais determinísticos derivados do texto do claim (§9.1). Heurística
+// declarada: é classificação de RISCO, não julgamento do conteúdo.
+const RISK_SIGNALS = Object.freeze([
+  { rx: /segur|security|secret|senha|token|vulnerab/i, signal: "securityImpact" },
+  { rx: /release|publicar|deploy|produç|production/i, signal: "releaseImpact" },
+  { rx: /irrevers|apagar|deletar|destru|drop\s+/i, signal: "irreversible" },
+  { rx: /inédito|novidade|estado da arte|state of the art|primeiro a/i, signal: "noveltyClaim" },
+  { rx: /versão|version|lançou|latest|hoje|atual|recente/i, signal: "externalInfoNeeded" },
+  { rx: /função|arquivo|módulo|código|depend|arquitet|api\b/i, signal: "codeClaim" },
+])
+
+function signalsFromQuestion(text) {
+  const s = {}
+  for (const { rx, signal } of RISK_SIGNALS) if (rx.test(text)) s[signal] = true
+  // Sem nenhum sinal, o classificador aplica o fail-safe para grounded (§9.3).
+  return s
+}
+
+// Sem `--network` as trilhas externas ficam vazias — nada é inventado.
+const OFFLINE_TRAILS = Object.freeze({ findSupport: () => [], findRefutation: () => [], findBoundaries: () => [] })
+
+function reviewForLevel(question, level) {
+  if (level === "sanity") return runSanityReview({ question, answer: question, limitations: [] })
+  return runBalancedProtocol({ question, level, claimTexts: [question], deps: OFFLINE_TRAILS })
+}
+
+function annotateReview(review, { classified, resolved, networkAllowed }) {
+  review.classificationReasons = [...classified.reasons, resolved.reason]
+  review.level = resolved.level
+  if (!networkAllowed) review.notPerformed.push("rede não autorizada (--network ausente) — nenhuma fonte externa consultada")
+  if (!resolved.mayClaimVerified) review.notPerformed.push("nível rebaixado por escolha explícita — este resultado não pode alegar verificação")
+  return review
+}
+
+function validateCmd(args, json) {
+  const question = args.filter((a) => !a.startsWith("-") && a !== "validate").join(" ").trim()
+  if (!question) {
+    error('research validate: informe o claim ou pergunta. Ex.: research validate "X reduz Y" --level auto')
+    process.exitCode = 2
+    return null
+  }
+  const classified = classifyLevel(signalsFromQuestion(question))
+  const resolved = resolveLevel({ classified: classified.level, requested: flagValue(args, "--level") || "auto" })
+  const review = annotateReview(reviewForLevel(question, resolved.level), {
+    classified, resolved, networkAllowed: args.includes("--network"),
+  })
+  process.exitCode = exitCodeForVerdict(review.verdict, { strict: args.includes("--strict") })
+  if (json) { process.stdout.write(JSON.stringify(review) + "\n"); return review }
+  section(`research validate — ${resolved.level}`)
+  console.log(renderEpistemicHuman(review))
+  return review
+}
+
 function printResearchUsage() {
   section("research")
   info("  research skills audit --path <dir> [--json]   audita mirror local read-only (adopt/adapt/avoid)")
   info("  research skills audit --repo <url> [--json]    clona raso (opt-in, rede) e audita — nunca executa/instala")
   info("  research notebooklm doctor|connect|query|import   conector experimental (cloud, não-oficial)")
+  info('  research validate "<claim>" [--level auto|sanity|grounded|adversarial] [--network] [--strict] [--json]')
+  warn("  validate é KNOWLEDGE: nunca executa código; experimentos saem como plano p/ `workflow`.")
 }
 
 /** Dispatcher do `research`. */
@@ -189,5 +253,6 @@ export async function researchCommand(args = [], opts = {}) {
   const sub = args.filter((a) => !a.startsWith("-"))
   if (sub[0] === "skills" && sub[1] === "audit") return auditCmd(cwd, args, json)
   if (sub[0] === "notebooklm") return notebookLmCmd(sub, args, json)
+  if (sub[0] === "validate") return validateCmd(args, json)
   printResearchUsage()
 }
