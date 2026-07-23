@@ -1,5 +1,32 @@
 # Changelog - gstack-vibehard
 
+## [5.58.0] - 2026-07-23 — PRD51 S51.0B: freeze e baseline reproduzível
+
+Estabelece o que "concluído" significa (§3 do PRD). `ready:true` deixou de autorizar a
+frase "programa concluído".
+
+- **`src/release/baseline.js`** (novo, `gstack.release-baseline.v1`): quatro estados
+  que **não se implicam** — `releaseReady` (gates passaram no commit) ·
+  `programComplete` (tudo entregue/removido/non-goal) · `operationallyProven` (E2E real
+  sem flake) · `fullyValidated` (métricas validadas). Item `partial`/`pending`/
+  `not_executed`/`blocked` impede `programComplete`, salvo conversão explícita em
+  non-goal com motivo.
+- **Duas lições codificadas:**
+  - `evidenceValidForCommit` — prova pertence a UM commit; proof de A nunca autoriza
+    release de B (achado da calibração).
+  - `operationallyProven` exige **≥20 execuções sem falha** (`MIN_RUNS_FOR_OPERATIONAL`)
+    — **n=1 verde não prova nada**, que é a exata lição que este programa aprendeu na
+    contra-auditoria. Qualquer flake > 0 derruba o estado.
+- **`canRenderAsComplete`**: só autoriza "concluído" com os 3 estados de fechamento
+  verdes. `releaseReady` sozinho nunca basta.
+- **`tests/fixtures/release/baseline-v5.57.0.json`** (novo): a baseline REAL medida,
+  honesta — proof verde, MAS registra a evidência de **flake (pass E fail, nunca uma
+  execução)**: runtime_e2e 8 runs/1 fail (7 verdes limpos + 1 vermelho sob carga do dono,
+  com PIDs vivos/EBUSY/27 resíduos), suíte 2 runs/1 flake. Veredito: `releaseReady:true`
+  mas `programComplete/operationallyProven/fullyValidated: false`. É o que foi publicado
+  como v5.56.0 — e o que o PRD51 corrige.
+- 12 testes novos (10 unit + 2 sobre o fixture real), QG strict 0.
+
 ## [5.57.0] - 2026-07-23 — PRD51 S51.0A: hotfix de honestidade das claims públicas
 
 Início do PRD51 (convergência/fechamento). Este é o **hotfix do achado 4.3** — o único
