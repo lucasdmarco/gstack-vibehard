@@ -1,5 +1,34 @@
 # Changelog - gstack-vibehard
 
+## [5.47.0] - 2026-07-23 — PRD49 S49.9: NotebookLM research connector experimental
+
+Conector cloud OPCIONAL — nunca vira memória automática, nunca gate de release, nunca
+claim de "local"/"grátis". Código nativo (sem mirror git fresco desta sessão, mesma
+distinção honesta do S49.7).
+
+- **`src/research/notebooklm-adapter.js`** (novo, `gstack.notebooklm-adapter.v1`):
+  `resolveConnectMode` sempre `"interactive_required"` — `--yes` nunca bypassa.
+  `classifyNotebookLMFailure`: schema/quota/auth (e categoria desconhecida) sempre
+  degradam pra `degraded_external_service`, nunca travam nem fingem sucesso.
+  `validateImportRequiresCitationAndApproval`: citação de fonte E aprovação explícita
+  ambas obrigatórias. `AUTO_COOKIE_IMPORT_ENABLED = false` +
+  `attemptAutomaticCookieImport()` sempre recusa — caminho nunca implementado de
+  propósito. `redactAuthLog`: nunca loga estado de auth (reusa `redactSecrets` +
+  padrões de cookie/session/auth_state).
+- **`src/tools/notebooklm.js`** (novo): wrapper CLI-facing puro sobre o adapter.
+- **`src/commands/research.js`**: `research notebooklm doctor|connect|query|import`.
+  `import` exige `--approved` explícito na linha de comando (nunca `--yes`) + citações
+  no artefato de resultado.
+- `tests/fixtures/notebooklm/scrubbed-cassettes/` (novo): cassetes VCR SINTÉTICOS —
+  nenhum cookie/token/dado pessoal real; teste de proveniência varre por padrões
+  sensíveis.
+- `docs/guides/notebooklm-experimental.md` (novo).
+- 15 testes novos (10 unit + 5 CLI), QG strict `blocking_severity_count:0`.
+- **Backlog honesto**: nenhum ambiente Python pinado real configurado — `doctor` sempre
+  reporta `not_configured`; testes ao vivo contra a API real não existem nesta sessão
+  (nunca gate de release, per DoD); `--approved` é uma flag explícita, não uma UI de
+  aprovação interativa completa.
+
 ## [5.46.0] - 2026-07-23 — PRD49 S49.8: unified media-intake router e Claude Video spike
 
 - **`src/capabilities/media-intake.js`** (novo, `gstack.media-intake-router.v1`):

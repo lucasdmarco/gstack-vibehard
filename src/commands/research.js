@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync } from 
 import { join, dirname, relative, isAbsolute } from "path"
 import { spawnSync } from "child_process"
 import { auditExternalSkills, renderAuditMarkdown } from "../skills/external-audit.js"
+import { notebookLmDoctor, notebookLmConnect, notebookLmQuery, notebookLmImport } from "../tools/notebooklm.js"
 import { section, success, warn, error, info } from "../cli/index.js"
 
 /**
@@ -113,10 +114,72 @@ function auditCmd(cwd, args, json) {
   return audit
 }
 
+function emitNotebookLm(payload, json, humanFn) {
+  if (json) { process.stdout.write(JSON.stringify(payload) + "\n"); return payload }
+  humanFn(payload)
+  return payload
+}
+
+function notebookLmDoctorCmd(json) {
+  const r = notebookLmDoctor()
+  return emitNotebookLm(r, json, (p) => {
+    section("research notebooklm doctor")
+    warn(`  status: ${p.status} — conector experimental, cloud, não-oficial`)
+  })
+}
+
+function notebookLmConnectCmd(json) {
+  const r = notebookLmConnect()
+  return emitNotebookLm(r, json, (p) => { section("research notebooklm connect"); warn(`  ${p.message}`) })
+}
+
+function notebookLmQueryCmd(args, json) {
+  const notebookId = flagValue(args, "--notebook")
+  const question = flagValue(args, "--question")
+  if (!notebookId || !question) { error("research notebooklm query: informe --notebook <id> --question <texto>"); process.exitCode = 1; return null }
+  const r = notebookLmQuery({ notebookId, question })
+  return emitNotebookLm(r, json, (p) => { section("research notebooklm query"); warn(`  status: ${p.status} (${p.category})`) })
+}
+
+function readImportResult(resultPath) {
+  try { return JSON.parse(readFileSync(resultPath, "utf-8")) } catch { return null }
+}
+
+function notebookLmImportCmd(args, json) {
+  const resultPath = flagValue(args, "--result")
+  const to = flagValue(args, "--to")
+  const approved = args.includes("--approved") // explícito na linha de comando -- --yes NUNCA basta (ver costGateStatus/spendConfirmed em outras sprints)
+  if (!resultPath || !to) { error("research notebooklm import: informe --result <artefato> --to context|obsidian"); process.exitCode = 1; return null }
+  const result = readImportResult(resultPath)
+  if (!result) { error(`research notebooklm import: não consegui ler/parsear ${resultPath}`); process.exitCode = 1; return null }
+  const r = notebookLmImport({ result, approved, to })
+  if (!r.ok) process.exitCode = 1
+  return emitNotebookLm(r, json, (p) => {
+    section("research notebooklm import")
+    ;(p.ok ? success : error)(p.ok ? `  importado para ${p.to} com ${p.sourceCitations.length} citação(ões)` : `  recusado: ${p.reason}`)
+  })
+}
+
+const NOTEBOOKLM_HANDLERS = Object.freeze({
+  doctor: (args, json) => notebookLmDoctorCmd(json),
+  connect: (args, json) => notebookLmConnectCmd(json),
+  query: (args, json) => notebookLmQueryCmd(args, json),
+  import: (args, json) => notebookLmImportCmd(args, json),
+})
+
+function notebookLmCmd(sub, args, json) {
+  const handler = NOTEBOOKLM_HANDLERS[sub[1]]
+  if (handler) return handler(args, json)
+  error("research notebooklm: use doctor|connect|query|import")
+  process.exitCode = 1
+  return null
+}
+
 function printResearchUsage() {
   section("research")
   info("  research skills audit --path <dir> [--json]   audita mirror local read-only (adopt/adapt/avoid)")
   info("  research skills audit --repo <url> [--json]    clona raso (opt-in, rede) e audita — nunca executa/instala")
+  info("  research notebooklm doctor|connect|query|import   conector experimental (cloud, não-oficial)")
 }
 
 /** Dispatcher do `research`. */
@@ -125,5 +188,6 @@ export async function researchCommand(args = [], opts = {}) {
   const json = args.includes("--json")
   const sub = args.filter((a) => !a.startsWith("-"))
   if (sub[0] === "skills" && sub[1] === "audit") return auditCmd(cwd, args, json)
+  if (sub[0] === "notebooklm") return notebookLmCmd(sub, args, json)
   printResearchUsage()
 }

@@ -1,0 +1,5 @@
+{
+  "note": "Cassete VCR SINTÉTICO — nenhum dado real. Simula uma falha de quota da API.",
+  "request": { "notebookId": "notebook-fixture-002", "question": "Resuma a fonte 1." },
+  "error": { "kind": "quota", "message": "synthetic fixture: quota exceeded (not a real API response)" }
+}
