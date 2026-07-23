@@ -1,5 +1,31 @@
 # Changelog - gstack-vibehard
 
+## [5.55.0] - 2026-07-23 — PRD50 S50.6: benchmark medido (e o que não foi medido)
+
+O sprint que separa "acreditar no prompt" de "medir". E que declara, sem rodeio, o que
+**não** dá para medir sem gente de fora.
+
+- **`src/epistemic/benchmark.js`** + **`npm run bench:epistemic`**: mede só o que tem
+  gabarito **objetivo** — decidível por inspeção do fixture, independente de quem
+  construiu o sistema. Resultado nesta máquina, todos os gates passando:
+  falso-suporte 0/3 · precisão de citação 6/6 · citação vazando como suporte 0 ·
+  classificação determinística 10/10 · abstenção 2/2 · tool claim sem recibo 0 ·
+  `proved` vindo de LLM 0.
+- **`tests/fixtures/epistemic/citation-pairs.json`** (novo): 6 pares claim/trecho/fonte
+  com gabarito objetivo, incluindo 2 casos de misquotation (trecho que não existe na
+  fonte) e 2 de menção sem suporte.
+- **A fatia subjetiva NÃO foi medida, por decisão metodológica**:
+  `citation_support_precision_on_ambiguous` e `answer_relevance_to_intent` saem como
+  `pending_human_labeling`. Se eu rotulasse, seria exatamente a autoconcordância que o
+  §2.3 item 1 rejeita — quem construiu o protocolo não pode dar a nota ao protocolo.
+- **`fullyValidated: false` é estrutural, não um TODO**: há teste que falha se alguém
+  colocar `true` com a fatia humana aberta, e outro que falha se algum percentual for
+  hardcoded como resultado (impede score de Aletheia/Deep Think migrar pra cá, §17.2).
+- `docs/guides/epistemic-benchmark.md` (novo): o que foi medido, o que falta, e o
+  procedimento de ~1h para rotular os 2 casos ambíguos — depois disso o script
+  recalcula sozinho.
+- 11 testes novos. QG strict 0 de primeira. Suíte 1916, 0 falhas.
+
 ## [5.54.0] - 2026-07-23 — PRD50 S50.5: contrato epistêmico cross-harness
 
 O §8 exige **uma fonte canônica** compilada para os adapters, nunca texto duplicado à

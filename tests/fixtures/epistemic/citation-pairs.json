@@ -1,0 +1,54 @@
+{
+  "schemaVersion": "gstack.epistemic-citation-pairs.v1",
+  "purpose": "Pares claim/trecho/fonte com gabarito OBJETIVO de suporte. Cada expectedState e decidivel por inspecao do proprio par -- nenhum exige julgamento humano. Casos ambiguos NAO entram aqui; eles vivem em corpus.json com requiresHumanLabel:true.",
+  "pairs": [
+    {
+      "id": "cp-supports-001",
+      "claim": "o metodo X reduz Y",
+      "excerpt": "concluimos que o metodo X reduz Y de forma consistente",
+      "content": "resumo: concluimos que o metodo X reduz Y de forma consistente em todos os testes.",
+      "expectedState": "supports",
+      "rationale": "trecho existe na fonte e afirma exatamente o claim"
+    },
+    {
+      "id": "cp-mentions-001",
+      "claim": "o metodo X reduz Y",
+      "excerpt": "trabalhos futuros podem investigar o metodo X",
+      "content": "trabalhos futuros podem investigar o metodo X em outros dominios.",
+      "expectedState": "mentions_only",
+      "rationale": "cita o tema mas nao afirma a reducao -- existencia nao e suporte"
+    },
+    {
+      "id": "cp-notfound-001",
+      "claim": "o metodo X reduz Y",
+      "excerpt": "o metodo X elimina completamente Y",
+      "content": "o metodo X reduz Y em ambiente controlado.",
+      "expectedState": "not_found",
+      "rationale": "misquotation: o trecho atribuido nao existe na fonte"
+    },
+    {
+      "id": "cp-contradicts-001",
+      "claim": "o metodo X reduz Y",
+      "excerpt": "o metodo X nao reduz Y",
+      "content": "nossos dados mostram que o metodo X nao reduz Y.",
+      "expectedState": "contradicts",
+      "rationale": "o trecho nega o claim"
+    },
+    {
+      "id": "cp-notfound-002",
+      "claim": "a biblioteca suporta streaming",
+      "excerpt": "a biblioteca suporta streaming nativo desde a v2",
+      "content": "a biblioteca oferece leitura sincrona e assincrona de arquivos.",
+      "expectedState": "not_found",
+      "rationale": "citacao inventada: nada disso consta na fonte"
+    },
+    {
+      "id": "cp-mentions-002",
+      "claim": "o pacote e seguro para producao",
+      "excerpt": "o pacote esta em uso por varios projetos",
+      "content": "o pacote esta em uso por varios projetos da comunidade.",
+      "expectedState": "mentions_only",
+      "rationale": "popularidade nao sustenta claim de seguranca para producao"
+    }
+  ]
+}
