@@ -264,14 +264,33 @@ export function stopAll(state, opts = {}) {
 // PRD51 S51.1: `still_alive` e `handle_not_released` são não-resolvidos — o
 // state nunca pode ser limpo enquanto um deles existir (senão o retry perde o pid).
 const STOP_UNRESOLVED = new Set(["access_denied", "signal_failed", "still_alive", "handle_not_released", "skipped_unverified", "skipped_foreign"])
+// PRD51 S51.1.1 (P0b): SÓ o `still_alive` é a race pura — kill SEM erro, mas a probe
+// IMEDIATA de `attemptKill` ainda vê o processo (taskkill /F é assíncrono no Windows).
+// A AUTORIDADE final é a liveness pós-espera (`waitPidsExit`): se o pid morreu durante a
+// espera, `still_alive` vira `stopped`. Deliberadamente NÃO reconciliamos:
+//   • `access_denied`/`signal_failed` — anomalia de permissão/erro; fail-closed por decisão
+//     do PRD45 S45.1 (P0.2): preservam o state mesmo que o pid morra sozinho depois;
+//   • `skipped_*` (ownership) — decisão de não-tocar, não é liveness nossa.
+const LIVENESS_DEPENDENT = new Set(["still_alive"])
+// Reconcilia cada result contra a liveness real pós-espera. Um status liveness-dependent
+// cujo pid sumiu vira `stopped` (mantendo `reconciledFrom` para diagnóstico honesto).
+function reconcileByLiveness(results, aliveSet) {
+  return (results || []).map((r) =>
+    LIVENESS_DEPENDENT.has(r.status) && !aliveSet.has(r.pid)
+      ? { ...r, status: "stopped", reconciledFrom: r.status }
+      : r)
+}
 export function stopOutcome(results, stillAlive) {
-  const unresolved = (results || []).filter((r) => STOP_UNRESOLVED.has(r.status))
-  const clearable = unresolved.length === 0 && (stillAlive || []).length === 0
+  const aliveSet = new Set(stillAlive || [])
+  const reconciled = reconcileByLiveness(results, aliveSet)
+  const unresolved = reconciled.filter((r) => STOP_UNRESOLVED.has(r.status))
+  const clearable = unresolved.length === 0 && aliveSet.size === 0
   return {
     clearable,
     exitCode: clearable ? 0 : 1,
     unresolved: unresolved.map((r) => ({ name: r.name, status: r.status, pid: r.pid })),
     stillAlive: stillAlive || [],
+    results: reconciled,
   }
 }
 

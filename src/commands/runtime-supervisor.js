@@ -81,11 +81,18 @@ function trustAndLoad(m, cwd) {
   success(`Manifest aprovado e confiado (digest ${verdict.digest.slice(0, 12)}…).`)
   return m
 }
+// PRD51 S51.1.1 (P0a): o diagnóstico do kill depende do stderr do taskkill (distinguir
+// "acesso negado" de "não encontrado"). `stdio:"ignore"` DESCARTAVA esse stderr →
+// `isAccessDeniedError` cegava → access_denied virava signal_failed → state preso/EBUSY.
+// Capturamos stderr (pipe) sem vazar para o console; stdout segue ignorado.
+export function winKillExec(execImpl = execFileSync) {
+  return (file, a) => execImpl(file, a, { stdio: ["ignore", "ignore", "pipe"], encoding: "utf-8" })
+}
 // Reinicia (--force): mata a árvore antiga e ESPERA a morte real (senão o antigo
 // ainda segura a porta/log e o novo nasce unhealthy — race do taskkill).
 async function restartAlive(alive, json) {
   const onWin = process.platform === "win32"
-  const killed = stopAll(alive, onWin ? { exec: (f, a) => execFileSync(f, a, { stdio: "ignore" }) } : {})
+  const killed = stopAll(alive, onWin ? { exec: winKillExec() } : {})
   if (!json) killed.forEach((r) => info(`  • reiniciando — parei o antigo ${r.name}: ${r.status}`))
   // TODOS os pids (não só "stopped"): "already-gone" pode estar em teardown de handles.
   await waitPidsExit(killed.map((r) => r.pid))
@@ -250,7 +257,7 @@ function stopNothing(json) {
 // é PULADO. Windows: taskkill /T /F via exec; POSIX: nativo (process.kill(-pid)).
 function stopExecOpts(opts) {
   const onWin = process.platform === "win32"
-  return { getAgeSec: opts.getAgeSec || procAgeSec, ...(onWin ? { exec: (file, a) => execFileSync(file, a, { stdio: "ignore" }) } : {}) }
+  return { getAgeSec: opts.getAgeSec || procAgeSec, ...(onWin ? { exec: winKillExec() } : {}) }
 }
 const stopLine = (r) => `  • ${r.name}: ${r.status}${r.pid ? ` (pid ${r.pid})` : ""}${r.note ? ` [${r.note}]` : ""}`
 function renderStopUnresolved(outcome) {
@@ -281,8 +288,10 @@ export async function stopCommand(args = [], opts = {}) {
   // com pid vivo era o bug que impedia a 2ª tentativa e deixava órfão/porta/handle presos.
   const outcome = stopOutcome(results, stillAlive)
   if (outcome.clearable) clearState(cwd)
-  if (json) process.stdout.write(JSON.stringify({ stopped: results, stillAlive, cleared: outcome.clearable, exitCode: outcome.exitCode }) + "\n")
-  else renderStop(results, outcome, opts)
+  // S51.1.1: reporta os results RECONCILIADOS (pós-espera), não os da probe imediata.
+  // `stopOutcome` sempre devolve `results` (reconciliados) — sem fallback (evita branch extra).
+  if (json) process.stdout.write(JSON.stringify({ stopped: outcome.results, stillAlive, cleared: outcome.clearable, exitCode: outcome.exitCode }) + "\n")
+  else renderStop(outcome.results, outcome, opts)
   return outcome.exitCode
 }
 
