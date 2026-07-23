@@ -55,6 +55,16 @@ Third-Party Components
    gstack_vibehard does not import Impeccable's CLI, installer, or Live Mode; only
    the audited, license-compatible detector/context modules are copied and adapted.
 
+10. Obsidian Skills (skills/vendor/kepano-obsidian-skills/)
+    License: MIT
+    Copyright (c) 2026 Steph Ango (@kepano)
+    https://github.com/kepano/obsidian-skills
+    Audited commit: a1dc48e68138490d522c04cbf5822214c6eb1202
+    Governed vendor snapshot (PRD49 S49.6) — 4 of 5 upstream skills vendored
+    (obsidian-markdown, obsidian-bases, json-canvas, obsidian-cli); see
+    skills/vendor/kepano-obsidian-skills/<commit>/upstream-map.md for the full
+    per-file provenance map and the honest reason `defuddle` was not vendored.
+
 
 Full License Texts
 ------------------
