@@ -1,5 +1,40 @@
 # Changelog - gstack-vibehard
 
+## [5.50.0] - 2026-07-23 — PRD50 S50.1: schema, classificador e EV0 (com wiring real)
+
+Primeiro sprint do PRD50 com código que roda. **Inclui o wiring antecipado do Sprint
+50.5 por decisão do usuário** — o passo "ligar num comando real" era exatamente onde
+PRD47/48/49 deferiram 3 vezes seguidas.
+
+- **`src/epistemic/schema.js`** (novo, `gstack.epistemic-review.v1`): vocabulário (§10)
+  + `buildReview`/`validateReview`/`verdictFromClaims`/`exitCodeForVerdict`. Invariantes
+  de §10.1 aplicados no único ponto por onde todo resultado passa: `confidence:"high"`
+  sem suporte é **inválido**; `status:"supported"` sem suporte é **inválido** (status
+  nunca vale por decreto); sem claim nenhum o verdict é `inconclusive`, jamais
+  `supported`. `refuted`/`inconclusive`/`needs_expert` são conclusões honestas → exit 0
+  (só `--strict` devolve 3).
+- **`src/epistemic/classifier.js`** (novo): EV0/EV1/EV2 determinístico (§9), sem LLM.
+  **Fail-safe deliberado**: ausência de sinal cai em `grounded`, NUNCA em `sanity` —
+  não classificar não pode virar desculpa para não verificar. Override (§9.3): elevar é
+  livre; **rebaixar EV2 sem confirmação é recusado**, e rebaixamento confirmado custa o
+  direito de alegar verificação (`mayClaimVerified: false` + `riskReceipt`).
+- **`src/epistemic/protocol.js`** (novo, só o caminho EV0 nesta sprint): uma passagem,
+  zero rede/subagente/model call. EV0 **nunca** emite `supported` (é sanity check, não
+  verificação) e sempre declara `notPerformed`. Sem limite real, o render devolve a
+  resposta crua — é isso que mantém o trivial barato.
+- **`src/commands/consult.js`** — **1º consumidor real (EV1)**. O `consult` sempre
+  misturou sondagem real de disco com heurística de keyword na mesma saída; agora sai
+  rotulado: `installState` = `fact` (suporte real: a sondagem read-only),
+  `recommendedMode` = `inference` (declara que é heurística, não medição),
+  `recommendedPath` = `recommendation`. **Aditivo**: nenhum campo existente mudou de
+  forma; os 4 campos do contrato de aceite original seguem intactos (testado).
+- **Gate dos 8% re-escopado honestamente**: medido dentro do comando do GStack, onde ele
+  controla entrada e saída. No Claude Code/Codex o contrato é texto injetado no adapter e
+  o GStack **nunca vê a resposta** — declarado no teste e no guia, não escondido.
+- 31 testes novos (`epistemic_schema` 8, `epistemic_classifier` 13, `epistemic_ev0` 10),
+  QG strict 0 (2 CRITICAL de complexidade em `validateReview`/`verdictFromClaims`
+  resolvidos por tabela de regras), zero regressão em `consult`/firewall.
+
 ## [5.49.0] - 2026-07-23 — PRD50 S50.0: baseline epistêmico, fontes e controles negativos
 
 Início do PRD50 (Protocolo de Verificação Epistêmica Proporcional). Esta sprint congela

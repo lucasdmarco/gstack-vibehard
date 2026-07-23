@@ -3,6 +3,7 @@ import { join } from "path"
 import { homedir } from "os"
 import { classify } from "../project-plan/classifier.js"
 import { getRecipe, DEFAULT_RECIPE_ID } from "../project-plan/recipes.js"
+import { buildReview } from "../epistemic/schema.js"
 import { section, success, warn, info, error } from "../cli/index.js"
 
 /**
@@ -51,6 +52,49 @@ function doNotStackFor(paths) {
  * preview e rollback. Contrato do aceite: recommendedPath, doNotStack,
  * previewCommand, rollbackCommand.
  */
+/**
+ * PRD50 S50.1 — 1º consumidor real do protocolo epistêmico (EV1).
+ *
+ * O `consult` sempre misturou duas coisas muito diferentes na mesma saída:
+ * `installState` vem de sondagem REAL do disco (fato), enquanto `recommendedMode`
+ * vem de heurística de keyword sobre o texto do objetivo (inferência). Aqui elas
+ * passam a sair rotuladas. ADITIVO: nenhum campo existente muda de forma.
+ */
+function epistemicReviewFor({ objective, recipe, paths, path }) {
+  const probed = Object.entries(paths).map(([k, v]) => `${k}=${v}`).join(", ")
+  return buildReview({
+    question: objective,
+    level: "grounded",
+    classificationReasons: ["claim sobre estado do produto/instalação (§9.2)"],
+    claims: [
+      {
+        id: "installState", text: `superfícies de instalação detectadas: ${probed}`,
+        kind: "fact", status: "supported",
+        // Fato tem suporte REAL: a sondagem read-only do filesystem.
+        support: [{ sourceId: "local:detectInstallPaths", excerpt: probed, kind: "local_primary" }],
+        counterevidence: [], boundaryCases: [], tests: [], limitations: [], confidence: "high",
+      },
+      {
+        id: "recommendedMode", text: `modo recomendado: ${recipe.recommendedMode}`,
+        kind: "inference", status: "ambiguous",
+        support: [], counterevidence: [], boundaryCases: [], tests: [],
+        limitations: ["derivado de heurística de palavras-chave sobre o objetivo — não é medição do projeto"],
+        confidence: "low",
+      },
+      {
+        id: "recommendedPath", text: `${path.id}: ${path.why}`,
+        kind: "recommendation", status: "not_applicable",
+        support: [], counterevidence: [], boundaryCases: [], tests: [],
+        limitations: ["recomendação, não verificação — execute o preview antes de aplicar"],
+        confidence: "low",
+      },
+    ],
+    protocol: { completed: true, iterations: 1, stopReason: "sufficient" },
+    notPerformed: ["nenhuma fonte externa consultada", "nenhum comando de instalação executado"],
+    tokenBudget: { network: false, extraModelCalls: 0, subagents: false, execution: false },
+  })
+}
+
 export function buildConsult({ objective = "", home, cwd } = {}) {
   const cls = classify(objective)
   const recipe = getRecipe(cls.recipeId || DEFAULT_RECIPE_ID) || getRecipe(DEFAULT_RECIPE_ID)
@@ -68,6 +112,7 @@ export function buildConsult({ objective = "", home, cwd } = {}) {
     rollbackCommand: "gstack_vibehard uninstall --dry-run",
     installState: paths,
     risks: paths.stacked ? ["instalação empilhada detectada (legado + atual)"] : [],
+    epistemic: epistemicReviewFor({ objective, recipe, paths, path }),
   }
 }
 
