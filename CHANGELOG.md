@@ -1,5 +1,41 @@
 # Changelog - gstack-vibehard
 
+## [5.45.0] - 2026-07-23 — PRD49 S49.7: Scroll World, capacidade distribuída governada
+
+**Distinção honesta em relação a S49.2A/S49.6**: esta sprint NÃO inclui um mirror git
+fresco de `oso95/scroll-world` nesta sessão — o código é NATIVO GStack, implementando a
+especificação já auditada e documentada em `.docs/PLANS/prd49.md#2.2`. O source-manifest
+permanece `verifiedByThisSession:false` para esta fonte (honesto: não fiz verificação
+própria do repo real).
+
+- **`src/capabilities/media-budget.js`** (novo, `gstack.media-budget.v1`):
+  `estimateMediaCost` (aritmética determinística), `canProceedWithMediaSpend` (**reusa
+  `costGateStatus` do S49.0** — `--yes` nunca confirma gasto, não duplica a lógica),
+  `enforceIterationCap`, `oneProviderPerChain` (1 provider/modelo por chain, exceção só
+  com recovery documentado), `buildMediaManifestEntry` (provider/promptHash/model/
+  source/license/dimensões/fileHash).
+- **`src/capabilities/scroll-world.js`** (novo, `gstack.scroll-world-capability.v1`):
+  `PUBLIC_SKILL_ID = null` (nenhum skill/catálogo público novo — controle real, não só
+  documentado). `validateScrollWorldIntake`: 8 itens obrigatórios fail-closed, incl.
+  `spendConfirmed:true` literal. `routeScrollWorldFragment`: mapeia pra
+  `EXISTING_SPECIALIST_ROLES` — só 3 papéis REAIS existem hoje
+  (`frontend-specialist`/`performance-optimizer`/`qa-automation-engineer`, provado contra
+  `agents/agents/*.md` no disco); não há papel dedicado de UX/acessibilidade, então
+  `ux`/`accessibility` mapeiam pro `frontend-specialist` (many-to-one honesto, nunca um
+  papel fabricado). `resolveGenerationFallback`: dependência ausente (auth/créditos/
+  FFmpeg/Pillow/provider) → `static_fallback`, preserva o brief, nunca destrói o projeto.
+  `runFakeProviderChain`: orquestra a rota completa (intake→gasto→cap→geração→manifesto)
+  com um provider FAKE — os mesmos gates reais, sem rede/gasto real.
+- `tests/e2e/scroll_world_fixture.e2e.test.js` (novo): E2E fake-provider prova a rota
+  inteira sem provider pago configurado.
+- `docs/guides/scroll-world.md` (novo).
+- 19 testes novos, QG strict `blocking_severity_count:0`.
+- **Backlog honesto e explícito**: os gates determinísticos/operacionais do plano
+  original (continuidade de seam, viewport mobile, reduced-motion, orçamento de
+  performance/LCP, detector Impeccable + gate visual sobre mídia gerada, worktree
+  obrigatório + Action Kernel real no fluxo) exigem um pipeline de mídia/Playwright real
+  que não existe nesta sessão — nunca fabricados com fixtures fake fingindo prova real.
+
 ## [5.44.0] - 2026-07-23 — PRD49 S49.6: Governed Obsidian skill bundle
 
 Segundo vendoring real de código/conteúdo de terceiro do projeto (depois do Impeccable,
