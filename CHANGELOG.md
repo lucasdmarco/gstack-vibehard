@@ -1,5 +1,33 @@
 # Changelog - gstack-vibehard
 
+## [5.48.0] - 2026-07-23 — PRD49 S49.10: fechamento do programa (RC checklist, README, cross-capability)
+
+**PRD49 FECHADO** (S49.0→S49.10, v5.37.0→v5.48.0, 11 sprints) — design/mídia/conhecimento
+governados. `prd49Readiness().ready === true` (os 3 P0 delivered: governança real,
+primeiro vendoring real do projeto com proveniência completa, detector nativo conectado
+ao vendor real). 4 dos 8 P1 ficam honestamente `partial` — cada um já documentado no
+CHANGELOG do próprio sprint, nenhuma surpresa nesta checklist.
+
+- **`src/dream/rc-checklist-prd49.js`** (novo, `gstack.rc-checklist.prd49.v1`):
+  `PRD49_RC_ITEMS` (3 P0 + 8 P1, cada um com `proof` real citando um teste que existe)
+  + `prd49Readiness()`. `PRD49_SCENARIO_COVERAGE`: os 15 cenários obrigatórios do plano
+  §49.10, cada um `real` (teste dedicado existe), `partial` (evidência real cobre parte)
+  ou `not_executed` (infraestrutura real — 3 SOs/provider pago/CI multi-SO — que não
+  existe nesta sessão, nunca fabricada).
+- **README.md**: 3 novas linhas de capacidade (detector de design, skills de Obsidian,
+  media-intake/Scroll World) + 4 novas entradas na tabela de documentação, apontando
+  pros guias reais de cada sprint.
+- `npm run sbom` (já existente, `npm sbom --sbom-format cyclonedx`) confirmado
+  funcional — SBOM de dependências npm; proveniência do código vendorizado (Impeccable/
+  Obsidian) fica em `UPSTREAM.json`/`NOTICE`, não no SBOM de pacotes.
+- 8 testes novos no guard da checklist, QG strict `blocking_severity_count:0`.
+
+**Não executado nesta sessão, declarado honestamente**: E2E de máquina limpa em 3 SOs
+(só Windows disponível), matriz de conformance viva contra harnesses reais (Claude/
+Codex/OpenCode/Cursor — só declarações estáticas foram testadas), estado real
+`awaiting_user_trust` do Codex, função de uninstall dedicada para as projeções
+project-local novas (S49.3). Nenhum destes foi fabricado com fixture fingindo prova real.
+
 ## [5.47.0] - 2026-07-23 — PRD49 S49.9: NotebookLM research connector experimental
 
 Conector cloud OPCIONAL — nunca vira memória automática, nunca gate de release, nunca
