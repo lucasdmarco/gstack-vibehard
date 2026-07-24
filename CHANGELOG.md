@@ -1,5 +1,36 @@
 # Changelog - gstack-vibehard
 
+## [5.59.1] - 2026-07-23 — PRD51 S51.1.1: runtime Windows — as DUAS causas que a 5.59.0 NÃO fechou
+
+A 5.59.0 (S51.1) corrigiu a classificação do `taskkill` (probe de liveness > exit code),
+mas o usuário **reproduziu a falha** (2/4 fail: ~81s, PIDs vivos, EBUSY, dirs residuais).
+Auditoria confirmou **duas causas remanescentes** — n=1 verde não fecha um vermelho no
+mesmo commit; a 5.59.0 foi declarada fechada cedo demais.
+
+- **P0a — o chamador descartava o stderr do taskkill.** `src/commands/runtime-supervisor.js`
+  matava com `execFileSync(..., { stdio: "ignore" })`, o que **apaga** o stderr que
+  `isAccessDeniedError` precisa para distinguir "acesso negado" de "não encontrado". Sem
+  stderr, um kill negado com o processo ainda vivo caía em `signal_failed`. Novo
+  `winKillExec(execImpl)` captura o stderr (`stdio: ["ignore","ignore","pipe"]`) sem vazar
+  para o console; usado no `stop` (`stopExecOpts`) e no `dev --force` (`restartAlive`).
+- **P0b — `stopOutcome` não reconciliava com a espera final.** O status vinha da probe
+  **imediata** de `attemptKill`; um processo carimbado `still_alive` que morria durante o
+  `waitPidsExit` (taskkill /F é assíncrono no Windows) mantinha o state preso para sempre
+  → EBUSY/resíduo. `stopOutcome` agora reconcilia: um `still_alive` cujo pid não está mais
+  vivo pós-espera vira `stopped` (com `reconciledFrom` para diagnóstico). A reconciliação é
+  **restrita a `still_alive`** — `access_denied`/`signal_failed` continuam fail-closed
+  (decisão do PRD45 S45.1 P0.2 preservada, sem regressão) e `skipped_*` (ownership) idem.
+- O `stop` passa a reportar os results **reconciliados** (não os da probe imediata).
+- Testes: `tests/runtime_windows_reconcile.test.js` (10 controles negativos das 2 causas,
+  RED→GREEN). Zero regressão nos 43 testes de runtime (reconcile+windows+ownership+supervisor).
+
+**Honestidade sobre a prova (a régua do 51.0B aplicada a mim):** validação distribuída
+**20/20 isoladas OK**, resíduo `gstack-e2e-*` delta **0**, processos node delta **0**,
+tempos ~3.5s (sem o hang de 81s). Runtime **100% verde** na suíte completa sob carga. Mas
+NÃO executados ainda: **harness restrito**, **3 suítes em máquina fria**, **clean-machine
+Windows**. Runtime **NÃO** declarado `operationallyProven`; republicação segue **travada**
+na revogação do token exposto + ordem humana explícita. Considerar depreciar a 5.59.0.
+
 ## [5.59.0] - 2026-07-23 — PRD51 S51.1: runtime Windows — causa raiz corrigida
 
 Corrige a **causa raiz** do achado 4.1, reproduzida com evidência: `execFileSync(
