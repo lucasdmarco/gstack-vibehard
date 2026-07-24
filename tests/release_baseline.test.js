@@ -20,7 +20,7 @@ test("§3: os 4 estados existem e são INDEPENDENTES (nenhum implica o outro)", 
   const { buildReleaseBaseline } = await imp("src/release/baseline.js")
   const b = buildReleaseBaseline({
     commit: "abc1234",
-    proof: { ready: true },
+    proof: { ready: true, commit: "abc1234" }, // S51.0C: prova precisa ser DO commit
     programItems: [{ id: "P0.1", status: "delivered" }, { id: "P1.1", status: "partial" }],
     flake: { runs: 3, failures: 1 },
     humanValidation: { pending: 2 },
@@ -86,9 +86,9 @@ test("CONTROLE NEGATIVO: ready:true com programComplete:false NÃO pode ser dito
 test("canRenderAsComplete: só com os 3 estados de fechamento verdes", async () => {
   const { canRenderAsComplete, buildReleaseBaseline } = await imp("src/release/baseline.js")
   const b = buildReleaseBaseline({
-    commit: "c", proof: { ready: true },
+    commit: "c", proof: { ready: true, commit: "c" }, // S51.0C: prova do commit
     programItems: [{ id: "x", status: "delivered" }],
-    flake: { runs: 30, failures: 0 }, humanValidation: { pending: 0 },
+    flake: { runs: 30, failures: 0 }, humanValidation: { performed: true, pending: 0 }, // S51.0C: validação declarada
   })
   assert.equal(canRenderAsComplete(b).ok, true)
 })

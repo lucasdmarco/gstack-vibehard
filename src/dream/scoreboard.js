@@ -34,10 +34,16 @@ export function buildDreamScoreboard(summary = {}, provenance = {}) {
   }
 }
 
-/** Consome o resultado do `audit()` real e devolve o placar honesto com proveniência. */
-export function scoreboardFromAudit(auditResult = {}) {
+/**
+ * Consome o resultado do `audit()` real e devolve o placar honesto com proveniência.
+ * O commit vem do `scope` do audit; se ausente, cai no `opts.commit` (o HEAD que o
+ * comando resolve). PRD51 S51.0C: o placar nunca fica sem commit por omissão — o
+ * chamador injeta o HEAD real. Continua PURO (nenhuma chamada a git aqui).
+ */
+export function scoreboardFromAudit(auditResult = {}, opts = {}) {
   const summary = auditResult.summary || {}
-  const commit = auditResult.scope ? auditResult.scope.headCommit || auditResult.scope.commit || null : null
+  const scope = auditResult.scope || {}
+  const commit = scope.headCommit || scope.commit || opts.commit || null
   return buildDreamScoreboard(summary, { commit })
 }
 

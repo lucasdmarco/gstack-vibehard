@@ -47,14 +47,26 @@ function computeOperational(flake) {
   return { proven, rate }
 }
 
+// PRD51 S51.0C — fail-closed: validação humana só conta se foi DECLARADAMENTE
+// executada (`performed:true`) E nada ficou pendente. Ausência de registro = NÃO
+// validado — nunca "zero pendências por omissão" (a fail-open que o usuário achou).
+function humanValidationComplete(humanValidation) {
+  return humanValidation.performed === true && (humanValidation.pending || 0) === 0
+}
+
 /** Monta a baseline a partir da evidência real do commit. PURO. */
 export function buildReleaseBaseline({
   commit = null, proof = {}, programItems = [], flake = {}, humanValidation = {},
 } = {}) {
-  const releaseReady = proof.ready === true
-  const programComplete = programItems.length === 0 || programItems.every(itemIsClosed)
+  // S51.0C: releaseReady exige que a prova seja DO COMMIT atual — prova de outro commit
+  // (ou sem commit) nunca autoriza (a lição da calibração, agora aplicada no builder).
+  const releaseReady = proof.ready === true && evidenceValidForCommit(proof, commit)
+  // S51.0C: programa vazio é AUSÊNCIA de evidência, não "completo". Exige itens declarados.
+  const programComplete = programItems.length > 0 && programItems.every(itemIsClosed)
   const { proven, rate } = computeOperational(flake)
-  const fullyValidated = (humanValidation.pending || 0) === 0 && proven
+  // S51.0C: os 4 estados são INDEPENDENTES (§3). fullyValidated depende SÓ da validação
+  // humana — desacoplado de operationallyProven (que antes o co-implicava por engano).
+  const fullyValidated = humanValidationComplete(humanValidation)
   return {
     schemaVersion: RELEASE_BASELINE_SCHEMA,
     releaseReady,

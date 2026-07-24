@@ -8,6 +8,7 @@ import { npxArgv } from "../installer/deps.js"
 import { aggregateTier } from "../project-plan/quality-profile.js"
 import { isKnownTier } from "../project-plan/qa-plan.js"
 import { dockerAvailable } from "../capabilities/e2e-runner.js"
+import { buildReleaseBaseline, canRenderAsComplete } from "../release/baseline.js"
 import { success, warn, error, info, section } from "../cli/index.js"
 
 /**
@@ -102,6 +103,13 @@ function renderAgentShieldLine(report) {
   const icon = a.status === "advisory" ? "•" : a.status === "unavailable" ? "⚠" : "–"
   info(`  ${icon} agentshield (ECC): ${a.status}${a.detail ? ` — ${a.detail}` : ""}`)
 }
+// PRD51 S51.0C parte 2 — advisory, nunca afeta o status do verify (§ attachReleaseBaseline).
+function renderReleaseBaselineLine(report) {
+  const b = report.releaseBaseline
+  if (!b) return
+  const verdict = b.completeVerdict.ok ? "pode renderizar 'concluído'" : b.completeVerdict.reason
+  info(`  • release-baseline (advisory): releaseReady=${b.releaseReady} programComplete=${b.programComplete} operationallyProven=${b.operationallyProven} fullyValidated=${b.fullyValidated} — ${verdict}`)
+}
 // Mensagem honesta: "PRONTO" só em ready; nunca em pending_product/blocked/timeout.
 function renderVerifyStatus(report) {
   if (report.status === "ready") return success("Projeto PRONTO — todos os gates aplicáveis passaram.")
@@ -118,6 +126,7 @@ function renderVerify(report, runId) {
   renderVerifyHeader(report)
   renderVerifySteps(report)
   renderAgentShieldLine(report)
+  renderReleaseBaselineLine(report)
   if (report.reducedTrust) warn(`Confiança REDUZIDA: harness '${report.harness}' não tem controle real (best-effort).`)
   info(`  Relatório: .gstack/runs/${runId}/verify.json`)
   renderVerifyStatus(report)
@@ -149,6 +158,26 @@ function applyTierGate(args, report, opts) {
   downgradeIfTierBlocks(report)
 }
 
+function resolveHeadCommit(cwd, exec) {
+  try { return String((exec || execFileSync)("git", ["rev-parse", "HEAD"], { cwd, stdio: "pipe", encoding: "utf-8", timeout: 15000 }) || "").trim() || null }
+  catch { return null }
+}
+
+/**
+ * PRD51 S51.0C parte 2 — release baseline como campo ADVISORY (decisão do usuário:
+ * opção 1). O publish-guard JÁ falha-fechado nos gates reais (source-parity/
+ * dream-required/capability-e2e/golden-workflow) — este campo é só um
+ * crédito-resumo desses estados para o commit atual, NUNCA um segundo gate.
+ * `programItems`/`humanValidation` ainda não têm ledger agregado real (isso é o
+ * Sprint 51.3) — ficam honestamente ausentes, nunca inventados, então
+ * `completeVerdict` é sempre não-ok até esse ledger existir de verdade.
+ */
+function attachReleaseBaseline(report, cwd, opts) {
+  const commit = resolveHeadCommit(cwd, opts.exec)
+  const baseline = buildReleaseBaseline({ commit, proof: { ready: report.status === "ready", commit } })
+  report.releaseBaseline = { ...baseline, advisory: true, completeVerdict: canRenderAsComplete(baseline) }
+}
+
 function runFullVerify(args, cwd, opts) {
   const runId = opts.runId || randomUUID().slice(0, 8)
   const dir = join(cwd, ".gstack", "runs", runId)
@@ -156,6 +185,7 @@ function runFullVerify(args, cwd, opts) {
   // ECC AgentShield (opt-in): camada de segurança de prompt-injection, advisory.
   if (wantsAgentShield(args)) report.agentShield = runAgentShield(cwd, opts.exec)
   applyTierGate(args, report, opts)
+  attachReleaseBaseline(report, cwd, opts)
   persistVerify(dir, runId, report)
   return { report, runId }
 }
