@@ -6,7 +6,8 @@
   "evidence": {
     "proof": {
       "ready": true,
-      "note": "verify --profile full deu ready:true em execução limpa; proof --profile full também. NÃO é estável — ver flake abaixo."
+      "commit": "039da5cbcc50fdd87036a1b65de81e74ed64a5e9",
+      "note": "verify --profile full deu ready:true em execução limpa; proof --profile full também. NÃO é estável — ver flake abaixo. S51.0C: prova atribuída ao commitAtFreeze (releaseReady exige evidência DO commit)."
     },
     "dreamAudit": {
       "source": "live_audit",

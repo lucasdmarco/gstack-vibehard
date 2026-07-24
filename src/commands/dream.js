@@ -1,4 +1,5 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs"
+import { execFileSync } from "node:child_process"
 import { join } from "node:path"
 import { audit } from "../dream/auditor.js"
 import { scoreboardFromAudit, renderScoreboardLine } from "../dream/scoreboard.js"
@@ -56,12 +57,20 @@ function claimIcon(status) {
   return status === "REAL" ? "✓" : status === "RISK" ? "⚠" : status === "PLACEBO" ? "✗" : status === "NOT_PROVED" ? "○" : "•"
 }
 
+// PRD51 S51.0C: HEAD real para a proveniência do placar. Falha → null (o placar
+// mostra só a data, honesto), nunca inventa um commit.
+function resolveHeadCommit(root) {
+  try { return String(execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, stdio: "pipe", encoding: "utf-8", timeout: 20000 }) || "").trim() || null }
+  catch { return null }
+}
+
 function auditCmd(ctx) {
   // PRD42 S42.0B: o modo COMPORTAMENTAL é o default do CLI — arquivo presente não vale
   // como REAL (vira NOT_PROVED). O modo legado (por arquivo) só sob opt-in `--files-only`.
   const r = audit({ root: ctx.root, behavioral: !ctx.filesOnly })
-  // PRD51 S51.0A: placar vivo com proveniência — nunca um número fixo (achado 4.3).
-  const scoreboard = scoreboardFromAudit(r)
+  // PRD51 S51.0A/0C: placar vivo com proveniência do commit real — nunca número fixo nem
+  // commit nulo por omissão (achados 4.3 e o do 51.0C).
+  const scoreboard = scoreboardFromAudit(r, { commit: resolveHeadCommit(ctx.root) })
   const withBoard = { ...r, scoreboard }
   return emit(ctx.json, withBoard, () => {
     section("dream audit — promessas vs evidência (determinístico, sem LLM)")
