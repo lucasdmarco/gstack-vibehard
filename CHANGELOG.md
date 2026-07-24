@@ -1,5 +1,33 @@
 # Changelog - gstack-vibehard
 
+## [5.59.2] - 2026-07-24 — PRD51 S51.0C parte 2: release baseline ADVISORY em `verify`
+
+Continuação da S51.0C (parte 1: baseline fail-closed + proveniência do scoreboard,
+v5.59.1 local). Pergunta pendente: como ligar os 4 estados do baseline
+(`releaseReady`/`programComplete`/`operationallyProven`/`fullyValidated`) ao caminho de
+release, já que o `publish-guard` **já falha-fechado** em
+`source-parity`/`dream-required`/`capability-e2e`/`golden-workflow`? **Decisão do
+usuário: opção 1 — Advisory no `verify`** (não Gate HARD no publish-guard, não gate na
+claim `concluído`) — o baseline é um crédito-resumo desses estados, nunca um segundo
+gate que duplica ou substitui os já existentes.
+
+- `src/commands/verify.js`: `verify --profile full --json` ganhou o campo
+  `releaseBaseline` — `buildReleaseBaseline` (S51.0B/C) alimentado com o commit HEAD real
+  e `proof.ready = (report.status === "ready")` do próprio run. **Puramente advisory**:
+  nunca sobrescreve `report.status`, nunca vira um gate novo. `programItems` e
+  `humanValidation` ainda não têm ledger agregado real (isso é o Sprint 51.3 — "Ledger
+  unificado de PRDs e claims") — ficam honestamente ausentes, então
+  `completeVerdict.ok` é sempre `false` até esse ledger existir de verdade (nunca
+  "concluído" por omissão).
+- Saída humana (`verify` sem `--json`) ganhou uma linha advisory mostrando os 4 estados
+  e o veredito de `canRenderAsComplete`.
+- `tests/verify_release_baseline_advisory.test.js` (3 testes): campo presente e
+  atribuído ao commit atual; controle negativo — git indisponível não inventa commit
+  (fica `null`) e não muda `report.status`; controle negativo — sem ledger de programa
+  wired, `completeVerdict.ok` nunca vira `true` por omissão.
+- 3 testes novos, QG strict `blocking_severity_count:0`, suíte JS 1982/1983 (1 skip
+  pré-existente).
+
 ## [5.59.1] - 2026-07-23 — PRD51 S51.1.1: runtime Windows — as DUAS causas que a 5.59.0 NÃO fechou
 
 A 5.59.0 (S51.1) corrigiu a classificação do `taskkill` (probe de liveness > exit code),
