@@ -1,5 +1,34 @@
 # Changelog - gstack-vibehard
 
+## [5.68.0] - 2026-07-27 — PRD51 S51.4.1: `plan run` passa a usar o mesmo pipeline do `start`
+
+Primeira parte do Sprint 51.4 ("Firewall por operação e registro único da CLI") —
+achado real (ação #5 do PRD, "corrigir `plan run`"): `plan run <id>` — que o próprio
+`start.js` recomenda como o equivalente não-interativo — rodava só o executor legado
+(`executePlan`, create-only), pulando SILENCIOSAMENTE dev/test/review/verify/preview,
+o design-system gate, a declaração de skill-route e o proof/closeout automático.
+
+- `src/commands/start.js`: `confirmAndRunPipeline` agora exportada.
+- `src/commands/plan.js`: `planRun` delega pra `confirmAndRunPipeline` (import
+  dinâmico — evita ciclo estático de import com `start.js`, que já importa
+  `printPlanHuman` de `plan.js`; ambos só tocam o binding importado dentro do corpo
+  da função, nunca em tempo de avaliação do módulo). `brief:null` é honesto — um
+  plano gerado por `plan "<objetivo>"` (sem o wizard/intake) nunca coletou
+  acceptance criteria. Novo flag `--design-system` em `plan run` (mesma semântica
+  de `start`, incluindo o opt-out explícito `none`).
+- **Consequência real, não escondida**: `plan run` de um objetivo que toca frontend
+  agora passa pelo Design System Gate como `start` sempre passou — sem
+  `--design-system`, bloqueia com a mesma mensagem honesta (antes nunca bloqueava,
+  porque nunca chegava perto do gate).
+- Removido código morto (`planRunGate`/`renderPlanResult`, substituídos pela
+  chamada única a `confirmAndRunPipeline`; import não usado de `executePlan`).
+- `tests/plan_command.test.js`: teste existente atualizado (`--design-system none`);
+  novo teste prova que o resultado agora tem `stages.review`/`verify`/`preview`
+  reais — não só `{status, completed, skipped}` do executor legado.
+- QG strict `blocking_severity_count:0`, suíte JS 2030/2030 (1 skip pré-existente,
+  máquina sob carga real de outros apps do usuário — suíte completa levou ~3.6min
+  em vez dos ~40s habituais, mas terminou limpa).
+
 ## [5.67.0] - 2026-07-27 — PRD51 S51.3: ledger unificado de PRDs + checklist canônico do PRD46
 
 Sprint 51.3 do PRD51 ("Ledger unificado de PRDs e claims"). Cada checklist

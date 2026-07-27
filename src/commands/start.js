@@ -301,7 +301,13 @@ function resolvedAcceptance(brief, opts, flags, cwd) {
 const wantsGoldenRun = (flags, opts) => flags.goldenRun === true || opts.goldenRun === true || process.env.GSTACK_GOLDEN_RUN === "1"
 
 /** Persiste, confirma e roda o pipeline. Retorna o contrato público do start. */
-async function confirmAndRunPipeline(plan, flags, opts, json, cwd, brief) {
+/**
+ * PRD51 S51.4.1 — exportado pra `plan run` (plan.js) reusar o MESMO pipeline
+ * do `start` (dev/test/review/verify/preview, design-system gate, skill-route,
+ * proof/closeout) em vez do executor legado sozinho (que `plan run` usava até
+ * aqui, achado real: silenciosamente pulava todos os gates pós-create).
+ */
+export async function confirmAndRunPipeline(plan, flags, opts, json, cwd, brief) {
   const planDir = persistPlanArtifacts(cwd, plan, brief)
   if (!json) printPlanHuman(plan)
 

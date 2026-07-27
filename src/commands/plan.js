@@ -2,9 +2,8 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync } from "fs"
 import { join } from "path"
 import { buildPlan } from "../project-plan/planner.js"
 import { getMode } from "../project-plan/modes.js"
-import { executePlan } from "../project-plan/executor.js"
 import { readState } from "../project-plan/state.js"
-import { success, warn, error, info, section, confirm } from "../cli/index.js"
+import { success, warn, error, info, section } from "../cli/index.js"
 
 /**
  * `plan` — gera um plano determinístico (sem LLM) a partir de um objetivo textual.
@@ -14,7 +13,7 @@ import { success, warn, error, info, section, confirm } from "../cli/index.js"
  *   gstack_vibehard plan "<objetivo>" --json     # JSON puro p/ automação
  *   gstack_vibehard plan "<objetivo>" --dry-run  # idêntico (PR3 nunca executa)
  */
-const PLAN_VALUE_FLAGS = { "--name": "name", "--mode": "mode", "--recipe": "recipe" }
+const PLAN_VALUE_FLAGS = { "--name": "name", "--mode": "mode", "--recipe": "recipe", "--design-system": "designSystem" }
 const PLAN_BOOL_FLAGS = new Set(["--json", "--dry-run", "--yes", "-y", "--with-optional"])
 function parse(args) {
   const out = {
@@ -134,29 +133,23 @@ function planRunRefused(json, autoYes) {
   else { section("plan run"); error("Modo não-interativo: confirme explicitamente com --yes.") }
   return true
 }
-// Imprime o plano (humano) e confirma. @returns false se o usuário cancelou.
-async function planRunGate(plan, json, autoYes) {
-  if (!json) printPlanHuman(plan)
-  if (autoYes) return true
-  const ok = await confirm(`Executar o plano ${plan.id} (${plan.steps.length} passos)?`, false)
-  if (!ok) info("Execução cancelada.")
-  return ok
-}
-function renderPlanResult(result) {
-  if (result.status === "done") success(`Plano concluído: ${result.completed.length} passo(s) ok, ${result.skipped.length} pulado(s).`)
-  else { error(`Plano parou em '${result.failed?.stepId}': ${result.failed?.summary}`); info("Corrija e rode `plan run` de novo — passos concluídos são retomados (journal).") }
-}
+/**
+ * PRD51 S51.4.1 — `plan run` delega pro MESMO pipeline do `start`
+ * (`confirmAndRunPipeline`, start.js) em vez do executor legado sozinho.
+ * Achado real: `plan run` (que `start.js` recomenda como o equivalente
+ * não-interativo) silenciosamente pulava dev/test/review/verify/preview, o
+ * design-system gate, a declaração de skill-route e o proof/closeout — rodava
+ * só o `create`. `brief:null` é honesto: um plano gerado por `plan "<objetivo>"`
+ * (sem o wizard/intake) nunca teve acceptance criteria coletados.
+ */
 async function planRun(cwd, flags, opts) {
   const planId = flags._[1]
   const plan = loadPlan(cwd, planId)
   if (!plan) return planRunNotFound(planId, flags.json)
   const autoYes = flags.yes || opts.yes === true
   if (planRunRefused(flags.json, autoYes)) return
-  if (!(await planRunGate(plan, flags.json, autoYes))) return
-  const result = executePlan({ plan, planDir: join(plansDir(cwd), plan.id), cwd, exec: opts.exec, includeOptional: flags.withOptional })
-  if (flags.json) return process.stdout.write(JSON.stringify(result) + "\n")
-  renderPlanResult(result)
-  return result
+  const { confirmAndRunPipeline } = await import("./start.js")
+  return confirmAndRunPipeline(plan, { ...flags, yes: autoYes }, opts, flags.json, cwd, null)
 }
 
 const PLAN_SUBS = { status: planStatus, explain: planExplain }
