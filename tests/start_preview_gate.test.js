@@ -1,6 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises"
+import { execFileSync } from "node:child_process"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
@@ -67,7 +68,7 @@ test("pipeline: preview unhealthy COM --golden-run em projeto SEM scripts.dev/st
     await writeFile(path.join(proj, "package.json"), JSON.stringify({ name: "app", scripts: { test: "node --test" } }))
     await writeFile(path.join(proj, ".gstack", "runtime.json"), JSON.stringify({ schemaVersion: 2, services: [{ name: "web", command: ["node", "s.js"], cwd: ".", dependsOn: [], port: null, health: { readiness: { type: "process" }, liveness: { type: "process" } }, restart: { policy: "never" }, secretRefs: [] }] }))
     await writeFile(path.join(proj, ".gstack", "runtime", "web.state.json"), JSON.stringify({ name: "web", pid: 1, port: 3000, status: "unhealthy", url: "http://127.0.0.1:3000/" }))
-    const { runPipeline } = await imp("src/project-plan/run-loop.js")
+    const { runPipeline, gateStagesFor } = await imp("src/project-plan/run-loop.js")
     const { buildPlan } = await imp("src/project-plan/planner.js")
     const { plan } = buildPlan({ objective: "cli tool", projectName: "app", mode: "lite" })
     const r = runPipeline({
@@ -75,7 +76,12 @@ test("pipeline: preview unhealthy COM --golden-run em projeto SEM scripts.dev/st
       exec: () => {}, devRunner: () => ({ services: [{ name: "web", status: "unhealthy" }] }),
       verifyRunner: () => ({ status: "ready", usable: true, failed: [] }),
     })
-    assert.equal(r.status, "done", "sem scripts.dev/start, preview não gateia mesmo com a flag ligada")
+    // PRD51 S51.2.7: com o cutover, o `status` agregado passou a depender TAMBÉM de
+    // acceptance/observação (gates do motor, não só do gate legado de preview) — a
+    // asserção precisa (preview não gateia sem hasRunScript) é sobre gateStagesFor
+    // diretamente, não sobre o status agregado.
+    assert.ok(!gateStagesFor({ goldenRun: true, projectDir: proj }).has("preview"), "sem scripts.dev/start, preview não entra no gate mesmo com a flag ligada")
+    assert.equal(r.stages.preview.status, "unhealthy", "estado real do preview continua honesto")
   } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
 })
 
@@ -87,6 +93,14 @@ test("pipeline: preview 'ready' COM --golden-run -> continua 'done' (só unhealt
     await writeFile(path.join(proj, "package.json"), JSON.stringify({ name: "app", scripts: { dev: "node s.js" } }))
     await writeFile(path.join(proj, ".gstack", "runtime.json"), JSON.stringify({ schemaVersion: 2, services: [{ name: "web", command: ["node", "server.js"], cwd: ".", dependsOn: [], port: { preferred: 3000, env: "WEB_PORT", autoAllocate: true }, health: { readiness: { type: "process" }, liveness: { type: "process" } }, restart: { policy: "never" }, secretRefs: [] }] }))
     await writeFile(path.join(proj, ".gstack", "runtime", "web.state.json"), JSON.stringify({ name: "web", pid: 1, port: 3000, status: "ready", url: "http://127.0.0.1:3000/" }))
+    // PRD51 S51.2.7: "done" com a flag exige os 4 portões do motor verdes,
+    // incluindo observationFresh (stage "test" ready/not_applicable) — árvore git
+    // limpa faz o gate seletivo por arquivos alterados resolver "clean"->"ready".
+    execFileSync("git", ["init"], { cwd: proj, stdio: "pipe" })
+    execFileSync("git", ["config", "user.email", "t@t.com"], { cwd: proj, stdio: "pipe" })
+    execFileSync("git", ["config", "user.name", "t"], { cwd: proj, stdio: "pipe" })
+    execFileSync("git", ["add", "-A"], { cwd: proj, stdio: "pipe" })
+    execFileSync("git", ["commit", "-m", "init"], { cwd: proj, stdio: "pipe" })
     const { runPipeline } = await imp("src/project-plan/run-loop.js")
     const { buildPlan } = await imp("src/project-plan/planner.js")
     const { plan } = buildPlan({ objective: "web app", projectName: "app", mode: "lite" })
@@ -94,7 +108,11 @@ test("pipeline: preview 'ready' COM --golden-run -> continua 'done' (só unhealt
       plan, planDir: path.join(cwd, ".gstack", "plans", plan.id), cwd, goldenRun: true,
       exec: () => {}, devRunner: () => ({ services: [{ name: "web", status: "ready" }] }),
       verifyRunner: () => ({ status: "ready", usable: true, failed: [] }),
+      // PRD51 S51.2.7: com o cutover, "done" só é alcançável com TODOS os 4 portões
+      // do motor verdes — aceite resolvido (verifier real) é um deles.
+      acceptance: [{ id: "feature-behavior", verifier: { kind: "command", ref: "npm test" } }],
     })
+    assert.equal(r.stages.test.status, "ready", "árvore git limpa -> changed-files 'clean' -> stage 'ready'")
     assert.equal(r.stages.preview.status, "ready")
     assert.equal(r.status, "done")
   } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }

@@ -1,5 +1,5 @@
-import { mkdirSync, writeFileSync, existsSync } from "fs"
-import { join } from "path"
+import { mkdirSync, writeFileSync, existsSync, readFileSync } from "fs"
+import { join, isAbsolute } from "path"
 import { runWizard } from "../project-plan/wizard.js"
 import { buildPlan } from "../project-plan/planner.js"
 import { sanitizeCommand } from "../project-plan/executor.js"
@@ -22,7 +22,7 @@ import { proposeBrownfieldChoices, decideBrownfieldOrNew } from "../onboarding/b
 import { openStateStore } from "../state/store.js"
 import { listSessions, activeSession } from "../state/session-index.js"
 import { buildProjections } from "../skills/design-context.js"
-import { resolveBriefAcceptances } from "../project-plan/acceptance-verification.js"
+import { resolveBriefAcceptances, mapJourney } from "../project-plan/acceptance-verification.js"
 
 /**
  * `start` — entrada Replit-like (PRD18 Sprint 1). Orquestra o wizard (objetivo →
@@ -35,7 +35,7 @@ import { resolveBriefAcceptances } from "../project-plan/acceptance-verification
  */
 
 // Flags do start: valor (consomem o próximo token) e booleanas (tabela → cc baixa).
-const VALUE_FLAGS = { "--name": "projectName", "--mode": "mode", "--skills": "skills", "--design-system": "designSystem", "--loop": "loop" }
+const VALUE_FLAGS = { "--name": "projectName", "--mode": "mode", "--skills": "skills", "--design-system": "designSystem", "--loop": "loop", "--journeys": "journeys" }
 const BOOL_FLAGS = { "--dry-run": "dryRun", "--json": "json", "--yes": "yes", "-y": "yes", "--assume-no-existing-model": "assumeNoExistingModel", "--proof": "proof", "--golden-run": "goldenRun", "--no-proof": "noProof" }
 
 function parseStartArgs(args) {
@@ -273,13 +273,26 @@ async function runStartProof(cwd, json, opts) {
   return proofCommand(["--profile", "release", ...(json ? ["--json"] : [])], { cwd })
 }
 
+// PRD51 S51.2.7 — journeys REAIS: `--journeys <arquivo.json>` declara um array de
+// journeys (mesmo shape de `mapJourney`) que o usuário/CI afirma cobrir de
+// verdade. Cada entrada passa por `mapJourney` — method/acceptanceId/ref
+// inválidos LANÇAM (journey malformada nunca vira "resolvido" por omissão de
+// validação). Sem `--journeys`, `journeys` continua `[]` — nada muda por padrão.
+function loadJourneysFromFile(journeysPath, cwd) {
+  const abs = isAbsolute(journeysPath) ? journeysPath : join(cwd, journeysPath)
+  const raw = JSON.parse(readFileSync(abs, "utf-8"))
+  if (!Array.isArray(raw)) throw new Error(`--journeys: ${journeysPath} deve conter um array JSON de journeys`)
+  return raw.map((j) => mapJourney(j))
+}
+
 // PRD51 S51.2.1: acceptance REAL do brief chega no motor (LoopEngine via runPipeline),
 // não mais [] por omissão de wiring. `pending_verifier` só vira `verifier` com journey
-// mapeada (`opts.journeys`) — sem journeys, o aceite segue honestamente pendente (nunca
-// "resolvido" por decreto). `goldenRun` continua não-autoritativo (aditivo).
-function resolvedAcceptance(brief, opts) {
+// mapeada — sem journeys, o aceite segue honestamente pendente (nunca "resolvido" por
+// decreto). `goldenRun` continua não-autoritativo (aditivo).
+function resolvedAcceptance(brief, opts, flags, cwd) {
   if (!brief) return []
-  return resolveBriefAcceptances(brief.acceptances, opts.journeys || [])
+  const journeys = opts.journeys || (flags.journeys ? loadJourneysFromFile(flags.journeys, cwd) : [])
+  return resolveBriefAcceptances(brief.acceptances, journeys)
 }
 
 // PRD51 S51.2.3+ — feature flag temporária do cutover do Golden Run (§11 do
@@ -325,7 +338,7 @@ async function confirmAndRunPipeline(plan, flags, opts, json, cwd, brief) {
     plan, planDir, cwd, skillRoute, designSystemGate: dsGate.evidence, loopDecision,
     exec: opts.exec, gateExec: opts.gateExec,
     devRunner: opts.devRunner, verifyRunner: opts.verifyRunner, scoutRunner: opts.scoutRunner,
-    maxAttempts: opts.maxAttempts, acceptance: resolvedAcceptance(brief, opts),
+    maxAttempts: opts.maxAttempts, acceptance: resolvedAcceptance(brief, opts, flags, cwd),
     goldenRun: wantsGoldenRun(flags, opts),
   })
 

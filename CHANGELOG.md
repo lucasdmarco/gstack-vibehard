@@ -1,5 +1,56 @@
 # Changelog - gstack-vibehard
 
+## [5.66.0] - 2026-07-27 — PRD51 S51.2.7: journeys reais + cutover final atrás da flag (Golden Run cutover, parte 7/7 — FECHA o Sprint 51.2)
+
+Sétimo e ÚLTIMO sub-sprint do Sprint 51.2 (ações #8/#10). **Achado antes de implementar,
+que quase virou uma decisão de pausar o sprint**: tracei `allGatesGreen` do motor até o
+fim e `acceptanceResolved` nunca ficava `true` sem uma `journey` real mapeada — e não
+existia NENHUMA forma de declarar journeys, tornando `status:"completed"` estruturalmente
+inalcançável (ligar `--golden-run` faria todo pipeline bem-sucedido reportar `"handoff"`,
+parecendo quebrado). Perguntado ao usuário: inicialmente decidiu pausar o cutover até o
+Sprint 51.6 (journeys) existir; revisitado depois, decidiu **construir os journeys reais
+agora** para desbloquear o 51.2.7 de verdade, em vez de esperar.
+
+**Parte A — journeys reais (`--journeys <arquivo.json>`)**:
+- `src/commands/start.js`: novo flag de valor `--journeys`. `loadJourneysFromFile` lê e
+  VALIDA cada entrada via `mapJourney` (`acceptance-verification.js`, já existente desde
+  PRD47 S47.5) — shape inválido (sem `acceptanceId`/`ref`/`method` reconhecido) LANÇA,
+  nunca ignora silenciosamente. `resolvedAcceptance` agora aceita `opts.journeys`
+  (programático, testes) OU o arquivo do flag — sem `--journeys`, `journeys` continua `[]`
+  (nada muda por padrão).
+- `tests/start_journeys_cli.test.js` (3 testes): journey real resolve
+  `acceptanceResolved`; entrada malformada lança; sem `--journeys`, comportamento do
+  S51.2.1 preservado.
+
+**Parte B — cutover final atrás da flag**:
+- `src/project-plan/run-loop.js`: `finishPipeline` agora deriva `status` de
+  `goldenRun.status` quando `ctx.goldenRun===true` — `GOLDEN_RUN_STATUS_MAP` mapeia o
+  vocabulário ESTRITO do motor (`completed|handoff|blocked|planned_only|not_executed|
+  cancelled`) pro vocabulário solto que todo o resto do pipeline sempre usou
+  (`done|handoff|cancelled`) — nunca um vocabulário novo, pra não quebrar consumidores de
+  `--json`. `completed`→`done`; `cancelled` passa direto; qualquer outro → `handoff`. Sem
+  a flag, comportamento 100% inalterado (o `status` legado que os call sites sempre
+  calcularam). Extraídos `resolvedStatus`/`failedStageLabel` — mesmo padrão de extração
+  contra CRAP usado o programa inteiro.
+- `tests/start_golden_run_cutover.test.js` (4 testes): sem a flag, zero regressão mesmo
+  quando o motor não fecharia os portões; com a flag e SEM journeys, `"handoff"` honesto
+  mesmo com tudo tecnicamente verde; com a flag E acceptance resolvida, `"done"` via
+  `goldenRun.status==="completed"`; gate falho com a flag continua `"handoff"` (S51.2.4
+  intacto).
+- **Achado de teste real**: 3 testes anteriores (S51.2.3/S51.2.6) usavam `--golden-run`
+  sem journeys/git real e esperavam `"done"` — com o cutover, esse `"done"` deixou de ser
+  alcançável sem os 4 portões fechados de verdade. Corrigidos: um passou a montar projeto
+  git real + acceptance resolvida; outro trocou a asserção de `status` agregado por
+  `gateStagesFor` direto (mais preciso — não reacopla ao gate de acceptance, que é
+  ortogonal ao que aquele teste realmente prova); o terceiro (closeout) ganhou o mesmo
+  projeto git real + journey.
+- QG strict `blocking_severity_count:0` (CC fix aplicado), suíte JS 2013/2013 (1 skip
+  pré-existente).
+
+**Fecha o Sprint 51.2 (7/7 sub-sprints, v5.60.0→v5.66.0)**. A flag `--golden-run`/
+`GSTACK_GOLDEN_RUN=1` continua default OFF — flipar o default e remover o código legado
+fica para decisão humana explícita "antes do RC" (§11 do prd51.md), fora desta leva.
+
 ## [5.65.0] - 2026-07-27 — PRD51 S51.2.6: closeout consome o proof real (Golden Run cutover, parte 6/7)
 
 Sexto sub-sprint do Sprint 51.2 (ação #9 — "closeout consome o resultado real do

@@ -417,23 +417,34 @@ function recordSessionIndex(ctx, status) {
 // Anexa `diagnosis` só quando existe — evita ternário repetido inflar a CC de finishPipeline.
 const withDiagnosis = (obj, diagnosis) => (diagnosis ? { ...obj, diagnosis } : obj)
 
+// PRD51 S51.2.7 — cutover atrás da flag: mapeia o veredito ESTRITO do motor
+// (`completed|handoff|blocked|planned_only|not_executed|cancelled`) pro
+// vocabulário solto que o resto do pipeline sempre usou (`done|handoff|
+// cancelled`) — nunca um vocabulário novo, pra não quebrar consumidores de
+// `--json`. `completed`→`done`; `cancelled` passa direto; qualquer outro
+// (`handoff`/`blocked`/`planned_only`/`not_executed`) → `handoff`.
+const GOLDEN_RUN_STATUS_MAP = Object.freeze({ completed: "done", cancelled: "cancelled" })
+const statusFromGoldenRun = (goldenRunStatus) => GOLDEN_RUN_STATUS_MAP[goldenRunStatus] || "handoff"
+const resolvedStatus = (ctx, legacyStatus, goldenRunStatus) => (ctx.goldenRun ? statusFromGoldenRun(goldenRunStatus) : legacyStatus)
+const failedStageLabel = (failedStage) => failedStage || "golden-run: portões não fechados"
+
 /** Fecha o run: handoff.md quando aplicável + journal + status.json. */
-function finishPipeline(ctx, stages, status, failedStage, diagnosis) {
+function finishPipeline(ctx, stages, legacyStatus, failedStage, diagnosis) {
+  // PRD47 S47.1 + PRD51 S51.2.7: o motor (LoopEngine) sempre teve os 4 portões
+  // mais estritos (allGatesGreen) mas finalize() nunca era chamado (dead code).
+  // Roda de verdade aqui, e vira AUTORIDADE do `status` público só atrás da flag
+  // `--golden-run` (§11 do prd51.md — cutover incremental). Sem a flag, `status`
+  // continua sendo o critério solto que os call sites sempre calcularam — zero
+  // regressão no caminho default.
+  const goldenRun = finalizeGoldenRun(ctx.engine, {
+    stages, proof: closeoutReadiness(stages), acceptance: ctx.engine.acceptance, cancelled: legacyStatus === "cancelled",
+  })
+  const status = resolvedStatus(ctx, legacyStatus, goldenRun.status)
   let handoffPath
   if (status === "handoff") {
     handoffPath = join(ctx.runDir, "handoff.md")
-    writeFileSync(handoffPath, renderHandoff({ runId: ctx.runId, plan: ctx.plan, stages, attempts: ctx.attempts, failedStage, diagnosis }))
+    writeFileSync(handoffPath, renderHandoff({ runId: ctx.runId, plan: ctx.plan, stages, attempts: ctx.attempts, failedStage: failedStageLabel(failedStage), diagnosis }))
   }
-  // PRD47 S47.1: reconcilia as duas derivações de "done" — o motor (LoopEngine)
-  // sempre teve os 4 portões mais estritos (allGatesGreen) mas finalize() nunca
-  // era chamado (dead code). Aqui ele passa a rodar de VERDADE, e o veredito
-  // tipado fica visível em `goldenRun` — ao lado do `status` solto existente,
-  // NUNCA o substituindo ainda (acceptance real/proof sempre-ligado chegam em
-  // sprints seguintes; substituir hoje declarararia handoff em todo pipeline
-  // verde de hoje, uma regressão de UX que o motor não pode causar sozinho).
-  const goldenRun = finalizeGoldenRun(ctx.engine, {
-    stages, proof: closeoutReadiness(stages), acceptance: ctx.engine.acceptance, cancelled: status === "cancelled",
-  })
   const engine = engineSnapshot(ctx.engine)
   appendRunEvent(ctx.runDir, { event: "pipeline_ended", status, failedStage: failedStage || null, attempts: ctx.attempts, enginePhase: engine.phase, engineCapped: engine.capped, goldenRunStatus: goldenRun.status })
   writeRunStatus(ctx.runDir, withDiagnosis({ runId: ctx.runId, planId: ctx.plan.id, status, stages, attempts: ctx.attempts, engine, goldenRun }, diagnosis))
