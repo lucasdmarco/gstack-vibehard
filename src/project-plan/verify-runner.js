@@ -188,6 +188,14 @@ export function planVerifySteps(ctx) {
 
 const VALID_PROFILES = ["quick", "scaffold", "full", "release"]
 const profileFlags = (profile) => ({ isQuick: profile === "quick", isFullish: profile === "full" || profile === "release", isRelease: profile === "release" })
+/** Projeto que "roda" (app/web) — reusado pelo `productCritical` do verify e pelo
+ * preview-gate do Golden Run (PRD51 S51.2.3). Puro: cwd -> bool. */
+export function projectHasRunScript(cwd) {
+  const pkgPath = join(cwd, "package.json")
+  if (!existsSync(pkgPath)) return false
+  const scripts = readJson(pkgPath).scripts || {}
+  return !!(scripts.start || scripts.dev)
+}
 function detectProject(cwd) {
   const pkgPath = join(cwd, "package.json")
   const hasPkg = existsSync(pkgPath)
@@ -196,7 +204,7 @@ function detectProject(cwd) {
   return {
     pkgPath, hasPkg, scripts, archetype,
     hasPyTests: ["pytest.ini", "pyproject.toml", "requirements.txt"].some((f) => existsSync(join(cwd, f))),
-    hasRunScript: !!(scripts.start || scripts.dev), // projeto que "roda" (app/web)
+    hasRunScript: projectHasRunScript(cwd),
     isLibCli: archetype === "library" || archetype === "cli",
   }
 }

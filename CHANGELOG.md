@@ -1,5 +1,40 @@
 # Changelog - gstack-vibehard
 
+## [5.62.0] - 2026-07-26 — PRD51 S51.2.3: preview bloqueante atrás de flag (Golden Run cutover, parte 3/7)
+
+Terceiro sub-sprint do Sprint 51.2. `preview` nunca esteve em `GATE_STAGES` — falha de
+preview nunca derrubava o pipeline (GAP-1/P0-A). Introduz a **feature flag temporária**
+que o §11 do `prd51.md` exige para todo o cutover: `--golden-run` /
+`GSTACK_GOLDEN_RUN=1` (idioma de `--agentshield`, `verify.js`), default OFF.
+
+- `src/project-plan/verify-runner.js`: extraído `projectHasRunScript(cwd)` (exportado)
+  do `detectProject` interno — mesmo sinal que já decide `productCritical` no verify
+  ("projeto que roda", `scripts.start`/`scripts.dev`). Reusado, não duplicado.
+- `src/project-plan/run-loop.js`: `GATE_STAGES` (const estática) virou
+  `gateStagesFor(ctx)` (exportado) — `preview` só entra no set quando
+  `ctx.goldenRun === true` E `projectHasRunScript(ctx.projectDir)`. Novo
+  `GATE_FAIL_STATUS` mapeia qual status de cada stage conta como falha de gate
+  (`test`/`verify`: `"failed"`; `preview`: `"unhealthy"` — `previewStage` em si NÃO
+  muda, continua reportando `ready|unhealthy|pending|not_applicable` honesto
+  independente da flag). `buildPipelineCtx` ganha `goldenRun: opts.goldenRun === true`.
+- `src/commands/start.js`: `--golden-run` em `BOOL_FLAGS`; `wantsGoldenRun(flags, opts)`
+  (CLI flag OU `opts.goldenRun` programático OU `GSTACK_GOLDEN_RUN=1`) passado como
+  `goldenRun` para `runPipeline`.
+- **Sem a flag — o default de todo usuário hoje — comportamento 100% inalterado**:
+  preview unhealthy nunca bloqueia, projeto CLI/lib (sem `scripts.dev/start`) nunca é
+  afetado mesmo com a flag ligada.
+- `tests/start_preview_gate.test.js` (6 testes): legado preservado sem a flag; gate
+  real com a flag em projeto UI; projeto CLI/lib não regride mesmo com a flag; preview
+  `ready` nunca gateia (só `unhealthy`); `--golden-run` via CLI chega ponta-a-ponta
+  (`startCommand` → `confirmAndRunPipeline` → `runPipeline`).
+- **`tests/prd47_baseline_negative_controls.test.js` atualizado** (não apagado — o
+  próprio header do arquivo exige isso): GAP-1 e GAP-2 faziam regex sobre o texto
+  literal `const GATE_STAGES = new Set([...])`, que deixou de existir. Reescritos para
+  testar o comportamento real via `gateStagesFor` — GAP-1 confirma que P0-A continua
+  preservado sem a flag E que preview vira gate real com ela; GAP-2 confirma que
+  `review` roda de verdade (S51.2.2) mas segue fora de qualquer gate nesta leva.
+- QG strict `blocking_severity_count:0`, suíte JS 1996/1996 (1 skip pré-existente).
+
 ## [5.61.0] - 2026-07-26 — PRD51 S51.2.2: review stage real (Golden Run cutover, parte 2/7)
 
 Segundo sub-sprint do Sprint 51.2. `review` era uma STRING hardcoded
