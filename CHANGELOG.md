@@ -1,5 +1,29 @@
 # Changelog - gstack-vibehard
 
+## [5.65.0] - 2026-07-27 — PRD51 S51.2.6: closeout consome o proof real (Golden Run cutover, parte 6/7)
+
+Sexto sub-sprint do Sprint 51.2 (ação #9 — "closeout consome o resultado real do
+proof"). **Achado de sequenciamento**: `finishPipeline` (`run-loop.js`) já roda o
+closeout DENTRO do pipeline, com um proxy leve (`closeoutReadiness`, só olha
+`stages.verify`) — mas o proof real (S51.2.5) só roda DEPOIS, em `start.js`, quando o
+pipeline já retornou. O closeout de dentro do pipeline não pode "esperar" um proof que
+ainda não existe nesse ponto.
+
+- `src/commands/start.js`: `resyncCloseoutWithRealProof(cwd, pipeline, proof)` chama
+  `runCloseoutSync` (`skills/closeout.js`) de novo, DEPOIS que o proof real roda —
+  `runCloseoutSync` é idempotente por `runId` (sobrescreve `closeout.json`/`.md`), então
+  resincronizar é seguro. Reconstrói `detect` (golden path) com os MESMOS insumos que
+  `run-loop.js` usa (`detectGoldenPath`/`readPlanJournal`/`runsDir`, todos já exportados)
+  — sem isso, o resync apagaria o `learning.candidate` já detectado no 1º closeout
+  (`runCloseoutSync` sobrescreve o objeto inteiro, não faz merge).
+- Só roda quando `proof` realmente executou (`wantsProof` do S51.2.5); sem ele, o
+  closeout original (proxy verify-gate) permanece intacto — zero regressão no caminho
+  sem a flag.
+- `tests/start_closeout_real_proof.test.js` (2 testes): `closeout.json.proof.ready`
+  reflete o proof REAL (não o proxy) quando `--golden-run` roda proof automático;
+  sem proof real, o closeout original permanece de pé.
+- QG strict `blocking_severity_count:0`, suíte JS 2006/2006 (1 skip pré-existente).
+
 ## [5.64.0] - 2026-07-27 — PRD51 S51.2.5: proof automático atrás de flag (Golden Run cutover, parte 5/7)
 
 Quinto sub-sprint do Sprint 51.2 (ações #6/#7 — "proof real por padrão em intenção de

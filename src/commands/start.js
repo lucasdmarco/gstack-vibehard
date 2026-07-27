@@ -3,7 +3,10 @@ import { join } from "path"
 import { runWizard } from "../project-plan/wizard.js"
 import { buildPlan } from "../project-plan/planner.js"
 import { sanitizeCommand } from "../project-plan/executor.js"
-import { runPipeline, renderPlanMarkdown, PIPELINE_STAGES } from "../project-plan/run-loop.js"
+import { runPipeline, renderPlanMarkdown, PIPELINE_STAGES, runsDir } from "../project-plan/run-loop.js"
+import { runCloseoutSync } from "../skills/closeout.js"
+import { detectGoldenPath } from "../dream/detector.js"
+import { readPlanJournal } from "../project-plan/journal.js"
 import { modeWizardText } from "../project-plan/modes.js"
 import { buildConsult, renderConsultHuman } from "./consult.js"
 import { printPlanHuman } from "./plan.js"
@@ -342,11 +345,26 @@ const wantsProof = (flags, opts) => {
   return wantsGoldenRun(flags, opts)
 }
 
+// PRD51 S51.2.6 (ação #9) — achado de sequenciamento: `finishPipeline`
+// (run-loop.js) já roda o closeout ANTES do proof existir (proof só roda aqui,
+// depois do pipeline retornar) — então o closeout de dentro do pipeline nunca
+// pode "esperar" o proof real. `runCloseoutSync` é idempotente por runId
+// (sobrescreve closeout.json/md) — resincroniza aqui com o proof REAL quando ele
+// rodou, reconstruindo `detect` (golden path) com os MESMOS insumos do
+// run-loop.js pra não regredir o `learning.candidate` já detectado no 1º closeout.
+function resyncCloseoutWithRealProof(cwd, pipeline, proof) {
+  if (!proof) return
+  const detect = () => detectGoldenPath({ status: pipeline.status, events: readPlanJournal(runsDir(cwd, pipeline.runId)), runId: pipeline.runId })
+  try { runCloseoutSync({ cwd, runId: pipeline.runId, command: "start", status: pipeline.status, proof: () => proof, detect }) }
+  catch { /* best-effort — não derruba o start */ }
+}
+
 // Emite o resultado + proof offer (F3-C / 28.5). Extraído p/ manter cc baixa.
 async function emitAndProof(plan, pipeline, decl, flags, opts, json, cwd) {
   if (json) process.stdout.write(JSON.stringify({ ok: pipeline.status === "done", runId: pipeline.runId, status: pipeline.status, stages: pipeline.stages, planId: plan.id, skillRoute: { selectedSkills: decl.skillRoute.selectedSkills, modelIntake: decl.skillRoute.modelIntake.status } }) + "\n")
   else renderPipelineHuman(pipeline, plan)
   const proof = wantsProof(flags, opts) ? await runStartProof(cwd, json, opts) : null
+  resyncCloseoutWithRealProof(cwd, pipeline, proof)
   return { plan, result: pipeline.execResult, pipeline, executed: true, skillRoute: decl.skillRoute, loopDecision: decl.loopDecision, ...(proof ? { proof } : {}) }
 }
 
