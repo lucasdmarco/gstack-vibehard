@@ -1,5 +1,30 @@
 # Changelog - gstack-vibehard
 
+## [5.70.0] - 2026-07-27 — PRD51 S51.4.3: consentimento + fim da staleness em `research --repo`
+
+Terceira parte do Sprint 51.4. Achado real (ação #5 do PRD, "corrigir `research
+--repo`") — dois problemas, não um: (1) `--repo <url>` disparava clone (efeito de
+rede) sem nenhum gate de consentimento; (2) `mirrorRepo` só clonava
+`if (!existsSync(dir))` — depois do 1º clone, chamadas seguintes NUNCA
+re-clonavam/atualizavam, servindo silenciosamente o snapshot do primeiro clone pra
+sempre (uma auditoria de "hoje" ficava presa no passado sem avisar).
+
+- `src/commands/research.js`: `auditCmd` agora exige confirmação antes de
+  `--repo` (mesmo padrão de `plan run`/`visual hooks install`: `--yes` explícito,
+  TTY interativo, ou `opts.confirm` injetado). `mirrorRepo` agora chama
+  `refreshMirror` (fetch raso + reset ao FETCH_HEAD) quando o mirror já existe,
+  em vez de reusar cegamente — mesma garantia read-only/hooks-desabilitados do
+  clone original.
+- QG (HIGH, CC 7→ok): extraídos `resolveMirror`/`emitNoMirror`/`emitAudit` —
+  mesmo padrão de extração contra CRAP usado o programa inteiro.
+- `tests/research_repo_consent.test.js` (4 testes, repo git REAL local como
+  "remoto" — sem rede de verdade, mesmo mecanismo): recusa sem `--yes`; cancela
+  quando o usuário recusa; clona de verdade com `--yes` e audita o commit real;
+  **prova da correção de staleness** — commita um arquivo novo no "remoto" DEPOIS
+  do 1º clone, roda `--repo` de novo, confirma que a 2ª auditoria reflete o commit
+  E o arquivo NOVOS (não o snapshot velho).
+- QG strict `blocking_severity_count:0`, suíte JS 2037/2037 (1 skip pré-existente).
+
 ## [5.69.0] - 2026-07-27 — PRD51 S51.4.2: consentimento real em `visual hooks install`
 
 Segunda parte do Sprint 51.4. Achado real (ação #5 do PRD, "corrigir `visual hooks
