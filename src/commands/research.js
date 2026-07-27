@@ -7,7 +7,7 @@ import { classifyLevel, resolveLevel } from "../epistemic/classifier.js"
 import { runBalancedProtocol, runSanityReview } from "../epistemic/protocol.js"
 import { renderEpistemicHuman } from "../epistemic/render.js"
 import { exitCodeForVerdict } from "../epistemic/schema.js"
-import { section, success, warn, error, info } from "../cli/index.js"
+import { section, success, warn, error, info, confirm } from "../cli/index.js"
 
 /**
  * `research skills audit --path <dir> | --repo <url>` (PRD29 29.5 / PRD34 F6-A).
@@ -82,10 +82,22 @@ function headCommit(dir) {
   return (head.stdout || "").trim() || null
 }
 
+// PRD51 S51.4.3 — achado real: mirror só clonava `if (!existsSync(dir))` — depois
+// da 1ª vez, `--repo <url>` nunca re-clonava/atualizava, servindo silenciosamente
+// o snapshot do 1º clone pra sempre (auditoria ficava presa no passado). Refresh
+// raso (fetch+reset) mantém a MESMA garantia read-only/hooks-desabilitados.
+function refreshMirror(dir) {
+  const fetch = spawnSync("git", ["-C", dir, "-c", "core.hooksPath=", "fetch", "--depth", "1", "origin", "HEAD"], { encoding: "utf-8" })
+  if (fetch.status !== 0) { error(`research: refresh do mirror falhou (${(fetch.stderr || "").trim() || fetch.error})`); return false }
+  const reset = spawnSync("git", ["-C", dir, "reset", "--hard", "FETCH_HEAD"], { encoding: "utf-8" })
+  return reset.status === 0
+}
+
 function mirrorRepo(url, cwd) {
   const name = url.replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "")
   const dir = join(cwd, ".gstack", "research", "mirrors", name)
-  if (!existsSync(dir) && !cloneReadOnly(url, dir)) return null
+  const ok = existsSync(dir) ? refreshMirror(dir) : cloneReadOnly(url, dir)
+  if (!ok) return null
   return { dir, source: url, commit: headCommit(dir) }
 }
 
@@ -107,15 +119,61 @@ function renderAuditHuman(audit, dir) {
   info(`  nada executado/instalado · JSON: ${dir}\\external-audit.json`)
 }
 
-function auditCmd(cwd, args, json) {
+// PRD51 S51.4.3 — achado real: `--repo` disparava clone/fetch (efeito de rede)
+// sem NENHUM gate de consentimento. Mesmo padrão de `plan run`/`visual hooks
+// install`: `--yes` explícito, TTY interativo, ou `opts.confirm` injetado.
+const wantsAutoYes = (args, opts) => args.includes("--yes") || args.includes("-y") || opts.yes === true
+const canPromptConfirm = (opts) => Boolean(opts.confirm) || Boolean(process.stdin.isTTY)
+function emitCancelled(json) {
+  const cancelled = { cancelled: true }
+  if (json) process.stdout.write(JSON.stringify(cancelled) + "\n")
+  return cancelled
+}
+function repoRefused(json, autoYes, opts) {
+  if (autoYes || canPromptConfirm(opts)) return false
+  if (json) process.stdout.write(JSON.stringify({ error: "needs_confirmation", hint: "use --yes" }) + "\n")
+  else { section("research skills audit --repo"); error("Modo não-interativo: confirme explicitamente com --yes (efeito de rede).") }
+  return true
+}
+async function repoConsentGate(url, json, autoYes, doConfirm) {
+  if (autoYes) return true
+  if (!json) { section("research skills audit --repo"); info(`  Vai clonar/atualizar via rede (read-only, hooks desabilitados): ${url}`) }
+  const ok = await doConfirm(`Clonar/atualizar mirror read-only de ${url}?`, false)
+  if (!ok && !json) info("Cancelado.")
+  return ok
+}
+async function grantRepoConsent(repo, json, opts, args) {
+  const autoYes = wantsAutoYes(args, opts)
+  if (repoRefused(json, autoYes, opts)) return { error: "needs_confirmation" }
+  const doConfirm = opts.confirm || confirm
+  if (!(await repoConsentGate(repo, json, autoYes, doConfirm))) return emitCancelled(json)
+  return null
+}
+// Resolve o mirror (local ou --repo, com gate de consentimento) num ÚNICO ponto
+// de decisão — mantém `auditCmd` linear (extração contra CRAP).
+async function resolveMirror(cwd, args, json, opts) {
   const repo = flagValue(args, "--repo")
-  const mirror = repo ? mirrorRepo(repo, cwd) : resolveLocalMirror(flagValue(args, "--path"), cwd)
-  if (!mirror) { if (!repo) error("research skills audit: informe --path <dir> ou --repo <url>"); process.exitCode = 1; return null }
+  if (!repo) return { mirror: resolveLocalMirror(flagValue(args, "--path"), cwd) }
+  const refusal = await grantRepoConsent(repo, json, opts, args)
+  return refusal ? { refusal } : { mirror: mirrorRepo(repo, cwd) }
+}
+function emitNoMirror(repo, json) {
+  if (!repo) error("research skills audit: informe --path <dir> ou --repo <url>")
+  process.exitCode = 1
+  return null
+}
+function emitAudit(mirror, cwd, json) {
   const audit = auditExternalSkills({ source: mirror.source, commit: mirror.commit, files: collectMirrorFiles(mirror.dir) })
   const dir = writeAuditArtifacts(cwd, audit)
   if (json) { process.stdout.write(JSON.stringify(audit) + "\n"); return audit }
   renderAuditHuman(audit, dir)
   return audit
+}
+async function auditCmd(cwd, args, json, opts) {
+  const { mirror, refusal } = await resolveMirror(cwd, args, json, opts)
+  if (refusal) return refusal
+  if (!mirror) return emitNoMirror(flagValue(args, "--repo"), json)
+  return emitAudit(mirror, cwd, json)
 }
 
 function emitNotebookLm(payload, json, humanFn) {
@@ -240,7 +298,7 @@ function validateCmd(args, json) {
 function printResearchUsage() {
   section("research")
   info("  research skills audit --path <dir> [--json]   audita mirror local read-only (adopt/adapt/avoid)")
-  info("  research skills audit --repo <url> [--json]    clona raso (opt-in, rede) e audita — nunca executa/instala")
+  info("  research skills audit --repo <url> [--json] [--yes]   clona/atualiza raso (rede, pede confirmação) e audita — nunca executa/instala")
   info("  research notebooklm doctor|connect|query|import   conector experimental (cloud, não-oficial)")
   info('  research validate "<claim>" [--level auto|sanity|grounded|adversarial] [--network] [--strict] [--json]')
   warn("  validate é KNOWLEDGE: nunca executa código; experimentos saem como plano p/ `workflow`.")
@@ -251,7 +309,7 @@ export async function researchCommand(args = [], opts = {}) {
   const cwd = opts.cwd || process.cwd()
   const json = args.includes("--json")
   const sub = args.filter((a) => !a.startsWith("-"))
-  if (sub[0] === "skills" && sub[1] === "audit") return auditCmd(cwd, args, json)
+  if (sub[0] === "skills" && sub[1] === "audit") return auditCmd(cwd, args, json, opts)
   if (sub[0] === "notebooklm") return notebookLmCmd(sub, args, json)
   if (sub[0] === "validate") return validateCmd(args, json)
   printResearchUsage()
