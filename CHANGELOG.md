@@ -1,5 +1,47 @@
 # Changelog - gstack-vibehard
 
+## [5.67.0] - 2026-07-27 — PRD51 S51.3: ledger unificado de PRDs + checklist canônico do PRD46
+
+Sprint 51.3 do PRD51 ("Ledger unificado de PRDs e claims"). Cada checklist
+`rc-checklist-prdXX.js` (45/47/48/49/50) tinha sua própria noção de "pronto" — este
+sprint projeta todos no schema comum já estabelecido por `release/baseline.js`
+(S51.0B/C: `releaseReady`/`programComplete`/`operationallyProven`/`fullyValidated`/
+`residuals`/`nonGoals`), sem duplicar a lógica dos 4 estados que não se implicam.
+
+- `src/dream/prd-ledger.js` (novo, `gstack.prd-ledger.v1`): `projectPrdLedger`
+  REUSA `buildReleaseBaseline` inteiro (não reescreve) — `programItems` de
+  qualquer checklist já casa com o shape que o builder espera
+  (`{id, status, nonGoal, nonGoalReason}`). `evidenceHash(repoRoot, proofPath)`
+  calcula sha256 REAL do arquivo de prova (`null` honesto se ausente, nunca
+  inventado). **Ação #4 do PRD** (proibir `status:delivered` sem prova em disco):
+  `violationsOf` detecta a violação e `projectPrdLedger` a usa pra derrubar
+  `releaseReady`/`programComplete` — nunca um aviso ignorável.
+- `src/dream/rc-checklist-prd46.js` (novo): PRD46 nunca teve checklist canônico
+  (achado da própria auditoria do PRD51, ação #1) — 13 itens reais cobrindo os 7
+  sprints (S46.0→S46.6, v5.11.0→v5.17.0), cada `proof` apontando um teste real
+  verificado no disco antes de citar.
+- `src/commands/prd.js` (novo) + registro em `DISPATCH`/`command-layers.js`:
+  `gstack_vibehard prd status [--json]` agrega PRD45-PRD50 via `projectPrdLedger`.
+  Classificado `knowledge` (read-only) no firewall — só lê checklists e arquivos
+  de prova, nunca edita fonte.
+- **Achado real de bug**: `projectPrdLedger` espalhava `...baseline` DEPOIS de
+  setar `schemaVersion: PRD_LEDGER_SCHEMA`, deixando o `schemaVersion` de
+  `release-baseline.js` sobrescrever o do ledger — pego só quando um teste novo
+  (`prd_status_command.test.js`) checou o campo explicitamente; nenhum dos 7
+  testes originais de `prd_ledger.test.js` verificava isso. Corrigido (ordem do
+  spread) e a asserção que faltava foi adicionada retroativamente.
+- `tests/prd_ledger.test.js` (7 testes), `tests/rc_checklist_prd46.test.js`
+  (4 testes), `tests/prd_status_command.test.js` (5 testes).
+- Escopo do PRD51 §S51.3 ainda não coberto nesta leva: hash/freshness como
+  BASELINE comparável ao longo do tempo (hoje é hash pontual, real, mas sem
+  histórico armazenado) e migração ponto-a-ponto dos 5 checklists existentes
+  para o schema comum (hoje eles continuam com seu shape próprio; a projeção
+  para o schema comum acontece só via `prd-ledger.js`, não uma reescrita).
+- QG strict `blocking_severity_count:0` (1 bug de spread corrigido), suíte JS
+  2029/2029 (1 skip pré-existente) — 4 tentativas anteriores mortas por
+  timeout/carga real da máquina (outros apps consumindo CPU), reproduzido limpo
+  na 5ª com timeout estendido.
+
 ## [5.66.0] - 2026-07-27 — PRD51 S51.2.7: journeys reais + cutover final atrás da flag (Golden Run cutover, parte 7/7 — FECHA o Sprint 51.2)
 
 Sétimo e ÚLTIMO sub-sprint do Sprint 51.2 (ações #8/#10). **Achado antes de implementar,
