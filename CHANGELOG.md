@@ -1,5 +1,31 @@
 # Changelog - gstack-vibehard
 
+## [5.71.0] - 2026-07-27 — PRD51 S51.4.4: `research`/`pp` ganham help; `visual`/`research --help` alcançam o usage real
+
+Quarta parte do Sprint 51.4 (ações #6/#8 — "garantir help específico de research,
+visual e aliases" / command-lint detectar "comando no dispatch sem help"). Achado
+real: `research` e `pp` existiam no `DISPATCH` (49 chaves) mas NUNCA tinham entrada
+em `COMMANDS` (47 entradas, o array que alimenta `help`/`--help`/`isKnownCommand`)
+— exatamente o gap que a ação #8 pede pro command-lint aprender a detectar.
+Separadamente: `visual --help` e `research --help` só imprimiam a linha curta do
+registry — o usage MULTI-SUBCOMANDO real de cada um (`printUsage`/
+`printResearchUsage`) nunca era alcançado, porque `wantsHelp` nunca despachava pro
+módulo do comando.
+
+- `src/cli/index.js`: novas entradas `research`/`pp` em `COMMANDS`. `helpFor`
+  ganhou `DETAILED_HELP` — pra `research`/`visual`, além da linha curta do
+  registry, despacha o próprio comando com args vazios (seguro: sem subcomando
+  reconhecido, cada handler só imprime seu usage completo, nenhum efeito) e
+  imprime o resultado. `helpFor` virou `async` (chamadas existentes não-`await`ed
+  continuam corretas — o efeito colateral síncrono de comandos sem
+  `DETAILED_HELP`, como `doctor`, acontece antes de qualquer ponto de `await`).
+- `tests/cli_help_gaps.test.js` (5 testes): `research`/`pp` conhecidos;
+  `help research`/`help visual` alcançam o usage detalhado real; `help doctor`
+  (sem `DETAILED_HELP`) continua funcionando; **guard genérico** — todo comando
+  do `DISPATCH` precisa ter entrada em `COMMANDS` (evita esse gap específico
+  reaparecer no futuro com outro comando).
+- QG strict `blocking_severity_count:0`, suíte JS 2042/2042 (1 skip pré-existente).
+
 ## [5.70.0] - 2026-07-27 — PRD51 S51.4.3: consentimento + fim da staleness em `research --repo`
 
 Terceira parte do Sprint 51.4. Achado real (ação #5 do PRD, "corrigir `research
