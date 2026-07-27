@@ -75,7 +75,10 @@ test("ensureRoutedChildEnv: proxy não fica pronto → routed:false honesto (env
   assert.equal(r.env.X, "1", "devolve o env base intacto")
 })
 
-test("proof --profile full: callable_not_routed vira pendência + warning (não estado aceitável)", async () => {
+// PRD51 S51.5.5 — regra Headroom: "se um perfil promete roteamento, esse
+// perfil deve bloquear sem proxy/tráfego". Antes disso, `full` só emitia
+// warning (pendência nunca virava blocker de verdade) — GAP real corrigido.
+test("proof --profile full: callable_not_routed vira BLOCKER (perfil promete routing, sem proxy = não pronto)", async () => {
   const { buildProof } = await imp("src/commands/proof.js")
   const deps = {
     verify: () => ({ status: "ready", failed: [], timedOut: [] }),
@@ -87,9 +90,27 @@ test("proof --profile full: callable_not_routed vira pendência + warning (não 
   }
   const full = buildProof({ cwd: "/x", profile: "full", deps })
   assert.equal(full.checks.headroomRouting.pending, true)
-  assert.ok(full.warnings.some((w) => /headroom.*PEND/i.test(w)))
-  // release/opt-in: callable_not_routed NÃO é pendência
+  assert.equal(full.ready, false, "full promete routing default-on -> sem proxy/tráfego, NÃO pronto")
+  assert.ok(full.blockers.some((b) => /headroom.*PEND/i.test(b)), "pendência vira BLOCKER real em full, não só aviso")
+  // release/opt-in: callable_not_routed NÃO é pendência -> nunca bloqueia, nunca avisa
   const release = buildProof({ cwd: "/x", profile: "release", deps })
   assert.equal(release.checks.headroomRouting.pending, false)
+  assert.equal(release.ready, true, "fora do full, routing é opt-in -> não bloqueia")
   assert.ok(!release.warnings.some((w) => /headroom.*PEND/i.test(w)))
+  assert.ok(!release.blockers.some((b) => /headroom/i.test(b)))
+})
+
+test("proof --profile full: headroom 'routed' -> sem blocker (promessa cumprida)", async () => {
+  const { buildProof } = await imp("src/commands/proof.js")
+  const deps = {
+    verify: () => ({ status: "ready", failed: [], timedOut: [] }),
+    dream: () => ({ summary: { REAL: 1, PARTIAL: 0, PLACEBO: 0, ROADMAP: 0, RISK: 0 } }),
+    readiness: () => ({ tools: { headroom: { status: "routed" }, graphify: { status: "callable" } }, graphify: { ok: true, state: "fresh" } }),
+    git: () => null,
+    skillGateRelease: () => ({ ok: true, pendingGates: [], blocker: null }),
+    env: {},
+  }
+  const full = buildProof({ cwd: "/x", profile: "full", deps })
+  assert.equal(full.checks.headroomRouting.pending, false)
+  assert.ok(!full.blockers.some((b) => /headroom/i.test(b)))
 })

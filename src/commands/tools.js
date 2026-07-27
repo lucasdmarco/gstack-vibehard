@@ -17,6 +17,7 @@ import { buildToolRefresh } from "../tools/refresh.js"
 import { enableRouting, disableRouting } from "../tools/headroom-route.js"
 import { startProxy, stopProxy, proxyStatus, DEFAULT_PROXY_PORT as PROXY_DEFAULT_PORT } from "../tools/headroom-proxy.js"
 import { proveRouting } from "../tools/headroom-traffic.js"
+import { buildHeadroomStatus } from "../tools/headroom-status.js"
 import { makeAnchor, validateAnchor } from "../tools/edit-guard.js"
 import { agentReachCommand } from "./agent-reach.js"
 import { confirm, success, warn, error, info, section } from "../cli/index.js"
@@ -359,6 +360,7 @@ function handleToolsHelp() {
   info("    tools clean-machine [--json] [--no-write] [--keep]    Proof pack offline: OpenCode sacred, backup/restore byte-for-byte, matriz de tools")
   info("    tools refresh [--changed] [--json] [--strict]         Action close: refresca graphify/context/headroom/fallow (bounded) + report + readiness")
   info("    tools headroom doctor|enable --harness codex|claude --project-only|disable --restore  Routing opt-in, project-scoped (nunca global/wrap)")
+  info("    tools headroom summary [--json]                       6 dimensões unificadas (binário/comando/proxy/harness/tráfego/economia)")
   info("    tools headroom start|stop|status [--port N]           Lifecycle do proxy Headroom (loopback, PID owned)")
   info("    tools doctor                  Validar binario/auth/MCP das instaladas")
   info("    tools generate                Gerar CLI de cauda-longa via HAR (em breve)")
@@ -502,8 +504,29 @@ async function headroomProveCmd(args, cwd) {
   return r
 }
 
-// `tools headroom <doctor|enable|disable|start|stop|status|prove>`: routing opt-in
-// + lifecycle do proxy, project-scoped (nunca global/wrap).
+// PRD51 S51.5.5 (ação #10) — as 6 dimensões (binário/comando/proxy/harness
+// roteado/tráfego provado/economia) já existem espalhadas em `readiness.js`
+// (doctor, dims 1-4) e `headroom-traffic.js` (prove, dims 5-6) — só compõe.
+function renderHeadroomSummary(s) {
+  section("tools headroom summary — 6 dimensões")
+  info(`  1. binário encontrado: ${s.binaryFound}`)
+  info(`  2. comando responde: ${s.commandResponds}`)
+  info(`  3. proxy saudável: ${s.proxyHealthy}`)
+  info(`  4. harness roteado: ${s.harnessRouted ? JSON.stringify(s.harnessRouted) : "desconhecido"}`)
+  info(`  5. tráfego comprovado: ${s.trafficProven}`)
+  info(`  6. economia observada: ${s.savingsObserved ? `${s.savingsObserved.tokensSaved} tokens (${s.savingsObserved.savingsPercent}%)` : "nenhuma (sem tráfego provado)"}`)
+}
+async function headroomSummaryCmd(args, cwd, opts) {
+  const readinessEntry = buildReadiness({ cwd, home: opts.home, probe: opts.probe, git: opts.git, now: opts.now }).tools.headroom
+  const proof = await (opts.proveRouting ? opts.proveRouting() : proveRouting({ cwd, proxyState: await proxyStatus({ cwd }) }))
+  const status = buildHeadroomStatus({ readinessEntry, proof })
+  if (args.includes("--json")) return emitTools(status)
+  renderHeadroomSummary(status)
+  return status
+}
+
+// `tools headroom <doctor|enable|disable|start|stop|status|prove|summary>`:
+// routing opt-in + lifecycle do proxy, project-scoped (nunca global/wrap).
 const HEADROOM_SUBS = Object.freeze({
   enable: (a, cwd) => headroomEnableCmd(a, cwd),
   disable: (a, cwd) => headroomDisableCmd(a, cwd),
@@ -513,6 +536,7 @@ const HEADROOM_SUBS = Object.freeze({
   prove: (a, cwd) => headroomProveCmd(a, cwd),
 })
 function handleHeadroom({ args, cwd, opts }) {
+  if (args[1] === "summary") return headroomSummaryCmd(args, cwd, opts)
   const handler = HEADROOM_SUBS[args[1]]
   return handler ? handler(args, cwd) : headroomDoctorCmd(args, cwd, opts)
 }

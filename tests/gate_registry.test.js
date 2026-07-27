@@ -15,16 +15,20 @@ test("todo gate do registry tem contrato COMPLETO (id/severity/evidência/negati
   assert.equal(buildGateRegistry().contractOk, true)
 })
 
+// PRD51 S51.5.5: headroom-routing é advisory FORA do perfil `full` (dentro dele
+// é hard — `headroom-routing-full`, testado em `headroom_policy.test.js`).
+// Usa "release" aqui pra continuar testando o princípio geral hard×advisory
+// sem se confundir com a regra full-específica do Headroom.
 test("severity governa: hard bloqueia; advisory só avisa (nunca reprova)", async () => {
   const { resolveGateOutcomes } = await imp("src/skills/gate-registry.js")
   const checks = {
     verify: { blocker: "verify falhou" },        // hard → blocker
-    headroomRouting: { blocker: "não roteado" },  // advisory → só warning
+    headroomRouting: { blocker: "não roteado" },  // advisory (fora de full) → só warning
     graphifyFreshness: { warning: "grafo 1 commit atrás" },
   }
-  const out = resolveGateOutcomes({ profile: "full", checks })
+  const out = resolveGateOutcomes({ profile: "release", checks })
   assert.ok(out.blockers.includes("verify falhou"), "gate hard bloqueia")
-  assert.ok(!out.blockers.includes("não roteado"), "gate advisory NUNCA bloqueia")
+  assert.ok(!out.blockers.includes("não roteado"), "gate advisory NUNCA bloqueia (fora de full)")
   assert.ok(out.warnings.includes("não roteado"), "advisory vira warning")
   assert.ok(out.warnings.includes("grafo 1 commit atrás"))
 })
@@ -47,9 +51,11 @@ test("contrato inválido é detectado (severity fora de hard|advisory, campo fal
   assert.equal(bad.badSeverity, true)
 })
 
+// PRD51 S51.5.5: perfil "release" (não "full") aqui de propósito — headroom
+// só é hard em `full` (ver `headroom_policy.test.js` pro caso full-específico).
 test("PARIDADE: proof consome o registry e os hard gates seguem sendo os blockers", async () => {
   const { buildProof } = await imp("src/commands/proof.js")
-  // deps injetados: verify falha (hard) → deve bloquear; headroom não-roteado (advisory) → warning
+  // deps injetados: verify falha (hard) → deve bloquear; headroom não-roteado (advisory fora de full) → warning
   const deps = {
     verify: () => ({ status: "failed", failed: ["suite"], timedOut: [] }),
     dream: () => ({ summary: { RISK: 0, PLACEBO: 0 }, scope: {} }),
@@ -57,10 +63,9 @@ test("PARIDADE: proof consome o registry e os hard gates seguem sendo os blocker
     git: () => "",
     skillGateRelease: () => ({ ok: true, blocker: null, pendingGates: [] }),
   }
-  const p = buildProof({ cwd: repoRoot, profile: "full", deps })
+  const p = buildProof({ cwd: repoRoot, profile: "release", deps })
   assert.equal(p.ready, false, "verify hard falho reprova")
   assert.ok(p.blockers.length > 0 && p.checks.verify.ok === false, "verify hard bloqueia")
-  assert.ok(p.warnings.some((w) => /headroom/.test(w)), "headroom advisory é warning, não blocker")
-  assert.ok(!p.blockers.some((w) => /headroom/.test(w)), "headroom NUNCA é blocker")
+  assert.ok(!p.blockers.some((w) => /headroom/.test(w)), "headroom NUNCA é blocker fora do perfil full")
   assert.equal(p.gateRegistry, "gstack.gate-registry.v1")
 })

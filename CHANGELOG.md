@@ -1,5 +1,55 @@
 # Changelog - gstack-vibehard
 
+## [5.77.0] - 2026-07-27 — PRD51 S51.5.5: Headroom em 6 dimensões + gate `full` alinhado à regra (fecha Sprint 51.5)
+
+Quinta e última parte do Sprint 51.5 (ação #10 + regra Headroom). As 6
+dimensões (binário encontrado; comando responde; proxy saudável; harness
+roteado; tráfego comprovado; economia observada) já existiam como primitivas
+espalhadas em `readiness.js` (doctor, dims 1-4) e `headroom-traffic.js`
+(prove, dims 5-6) — nunca unificadas num status object.
+
+- `src/tools/headroom-status.js` (novo): `buildHeadroomStatus({readinessEntry,
+  proof})`, função PURA que só compõe os dois relatórios já computados
+  (nunca re-sonda). `src/commands/tools.js`: novo `tools headroom summary
+  [--json]`.
+- **Achado real e mais significativo desta leva**: a regra Headroom exige
+  "se um perfil promete roteamento, esse perfil deve bloquear sem proxy/
+  tráfego" — mas `gate-registry.js` hardcodeava `headroom-routing` como
+  `severity:"advisory"` pra TODO profile, inclusive `full` (que promete
+  routing default-on via `routeDefaultOn`). Resultado: `proof --profile
+  full` com Headroom `callable_not_routed` sempre devolvia `ready:true`,
+  contradizendo a própria promessa do perfil. Corrigido: `gate-registry.js`
+  agora tem `headroom-routing` (advisory, `["release","quick"]`) E
+  `headroom-routing-full` (hard, `["full"]`) — mesmo evidenceKey, gate
+  diferente por perfil. `proof.js`'s `headroomEntry` agora popula `.blocker`
+  quando `pending:true` (antes só virava `.note`/warning solto, nunca um
+  blocker real).
+- **3 testes baseline pré-existentes** combinavam `profile:"full"` com
+  headroom `callable_not_routed` só como fixture incidental (não era o que
+  testavam) — `gate_registry.test.js` (2 testes) e `dream_cli_behavioral.test.js`
+  quebraram com o novo bloqueio real. Corrigido trocando pra `profile:
+  "release"` nesses (preserva a intenção original de cada teste, sem se
+  confundir com a regra full-específica nova). `headroom_policy.test.js`
+  reescrito para testar a regra nova diretamente: `full`+`callable_not_routed`
+  → `ready:false` com blocker real; `full`+`routed` → sem blocker.
+- `tests/headroom_status.test.js` (6 testes, novo): as 6 dimensões
+  compostas corretamente, incluindo controle negativo (`routed_no_traffic`
+  nunca vira `trafficProven`/economia — "não é enfeite").
+- QG achou CRAP CRITICAL em `buildHeadroomStatus` (CC10/cognitive9) —
+  extraído em `commandDims`/`trafficDims` (mesmo padrão de extração do
+  programa inteiro). QG strict `blocking_severity_count:0`, suíte JS
+  2079/2080 (1 skip pré-existente).
+
+## Sprint 51.5 — FECHADO (5 de 5 sub-sprints, v5.73.0→v5.77.0)
+
+S51.5.1 (sidecar de proveniência do Graphify) → S51.5.2 (closeout refresh
+wiring) → S51.5.3 (prioridade/filtro/dedup/achabilidade no context index) →
+S51.5.4 (`tools verdict` reconcilia readiness+agents doctor) → S51.5.5
+(Headroom 6 dimensões + gate `full` real). Cada sub-sprint corrigiu um gap
+REAL descoberto por investigação de código, não hipotético — o achado mais
+significativo foi o gate `headroom-routing` nunca ter sido `hard` em nenhum
+perfil, contradizendo a própria promessa de "routing default-on" do `full`.
+
 ## [5.76.0] - 2026-07-27 — PRD51 S51.5.4: `tools verdict` — capability verdict canônico (ação #9)
 
 Quarta parte do Sprint 51.5. Achado real: `tools readiness`

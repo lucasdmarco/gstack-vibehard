@@ -28,8 +28,14 @@ export const PROOF_GATES = Object.freeze([
     toolMissing: "warn", negativeControl: "gate pendente enforced → blocker" },
   { id: "tool-readiness", version: 1, severity: "advisory", appliesTo: "all", evidenceKey: "toolReadiness",
     toolMissing: "warn", negativeControl: "ferramenta ausente → warning (nunca bloqueia)" },
-  { id: "headroom-routing", version: 1, severity: "advisory", appliesTo: "all", evidenceKey: "headroomRouting",
-    toolMissing: "warn", negativeControl: "callable_not_routed → warning, nunca economia alegada" },
+  // PRD51 S51.5.5 — a regra Headroom exige: "se um perfil promete roteamento,
+  // esse perfil deve bloquear sem proxy/tráfego". Só o perfil `full` promete
+  // routing default-on (`headroom-policy.js:routeDefaultOn`) — por isso o gate
+  // é HARD só em `full`; fora dele, routing continua opt-in e advisory.
+  { id: "headroom-routing", version: 1, severity: "advisory", appliesTo: ["release", "quick"], evidenceKey: "headroomRouting",
+    toolMissing: "warn", negativeControl: "callable_not_routed → warning, nunca economia alegada (fora do perfil full)" },
+  { id: "headroom-routing-full", version: 1, severity: "hard", appliesTo: ["full"], evidenceKey: "headroomRouting",
+    toolMissing: "block", negativeControl: "perfil full promete routing default-on: sem proxy/tráfego provado é blocker, nunca só warning" },
   { id: "design-detector", version: 1, severity: "advisory", appliesTo: "all", evidenceKey: "designDetector",
     toolMissing: "warn", negativeControl: "achado de contraste sem waiver → warning (advisory; só 1 regra do motor Impeccable vendorizada, S49.2A/B — nunca bloqueia release ainda)" },
 ])

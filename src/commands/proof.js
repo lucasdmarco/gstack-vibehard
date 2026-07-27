@@ -69,6 +69,9 @@ function toolsWarnings(tools) {
   return out
 }
 // No perfil `full`, o routing é default-on → callable_not_routed é PENDÊNCIA (C3).
+// PRD51 S51.5.5 — pendência agora carrega `.blocker` (não só nota/warning): o
+// Gate Registry decide a severidade real (hard em `full`, advisory fora dele —
+// `gate-registry.js:headroom-routing-full`); aqui só declaramos o FATO.
 function headroomEntry(status, profile, env) {
   const onByDefault = routeDefaultOn({ mode: profile === "full" ? "full" : "other", env })
   const pend = headroomPendency({ status, onByDefault })
@@ -76,6 +79,7 @@ function headroomEntry(status, profile, env) {
     status,
     pending: pend.pending,
     note: pend.pending ? pend.note : "callable_not_routed é o claim honesto; routing é opt-in",
+    blocker: pend.pending ? `headroom: ${pend.note} — corrija: ${pend.action}` : null,
     ...(pend.action ? { action: pend.action } : {}),
   }
 }
@@ -83,7 +87,6 @@ function checkReadiness(deps, cwd, profile) {
   const r = (deps.readiness || buildReadiness)({ cwd })
   const headroom = headroomEntry(r.tools.headroom.status, profile, deps.env || process.env)
   const warnings = toolsWarnings(r.tools)
-  if (headroom.pending) warnings.push(`headroom: ${headroom.note} — corrija: ${headroom.action}`)
   return {
     tools: Object.fromEntries(Object.entries(r.tools).map(([k, t]) => [k, t.status])),
     graphify: graphifyCheck(r.tools),

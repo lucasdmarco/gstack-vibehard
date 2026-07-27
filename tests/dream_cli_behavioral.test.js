@@ -30,6 +30,9 @@ test("dream status usa o mesmo default comportamental", async () => {
   assert.ok((r.audit.NOT_PROVED || 0) > 0, "status reflete o audit comportamental")
 })
 
+// PRD51 S51.5.5: perfil "release" aqui de propósito — o teste é sobre
+// dream/behavioral, não sobre a regra de routing do Headroom em `full`
+// (que agora bloqueia sem proxy provado; ver `headroom_policy.test.js`).
 test("proof consome o dream COMPORTAMENTAL (RISK/PLACEBO inalterados → ready não afetado)", async () => {
   const { buildProof } = await import("../src/commands/proof.js")
   let seen = null
@@ -41,7 +44,7 @@ test("proof consome o dream COMPORTAMENTAL (RISK/PLACEBO inalterados → ready n
     skillGateRelease: () => ({ ok: true }),
     env: {},
   }
-  const p = buildProof({ cwd: repoRoot, profile: "full", deps })
+  const p = buildProof({ cwd: repoRoot, profile: "release", deps })
   assert.equal(seen && seen.behavioral, true, "proof chama o dream em modo behavioral")
   assert.equal(p.ready, true, "RISK/PLACEBO=0 → ready:true mesmo com NOT_PROVED presente")
 })
