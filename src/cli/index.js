@@ -369,6 +369,19 @@ const DISPATCH = {
   help: () => showHelp(),
 }
 
+// PRD51 S51.4.5 (ação #8) — command-lint precisa detectar "comando no dispatch
+// sem help" e seu inverso "help sem handler". `COMMANDS`/`DISPATCH` são a fonte
+// única de cada lado; expostos aqui como funções puras pra serem checados por
+// testes/CI sem duplicar as duas listas em outro módulo.
+export function dispatchCommandsWithoutHelp() {
+  const known = new Set(COMMANDS.map((c) => c.name))
+  return Object.keys(DISPATCH).filter((k) => !known.has(k))
+}
+export function helpEntriesWithoutHandler() {
+  const handlers = new Set(Object.keys(DISPATCH))
+  return COMMANDS.map((c) => c.name).filter((n) => !handlers.has(n))
+}
+
 async function dispatch(command, args) {
   const handler = DISPATCH[command]
   if (!handler) {

@@ -1,5 +1,41 @@
 # Changelog - gstack-vibehard
 
+## [5.72.0] - 2026-07-27 — PRD51 S51.4.5: registry de efeitos por operação + guard de help/dispatch (fecha Sprint 51.4)
+
+Quinta e última parte do Sprint 51.4 (ação #8 — "command-lint detecta operação
+mutável classificada read-only" / "comando no dispatch sem help"). Escopo
+HONESTO, não exaustivo: 2 das 5 detecções pedidas pelo PRD ("subcomando
+inexistente", "flag documentada não reconhecida") ficam de fora desta leva —
+exigiriam catalogar subcomandos/flags de cada um dos ~49 comandos, o que não
+existe hoje e não vou fabricar a partir do nome do comando.
+
+- `src/meta/operation-registry.js` (novo): `OPERATION_REGISTRY` — schema
+  mínimo por operação (`effects`, `network`, `execution`, `requiresConsent`,
+  `jsonSchema`), escopado só às operações genuinamente investigadas nesta
+  sprint (`plan run`, `visual hooks install/status`, `research skills audit
+  --repo/--path`) mais um punhado de operações já bem conhecidas (`start`,
+  `verify`, `prd status`). `OPERATION_EFFECTS` é vocabulário fechado;
+  `invalidEffects()` valida contra ele. `mutableOperationMisclassified()`
+  cruza o registry com o firewall Knowledge/Execution (`command-layers.js`) —
+  sinaliza só comando de TOPO sem NENHUMA classificação, não qualquer efeito
+  mutável em comando `knowledge` (comandos `knowledge` como `visual`/
+  `research` legitimamente escrevem em `.gstack`/config de projeto sem violar
+  "nunca edita código-fonte" — checagem literal produziria falso-positivo
+  contra esse design deliberado, coberto por teste dedicado).
+- `src/cli/index.js`: `dispatchCommandsWithoutHelp()` e
+  `helpEntriesWithoutHandler()` — funções puras reais que substituem o guard
+  anterior baseado em regex sobre o source; usadas pelo command-lint e por
+  `tests/cli_help_gaps.test.js`.
+- `tests/operation_registry.test.js` (7 testes, novo): vocabulário fechado +
+  controle negativo, entradas batendo com os achados reais de S51.4.1-3,
+  `mutableOperationMisclassified` pegando comando fantasma sem classificação,
+  registry real sem misclassificação, e o teste de não-falso-positivo pra
+  `visual hooks install`.
+- QG strict `blocking_severity_count:0`, suíte JS 2050/2050 (1 skip
+  pré-existente). **Fecha o Sprint 51.4 (5/5 sub-sprints: 51.4.1 pipeline do
+  `plan run`, 51.4.2 consentimento `visual hooks install`, 51.4.3
+  consentimento+staleness `research --repo`, 51.4.4 gaps de help, 51.4.5 este).**
+
 ## [5.71.0] - 2026-07-27 — PRD51 S51.4.4: `research`/`pp` ganham help; `visual`/`research --help` alcançam o usage real
 
 Quarta parte do Sprint 51.4 (ações #6/#8 — "garantir help específico de research,
