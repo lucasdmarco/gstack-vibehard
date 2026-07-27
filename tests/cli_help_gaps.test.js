@@ -53,10 +53,12 @@ test("helpFor('doctor'): comando SEM DETAILED_HELP continua funcionando (regress
   assert.match(cap.get(), /doctor/)
 })
 
-test("DISPATCH e COMMANDS: todo comando do DISPATCH tem entrada em COMMANDS (nenhum 'sem help')", async () => {
-  const cliSrc = (await import("node:fs")).readFileSync(mod, "utf-8")
-  const dispatchKeys = [...cliSrc.matchAll(/^\s*"?([a-z][\w-]*)"?:\s*\(a[^)]*\)\s*=>/gm)].map((m) => m[1])
-  const { isKnownCommand } = await imp()
-  const missing = dispatchKeys.filter((k) => !isKnownCommand(k))
-  assert.deepEqual(missing, [], `comando(s) no DISPATCH sem entrada em COMMANDS: ${missing.join(", ")}`)
+test("dispatchCommandsWithoutHelp: nenhum comando do DISPATCH fica sem help (PRD51 S51.4.5, ação #8)", async () => {
+  const { dispatchCommandsWithoutHelp } = await imp()
+  assert.deepEqual(dispatchCommandsWithoutHelp(), [])
+})
+
+test("helpEntriesWithoutHandler: nenhuma entrada de help fica sem handler real no DISPATCH", async () => {
+  const { helpEntriesWithoutHandler } = await imp()
+  assert.deepEqual(helpEntriesWithoutHandler(), [])
 })
