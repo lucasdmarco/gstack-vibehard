@@ -1,5 +1,37 @@
 # Changelog - gstack-vibehard
 
+## [5.63.0] - 2026-07-26 — PRD51 S51.2.4: diagnóstico real anexado ao handoff (Golden Run cutover, parte 4/7)
+
+Quarto sub-sprint do Sprint 51.2. GAP-6: "gate falho -> handoff DIRETO — diagnose-loop.js
+nunca é consultado". **Achado que recalibrou o escopo mapeado no plano**: `diagnose-loop.js`/
+`runtime-repair-cycle.js` foram desenhados para um ciclo AGÊNTICO (observa → diagnostica →
+LLM PROPÕE correção → reobservação valida), usado hoje só por `gstack_vibehard loop`
+(comando interativo com pausa/retomada real). `runPipeline` do `start` é SÍNCRONO — roda
+dev/test/review/verify/preview uma vez e retorna; não há como pausar no meio e devolver
+controle ao LLM pra escrever código e retomar. Perguntado ao usuário: **decisão — não
+fabricar autocorreção real; só anexar diagnóstico estruturado REAL ao handoff**, honesto
+sobre o limite estrutural (síncrono vs agêntico) em vez de fingir um ciclo de reparo que
+o `start` não suporta.
+
+- `src/project-plan/run-loop.js`: quando um gate (test/verify/preview-quando-aplicável)
+  falha, `gateFailureDiagnosis(stage, stageResult)` chama `diagnoseObservation`
+  (`skills/diagnose-loop.js`, já testado, agora genuinamente importado e consultado —
+  não mais só por `commands/loop.js`) com o detail REAL do stage que falhou. O resultado
+  (`schemaVersion, passed, problems, pendingCriteria`) é anexado ao retorno de
+  `runPipeline`, ao `status.json` persistido, e a uma nova seção `## Diagnóstico` no
+  `handoff.md`. Falha de `create` (execução de plano, não observação de runtime) e
+  status `"done"` nunca carregam `diagnosis` — fora do domínio do módulo.
+  Extraído `withDiagnosis(obj, diagnosis)` — evita repetir o ternário de anexação em
+  `finishPipeline`, que cruzou o limiar de CC bloqueante com os 2 pontos de anexação
+  originais (mesmo padrão de extração usado o programa inteiro).
+- **O gap estrutural que sobra é real e documentado, não escondido**: nenhum retry
+  acontece — o pipeline ainda vai direto pra handoff, só que com diagnóstico útil em vez
+  de uma mensagem crua de erro de gate.
+- `tests/start_repair_diagnosis.test.js` (3 testes). `tests/prd47_baseline_negative_controls.test.js`
+  GAP-6 atualizado (não apagado) para a nova realidade: diagnose-loop.js É consultado,
+  mas o handoff imediato continua (limite estrutural, não um bug a esconder).
+- QG strict `blocking_severity_count:0`, suíte JS 1999/1999 (1 skip pré-existente).
+
 ## [5.62.0] - 2026-07-26 — PRD51 S51.2.3: preview bloqueante atrás de flag (Golden Run cutover, parte 3/7)
 
 Terceiro sub-sprint do Sprint 51.2. `preview` nunca esteve em `GATE_STAGES` — falha de

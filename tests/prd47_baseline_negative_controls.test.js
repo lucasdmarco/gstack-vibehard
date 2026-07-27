@@ -90,12 +90,28 @@ test("GAP-5: run-loop.js NUNCA chama advanceExecution/recordApplied/verifyExecut
 })
 
 // ── 6. GAP: handoff imediato, sem tentativa de classificação/reparo ──────────
-test("GAP-6: gate falho -> handoff DIRETO — diagnose-loop.js nunca é consultado no caminho automático", async () => {
+// GAP-6, ATUALIZADO no PRD51 S51.2.4: `diagnose-loop.js` agora É consultado
+// (`diagnoseObservation`) antes do handoff — mas SÓ para anexar diagnóstico REAL,
+// nunca autocorreção fabricada (autocorreção de verdade exige um ciclo agêntico
+// com pausa/retomada que o `start` síncrono não suporta; decisão do usuário).
+// `run-loop.js` ainda vai direto pra handoff (nenhum retry acontece) — o gap real
+// que sobra é estrutural (síncrono vs agêntico), documentado, não escondido.
+test("GAP-6 -> S51.2.4: gate falho consulta diagnose-loop.js (diagnóstico real anexado), mas segue indo direto pra handoff (sem autocorreção — limite estrutural do start síncrono)", async () => {
   const runLoopSrc = src("src/project-plan/run-loop.js")
-  assert.doesNotMatch(runLoopSrc, /diagnose-loop/, "run-loop.js não importa diagnose-loop — só commands/loop.js (manual) o faz")
-  const loopCmdSrc = src("src/commands/loop.js")
-  assert.match(loopCmdSrc, /diagnose-loop/, "confirma que diagnose-loop EXISTE e é usado, só que manualmente")
-  assert.match(runLoopSrc, /Gate determinístico falhou e não há passo retomável para corrigir → handoff\s*\n\s*\/\/ imediato/, "comentário do próprio código admite o handoff imediato")
+  assert.match(runLoopSrc, /import \{ diagnoseObservation \} from "\.\.\/skills\/diagnose-loop\.js"/, "diagnose-loop.js agora É importado e consultado")
+  const { runPipeline } = await imp("src/project-plan/run-loop.js")
+  const { buildPlan } = await imp("src/project-plan/planner.js")
+  const cwd = await mk("gstack-gap6-")
+  try {
+    mkdirSync(path.join(cwd, "app"), { recursive: true })
+    const { plan } = buildPlan({ objective: "web app", projectName: "app", mode: "lite" })
+    const r = runPipeline({
+      plan, planDir: path.join(cwd, ".gstack", "plans", plan.id), cwd,
+      exec: () => {}, verifyRunner: () => ({ status: "blocked", usable: false, failed: ["qg-l1"] }),
+    })
+    assert.equal(r.status, "handoff", "ainda vai direto pra handoff — nenhum retry/autocorreção real acontece")
+    assert.ok(r.diagnosis, "mas com diagnóstico real anexado (não fabricado)")
+  } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
 })
 
 // ── 7. GAP real confirmado: integrity.js tem ponto cego pra itens kind:"dir" ─

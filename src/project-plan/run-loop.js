@@ -6,6 +6,7 @@ import { executePlan, sanitizeCommand } from "./executor.js"
 import { runVerify, projectHasRunScript } from "./verify-runner.js"
 import { runChangedFilesVerify } from "./changed-files.js"
 import { diffHygiene } from "./diff-hygiene.js"
+import { diagnoseObservation } from "../skills/diagnose-loop.js"
 import { loadRuntimeManifest, evaluatePreviewReadiness } from "../runtime/manifest.js"
 import { readAllState } from "../runtime/supervisor.js"
 import { scout } from "../context-docs/scout.js"
@@ -123,7 +124,18 @@ export function renderPlanMarkdown(plan) {
 }
 
 /** Handoff humano após cap/falha — resumo acionável, sem secrets/output bruto. */
-export function renderHandoff({ runId, plan, stages, attempts, failedStage }) {
+// PRD51 S51.2.4 (GAP-6): quando o handoff vem de gate falho, anexa a seção de
+// diagnóstico REAL de `diagnoseObservation` — nunca uma autocorreção fabricada
+// (o `start` síncrono não pausa/retoma pra um ciclo agêntico real).
+function diagnosisLines(diagnosis) {
+  if (!diagnosis) return []
+  const lines = ["", "## Diagnóstico (diagnose-loop.js)"]
+  for (const p of diagnosis.problems) lines.push(`- ${p}`)
+  if (diagnosis.pendingCriteria.length) lines.push(`- critérios de aceite sem evidência: ${diagnosis.pendingCriteria.join(", ")}`)
+  return lines
+}
+
+export function renderHandoff({ runId, plan, stages, attempts, failedStage, diagnosis }) {
   const lines = [
     `# Handoff — run ${runId}`,
     "",
@@ -134,6 +146,7 @@ export function renderHandoff({ runId, plan, stages, attempts, failedStage }) {
     "## Estado por estágio",
   ]
   for (const [stage, s] of Object.entries(stages)) lines.push(`- ${stage}: ${s.status}${s.detail ? ` — ${s.detail}` : ""}`)
+  lines.push(...diagnosisLines(diagnosis))
   lines.push("", "## Próximos passos sugeridos",
     `1. Veja o journal: .gstack/runs/${runId}/journal.jsonl`,
     `2. Corrija a causa e retome: \`gstack_vibehard plan run ${plan.id}\``,
@@ -401,12 +414,15 @@ function recordSessionIndex(ctx, status) {
   } catch { /* session index best-effort */ }
 }
 
+// Anexa `diagnosis` só quando existe — evita ternário repetido inflar a CC de finishPipeline.
+const withDiagnosis = (obj, diagnosis) => (diagnosis ? { ...obj, diagnosis } : obj)
+
 /** Fecha o run: handoff.md quando aplicável + journal + status.json. */
-function finishPipeline(ctx, stages, status, failedStage) {
+function finishPipeline(ctx, stages, status, failedStage, diagnosis) {
   let handoffPath
   if (status === "handoff") {
     handoffPath = join(ctx.runDir, "handoff.md")
-    writeFileSync(handoffPath, renderHandoff({ runId: ctx.runId, plan: ctx.plan, stages, attempts: ctx.attempts, failedStage }))
+    writeFileSync(handoffPath, renderHandoff({ runId: ctx.runId, plan: ctx.plan, stages, attempts: ctx.attempts, failedStage, diagnosis }))
   }
   // PRD47 S47.1: reconcilia as duas derivações de "done" — o motor (LoopEngine)
   // sempre teve os 4 portões mais estritos (allGatesGreen) mas finalize() nunca
@@ -420,7 +436,7 @@ function finishPipeline(ctx, stages, status, failedStage) {
   })
   const engine = engineSnapshot(ctx.engine)
   appendRunEvent(ctx.runDir, { event: "pipeline_ended", status, failedStage: failedStage || null, attempts: ctx.attempts, enginePhase: engine.phase, engineCapped: engine.capped, goldenRunStatus: goldenRun.status })
-  writeRunStatus(ctx.runDir, { runId: ctx.runId, planId: ctx.plan.id, status, stages, attempts: ctx.attempts, engine, goldenRun })
+  writeRunStatus(ctx.runDir, withDiagnosis({ runId: ctx.runId, planId: ctx.plan.id, status, stages, attempts: ctx.attempts, engine, goldenRun }, diagnosis))
   try { writePipelineEvidence(ctx, stages) } catch { /* evidence best-effort — não derruba o run */ }
   // Run Closeout Sync (F4-A) + proof automático no encerramento (36.10): a prontidão
   // é DERIVADA do gate verify que já rodou no pipeline — síncrono, bounded, sem
@@ -430,7 +446,18 @@ function finishPipeline(ctx, stages, status, failedStage) {
   const detect = () => detectGoldenPath({ status, events: readPlanJournal(ctx.runDir), runId: ctx.runId })
   try { runCloseoutSync({ cwd: ctx.cwd, runId: ctx.runId, command: "start", status, proof: () => closeoutReadiness(stages), detect }) } catch { /* closeout best-effort */ }
   recordSessionIndex(ctx, status)
-  return { runId: ctx.runId, status, stages, attempts: ctx.attempts, execResult: ctx.execResult, engine, goldenRun, ...(handoffPath ? { handoffPath } : {}) }
+  return withDiagnosis({ runId: ctx.runId, status, stages, attempts: ctx.attempts, execResult: ctx.execResult, engine, goldenRun, ...(handoffPath ? { handoffPath } : {}) }, diagnosis)
+}
+
+// PRD51 S51.2.4 (GAP-6): consulta diagnose-loop.js ANTES do handoff de um gate
+// falho — real, não fabricado. Autocorreção de verdade exigiria um ciclo agêntico
+// (LLM propõe, reobservação valida) que o `start` síncrono não suporta (decisão
+// do usuário: enriquecer o handoff, sem fingir correção). `observation` honesto:
+// não houve observação de runtime real para gates de código (test/verify/preview
+// sem browser) — só o detail já computado pelo próprio stage.
+function gateFailureDiagnosis(stage, stageResult) {
+  const observation = { visualValidated: false, problems: [stageResult.detail || `${stage} falhou`] }
+  return diagnoseObservation({ observation, acceptance: [] })
 }
 
 /** Roda dev→test→review→verify→preview. Retorna o nome do gate que falhou, ou null. */
@@ -470,6 +497,6 @@ export function runPipeline(opts = {}) {
   if (stages.create.status === "failed") return finishPipeline(ctx, stages, "handoff", "create")
 
   const failedGate = runPostCreateStages(ctx, stages)
-  if (failedGate) return finishPipeline(ctx, stages, "handoff", failedGate)
+  if (failedGate) return finishPipeline(ctx, stages, "handoff", failedGate, gateFailureDiagnosis(failedGate, stages[failedGate]))
   return finishPipeline(ctx, stages, "done")
 }
