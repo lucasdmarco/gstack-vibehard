@@ -19,6 +19,7 @@ import { proposeBrownfieldChoices, decideBrownfieldOrNew } from "../onboarding/b
 import { openStateStore } from "../state/store.js"
 import { listSessions, activeSession } from "../state/session-index.js"
 import { buildProjections } from "../skills/design-context.js"
+import { resolveBriefAcceptances } from "../project-plan/acceptance-verification.js"
 
 /**
  * `start` — entrada Replit-like (PRD18 Sprint 1). Orquestra o wizard (objetivo →
@@ -269,6 +270,15 @@ async function runStartProof(cwd, json, opts) {
   return proofCommand(["--profile", "release", ...(json ? ["--json"] : [])], { cwd })
 }
 
+// PRD51 S51.2.1: acceptance REAL do brief chega no motor (LoopEngine via runPipeline),
+// não mais [] por omissão de wiring. `pending_verifier` só vira `verifier` com journey
+// mapeada (`opts.journeys`) — sem journeys, o aceite segue honestamente pendente (nunca
+// "resolvido" por decreto). `goldenRun` continua não-autoritativo (aditivo).
+function resolvedAcceptance(brief, opts) {
+  if (!brief) return []
+  return resolveBriefAcceptances(brief.acceptances, opts.journeys || [])
+}
+
 /** Persiste, confirma e roda o pipeline. Retorna o contrato público do start. */
 async function confirmAndRunPipeline(plan, flags, opts, json, cwd, brief) {
   const planDir = persistPlanArtifacts(cwd, plan, brief)
@@ -307,7 +317,7 @@ async function confirmAndRunPipeline(plan, flags, opts, json, cwd, brief) {
     plan, planDir, cwd, skillRoute, designSystemGate: dsGate.evidence, loopDecision,
     exec: opts.exec, gateExec: opts.gateExec,
     devRunner: opts.devRunner, verifyRunner: opts.verifyRunner, scoutRunner: opts.scoutRunner,
-    maxAttempts: opts.maxAttempts,
+    maxAttempts: opts.maxAttempts, acceptance: resolvedAcceptance(brief, opts),
   })
 
   return emitAndProof(plan, pipeline, { skillRoute, loopDecision }, flags, opts, json, cwd)

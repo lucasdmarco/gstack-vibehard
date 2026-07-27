@@ -1,5 +1,37 @@
 # Changelog - gstack-vibehard
 
+## [5.60.0] - 2026-07-26 — PRD51 S51.2.1: acceptance real chega no pipeline (Golden Run cutover, parte 1/7)
+
+Primeiro sub-sprint do Sprint 51.2 ("Cutover do Golden Run no `start`") — o sprint
+estrutural mais central e arriscado do PRD51 (§11 exige decomposição incremental
+aditiva, sem substituir comportamento default até um cutover final atrás de flag).
+Achado que abre o sub-sprint: `start.js` chamava `runPipeline` sem passar `acceptance`
+— `opts.acceptance` sempre `undefined` → `[]` — fazendo `deriveEngineGates.
+acceptanceResolved` (`golden-run.js`) ser sempre falso por VAZIO, nunca por decisão real.
+
+- `src/commands/start.js`: `confirmAndRunPipeline` agora resolve `brief.acceptances`
+  via `resolveBriefAcceptances` (`acceptance-verification.js`, já existente desde
+  PRD47 S47.5 mas nunca chamado) e passa o resultado como `opts.acceptance` em
+  `runPipeline`. `pending_verifier` só vira `verifier` real com uma journey mapeada
+  (`opts.journeys`) por `acceptanceId` — sem journeys, o aceite segue honestamente
+  pendente, nunca "resolvido" por decreto. `brief.json` persistido em disco continua
+  intacto (a resolução vale só para o motor, nunca reescreve o brief).
+  Extraído `resolvedAcceptance(brief, opts)` como helper nomeado — evita CRAP alto em
+  `confirmAndRunPipeline` (mesmo padrão de todo o programa: operador ternário vira CC).
+- Puramente aditivo: `goldenRun` (exposto desde PRD47 S47.1) continua não-autoritativo
+  — só passa a refletir dado real de acceptance em vez de vazio por omissão.
+- `tests/start_acceptance_wiring.test.js` (3 testes): sem journey, aceite de feature
+  continua pending (`acceptanceResolved:false`, honesto); com journey mapeada,
+  `acceptanceResolved` vira `true` (infra já tem verifier real); brief no disco nunca
+  é reescrito pela resolução do pipeline.
+- QG strict `blocking_severity_count:0`, suíte JS 1985/1985 (1 skip pré-existente).
+- **Achado colateral não relacionado a este sprint**: dois arquivos não rastreados
+  (`.docs/RESEARCH/prd53-*-20260725.md`, trabalho externo real de outra sessão sobre
+  um futuro PRD53) quebravam `comparison_gate.test.js` por faltar a citação literal do
+  `batch-6-aidd-methodology` — o conteúdo já listava os repos do batch corretamente,
+  só faltava a string que o gate busca. Corrigido com 1 linha por arquivo, sem tocar
+  no resto do conteúdo (arquivos gitignored, fora deste commit).
+
 ## [5.59.2] - 2026-07-24 — PRD51 S51.0C parte 2: release baseline ADVISORY em `verify`
 
 Continuação da S51.0C (parte 1: baseline fail-closed + proveniência do scoreboard,
