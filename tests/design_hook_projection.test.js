@@ -194,14 +194,47 @@ test("CLI visual hooks status --json: projeto vazio -> todos installed:false", a
   } finally { await rm(dir, { recursive: true, force: true }) }
 })
 
-test("CLI visual hooks install --json depois status --json: reflete instalação real", async () => {
+test("CLI visual hooks install --json --yes depois status --json: reflete instalação real", async () => {
   const { visualCommand } = await imp("src/commands/visual.js")
   const dir = await tmpProject()
   try {
-    const installOut = JSON.parse(await captureStdout(() => visualCommand(["hooks", "install", "--json"], { cwd: dir })))
+    // PRD51 S51.4.2: hooks install agora exige consentimento (--yes ou TTY).
+    const installOut = JSON.parse(await captureStdout(() => visualCommand(["hooks", "install", "--json", "--yes"], { cwd: dir })))
     assert.equal(installOut.ok, true)
     const statusOut = JSON.parse(await captureStdout(() => visualCommand(["hooks", "status", "--json"], { cwd: dir })))
     assert.ok(statusOut.results.every((r) => r.installed === true))
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
+
+// PRD51 S51.4.2 — consentimento real: hooks install nunca escreve sem --yes/TTY/confirm.
+test("CLI visual hooks install SEM --yes (não-interativo): recusa honesta, nada é escrito", async () => {
+  const { visualCommand } = await imp("src/commands/visual.js")
+  const dir = await tmpProject()
+  try {
+    const out = JSON.parse(await captureStdout(() => visualCommand(["hooks", "install", "--json"], { cwd: dir })))
+    assert.equal(out.error, "needs_confirmation")
+    assert.ok(!existsSync(path.join(dir, ".claude")), "nada escrito sem consentimento")
+    assert.ok(!existsSync(path.join(dir, "AGENTS.md")))
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
+
+test("CLI visual hooks install: usuário RECUSA no prompt (confirm injetado) -> cancelado, nada escrito", async () => {
+  const { visualCommand } = await imp("src/commands/visual.js")
+  const dir = await tmpProject()
+  try {
+    const out = JSON.parse(await captureStdout(() => visualCommand(["hooks", "install", "--json"], { cwd: dir, confirm: async () => false })))
+    assert.equal(out.cancelled, true)
+    assert.ok(!existsSync(path.join(dir, ".claude")), "nada escrito quando usuário recusa")
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
+
+test("CLI visual hooks install: usuário CONFIRMA no prompt (confirm injetado) -> instala de verdade", async () => {
+  const { visualCommand } = await imp("src/commands/visual.js")
+  const dir = await tmpProject()
+  try {
+    const out = JSON.parse(await captureStdout(() => visualCommand(["hooks", "install", "--json"], { cwd: dir, confirm: async () => true })))
+    assert.equal(out.ok, true)
+    assert.ok(existsSync(path.join(dir, ".claude", "settings.json")))
   } finally { await rm(dir, { recursive: true, force: true }) }
 })
 

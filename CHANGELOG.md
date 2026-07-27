@@ -1,5 +1,30 @@
 # Changelog - gstack-vibehard
 
+## [5.69.0] - 2026-07-27 — PRD51 S51.4.2: consentimento real em `visual hooks install`
+
+Segunda parte do Sprint 51.4. Achado real (ação #5 do PRD, "corrigir `visual hooks
+install`"): o comando escrevia/atualizava 4 arquivos de config do projeto
+(`.claude/settings.json`, `AGENTS.md`, `.github/copilot-instructions.md`,
+`.cursor/rules/gstack-design-detector.mdc`) **sem nenhum gate de consentimento** —
+nem `--yes`, nem checagem de TTY, nem `--dry-run` documentado. A implementação em si
+(`applyDesignHookProjections`) já estava correta (project-local, nunca global); só
+faltava o consentimento antes do efeito.
+
+- `src/commands/visual.js`: `hooksInstallCmd` agora exige confirmação — mesmo padrão
+  de `plan run`/`start` (`--yes` explícito, ou TTY interativo com prompt real via
+  `confirm()`, ou `opts.confirm` injetado programaticamente). Modo não-interativo
+  sem `--yes` recusa honestamente (`{error:"needs_confirmation"}`), nunca escreve.
+  Usuário que recusa no prompt → `{cancelled:true}`, nada é escrito.
+  `canPromptConfirm` trata `opts.confirm` injetado como "consegue perguntar" — mesmo
+  padrão já usado por `canPromptSelect` em `start.js`.
+- QG (CRITICAL, CC 12→ok): extraídos `wantsAutoYes`/`emitCancelled`/
+  `renderHookResult`/`emitInstallResult` — mesmo padrão de extração contra CRAP
+  usado o programa inteiro.
+- `tests/design_hook_projection.test.js`: teste existente atualizado (`--yes`
+  explícito); 3 testes novos — recusa honesta sem `--yes`; cancela quando o usuário
+  recusa no prompt; instala de verdade quando confirma.
+- QG strict `blocking_severity_count:0`, suíte JS 2033/2033 (1 skip pré-existente).
+
 ## [5.68.0] - 2026-07-27 — PRD51 S51.4.1: `plan run` passa a usar o mesmo pipeline do `start`
 
 Primeira parte do Sprint 51.4 ("Firewall por operação e registro único da CLI") —
