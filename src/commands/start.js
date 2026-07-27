@@ -23,6 +23,7 @@ import { openStateStore } from "../state/store.js"
 import { listSessions, activeSession } from "../state/session-index.js"
 import { buildProjections } from "../skills/design-context.js"
 import { resolveBriefAcceptances, mapJourney } from "../project-plan/acceptance-verification.js"
+import { buildToolRefresh } from "../tools/refresh.js"
 
 /**
  * `start` — entrada Replit-like (PRD18 Sprint 1). Orquestra o wizard (objetivo →
@@ -36,7 +37,7 @@ import { resolveBriefAcceptances, mapJourney } from "../project-plan/acceptance-
 
 // Flags do start: valor (consomem o próximo token) e booleanas (tabela → cc baixa).
 const VALUE_FLAGS = { "--name": "projectName", "--mode": "mode", "--skills": "skills", "--design-system": "designSystem", "--loop": "loop", "--journeys": "journeys" }
-const BOOL_FLAGS = { "--dry-run": "dryRun", "--json": "json", "--yes": "yes", "-y": "yes", "--assume-no-existing-model": "assumeNoExistingModel", "--proof": "proof", "--golden-run": "goldenRun", "--no-proof": "noProof" }
+const BOOL_FLAGS = { "--dry-run": "dryRun", "--json": "json", "--yes": "yes", "-y": "yes", "--assume-no-existing-model": "assumeNoExistingModel", "--proof": "proof", "--golden-run": "goldenRun", "--no-proof": "noProof", "--refresh-on-close": "refreshOnClose" }
 
 function parseStartArgs(args) {
   const out = { _: [] }
@@ -364,6 +365,25 @@ const wantsProof = (flags, opts) => {
   return wantsGoldenRun(flags, opts)
 }
 
+// PRD51 S51.5.2 (ação #1) — "no closeout, após o commit final: atualizar
+// contexto; atualizar Graphify; gerar readiness; registrar hashes e HEAD;
+// verificar de novo". `buildToolRefresh` (tools/refresh.js) já faz tudo isso —
+// mas é PESADO (graphify+context+fallow podem somar minutos), então fica atrás
+// de `--refresh-on-close`/`GSTACK_REFRESH_ON_CLOSE=1`, default OFF, e só roda
+// em run BEM-SUCEDIDA (`status==="done"` — o "commit final" real do PRD).
+// Decidido como flag PRÓPRIA (não reusa `--golden-run`): é uma preocupação
+// ortogonal (frescor de contexto pro PRÓXIMO agente, não autoridade de gate).
+const wantsToolRefresh = (flags, opts) => flags.refreshOnClose === true || opts.refreshOnClose === true || process.env.GSTACK_REFRESH_ON_CLOSE === "1"
+
+// `strict:true` cobre "verificar de novo" (buildToolRefresh só roda verify em
+// strict); provenance (S51.5.1) cobre "registrar hashes e HEAD".
+function defaultToolRefreshRunner(cwd, runId) {
+  return () => {
+    const r = buildToolRefresh({ cwd, strict: true, runId: `${runId}-close` })
+    return { state: r.ok ? "ok" : "degraded", steps: r.steps, writtenTo: r.writtenTo, readinessPath: r.readinessPath, provenance: r.provenance }
+  }
+}
+
 // PRD51 S51.2.6 (ação #9) — achado de sequenciamento: `finishPipeline`
 // (run-loop.js) já roda o closeout ANTES do proof existir (proof só roda aqui,
 // depois do pipeline retornar) — então o closeout de dentro do pipeline nunca
@@ -371,11 +391,20 @@ const wantsProof = (flags, opts) => {
 // (sobrescreve closeout.json/md) — resincroniza aqui com o proof REAL quando ele
 // rodou, reconstruindo `detect` (golden path) com os MESMOS insumos do
 // run-loop.js pra não regredir o `learning.candidate` já detectado no 1º closeout.
-function resyncCloseoutWithRealProof(cwd, pipeline, proof) {
-  if (!proof) return
-  const detect = () => detectGoldenPath({ status: pipeline.status, events: readPlanJournal(runsDir(cwd, pipeline.runId)), runId: pipeline.runId })
-  try { runCloseoutSync({ cwd, runId: pipeline.runId, command: "start", status: pipeline.status, proof: () => proof, detect }) }
-  catch { /* best-effort — não derruba o start */ }
+// S51.5.2 estende o mesmo resync pra também carregar o refresh de ferramentas
+// (quando pedido) — refresh só dispara em run "done", nunca em handoff/cancelled.
+const goldenPathDetector = (cwd, pipeline) => () =>
+  detectGoldenPath({ status: pipeline.status, events: readPlanJournal(runsDir(cwd, pipeline.runId)), runId: pipeline.runId })
+const resolvedRefresh = (pipeline, refreshFn) => (refreshFn && pipeline.status === "done" ? refreshFn : null)
+
+function resyncCloseoutAfterRun(cwd, pipeline, proof, refreshFn) {
+  if (!proof && !refreshFn) return
+  try {
+    runCloseoutSync({
+      cwd, runId: pipeline.runId, command: "start", status: pipeline.status,
+      proof: proof ? () => proof : null, detect: goldenPathDetector(cwd, pipeline), refresh: resolvedRefresh(pipeline, refreshFn),
+    })
+  } catch { /* best-effort — não derruba o start */ }
 }
 
 // Emite o resultado + proof offer (F3-C / 28.5). Extraído p/ manter cc baixa.
@@ -383,7 +412,8 @@ async function emitAndProof(plan, pipeline, decl, flags, opts, json, cwd) {
   if (json) process.stdout.write(JSON.stringify({ ok: pipeline.status === "done", runId: pipeline.runId, status: pipeline.status, stages: pipeline.stages, planId: plan.id, skillRoute: { selectedSkills: decl.skillRoute.selectedSkills, modelIntake: decl.skillRoute.modelIntake.status } }) + "\n")
   else renderPipelineHuman(pipeline, plan)
   const proof = wantsProof(flags, opts) ? await runStartProof(cwd, json, opts) : null
-  resyncCloseoutWithRealProof(cwd, pipeline, proof)
+  const refreshFn = wantsToolRefresh(flags, opts) ? (opts.refreshRunner || defaultToolRefreshRunner(cwd, pipeline.runId)) : null
+  resyncCloseoutAfterRun(cwd, pipeline, proof, refreshFn)
   return { plan, result: pipeline.execResult, pipeline, executed: true, skillRoute: decl.skillRoute, loopDecision: decl.loopDecision, ...(proof ? { proof } : {}) }
 }
 

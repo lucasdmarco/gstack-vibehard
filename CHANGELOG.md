@@ -1,5 +1,40 @@
 # Changelog - gstack-vibehard
 
+## [5.74.0] - 2026-07-27 — PRD51 S51.5.2: closeout resincroniza refresh de ferramentas (ação #1)
+
+Segunda parte do Sprint 51.5 (ação #1 — "no closeout, após o commit final:
+atualizar contexto; atualizar Graphify; gerar readiness; registrar hashes e
+HEAD; verificar de novo"). Achado real: `buildToolRefresh`
+(`tools/refresh.js`, PRD24 S24.3) já faz exatamente isso, mas era um comando
+standalone (`tools refresh`) — nenhum dos dois call sites reais de
+`runCloseoutSync` (`start.js`, `run-loop.js`) jamais injetava `refresh`, então
+`toolsRefresh` era sempre `{ran:false, state:"not_run"}` em qualquer run real.
+
+- `src/commands/start.js`: nova flag `--refresh-on-close` /
+  `GSTACK_REFRESH_ON_CLOSE=1` (idioma de `--golden-run`/`--agentshield`,
+  default OFF — deliberadamente uma flag PRÓPRIA, não reusa `--golden-run`,
+  por ser preocupação ortogonal: frescor de contexto pro próximo agente, não
+  autoridade de gate). `defaultToolRefreshRunner` chama `buildToolRefresh({
+  strict:true })` — `strict` cobre "verificar de novo" (só em strict o
+  refresh roda `verify`); o sidecar de proveniência (S51.5.1) cobre
+  "registrar hashes e HEAD". `resyncCloseoutWithRealProof` virou
+  `resyncCloseoutAfterRun`, estendida pra também levar o `refresh` — só
+  dispara quando `pipeline.status==="done"` (a run "fechou com sucesso" real,
+  nunca em handoff/cancelled). Sem a flag: `toolsRefresh` continua
+  `"not_run"`, zero regressão. `opts.refreshRunner` é o seam de teste
+  (mesmo padrão de `opts.proofRunner`).
+- É PESADO por natureza (graphify+context+fallow podem somar minutos) —
+  por isso fica atrás de opt-in explícito, nunca ligado por padrão mesmo sob
+  `--golden-run`.
+- `tests/start_refresh_on_close.test.js` (4 testes, novo): refresh injetado
+  roda e o closeout reflete o resultado real; sem a flag continua
+  `"not_run"`; refresh NÃO roda quando a run não fecha `"done"` (gate falho →
+  handoff); env var tem o mesmo efeito da flag CLI.
+- QG achou CRAP HIGH em `resyncCloseoutAfterRun` (CC7/cognitive6) — extraído
+  `goldenPathDetector`/`resolvedRefresh` (mesmo padrão de extração do
+  programa inteiro). QG strict `blocking_severity_count:0`, suíte JS
+  2064/2065 (1 skip pré-existente).
+
 ## [5.73.0] - 2026-07-27 — PRD51 S51.5.1: sidecar de proveniência do Graphify (início do Sprint 51.5)
 
 Primeira parte do Sprint 51.5 ("Contexto, Graphify e readiness transacionais",
