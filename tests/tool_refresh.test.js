@@ -22,6 +22,8 @@ function goodRunners(extra = {}) {
     headroomDoctor: ok("proxy stopped; not routed"),
     fallowAudit: ok("audit", JSON.stringify({ verdict: "fail", summary: { dead_code_issues: 5, max_cyclomatic: 6 } })),
     verify: ok("verify ok"),
+    resolveCommit: () => "abc123",
+    graphifyVersionProbe: () => "0.8.30",
     ...extra,
   }
 }
@@ -42,6 +44,28 @@ test("buildToolRefresh: grava report + readiness; passos ok; nunca spawna (runne
     const readiness = JSON.parse(await readFile(rep.readinessPath, "utf-8"))
     assert.equal(readiness.tools.fallow.auditSummary.verdict, "fail")
     assert.equal(readiness.tools.fallow.auditSummary.deadCode, 5)
+  } finally { await rm(cwd, { recursive: true, force: true }) }
+})
+
+test("buildToolRefresh: grava sidecar de proveniência do Graphify quando o passo graphify é ok (PRD51 S51.5.1 ação #2)", async () => {
+  const { buildToolRefresh } = await imp()
+  const cwd = await mkdtemp(path.join(tmpdir(), "gstack-refresh-"))
+  try {
+    const rep = buildToolRefresh({ cwd, runners: goodRunners(), runId: "r1" })
+    assert.deepEqual(rep.provenance, { schemaVersion: "gstack.graphify-provenance.v1", builtAtCommit: "abc123", graphifyVersion: "0.8.30", generatedAt: rep.provenance.generatedAt })
+    const onDisk = JSON.parse(await readFile(path.join(cwd, ".gstack", "graphify-provenance.json"), "utf-8"))
+    assert.equal(onDisk.builtAtCommit, "abc123")
+  } finally { await rm(cwd, { recursive: true, force: true }) }
+})
+
+test("buildToolRefresh: NÃO grava sidecar quando graphify foi 'skipped' (--changed sem arquivo relevante)", async () => {
+  const { buildToolRefresh } = await imp()
+  const cwd = await mkdtemp(path.join(tmpdir(), "gstack-refresh-"))
+  try {
+    const runners = goodRunners({ changedFiles: () => ["README.md"] })
+    const rep = buildToolRefresh({ cwd, changed: true, runners, runId: "r1" })
+    assert.equal(rep.provenance, null)
+    assert.ok(!existsSync(path.join(cwd, ".gstack", "graphify-provenance.json")))
   } finally { await rm(cwd, { recursive: true, force: true }) }
 })
 

@@ -12,6 +12,7 @@ import { readOpenCodeMcp } from "../mcp/readers/opencode.js"
 import { readProjectMcp } from "../mcp/readers/project.js"
 import { loadContextPolicy, remoteAllowed } from "../skills/context-confidence.js"
 import { detectGraphifyPackage, resolveQueryFirstPolicy, loadProjectPolicyFile, legacyDepsJsonStatus } from "./graphify-adapter.js"
+import { readGraphifyProvenance, graphSchemaDrift } from "./graphify-provenance.js"
 
 // Readers do inventário + o run context do GStack (runtime-injected).
 const mcpReaders = () => [readClaudeMcp, readCodexMcp, readOpenCodeMcp, readProjectMcp, readRuntimeMcp]
@@ -193,13 +194,28 @@ const FRESHNESS_ACTIONS = Object.freeze({
 })
 const withAction = (freshness) => ({ ...freshness, recommendedAction: FRESHNESS_ACTIONS[freshness.state] || null })
 // Lê graphify-out/graph.json UMA vez: freshness (vs git HEAD) + métricas (nós/arestas/comunidades).
+// Proveniência: o sidecar (`graphify-provenance.js`, escrito pelo próprio GStack
+// após `graphify update .`) é a fonte PREFERIDA — o `built_at_commit` inline do
+// graph.json real do upstream não existe hoje, então o sidecar é quem garante
+// que freshness nunca vire "fresh" por engano quando a proveniência é unknown.
+function resolvedProvenance(cwd, m) {
+  const sidecar = readGraphifyProvenance(cwd)
+  if (sidecar && sidecar.builtAtCommit) return { builtAtCommit: sidecar.builtAtCommit, source: "sidecar" }
+  if (m.indexedCommit) return { builtAtCommit: m.indexedCommit, source: "inline" }
+  return { builtAtCommit: null, source: "unknown" }
+}
 function graphInfo(cwd, head) {
   const graphPath = join(cwd, "graphify-out", "graph.json")
   if (!existsSync(graphPath)) return { freshness: withAction({ state: "absent" }), metrics: null }
   const g = readGraph(graphPath)
   if (!g) return { freshness: withAction({ state: "unknown", head: head || null }), metrics: null }
   const m = graphMetrics(g)
-  return { freshness: withAction({ state: freshnessState(m.indexedCommit, head), builtAtCommit: m.indexedCommit, head: head || null }), metrics: m }
+  const { builtAtCommit, source } = resolvedProvenance(cwd, m)
+  const drift = graphSchemaDrift(g)
+  return {
+    freshness: withAction({ state: freshnessState(builtAtCommit, head), builtAtCommit, head: head || null, provenance: source }),
+    metrics: drift.length ? { ...m, schemaDrift: drift } : m,
+  }
 }
 function probeGraphify(probe, cwd, head) {
   const res = probe("graphify", ["--version"])
