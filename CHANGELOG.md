@@ -1,5 +1,40 @@
 # Changelog - gstack-vibehard
 
+## [5.75.0] - 2026-07-27 — PRD51 S51.5.3: prioridade, filtros, dedup e achabilidade real no context index (ações #5-#8)
+
+Terceira parte do Sprint 51.5. `context_db.py` (Document Graph local,
+SQLite/FTS5) só ordenava por rank FTS puro, sem noção de fonte/recência,
+sem filtro nenhum, e sem proteção contra conteúdo espelhado duplicado.
+
+- **Ação #5 (prioridade)**: `SOURCE_TIER` mapeia o vocabulário REAL de
+  `source` pras 4 faixas do PRD — `repo` (contratos, tier 0) > `adr/prd/
+  plans/docs/readme/changelog` (vigentes, tier 1) > `trail/audits`
+  (decisões recentes, tier 2) > `research/obsidian` (mirrors externos, tier
+  3). `search_cmd` ordena por `(tier, rank_fts)` — nenhuma fonte nova
+  inventada, só ordenada.
+- **Ação #6 (filtro)**: novos flags `--source` (tipo, ex. `prd,adr`),
+  `--kind` (origem/diretório, ex. `plans,research`) e `--since` (ISO8601 →
+  `mtime`) em `search`. `src/commands/context.js` (`ctxSearch`) repassa os
+  3 flags de verdade pro indexer Python (bridge real, testado ponta a
+  ponta, não só no Python isolado).
+- **Ação #7 (dedup)**: novo `dedupe_pass()` — conteúdo com hash IDÊNTICO em
+  paths diferentes aponta pro path CANÔNICO via `duplicate_of` (nova
+  coluna, migração leve via `_ensure_column`). Canônico = a fonte de MAIOR
+  prioridade (mesma tabela da ação #5, não ordem alfabética — um ADR
+  original vence um mirror em `.docs/RESEARCH`). Duplicado NUNCA é apagado
+  (continua contável em `status`) — só excluído de `search`/`related`/
+  `decision` (`WHERE duplicate_of IS NULL`).
+- **Ação #8 (achabilidade real)**: novo teste que copia os arquivos REAIS
+  `prd49.md`/`prd50.md`/`manualdeengenhariacomia.md` (não fixture
+  sintética) pra uma árvore temporária no layout real (`.docs/PLANS`),
+  indexa, e confirma que aparecem em `search` com `source=prd` — prova que
+  a classificação por nome de arquivo (`classify_source`) funciona nos
+  documentos de verdade, não só em exemplos inventados.
+- `tests/test_context_db.py` (+6 testes Python), `tests/context_index.test.js`
+  (+1 teste JS — bridge real do `--source`). QG strict
+  `blocking_severity_count:0`, suíte JS 2065/2066 (1 skip pré-existente),
+  suíte Python 89/89 (`npm run test:py`, não coberta por `npm test`).
+
 ## [5.74.0] - 2026-07-27 — PRD51 S51.5.2: closeout resincroniza refresh de ferramentas (ação #1)
 
 Segunda parte do Sprint 51.5 (ação #1 — "no closeout, após o commit final:

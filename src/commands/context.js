@@ -228,6 +228,16 @@ function ctxScout(args, cwd) {
   return report
 }
 
+// PRD51 S51.5.3 (ação #6) — repassa filtro por tipo/origem/recência ao indexer.
+const SEARCH_FILTER_FLAGS = ["--source", "--kind", "--since"]
+function forwardSearchFilters(args) {
+  const out = []
+  for (const f of SEARCH_FILTER_FLAGS) {
+    const i = args.indexOf(f)
+    if (i !== -1 && args[i + 1]) out.push(f, args[i + 1])
+  }
+  return out
+}
 function ctxSearch(args, cwd) {
   const q = args[1]
   const json = args.includes("--json")
@@ -235,7 +245,7 @@ function ctxSearch(args, cwd) {
   if (!json) section(`context search — ${orEmpty(q)}`)
   if (!q) return ctxFail(json, "missing query", () => error("Forneça o termo: context search \"...\""))
   if (!existsSync(dbPath(cwd))) return ctxFail(json, "no_index", () => warn("Índice não existe. Rode `context index` antes."))
-  const r = runIndexer(["search", "--db", dbPath(cwd), "--query", q, ...jsonFlag(json)])
+  const r = runIndexer(["search", "--db", dbPath(cwd), "--query", q, ...forwardSearchFilters(args), ...jsonFlag(json)])
   if (r.ok) return process.stdout.write(r.stdout)
   ctxFail(json, r.error || "search_failed", () => error(`Busca falhou: ${r.error}`))
 }
@@ -275,7 +285,7 @@ function ctxHelp() {
   info("  gstack_vibehard context init             Criar .gstack/context.json + docs/{adr,prd,plans,research}")
   info("  gstack_vibehard context index            Indexar docs em SQLite/FTS5 (.gstack/context/context.db)")
   info("  gstack_vibehard context scout \"<pergunta>\" Explorador read-only: paths+linhas, não dumps (local-first)")
-  info("  gstack_vibehard context search \"<termo>\"  Buscar (FTS5, offline)")
+  info("  gstack_vibehard context search \"<termo>\"  Buscar (FTS5, offline; --source/--kind/--since filtram)")
   info("  gstack_vibehard context related <Nome>   Entidades/relações de um termo")
   info("  gstack_vibehard context explain \"<top>\"   Docs + entidades de um tópico")
   info("  gstack_vibehard context status [--db]    Contagem (e grafo indexado com --db)")

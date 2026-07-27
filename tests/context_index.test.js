@@ -29,6 +29,30 @@ test("context index/search via comando JS (bridge Python)", async () => {
   }
 })
 
+// PRD51 S51.5.3 (ação #6) — `--source` do CLI JS chega de verdade ao filtro do
+// indexer Python (não só existe no Python isolado).
+test("context search --source repassa o filtro de tipo pro indexer Python (bridge real)", async () => {
+  const tmp = await mkdtemp(path.join(tmpdir(), "gstack-cidx-src-"))
+  const origWrite = process.stdout.write.bind(process.stdout)
+  let buf = ""
+  process.stdout.write = (s) => { buf += s; return true }
+  try {
+    await mkdir(path.join(tmp, ".docs", "PLANS"), { recursive: true })
+    await writeFile(path.join(tmp, ".docs", "PLANS", "prd77.md"), "# PRD77\nQuazoline em progresso.\n")
+    await writeFile(path.join(tmp, "README.md"), "# Projeto\nQuazoline tambem aparece aqui.\n")
+    const { contextCommand } = await import(`${pathToFileURL(cmdMod)}?t=${Date.now()}`)
+    await contextCommand(["index"], { cwd: tmp })
+    buf = ""
+    await contextCommand(["search", "Quazoline", "--source", "prd", "--json"], { cwd: tmp })
+  } finally {
+    process.stdout.write = origWrite
+    await rm(tmp, { recursive: true, force: true })
+  }
+  const out = JSON.parse(buf.trim())
+  assert.ok(out.results.length >= 1)
+  assert.ok(out.results.every((r) => r.path.endsWith("prd77.md")), "--source prd exclui o README (source=readme)")
+})
+
 test("context search --json (sem índice) emite JSON PURO, sem banner", async () => {
   const tmp = await mkdtemp(path.join(tmpdir(), "gstack-cjson-"))
   const origWrite = process.stdout.write.bind(process.stdout)

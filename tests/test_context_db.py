@@ -151,6 +151,97 @@ class ContextDbTest(unittest.TestCase):
             r = run("index", "--db", db, "--root", str(root))  # sem --graphify
             self.assertEqual(r.returncode, 0)
 
+    # PRD51 S51.5.3 (ação #5) — prioridade: repo (contratos) > adr/prd/plans/docs
+    # > research (mirrors). CLAUDE.md (source=repo) e docs/adr/001.md (source=adr)
+    # mencionam a MESMA palavra-chave num termo raro (evita ranking por FTS puro
+    # coincidir com a ordem esperada por acaso) — só a prioridade por fonte decide.
+    def test_search_prioriza_source_tier_repo_antes_de_research(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = make_project(tmp)
+            (root / "CLAUDE.md").write_text("# Contrato\nUsamos Zylofoo em producao.\n", encoding="utf-8")
+            (root / ".docs" / "RESEARCH").mkdir(parents=True)
+            (root / ".docs" / "RESEARCH" / "mirror.md").write_text("# Mirror\nZylofoo mencionado aqui tambem.\n", encoding="utf-8")
+            db = str(root / ".gstack" / "context" / "context.db")
+            run("index", "--db", db, "--root", str(root))
+            sr = json.loads(run("search", "--db", db, "--query", "Zylofoo", "--json").stdout)
+            paths = [r["path"] for r in sr["results"]]
+            self.assertLess(paths.index("CLAUDE.md"), paths.index(".docs/RESEARCH/mirror.md"),
+                             "repo (contrato) deve vir ANTES de research (mirror) na mesma busca")
+
+    # PRD51 S51.5.3 (ação #6) — filtro por tipo (--source) e origem (--kind).
+    def test_search_filtro_por_source_e_kind(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = make_project(tmp)
+            (root / ".docs" / "PLANS").mkdir(parents=True)
+            (root / ".docs" / "PLANS" / "prd99.md").write_text("# PRD99\nWombatrix em progresso.\n", encoding="utf-8")
+            (root / "README.md").write_text("# Projeto\nWombatrix tambem aparece no readme.\n", encoding="utf-8")
+            db = str(root / ".gstack" / "context" / "context.db")
+            run("index", "--db", db, "--root", str(root))
+            only_prd = json.loads(run("search", "--db", db, "--query", "Wombatrix", "--source", "prd", "--json").stdout)
+            self.assertTrue(all(r["path"].endswith("prd99.md") for r in only_prd["results"]))
+            self.assertTrue(len(only_prd["results"]) >= 1)
+            only_plans_kind = json.loads(run("search", "--db", db, "--query", "Wombatrix", "--kind", "plans", "--json").stdout)
+            self.assertTrue(all("PLANS" in r["path"] for r in only_plans_kind["results"]))
+
+    # PRD51 S51.5.3 (ação #6) — filtro por recência (--since).
+    def test_search_filtro_por_since_exclui_documento_antigo(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            import os
+            root = make_project(tmp)
+            old = root / "docs" / "adr" / "old.md"
+            old.write_text("# ADR antigo\nFluxogramix decidido ha muito tempo.\n", encoding="utf-8")
+            os.utime(old, (946684800, 946684800))  # 2000-01-01, bem antigo
+            db = str(root / ".gstack" / "context" / "context.db")
+            run("index", "--db", db, "--root", str(root))
+            recent = json.loads(run("search", "--db", db, "--query", "Fluxogramix", "--since", "2020-01-01T00:00:00Z", "--json").stdout)
+            self.assertEqual(recent["results"], [], "documento de 2000 nao deve passar no filtro --since 2020")
+            everything = json.loads(run("search", "--db", db, "--query", "Fluxogramix", "--json").stdout)
+            self.assertTrue(len(everything["results"]) >= 1, "sem --since, o documento antigo aparece normalmente")
+
+    # PRD51 S51.5.3 (ação #7) — conteúdo espelhado (mesmo hash, paths diferentes)
+    # aparece só UMA vez na busca (o path canônico, alfabeticamente menor).
+    def test_dedupe_conteudo_espelhado_aparece_uma_vez_na_busca(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = make_project(tmp)
+            same_content = "# Espelhado\nGorbelquin aparece em dois lugares identicos.\n"
+            (root / "docs" / "adr" / "a-original.md").write_text(same_content, encoding="utf-8")
+            (root / ".docs" / "RESEARCH").mkdir(parents=True)
+            (root / ".docs" / "RESEARCH" / "z-mirror.md").write_text(same_content, encoding="utf-8")
+            db = str(root / ".gstack" / "context" / "context.db")
+            run("index", "--db", db, "--root", str(root))
+            sr = json.loads(run("search", "--db", db, "--query", "Gorbelquin", "--json").stdout)
+            self.assertEqual(len(sr["results"]), 1, "conteudo identico em 2 paths so aparece 1x na busca")
+            self.assertTrue(sr["results"][0]["path"].endswith("a-original.md"), "path CANONICO (alfabeticamente menor) vence")
+            # o duplicado continua RASTREADO no status (nunca apagado do disco/DB)
+            st = json.loads(run("status", "--db", db, "--json").stdout)
+            self.assertEqual(st["documents"], 4, "documento duplicado continua contado (nao e apagado)")
+
+    # PRD51 S51.5.3 (ação #8) — PRD49/PRD50/manual REAIS (não fixture sintética)
+    # são encontráveis via search depois de indexados no layout real do repo.
+    def test_prd49_prd50_manual_reais_sao_encontraveis(self):
+        prd49 = REPO_ROOT / ".docs" / "PLANS" / "prd49.md"
+        prd50 = REPO_ROOT / ".docs" / "PLANS" / "prd50.md"
+        manual = REPO_ROOT / ".docs" / "PLANS" / "manualdeengenhariacomia.md"
+        for p in (prd49, prd50, manual):
+            if not p.exists():
+                self.skipTest(f"{p} nao existe nesta arvore (achado de S51.5.3 exige os arquivos reais)")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "proj"
+            (root / ".docs" / "PLANS").mkdir(parents=True)
+            (root / ".docs" / "PLANS" / "prd49.md").write_text(prd49.read_text(encoding="utf-8"), encoding="utf-8")
+            (root / ".docs" / "PLANS" / "prd50.md").write_text(prd50.read_text(encoding="utf-8"), encoding="utf-8")
+            (root / ".docs" / "PLANS" / "manualdeengenhariacomia.md").write_text(manual.read_text(encoding="utf-8"), encoding="utf-8")
+            db = str(root / ".gstack" / "context" / "context.db")
+            r = run("index", "--db", db, "--root", str(root), "--json")
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertEqual(json.loads(r.stdout)["indexed"], 3)
+            sr49 = json.loads(run("search", "--db", db, "--query", "PRD49", "--json").stdout)
+            self.assertTrue(any("prd49.md" in x["path"] for x in sr49["results"]), "PRD49 real deve ser encontrável")
+            sr50 = json.loads(run("search", "--db", db, "--query", "PRD50", "--json").stdout)
+            self.assertTrue(any("prd50.md" in x["path"] for x in sr50["results"]), "PRD50 real deve ser encontrável")
+            st = json.loads(run("status", "--db", db, "--json").stdout)
+            self.assertEqual(st["by_source"].get("prd"), 2, "prd49/prd50 classificados como source=prd (pelo nome do arquivo)")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -87,6 +87,13 @@ def fts5_available(con: sqlite3.Connection) -> bool:
         return False
 
 
+def _ensure_column(con: sqlite3.Connection, table: str, column: str, coltype: str) -> None:
+    """Migração leve: adiciona coluna se ainda não existir (DBs antigos deste projeto)."""
+    cols = {r["name"] for r in con.execute(f"PRAGMA table_info({table})")}
+    if column not in cols:
+        con.execute(f"ALTER TABLE {table} ADD COLUMN {column} {coltype}")
+
+
 def init_schema(con: sqlite3.Connection) -> bool:
     con.executescript(
         """
@@ -115,6 +122,9 @@ def init_schema(con: sqlite3.Connection) -> bool:
     if has_fts:
         # FTS5 padrão (guarda o próprio conteúdo) — snippet()/colunas recuperáveis.
         con.execute("CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(content, heading, path)")
+    # PRD51 S51.5.3 (ação #7) — aponta pro path CANÔNICO quando o conteúdo é
+    # espelhado (mesmo hash, paths diferentes). NULL = original/único.
+    _ensure_column(con, "documents", "duplicate_of", "TEXT")
     con.execute("INSERT OR REPLACE INTO index_meta(key,value) VALUES('schema_version',?)", (str(SCHEMA_VERSION),))
     con.execute("INSERT OR REPLACE INTO index_meta(key,value) VALUES('fts_enabled',?)", ("1" if has_fts else "0"))
     con.commit()
@@ -313,6 +323,7 @@ def index_cmd(args) -> int:
         except (OSError, ValueError, json.JSONDecodeError) as e:
             sys.stderr.write(f"[graphify] ignorado: {e}\n")
 
+    dedupe_pass(con)
     con.execute("INSERT OR REPLACE INTO index_meta(key,value) VALUES('indexed_at',?)", (now_iso(),))
     con.commit()
     out = {"indexed": indexed, "documents": count(con, "documents"), "fts_enabled": has_fts}
@@ -322,6 +333,27 @@ def index_cmd(args) -> int:
 
 def count(con, table) -> int:
     return con.execute(f"SELECT COUNT(*) c FROM {table}").fetchone()["c"]
+
+
+def dedupe_pass(con: sqlite3.Connection) -> None:
+    """PRD51 S51.5.3 (ação #7) — conteúdo espelhado (mesmo hash de arquivo,
+    paths diferentes) aponta pro path CANÔNICO via `duplicate_of`. Canônico =
+    a fonte de MAIOR prioridade (mesma faixa da ação #5 — `SOURCE_TIER`;
+    ex.: um ADR original vence um mirror em `.docs/RESEARCH`, nunca o
+    contrário só por ordem alfabética), com path como desempate determinístico.
+    NUNCA apaga o duplicado (segue contável/rastreável) — só o EXCLUI de
+    resultados de busca/relacionados (`WHERE duplicate_of IS NULL`)."""
+    con.execute("UPDATE documents SET duplicate_of=NULL")
+    groups: dict[str, list[tuple[int, str, str]]] = {}
+    for row in con.execute("SELECT id, path, hash, source FROM documents ORDER BY path"):
+        groups.setdefault(row["hash"], []).append((row["id"], row["path"], row["source"]))
+    for members in groups.values():
+        if len(members) < 2:
+            continue
+        ranked = sorted(members, key=lambda m: (SOURCE_TIER.get(m[2], DEFAULT_TIER), m[1]))
+        canonical_path = ranked[0][1]
+        for doc_id, _, _src in ranked[1:]:
+            con.execute("UPDATE documents SET duplicate_of=? WHERE id=?", (canonical_path, doc_id))
 
 
 def bridge_graphify(con, graph_path: Path) -> None:
@@ -406,7 +438,7 @@ def decision_cmd(args) -> int:
     rows = con.execute(
         "SELECT d.path path, c.heading heading, c.content content, c.start_line s, c.end_line e "
         "FROM chunks c JOIN documents d ON d.id=c.document_id "
-        "WHERE c.content LIKE ? ORDER BY c.document_id LIMIT ?",
+        "WHERE c.content LIKE ? AND d.duplicate_of IS NULL ORDER BY c.document_id LIMIT ?",
         (like, max(args.limit * 4, 40))).fetchall()
     results = []
     for r in rows:
@@ -425,18 +457,70 @@ def decision_cmd(args) -> int:
     return 0
 
 
+# PRD51 S51.5.3 (ação #5) — prioridade no índice: código/contratos atuais >
+# ADRs/manuais/PRDs vigentes > decisões recentes > mirrors externos. Mapeia o
+# vocabulário REAL de `source` (discover()/classify_source()) pras 4 faixas do
+# PRD — nenhuma fonte nova é inventada, só ordenada. Faixa menor = prioridade maior.
+SOURCE_TIER = {
+    "repo": 0,  # AGENTS.md/CLAUDE.md — contratos atuais
+    "adr": 1, "prd": 1, "plans": 1, "docs": 1, "readme": 1, "changelog": 1,  # ADRs/manuais/PRDs vigentes
+    "trail": 2, "audits": 2,  # decisões recentes (trilhas/auditorias)
+    "research": 3, "obsidian": 3,  # mirrors externos
+}
+DEFAULT_TIER = 2
+
+
+def _tier_case_sql(column: str) -> str:
+    cases = " ".join(f"WHEN '{k}' THEN {v}" for k, v in SOURCE_TIER.items())
+    return f"CASE {column} {cases} ELSE {DEFAULT_TIER} END"
+
+
+def _parse_since(since: str):
+    try:
+        return datetime.fromisoformat(since.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+
+
+def _search_filters(args) -> tuple[str, list]:
+    """PRD51 S51.5.3 (ação #6) — filtro por TIPO (`--source`, ex.: prd/adr),
+    ORIGEM (`--kind`, o diretório de onde veio) e RECÊNCIA (`--since`,
+    ISO8601 -> mtime). Ausentes -> sem filtro (default OFF, zero regressão)."""
+    clauses, params = [], []
+    for flag, col in (("source", "d.source"), ("kind", "d.kind")):
+        raw = getattr(args, flag, None)
+        vals = [s.strip() for s in raw.split(",")] if raw else []
+        vals = [v for v in vals if v]
+        if vals:
+            clauses.append(f"{col} IN ({','.join('?' for _ in vals)})")
+            params.extend(vals)
+    since = getattr(args, "since", None)
+    if since:
+        ts = _parse_since(since)
+        if ts is not None:
+            clauses.append("d.mtime >= ?")
+            params.append(ts)
+    where = ("AND " + " AND ".join(clauses)) if clauses else ""
+    return where, params
+
+
 def search_cmd(args) -> int:
     con = connect(args.db)
     fts = con.execute("SELECT value FROM index_meta WHERE key='fts_enabled'").fetchone()
     has_fts = bool(fts and fts["value"] == "1")
     q = args.query.strip()
+    where_extra, params_extra = _search_filters(args)
+    tier_expr = _tier_case_sql("d.source")
     rows = []
     if has_fts:
         try:
             rows = con.execute(
-                "SELECT path, heading, snippet(chunks_fts,0,'[',']','…',8) AS snip, rank "
-                "FROM chunks_fts WHERE chunks_fts MATCH ? ORDER BY rank LIMIT ?",
-                (q, args.limit)).fetchall()
+                "SELECT chunks_fts.path AS path, chunks_fts.heading AS heading, "
+                "snippet(chunks_fts,0,'[',']','…',8) AS snip, chunks_fts.rank AS rank "
+                "FROM chunks_fts JOIN documents d ON d.path = chunks_fts.path "
+                f"WHERE chunks_fts MATCH ? AND d.duplicate_of IS NULL {where_extra} "
+                f"ORDER BY {tier_expr}, chunks_fts.rank LIMIT ?",
+                (q, *params_extra, args.limit)).fetchall()
         except sqlite3.OperationalError:
             has_fts = False
     if not has_fts:
@@ -444,7 +528,8 @@ def search_cmd(args) -> int:
         rows = con.execute(
             "SELECT d.path AS path, c.heading AS heading, substr(c.content,1,160) AS snip, 0 AS rank "
             "FROM chunks c JOIN documents d ON d.id=c.document_id "
-            "WHERE c.content LIKE ? LIMIT ?", (like, args.limit)).fetchall()
+            f"WHERE c.content LIKE ? AND d.duplicate_of IS NULL {where_extra} "
+            f"ORDER BY {tier_expr} LIMIT ?", (like, *params_extra, args.limit)).fetchall()
     # backend REAL por resultado (fts5 vs varredura LIKE) — declarado, nunca fingido.
     backend = "fts" if has_fts else "scan"
     results = [{"path": r["path"], "heading": r["heading"], "snippet": r["snip"], "score": r["rank"], "backend": backend} for r in rows]
@@ -470,7 +555,7 @@ def related_cmd(args) -> int:
         "SELECT d.path, d.title, de.count, e.relation FROM doc_entities de "
         "JOIN documents d ON d.id=de.document_id "
         "JOIN edges e ON e.document_id=de.document_id AND e.to_id=de.entity_id "
-        "WHERE de.entity_id=? GROUP BY d.path ORDER BY de.count DESC", (ent["id"],)).fetchall()
+        "WHERE de.entity_id=? AND d.duplicate_of IS NULL GROUP BY d.path ORDER BY de.count DESC", (ent["id"],)).fetchall()
     # Edges de código (Graphify bridge): depends_on com a entidade + implemented_in
     code = []
     for e in con.execute(
@@ -537,6 +622,11 @@ def main() -> int:
         if name in ("search", "decision"):
             sp.add_argument("--query", required=True)
             sp.add_argument("--limit", type=int, default=10)
+        if name == "search":
+            # PRD51 S51.5.3 (ação #6): tipo (source), origem (kind), recência (mtime).
+            sp.add_argument("--source", default=None, help="filtro por tipo, ex.: prd,adr (CSV)")
+            sp.add_argument("--kind", default=None, help="filtro por origem/diretório, ex.: plans,research (CSV)")
+            sp.add_argument("--since", default=None, help="ISO8601 — só documentos modificados a partir daqui")
         if name == "related":
             sp.add_argument("--entity", required=True)
     args = p.parse_args()
