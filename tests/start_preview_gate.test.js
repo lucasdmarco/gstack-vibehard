@@ -110,6 +110,7 @@ test("startCommand: --golden-run (flag CLI, não opts direto) chega até o pipel
       confirm: async () => true, exec: () => {},
       devRunner: () => ({ services: [{ name: "web", status: "unhealthy" }] }),
       verifyRunner: () => ({ status: "ready", usable: true, failed: [] }),
+      proofRunner: async () => ({ ready: false }), // S51.2.5: --golden-run roda proof por padrão — isola do proof real
     })
     assert.equal(r.pipeline.status, "handoff", "--golden-run parseado por parseStartArgs, propagado por confirmAndRunPipeline até runPipeline")
   } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }

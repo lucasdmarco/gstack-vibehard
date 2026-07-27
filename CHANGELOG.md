@@ -1,5 +1,35 @@
 # Changelog - gstack-vibehard
 
+## [5.64.0] - 2026-07-27 — PRD51 S51.2.5: proof automático atrás de flag (Golden Run cutover, parte 5/7)
+
+Quinto sub-sprint do Sprint 51.2 (ações #6/#7 — "proof real por padrão em intenção de
+entrega" / "não exigir proof em consulta/plan/dry-run"). **Achado que recalibrou o
+escopo mapeado no plano**: o plano original assumia reusar `plan.intent`/`plan.mode`
+pra distinguir "entrega" de "dev-loop" — mas `plan.intent` é na verdade o ID da recipe
+(`"web-app"`, `"cli-tool"`, ...) e `plan.mode` é profundidade de scaffold
+(`"lite"`/`"full"`); nenhum dos dois codifica intenção de entrega. **Não existe esse
+sinal em lugar nenhum do código** — perguntado ao usuário, que confirmou a
+interpretação mais honesta: `start` sempre significa "construir/rodar algo" (consulta/
+planejamento são outros comandos: `consult`/`plan`), então não há necessidade de
+inventar um classificador — a ação #7 já é estrutural (`--dry-run` sai antes de
+`confirmAndRunPipeline` existir).
+
+- `src/commands/start.js`: novo `--no-proof` em `BOOL_FLAGS`. `wantsProof(flags, opts)`
+  — `--proof` explícito sempre roda (comportamento opt-in antigo preservado);
+  `--no-proof` sempre bloqueia; senão, roda automaticamente quando `--golden-run`/
+  `GSTACK_GOLDEN_RUN=1` está ativo. Sem a flag, comportamento 100% inalterado.
+- **Achado de teste real**: `tests/start_preview_gate.test.js` (S51.2.3) tinha um teste
+  chamando `startCommand(["--golden-run"], ...)` sem `proofRunner` injetado — com o
+  novo default, isso passou a disparar o `proof.js` REAL dentro do sandbox de teste e
+  derrubava o processo. Corrigido injetando `proofRunner` fake (isolamento de teste, não
+  um bug do proof-default em si).
+- `tests/start_proof_default.test.js` (5 testes): legado sem a flag; auto-roda com a
+  flag; `--no-proof` bloqueia mesmo com a flag; `--proof` explícito preservado; `--dry-run`
+  nunca roda proof mesmo com a flag.
+- QG strict `blocking_severity_count:0`, suíte JS 2004/2004 (1 skip pré-existente; 1º
+  run pegou o flake já documentado de `context_index_sources.test.js` sob carga —
+  reproduzido limpo isolado, retry da suíte completa veio verde).
+
 ## [5.63.0] - 2026-07-26 — PRD51 S51.2.4: diagnóstico real anexado ao handoff (Golden Run cutover, parte 4/7)
 
 Quarto sub-sprint do Sprint 51.2. GAP-6: "gate falho -> handoff DIRETO — diagnose-loop.js

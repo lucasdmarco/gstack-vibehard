@@ -33,7 +33,7 @@ import { resolveBriefAcceptances } from "../project-plan/acceptance-verification
 
 // Flags do start: valor (consomem o próximo token) e booleanas (tabela → cc baixa).
 const VALUE_FLAGS = { "--name": "projectName", "--mode": "mode", "--skills": "skills", "--design-system": "designSystem", "--loop": "loop" }
-const BOOL_FLAGS = { "--dry-run": "dryRun", "--json": "json", "--yes": "yes", "-y": "yes", "--assume-no-existing-model": "assumeNoExistingModel", "--proof": "proof", "--golden-run": "goldenRun" }
+const BOOL_FLAGS = { "--dry-run": "dryRun", "--json": "json", "--yes": "yes", "-y": "yes", "--assume-no-existing-model": "assumeNoExistingModel", "--proof": "proof", "--golden-run": "goldenRun", "--no-proof": "noProof" }
 
 function parseStartArgs(args) {
   const out = { _: [] }
@@ -329,11 +329,24 @@ async function confirmAndRunPipeline(plan, flags, opts, json, cwd, brief) {
   return emitAndProof(plan, pipeline, { skillRoute, loopDecision }, flags, opts, json, cwd)
 }
 
+// PRD51 S51.2.5 (ações #6/#7) — achado que recalibrou o plano: não existe (e não
+// deveria existir) um classificador de "intenção de entrega" separado — `start`
+// SEMPRE significa "construir/rodar algo" (consulta/planejamento são outros
+// comandos: `consult`/`plan`); `--dry-run` já sai antes de chegar aqui
+// (`startCommand`), então a ação #7 já é estrutural. Atrás da flag `--golden-run`,
+// toda run real roda proof por padrão — `--no-proof` é o opt-out explícito. Sem a
+// flag, comportamento inalterado (proof continua opt-in via `--proof`).
+const wantsProof = (flags, opts) => {
+  if (flags.proof === true) return true
+  if (flags.noProof === true || opts.noProof === true) return false
+  return wantsGoldenRun(flags, opts)
+}
+
 // Emite o resultado + proof offer (F3-C / 28.5). Extraído p/ manter cc baixa.
 async function emitAndProof(plan, pipeline, decl, flags, opts, json, cwd) {
   if (json) process.stdout.write(JSON.stringify({ ok: pipeline.status === "done", runId: pipeline.runId, status: pipeline.status, stages: pipeline.stages, planId: plan.id, skillRoute: { selectedSkills: decl.skillRoute.selectedSkills, modelIntake: decl.skillRoute.modelIntake.status } }) + "\n")
   else renderPipelineHuman(pipeline, plan)
-  const proof = flags.proof ? await runStartProof(cwd, json, opts) : null
+  const proof = wantsProof(flags, opts) ? await runStartProof(cwd, json, opts) : null
   return { plan, result: pipeline.execResult, pipeline, executed: true, skillRoute: decl.skillRoute, loopDecision: decl.loopDecision, ...(proof ? { proof } : {}) }
 }
 
