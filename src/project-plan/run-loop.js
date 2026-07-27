@@ -5,6 +5,7 @@ import { execFileSync } from "child_process"
 import { executePlan, sanitizeCommand } from "./executor.js"
 import { runVerify } from "./verify-runner.js"
 import { runChangedFilesVerify } from "./changed-files.js"
+import { diffHygiene } from "./diff-hygiene.js"
 import { loadRuntimeManifest, evaluatePreviewReadiness } from "../runtime/manifest.js"
 import { readAllState } from "../runtime/supervisor.js"
 import { scout } from "../context-docs/scout.js"
@@ -211,6 +212,25 @@ function testStage(ctx, stages) {
       : { status: "ready", detail: `changed-files: ${r.status} (${r.files.length} arquivo(s))` }
 }
 
+// PRD51 S51.2.2 — review real (reusa `diff-hygiene.js`, já usado por `gstack_vibehard
+// qa`): HIGH real (debugger/segredo/.only) vira `failed`, achado menor vira `advisory`,
+// diff limpo vira `ready`. Ainda NÃO entra em GATE_STAGES (cutover final, S51.2.7) —
+// `failed` aqui é evidência real, não bloqueio; o gate determinístico continua test/verify.
+function reviewVerdict(hy) {
+  if (hy.status === "fail") {
+    const rules = hy.findings.filter((f) => f.severity === "HIGH").map((f) => f.rule)
+    return { status: "failed", detail: `diff-hygiene: ${hy.high} achado(s) ALTO — ${rules.join(", ")}` }
+  }
+  if (hy.status === "warn") return { status: "advisory", detail: `diff-hygiene: ${hy.findings.length} achado(s) menor(es) — revisão não bloqueia (gate real é test/verify)` }
+  return { status: "ready", detail: "diff-hygiene limpo nos arquivos mudados" }
+}
+
+function reviewStage(ctx, stages) {
+  if (!existsSync(ctx.projectDir)) { stages.review = { status: "advisory", detail: "revisão é ADVISORY — projeto não criado, nada a revisar" }; return }
+  try { stages.review = reviewVerdict(diffHygiene({ cwd: ctx.projectDir, exec: ctx.gateExec })) }
+  catch (e) { stages.review = { status: "advisory", detail: `revisão indisponível: ${String(e.message || "").slice(0, 80)}` } }
+}
+
 function verifyStage(ctx, stages) {
   if (!existsSync(ctx.projectDir)) { stages.verify = { status: "not_applicable", detail: "projeto não criado" }; return null }
   const report = (ctx.verifyRunner || runVerify)({ cwd: ctx.projectDir, profile: ctx.verifyProfile, exec: ctx.gateExec })
@@ -301,7 +321,7 @@ function scoutStage(ctx, stages) {
 }
 
 const GATE_STAGES = new Set(["test", "verify"])
-const POST_CREATE_STAGES = [["dev", devStage], ["test", testStage], ["verify", verifyStage], ["preview", previewStage]]
+const POST_CREATE_STAGES = [["dev", devStage], ["test", testStage], ["review", reviewStage], ["verify", verifyStage], ["preview", previewStage]]
 
 // Fonte de evidência por estágio (define o que PODE provar). test/verify = gate real;
 // scout/review nunca provam (viram advisory). O status honesto vem do próprio estágio.
