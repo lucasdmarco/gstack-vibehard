@@ -67,13 +67,30 @@ test("plan run: gera, executa com exec injetado (--yes) e reporta done; status r
     const planId = JSON.parse(genBuf.trim()).plan.id
     // 2) executa com exec injetado (não roda comandos reais)
     const ran = []
-    const runBuf = await capture(() => planCommand(["run", planId, "--json", "--yes"], { cwd: tmp, exec: (c) => ran.push(c.join(" ")) }))
+    // PRD51 S51.4.1: plan run passa pelo MESMO design-system gate do start —
+    // "web app" toca frontend, precisa de --design-system (none = opt-out honesto).
+    const runBuf = await capture(() => planCommand(["run", planId, "--json", "--yes", "--design-system", "none"], { cwd: tmp, exec: (c) => ran.push(c.join(" ")) }))
     const res = JSON.parse(runBuf.trim())
     assert.equal(res.status, "done")
     assert.ok(ran.some((c) => c.includes("create loja")))
     // 3) status reflete done
     const stBuf = await capture(() => planCommand(["status", planId, "--json"], { cwd: tmp }))
     assert.equal(JSON.parse(stBuf.trim()).status, "done")
+  } finally {
+    await rm(tmp, { recursive: true, force: true })
+  }
+})
+
+test("plan run: PRD51 S51.4.1 -- vai além do create (mesmo pipeline do start: review/verify/preview reais, não só create)", async () => {
+  const tmp = await mkdtemp(path.join(tmpdir(), "gstack-plan5-"))
+  try {
+    const { planCommand } = await import(`${pathToFileURL(cmdMod)}?t=${Date.now()}`)
+    const genBuf = await capture(() => planCommand(["cli tool", "--name", "ferramenta", "--json"], { cwd: tmp }))
+    const planId = JSON.parse(genBuf.trim()).plan.id
+    const runBuf = await capture(() => planCommand(["run", planId, "--json", "--yes"], { cwd: tmp, exec: () => {} }))
+    const res = JSON.parse(runBuf.trim())
+    assert.ok(res.stages, "resultado agora tem os estágios do pipeline completo (não só {planId,status,completed,skipped})")
+    assert.ok("review" in res.stages && "verify" in res.stages && "preview" in res.stages, "review/verify/preview presentes -- antes plan run nunca chegava neles")
   } finally {
     await rm(tmp, { recursive: true, force: true })
   }
