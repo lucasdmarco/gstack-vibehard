@@ -39,6 +39,7 @@ import { visualCommand } from "../commands/visual.js"
 import { loopCommand } from "../commands/loop.js"
 import { researchCommand } from "../commands/research.js"
 import { dreamCommand } from "../commands/dream.js"
+import { prdCommand } from "../commands/prd.js"
 import { proxyCommand } from "../commands/proxy.js"
 import { activateCommand } from "../commands/activate.js"
 import { publishGuardCommand } from "../commands/publish-guard.js"
@@ -202,6 +203,7 @@ const COMMANDS = [
   { name: "worktree", group: "advanced", desc: "Lifecycle de worktrees: estados, diff, accept (verify), cleanup seguro", usage: "gstack_vibehard worktree <list|inspect|diff|accept|discard|cleanup> [id] [--dry-run] [--force] [--json]" },
   { name: "publish-guard", group: "advanced", desc: "Check determinístico pré-publish (tree/bump/CHANGELOG/tag/CI)", usage: "gstack_vibehard publish-guard [--json] [--no-ci]" },
   { name: "dream", group: "advanced", desc: "Auditoria promessas-vs-evidência (audit/status)", usage: "gstack_vibehard dream audit|status [--json]" },
+  { name: "prd", group: "advanced", desc: "Ledger unificado de PRDs (PRD51 S51.3): releaseReady/programComplete/operationallyProven/fullyValidated por programa", usage: "gstack_vibehard prd status [--json]" },
   { name: "proxy", group: "advanced", desc: "Proxy de redaction pré-output (opt-in) + cobertura honesta do guard", usage: "gstack_vibehard proxy [--port N] [--upstream URL] · proxy status [--json]" },
   { name: "tools", group: "advanced", desc: "Integrações: Composio (nuvem) + Printing Press (local)", usage: "gstack_vibehard tools <suggested|list|install|mcp>" },
   { name: "context", group: "advanced", desc: "Context docs + scout read-only (paths+linhas, local-first, sem dump)", usage: "gstack_vibehard context <init|index|scout|search|related|explain|status>" },
@@ -347,6 +349,7 @@ const DISPATCH = {
   "publish-guard": (a) => publishGuardCommand(a),
   update: (a) => updateCommand(a),
   dream: (a) => dreamCommand(a),
+  prd: (a) => prdCommand(a),
   proxy: (a) => proxyCommand(a),
   delegate: (a) => delegateCommand(a),
   workflow: (a) => workflowCommand(a),
