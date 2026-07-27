@@ -19,22 +19,40 @@ const imp = (rel) => import(`${pathToFileURL(path.join(repoRoot, rel))}?t=${Date
 const mk = (p) => mkdtemp(path.join(tmpdir(), p))
 const src = (rel) => readFileSync(path.join(repoRoot, rel), "utf-8")
 
-// ── 1. GAP: `done` ocorre mesmo com preview pending/unhealthy (P0-A) ─────────
-test("GAP-1 (P0-A): pipeline fecha 'done' mesmo com preview unhealthy — preview não está em GATE_STAGES", async () => {
-  const runLoopSrc = src("src/project-plan/run-loop.js")
-  const m = /const GATE_STAGES = new Set\(\[([^\]]*)\]\)/.exec(runLoopSrc)
-  assert.ok(m, "GATE_STAGES precisa existir p/ este teste fazer sentido")
-  const gates = m[1].split(",").map((s) => s.trim().replace(/"/g, ""))
-  assert.deepEqual(gates.sort(), ["test", "verify"], "preview NÃO é gate — baseline do gap P0-A")
-  assert.ok(!gates.includes("preview"), "confirma: preview unhealthy NUNCA derruba o pipeline hoje")
+// ── 1. GAP (P0-A), ATUALIZADO no PRD51 S51.2.3: preview virou gate REAL, mas só
+// atrás da flag `--golden-run`/`GSTACK_GOLDEN_RUN=1` (§11 do prd51.md — cutover
+// incremental, flag temporária) E em projeto que "roda" (hasRunScript). Sem a
+// flag — o default de todo usuário hoje —, o comportamento do P0-A original
+// (preview nunca derruba o pipeline) continua byte-a-byte preservado.
+test("GAP-1 (P0-A) -> S51.2.3: SEM --golden-run, preview continua fora do gate (P0-A preservado por padrão)", async () => {
+  const { gateStagesFor } = await imp("src/project-plan/run-loop.js")
+  const gates = gateStagesFor({ goldenRun: false, projectDir: repoRoot })
+  assert.deepEqual([...gates].sort(), ["test", "verify"], "sem a flag, gates == baseline original")
+})
+test("GAP-1 (P0-A) -> S51.2.3: COM --golden-run em projeto UI, preview agora É gate real (comportamento novo, atrás de flag)", async () => {
+  const { gateStagesFor } = await imp("src/project-plan/run-loop.js")
+  const cwd = await mk("gstack-gap1-")
+  try {
+    mkdirSync(cwd, { recursive: true })
+    writeFileSync(path.join(cwd, "package.json"), JSON.stringify({ scripts: { dev: "x" } }))
+    const gates = gateStagesFor({ goldenRun: true, projectDir: cwd })
+    assert.ok(gates.has("preview"), "com a flag + hasRunScript, preview vira gate")
+  } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
 })
 
-// ── 2. GAP: review nunca bloqueia (é sempre advisory) ────────────────────────
-test("GAP-2: stage 'review' é SEMPRE advisory — nunca participa do gate determinístico", async () => {
+// ── 2. GAP, ATUALIZADO no PRD51 S51.2.2/S51.2.3: `review` deixou de ser uma
+// string hardcoded — `reviewStage` roda `diff-hygiene` de verdade e pode virar
+// `failed`. Mas review NUNCA entra em GATE_STAGES nesta leva (nem com a flag) —
+// isso fica para o cutover final (S51.2.7, ainda não feito).
+test("GAP-2 -> S51.2.2: review roda de verdade via reviewStage (diff-hygiene) em POST_CREATE_STAGES — a string estática vira só o fallback do caminho de create-fail", async () => {
   const runLoopSrc = src("src/project-plan/run-loop.js")
-  assert.match(runLoopSrc, /review:\s*\{\s*status:\s*"advisory"/, "review hardcoded como advisory")
-  const m = /const GATE_STAGES = new Set\(\[([^\]]*)\]\)/.exec(runLoopSrc)
-  assert.ok(!m[1].includes("review"), "review não está em GATE_STAGES — nunca bloqueia hoje")
+  assert.match(runLoopSrc, /function reviewStage\(ctx, stages\)/, "reviewStage real existe")
+  assert.match(runLoopSrc, /POST_CREATE_STAGES = \[.*\["review", reviewStage\]/, "reviewStage roda como parte do pipeline real")
+})
+test("GAP-2 -> S51.2.3: review continua fora de GATE_STAGES mesmo com --golden-run (cutover final é sprint separado)", async () => {
+  const { gateStagesFor } = await imp("src/project-plan/run-loop.js")
+  const gates = gateStagesFor({ goldenRun: true, projectDir: repoRoot })
+  assert.ok(!gates.has("review"), "review nunca é gate nesta leva")
 })
 
 // ── 3. GAP: feature-behavior fica pending_verifier incondicional (P0-C) ──────

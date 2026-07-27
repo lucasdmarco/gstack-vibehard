@@ -33,7 +33,7 @@ import { resolveBriefAcceptances } from "../project-plan/acceptance-verification
 
 // Flags do start: valor (consomem o próximo token) e booleanas (tabela → cc baixa).
 const VALUE_FLAGS = { "--name": "projectName", "--mode": "mode", "--skills": "skills", "--design-system": "designSystem", "--loop": "loop" }
-const BOOL_FLAGS = { "--dry-run": "dryRun", "--json": "json", "--yes": "yes", "-y": "yes", "--assume-no-existing-model": "assumeNoExistingModel", "--proof": "proof" }
+const BOOL_FLAGS = { "--dry-run": "dryRun", "--json": "json", "--yes": "yes", "-y": "yes", "--assume-no-existing-model": "assumeNoExistingModel", "--proof": "proof", "--golden-run": "goldenRun" }
 
 function parseStartArgs(args) {
   const out = { _: [] }
@@ -279,6 +279,11 @@ function resolvedAcceptance(brief, opts) {
   return resolveBriefAcceptances(brief.acceptances, opts.journeys || [])
 }
 
+// PRD51 S51.2.3+ — feature flag temporária do cutover do Golden Run (§11 do
+// prd51.md), idioma de `--agentshield` (verify.js): CLI flag OU env var, default
+// OFF. Nada muda no comportamento default sem opt-in explícito.
+const wantsGoldenRun = (flags, opts) => flags.goldenRun === true || opts.goldenRun === true || process.env.GSTACK_GOLDEN_RUN === "1"
+
 /** Persiste, confirma e roda o pipeline. Retorna o contrato público do start. */
 async function confirmAndRunPipeline(plan, flags, opts, json, cwd, brief) {
   const planDir = persistPlanArtifacts(cwd, plan, brief)
@@ -318,6 +323,7 @@ async function confirmAndRunPipeline(plan, flags, opts, json, cwd, brief) {
     exec: opts.exec, gateExec: opts.gateExec,
     devRunner: opts.devRunner, verifyRunner: opts.verifyRunner, scoutRunner: opts.scoutRunner,
     maxAttempts: opts.maxAttempts, acceptance: resolvedAcceptance(brief, opts),
+    goldenRun: wantsGoldenRun(flags, opts),
   })
 
   return emitAndProof(plan, pipeline, { skillRoute, loopDecision }, flags, opts, json, cwd)

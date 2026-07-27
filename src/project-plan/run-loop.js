@@ -3,7 +3,7 @@ import { join, resolve, dirname } from "path"
 import { fileURLToPath } from "url"
 import { execFileSync } from "child_process"
 import { executePlan, sanitizeCommand } from "./executor.js"
-import { runVerify } from "./verify-runner.js"
+import { runVerify, projectHasRunScript } from "./verify-runner.js"
 import { runChangedFilesVerify } from "./changed-files.js"
 import { diffHygiene } from "./diff-hygiene.js"
 import { loadRuntimeManifest, evaluatePreviewReadiness } from "../runtime/manifest.js"
@@ -276,6 +276,9 @@ function buildPipelineCtx(opts, plan, planDir) {
     projectDir: resolve(cwd, plan.projectName || "."),
     exec, gateExec, devRunner, verifyRunner, scoutRunner, verifyProfile, // gateExec = exec dos GATES; default real
     includeOptional: opts.includeOptional === true,
+    // PRD51 S51.2.3 — feature flag temporária (§11 do prd51.md), idioma de
+    // `--agentshield`. Default false: nada muda sem opt-in explícito.
+    goldenRun: opts.goldenRun === true,
     maxAttempts,
     attempts: 0,
     engine: makeEngine(runId, plan, maxAttempts, opts.acceptance),
@@ -320,8 +323,19 @@ function scoutStage(ctx, stages) {
   }
 }
 
-const GATE_STAGES = new Set(["test", "verify"])
 const POST_CREATE_STAGES = [["dev", devStage], ["test", testStage], ["review", reviewStage], ["verify", verifyStage], ["preview", previewStage]]
+
+// PRD51 S51.2.3 — `preview` só vira gate real (bloqueia `done`) quando a run está
+// atrás da flag `--golden-run`/`GSTACK_GOLDEN_RUN=1` (idioma de `--agentshield`,
+// verify.js) E o projeto "roda" (`hasRunScript`, mesmo sinal de `verify-runner.js`
+// que já decide `productCritical`). Sem a flag, ou em projeto CLI/lib sem
+// scripts.dev/start, comportamento 100% inalterado — zero regressão no default.
+const GATE_FAIL_STATUS = Object.freeze({ test: "failed", verify: "failed", preview: "unhealthy" })
+export function gateStagesFor(ctx) {
+  const gates = new Set(["test", "verify"])
+  if (ctx.goldenRun && projectHasRunScript(ctx.projectDir)) gates.add("preview")
+  return gates
+}
 
 // Fonte de evidência por estágio (define o que PODE provar). test/verify = gate real;
 // scout/review nunca provam (viram advisory). O status honesto vem do próprio estágio.
@@ -419,15 +433,16 @@ function finishPipeline(ctx, stages, status, failedStage) {
   return { runId: ctx.runId, status, stages, attempts: ctx.attempts, execResult: ctx.execResult, engine, goldenRun, ...(handoffPath ? { handoffPath } : {}) }
 }
 
-/** Roda dev→test→verify→preview. Retorna o nome do gate que falhou, ou null. */
+/** Roda dev→test→review→verify→preview. Retorna o nome do gate que falhou, ou null. */
 function runPostCreateStages(ctx, stages) {
+  const gates = gateStagesFor(ctx)
   for (const [stage, fn] of POST_CREATE_STAGES) {
     fn(ctx, stages)
     advanceEngine(ctx.engine, stage) // run → observe/diagnose → checkpoint/verify → proof
     appendRunEvent(ctx.runDir, { event: "stage_done", stage, status: stages[stage].status, detail: stages[stage].detail, enginePhase: ctx.engine.phase })
     // Gate determinístico falhou e não há passo retomável para corrigir → handoff
     // imediato (repetir o mesmo verify sem mudança seria loop zumbi).
-    if (GATE_STAGES.has(stage) && stages[stage].status === "failed") return stage
+    if (gates.has(stage) && stages[stage].status === (GATE_FAIL_STATUS[stage] || "failed")) return stage
   }
   return null
 }
