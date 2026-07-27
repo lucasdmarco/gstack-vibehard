@@ -204,8 +204,10 @@ const COMMANDS = [
   { name: "publish-guard", group: "advanced", desc: "Check determinístico pré-publish (tree/bump/CHANGELOG/tag/CI)", usage: "gstack_vibehard publish-guard [--json] [--no-ci]" },
   { name: "dream", group: "advanced", desc: "Auditoria promessas-vs-evidência (audit/status)", usage: "gstack_vibehard dream audit|status [--json]" },
   { name: "prd", group: "advanced", desc: "Ledger unificado de PRDs (PRD51 S51.3): releaseReady/programComplete/operationallyProven/fullyValidated por programa", usage: "gstack_vibehard prd status [--json]" },
+  { name: "research", group: "advanced", desc: "Auditoria KNOWLEDGE de skills externas (adopt/adapt/avoid) + research validate epistêmico", usage: "gstack_vibehard research skills audit --path <dir>|--repo <url> [--yes] [--json]" },
   { name: "proxy", group: "advanced", desc: "Proxy de redaction pré-output (opt-in) + cobertura honesta do guard", usage: "gstack_vibehard proxy [--port N] [--upstream URL] · proxy status [--json]" },
   { name: "tools", group: "advanced", desc: "Integrações: Composio (nuvem) + Printing Press (local)", usage: "gstack_vibehard tools <suggested|list|install|mcp>" },
+  { name: "pp", group: "advanced", desc: "Alias de `tools` (Printing Press)", usage: "gstack_vibehard pp <suggested|list|install|mcp>" },
   { name: "context", group: "advanced", desc: "Context docs + scout read-only (paths+linhas, local-first, sem dump)", usage: "gstack_vibehard context <init|index|scout|search|related|explain|status>" },
   { name: "delegate", group: "advanced", desc: "Delegar tarefa a OpenCode ou Devin (opt-in, worktree, verify, provenance)", usage: "gstack_vibehard delegate <opencode|devin> --task \"...\" [--model M] [--worktree] [--cloud-handoff] [--yes]" },
   { name: "policy", group: "advanced", desc: "Policy DSL cross-harness (.gstack/policy.json): deny>allow>ask>default, compila por harness com nível honesto", usage: "gstack_vibehard policy <init|show|eval|compile|doctor> [--harness X] [--json]" },
@@ -241,12 +243,22 @@ export function showHelp(mode = "short") {
   if (mode === "short") console.log(color("  Primeira vez? → `gstack_vibehard start`   ·   Avançados → `gstack_vibehard help advanced`", COLORS.dim))
 }
 
-export function helpFor(name) {
+// PRD51 S51.4.4 — achado real: `research --help`/`visual --help` só imprimiam a
+// linha curta do registry — o usage MULTI-SUBCOMANDO real de cada um
+// (`printUsage`/`printResearchUsage`) nunca era alcançado, porque `wantsHelp`
+// nunca despachava pro módulo do comando. Chamar com args vazios é seguro (sem
+// subcomando reconhecido, cada handler só imprime o usage — nenhum efeito).
+const DETAILED_HELP = Object.freeze({
+  visual: () => visualCommand([], {}),
+  research: () => researchCommand([], {}),
+})
+export async function helpFor(name) {
   const c = COMMANDS.find((x) => x.name === name)
   if (!c) { showHelp("short"); return }
   console.log(color(`  ${c.name} — ${c.desc}`, COLORS.bold))
   console.log("")
   console.log(color(`    ${c.usage}`, COLORS.cyan))
+  if (DETAILED_HELP[name]) { console.log(""); await DETAILED_HELP[name]() }
 }
 
 export function isKnownCommand(name) { return COMMANDS.some((c) => c.name === name) }
