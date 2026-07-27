@@ -1,5 +1,38 @@
 # Changelog - gstack-vibehard
 
+## [5.76.0] - 2026-07-27 — PRD51 S51.5.4: `tools verdict` — capability verdict canônico (ação #9)
+
+Quarta parte do Sprint 51.5. Achado real: `tools readiness`
+(`src/tools/readiness.js`) e `agents doctor` (`src/commands/agents.js`) eram
+dois sistemas TOTALMENTE separados — nenhum código cruzava os dois, então
+podiam discordar em silêncio sobre "o projeto está pronto?" (ex.: Headroom
+`callable_not_routed` sem nunca cruzar com um manifest de agentes com drift).
+
+- `src/meta/capability-verdict.js` (novo): `buildCapabilityVerdict({readiness,
+  agentsDoctor})`, função PURA — recebe os dois relatórios já computados,
+  nunca faz I/O. `tools.ok` bloqueia só em status realmente bloqueante
+  (`missing`/`installed_not_callable`/`timeout_degraded` — nunca
+  `callable_not_routed`, já que routing do Headroom é sempre opt-in).
+  `agents.ok` reflete `computeAgentsDoctor().report.ok`, com `reasons`
+  honestas (drift/contract/scorecard) quando `false`, nunca esconde ausência
+  de manifest atrás de um `ok` genérico.
+- **Escopo HONESTO**: a ação #9 do PRD nomeia só `tools readiness` +
+  `agents doctor` — `tools doctor` (`printing-press/doctor.js`, CLIs de
+  terceiros instalados) é um domínio distinto e fica declarado FORA
+  (`excludedFromScope`), não silenciosamente ignorado.
+- `src/commands/agents.js`: extraído `computeAgentsDoctor()` (exportado) —
+  refatoração pura de `doctorCmd` (cálculo separado do output), reusável
+  sem duplicar a lógica do Agent Factory.
+- `src/commands/tools.js`: novo subcomando `tools verdict [--json]`.
+- `tests/capability_verdict.test.js` (7 testes, novo): os dois OK; headroom
+  não-roteado nunca bloqueia; controle negativo de tool `missing`; controle
+  negativo de drift em agents; agents doctor ausente vira reason honesta;
+  escopo declarado; CLI real via `toolsCommand`.
+- QG achou CRAP HIGH em `agentsDoctorReasons` (CC9/cognitive8) — extraído em
+  tabela de checks + helper de scorecard (mesmo padrão de extração do
+  programa inteiro). QG strict `blocking_severity_count:0`, suíte JS
+  2072/2073 (1 skip pré-existente).
+
 ## [5.75.0] - 2026-07-27 — PRD51 S51.5.3: prioridade, filtros, dedup e achabilidade real no context index (ações #5-#8)
 
 Terceira parte do Sprint 51.5. `context_db.py` (Document Graph local,

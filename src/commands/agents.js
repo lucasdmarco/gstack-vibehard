@@ -231,7 +231,10 @@ function renderAgentsDoctor(report, manifest, drift, scorecard) {
   renderDoctorVerdict(report)
 }
 
-function doctorCmd(json) {
+// PRD51 S51.5.4 (ação #9) — parte de cálculo extraída (sem I/O de output),
+// reusável por `capability-verdict.js` pra reconciliar com `tools readiness`
+// sem duplicar a lógica do Agent Factory.
+export function computeAgentsDoctor() {
   const manifest = readManifest()
   const drift = checkDrift()
   const adapters = manifest && manifest.adapters ? manifest.adapters : {}
@@ -239,6 +242,11 @@ function doctorCmd(json) {
   const scorecard = validateScorecard()
   const contract = countMissingContract(collectAdapterFiles())
   const report = buildAgentsDoctorReport(manifest, drift, matrix, contract, scorecard)
+  return { report, manifest, drift, scorecard }
+}
+
+function doctorCmd(json) {
+  const { report, manifest, drift, scorecard } = computeAgentsDoctor()
   if (json) { process.stdout.write(JSON.stringify(report) + "\n"); if (!report.ok) process.exitCode = 1; return }
   if (!manifest) { error("manifest.json ausente — rode `agents build`."); process.exitCode = 1; return }
   renderAgentsDoctor(report, manifest, drift, scorecard)

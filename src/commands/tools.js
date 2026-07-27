@@ -10,6 +10,8 @@ import { buildRufloReport } from "../harness/ruflo.js"
 import { buildToolCatalog, annotateCatalogEntry, LOCAL_CATALOG } from "../tools/catalog.js"
 import { recordToolProvenance } from "../tools/provenance.js"
 import { buildReadiness } from "../tools/readiness.js"
+import { buildCapabilityVerdict } from "../meta/capability-verdict.js"
+import { computeAgentsDoctor } from "./agents.js"
 import { runCleanMachine } from "../installer/clean-machine.js"
 import { buildToolRefresh } from "../tools/refresh.js"
 import { enableRouting, disableRouting } from "../tools/headroom-route.js"
@@ -353,6 +355,7 @@ function handleToolsHelp() {
   info("    tools agent-reach channels|doctor [--json]   Catalogo e estado por canal")
   info("  Qualidade:")
   info("    tools readiness [--json] [--write] [--clean-machine]  Estado REAL das ferramentas (Fallow/Graphify/Headroom/context)")
+  info("    tools verdict [--json]        Capability verdict canônico (reconcilia readiness + agents doctor)")
   info("    tools clean-machine [--json] [--no-write] [--keep]    Proof pack offline: OpenCode sacred, backup/restore byte-for-byte, matriz de tools")
   info("    tools refresh [--changed] [--json] [--strict]         Action close: refresca graphify/context/headroom/fallow (bounded) + report + readiness")
   info("    tools headroom doctor|enable --harness codex|claude --project-only|disable --restore  Routing opt-in, project-scoped (nunca global/wrap)")
@@ -547,9 +550,27 @@ function handleEditGuard({ args, cwd }) {
   return r
 }
 
+// PRD51 S51.5.4 (ação #9) — reconcilia tools readiness + agents doctor.
+function renderVerdict(v) {
+  section("tools verdict — capability verdict canônico")
+  ;(v.ok ? success : warn)(`  ok=${v.ok}`)
+  info(`  tools: ok=${v.tools.ok}${v.tools.blockers.length ? ` — ${v.tools.blockers.map((b) => `${b.tool}:${b.status}`).join(", ")}` : ""}`)
+  info(`  agents: ok=${v.agents.ok}${v.agents.reasons.length ? ` — ${v.agents.reasons.join("; ")}` : ""}`)
+  info("  (printing-press doctor fica fora deste veredito — domínio distinto)")
+}
+function handleVerdict({ args, opts, cwd }) {
+  const readiness = buildReadiness({ cwd, home: opts.home, probe: opts.probe, git: opts.git, now: opts.now })
+  const agentsDoctor = opts.agentsDoctor || computeAgentsDoctor().report
+  const verdict = buildCapabilityVerdict({ readiness, agentsDoctor })
+  if (args.includes("--json")) return emitTools(verdict)
+  renderVerdict(verdict)
+  return verdict
+}
+
 const TOOLS_HANDLERS = {
   suggested: handleSuggested,
   readiness: handleReadiness,
+  verdict: handleVerdict,
   refresh: handleRefresh,
   headroom: handleHeadroom,
   "edit-guard": handleEditGuard,
