@@ -5,7 +5,7 @@ import { detectColorContrastFindings } from "../skills/design-detector.js"
 import { renderCompactFeedback, renderFeedbackMarkdown } from "../skills/design-feedback.js"
 import { buildDesignRuleRegistry, getDesignRule } from "../skills/design-rule-registry.js"
 import { applyDesignHookProjections, designHookStatus } from "../harness/design-hooks.js"
-import { section, success, warn, error, info } from "../cli/index.js"
+import { section, success, warn, error, info, confirm } from "../cli/index.js"
 
 /**
  * `gstack_vibehard visual check --url <u>` (PRD36 36.9). Executa o gate visual:
@@ -106,22 +106,59 @@ function hooksStatusCmd(cwd, json) {
   return payload
 }
 
-function hooksInstallCmd(cwd, json) {
-  const result = applyDesignHookProjections(cwd)
+// PRD51 S51.4.2 — achado real: `hooks install` escrevia 4 arquivos de config do
+// projeto (.claude/settings.json, AGENTS.md, .github/copilot-instructions.md,
+// .cursor/rules/...) SEM nenhum gate de consentimento — mesmo padrão de
+// `--yes`/TTY já usado por `plan run`/`start` (nunca escreve sem confirmação
+// explícita em modo não-interativo).
+// Injeção de `opts.confirm` (testes/chamada programática) conta como "consegue
+// perguntar" — mesmo padrão de `canPromptSelect` (start.js).
+const canPromptConfirm = (opts) => Boolean(opts.confirm) || Boolean(process.stdin.isTTY)
+function hooksInstallRefused(json, autoYes, opts) {
+  if (autoYes || canPromptConfirm(opts)) return false
+  if (json) process.stdout.write(JSON.stringify({ error: "needs_confirmation", hint: "use --yes" }) + "\n")
+  else { section("visual hooks install"); error("Modo não-interativo: confirme explicitamente com --yes.") }
+  return true
+}
+async function hooksInstallGate(cwd, json, autoYes, doConfirm) {
+  if (autoYes) return true
+  if (!json) {
+    section("visual hooks install (project-local — advisory/instructional, nunca bloqueia)")
+    info("  Vai escrever/atualizar: .claude/settings.json, AGENTS.md, .github/copilot-instructions.md, .cursor/rules/gstack-design-detector.mdc")
+  }
+  const ok = await doConfirm(`Aplicar as projeções de hook de design neste projeto (${cwd})?`, false)
+  if (!ok && !json) info("Instalação cancelada.")
+  return ok
+}
+const wantsAutoYes = (args, opts) => args.includes("--yes") || args.includes("-y") || opts.yes === true
+function emitCancelled(json) {
+  const cancelled = { cancelled: true }
+  if (json) process.stdout.write(JSON.stringify(cancelled) + "\n")
+  return cancelled
+}
+const hookLine = (r) => `  ${r.ok ? "✓" : "✗"} ${r.harness}: ${r.path} (${r.ok ? r.action : r.reason})`
+function renderHookResult(r) { (r.ok ? success : error)(hookLine(r)) }
+function emitInstallResult(result, json) {
   if (json) { process.stdout.write(JSON.stringify(result) + "\n"); return result }
-  section("visual hooks install (project-local — advisory/instructional, nunca bloqueia)")
-  for (const r of result.results) (r.ok ? success : error)(`  ${r.ok ? "✓" : "✗"} ${r.harness}: ${r.path} (${r.ok ? r.action : r.reason})`)
+  for (const r of result.results) renderHookResult(r)
   return result
+}
+async function hooksInstallCmd(cwd, json, args, opts) {
+  const autoYes = wantsAutoYes(args, opts)
+  if (hooksInstallRefused(json, autoYes, opts)) return { error: "needs_confirmation" }
+  const granted = await hooksInstallGate(cwd, json, autoYes, opts.confirm || confirm)
+  if (!granted) return emitCancelled(json)
+  return emitInstallResult(applyDesignHookProjections(cwd), json)
 }
 
 const HOOKS_ACTIONS = Object.freeze({
   status: (cwd, json) => hooksStatusCmd(cwd, json),
-  install: (cwd, json) => hooksInstallCmd(cwd, json),
+  install: (cwd, json, args, opts) => hooksInstallCmd(cwd, json, args, opts),
 })
 
-function hooksCmd(cwd, args, json) {
+function hooksCmd(cwd, args, json, opts) {
   const action = HOOKS_ACTIONS[positionalAfter(args, "hooks")]
-  if (action) return action(cwd, json)
+  if (action) return action(cwd, json, args, opts)
   error("visual hooks: use `install` ou `status`")
   process.exitCode = 1
   return null
@@ -133,7 +170,8 @@ function printUsage() {
   info("  visual doctor [--json]                                 status do motor/regras nativas de design")
   info("  visual detect <elements.json> [--json]                 detecta findings (só color-contrast por ora)")
   info("  visual explain <rule-id> [--json]                      explica uma regra do registry")
-  info("  visual hooks install|status [--json]                   projeções de hook project-local por harness")
+  info("  visual hooks install|status [--json] [--yes]           projeções de hook project-local por harness")
+  warn("  visual hooks install pede confirmação (--yes ou TTY) antes de escrever — nunca sem consentimento.")
   warn("  sem playwright instalado, reporta needs_browser (blocked) — nunca finge verde.")
   warn("  visual detect lê um JSON de elementos já extraídos — não faz scraping de DOM/URL ao vivo ainda.")
   warn("  visual hooks nunca escreve config GLOBAL (~/.claude, ~/.cursor, ...) — só dentro do projeto (cwd).")
@@ -144,7 +182,7 @@ const SUBCOMMANDS = Object.freeze({
   doctor: (cwd, args, json) => doctorCmd(json),
   detect: (cwd, args, json) => detectCmd(cwd, args, json),
   explain: (cwd, args, json) => explainCmd(args, json),
-  hooks: (cwd, args, json) => hooksCmd(cwd, args, json),
+  hooks: (cwd, args, json, opts) => hooksCmd(cwd, args, json, opts),
 })
 
 export async function visualCommand(args = [], opts = {}) {
@@ -152,6 +190,6 @@ export async function visualCommand(args = [], opts = {}) {
   const json = args.includes("--json")
   const sub = args.find((a) => !a.startsWith("-"))
   const handler = SUBCOMMANDS[sub]
-  if (handler) return handler(cwd, args, json)
+  if (handler) return handler(cwd, args, json, opts)
   return printUsage()
 }
