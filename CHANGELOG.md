@@ -1,5 +1,26 @@
 # Changelog - gstack-vibehard
 
+## [5.61.0] - 2026-07-26 — PRD51 S51.2.2: review stage real (Golden Run cutover, parte 2/7)
+
+Segundo sub-sprint do Sprint 51.2. `review` era uma STRING hardcoded
+(`{status:"advisory", detail:"rode gstack_vibehard qa..."}`) em `initialStages()` —
+`gstack_vibehard qa` nunca rodava de verdade dentro do pipeline.
+
+- `src/project-plan/run-loop.js`: novo `reviewStage(ctx, stages)` em
+  `POST_CREATE_STAGES` (entre `test` e `verify`, mesma ordem de `PIPELINE_STAGES`),
+  reusando `diffHygiene` (`diff-hygiene.js`, já usado por `gstack_vibehard qa`) —
+  achado HIGH real (debugger/segredo/`.only`) vira `failed`; achado menor vira
+  `advisory`; diff limpo vira `ready`. Projeto ainda não criado preserva o
+  comportamento anterior (`advisory`, sem regressão).
+- **Ainda NÃO entra em `GATE_STAGES`** (isso é o cutover final, S51.2.7) — `review`
+  `failed` é evidência real no journal/evidence-ledger, mas não bloqueia o pipeline
+  nesta sprint. `initialStages()` mantém o placeholder estático como fallback do
+  caminho de falha imediata do `create` (onde `POST_CREATE_STAGES` nunca chega a
+  rodar) — mudança puramente aditiva.
+- `tests/start_review_stage.test.js` (3 testes): debugger real detectado (`failed`,
+  não bloqueia); diff limpo (`ready`); projeto não criado (`advisory`, preservado).
+- QG strict `blocking_severity_count:0`, suíte JS 1988/1988 (1 skip pré-existente).
+
 ## [5.60.0] - 2026-07-26 — PRD51 S51.2.1: acceptance real chega no pipeline (Golden Run cutover, parte 1/7)
 
 Primeiro sub-sprint do Sprint 51.2 ("Cutover do Golden Run no `start`") — o sprint
