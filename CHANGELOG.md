@@ -1,5 +1,42 @@
 # Changelog - gstack-vibehard
 
+## [5.73.0] - 2026-07-27 — PRD51 S51.5.1: sidecar de proveniência do Graphify (início do Sprint 51.5)
+
+Primeira parte do Sprint 51.5 ("Contexto, Graphify e readiness transacionais",
+ações #2/#3/#4). Achado real confirmado rodando o binário `graphify`
+instalado: o `graph.json` real do upstream **não tem `built_at_commit`** — só
+`nodes`/`links`/`input_tokens`/`output_tokens`. O commit só existia como texto
+solto em `GRAPH_REPORT.md`, nunca parseado por nenhum código. Consequência:
+`freshnessState()` sempre recebia `builtAt=undefined` em uso real e nunca
+conseguia ser `"fresh"` nem `"stale"` — ficava preso em `"unknown"` para
+sempre, mesmo logo após um `graphify update .` bem-sucedido.
+
+- `src/tools/graphify-provenance.js` (novo): em vez de depender de um campo
+  upstream instável/ausente, GStack registra a proveniência ele mesmo — já
+  que é ele quem dispara `graphify update .` (`tools/refresh.js`) — num
+  sidecar `.gstack/graphify-provenance.json`
+  (`{schemaVersion, builtAtCommit, graphifyVersion, generatedAt}`).
+  `graphSchemaDrift(g)` é o groundwork da ação #3 (adaptar ao schema
+  detectado): reporta chaves de topo desconhecidas do `graph.json` em vez de
+  ignorá-las em silêncio — visível/testável quando o upstream mudar de shape.
+- `src/tools/readiness.js`: `graphInfo` passa a preferir o sidecar sobre o
+  campo `built_at_commit` inline (mantém retrocompat quando só o inline
+  existir — grafos antigos/gerados fora do GStack). Ação #4 (nunca "fresh"
+  com proveniência unknown) reverificada contra a shape REAL do upstream, não
+  só contra fixtures sintéticas como antes.
+- `src/tools/refresh.js`: após o passo `graphify` terminar `ok`, escreve o
+  sidecar com o HEAD real (`resolveCommit`) e a versão real
+  (`graphifyVersionProbe`) — ambos runners injetáveis, sem novo spawn nos
+  testes existentes (`goodRunners()` atualizado com fakes determinísticos).
+  Skip do graphify (`--changed` sem arquivo relevante) não escreve sidecar.
+- `tests/graphify_provenance.test.js` (5 testes, novo), `tests/tool_readiness.test.js`
+  (+4 testes: controle negativo com a shape real sem sidecar, sidecar resolve
+  freshness, sidecar vence campo inline desatualizado, schemaDrift aparece
+  nas métricas), `tests/tool_refresh.test.js` (+2 testes: sidecar gravado
+  quando graphify ok, não gravado quando skipped).
+- QG strict `blocking_severity_count:0`, suíte JS 2060/2061 (1 skip
+  pré-existente).
+
 ## [5.72.0] - 2026-07-27 — PRD51 S51.4.5: registry de efeitos por operação + guard de help/dispatch (fecha Sprint 51.4)
 
 Quinta e última parte do Sprint 51.4 (ação #8 — "command-lint detecta operação

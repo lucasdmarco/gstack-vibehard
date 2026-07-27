@@ -3,6 +3,7 @@ import { join, dirname } from "path"
 import { fileURLToPath } from "url"
 import { execFileSync } from "child_process"
 import { buildReadiness } from "./readiness.js"
+import { writeGraphifyProvenance } from "./graphify-provenance.js"
 
 /**
  * Action Close Tool Refresh (PRD24 Sprint 24.3): ao FECHAR uma ação da IA, mantém
@@ -47,6 +48,15 @@ function gitChanged(cwd) {
   const r = boundedRun("git", ["diff", "--name-only", "HEAD"], { cwd, timeout: 10000 })
   return r.ok ? r.summary.split(/\s+/).filter(Boolean) : []
 }
+function gitHead(cwd) {
+  const r = boundedRun("git", ["rev-parse", "HEAD"], { cwd, timeout: 10000 })
+  return r.ok ? r.summary.trim() || null : null
+}
+function graphifyVersion(cwd) {
+  const r = boundedRun("graphify", ["--version"], { cwd, timeout: 10000 })
+  const m = r.ok ? /(\d+\.\d+\.\d+)/.exec(r.summary) : null
+  return m ? m[1] : null
+}
 
 // Runners default: bounded, cross-platform, best-effort (nunca lançam).
 export function defaultRunners(cwd) {
@@ -59,6 +69,8 @@ export function defaultRunners(cwd) {
     headroomDoctor: () => boundedRun(headroomExe(cwd), ["doctor"], { cwd, timeout: 15000 }),
     fallowAudit: () => boundedRun(npxBin(), ["fallow", "audit", "--format", "json"], { cwd, timeout: 90000 }),
     verify: () => boundedRun("node", [join(cwd, "src", "index.js"), "verify", "--changed-files", "--json"], { cwd, timeout: 120000 }),
+    resolveCommit: () => gitHead(cwd),
+    graphifyVersionProbe: () => graphifyVersion(cwd),
   }
 }
 
@@ -123,6 +135,18 @@ function refreshReport(runId, cwd, strict, changed, steps, nowIso) {
   return { runId, cwd, strict, changed, generatedAt: nowIso(), steps, ok: steps.every((s) => s.status !== "error") }
 }
 
+// Ação #2 (PRD51 S51.5): GStack controla a invocação de `graphify update .`,
+// então registra a proveniência ele mesmo assim que ela roda com sucesso —
+// nunca depende do upstream carregar `built_at_commit` (confirmado ausente).
+function maybeWriteProvenance(cwd, runners, steps, opts) {
+  if (opts.write === false) return null
+  const g = steps.find((s) => s.tool === "graphify")
+  if (!g || g.status !== "ok") return null
+  const commit = runners.resolveCommit ? runners.resolveCommit() : null
+  const graphifyVersion = runners.graphifyVersionProbe ? runners.graphifyVersionProbe() : null
+  return writeGraphifyProvenance(cwd, { commit, graphifyVersion, nowIso: opts.nowIso })
+}
+
 /**
  * Executa o refresh. `runners`/`now` injetáveis; `write:false` para não tocar disco.
  * @returns {{ runId, ok, strict, changed, steps, writtenTo, readinessPath }}
@@ -134,6 +158,7 @@ export function buildToolRefresh(opts = {}) {
   const steps = refreshSteps(runners, { strict: opts.strict === true, changed: opts.changed === true, now: opts.now })
   const fallowRaw = extractFallowRaw(steps)
   const report = refreshReport(runId, cwd, opts.strict === true, opts.changed === true, steps, opts.nowIso || (() => new Date().toISOString()))
-  if (opts.write === false) return { ...report, writtenTo: null, readinessPath: null }
-  return { ...report, writtenTo: writeRefreshReport(cwd, runId, report), readinessPath: refreshReadiness(cwd, fallowRaw) }
+  const provenance = maybeWriteProvenance(cwd, runners, steps, opts)
+  if (opts.write === false) return { ...report, writtenTo: null, readinessPath: null, provenance: null }
+  return { ...report, writtenTo: writeRefreshReport(cwd, runId, report), readinessPath: refreshReadiness(cwd, fallowRaw), provenance }
 }

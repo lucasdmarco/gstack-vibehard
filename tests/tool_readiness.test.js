@@ -85,6 +85,63 @@ test("buildReadiness: graphify freshness fresh vs stale vs absent (built_at_comm
   } finally { await rm(cwd, { recursive: true, force: true }) }
 })
 
+test("buildReadiness: CONTROLE NEGATIVO -- shape REAL do upstream (sem built_at_commit, sem sidecar) NUNCA vira 'fresh'", async () => {
+  const { buildReadiness } = await imp(readyMod)
+  const cwd = await mkdtemp(path.join(tmpdir(), "gstack-ready-"))
+  try {
+    await mkdir(path.join(cwd, "graphify-out"), { recursive: true })
+    // shape REAL confirmado rodando o binário graphify instalado: nodes/links/input_tokens/output_tokens, SEM built_at_commit.
+    await writeFile(path.join(cwd, "graphify-out", "graph.json"), JSON.stringify({ nodes: [], links: [], input_tokens: 10, output_tokens: 5 }))
+    const probe = makeProbe({ "graphify --version": { ok: true, code: 0, stdout: "graphify 0.8.30", stderr: "" } })
+    const r = buildReadiness({ cwd, home: cwd, probe, git: () => "HEAD1" })
+    assert.equal(r.tools.graphify.freshness.state, "unknown", "sem proveniência real, nunca 'fresh' por engano")
+    assert.equal(r.tools.graphify.freshness.provenance, "unknown")
+  } finally { await rm(cwd, { recursive: true, force: true }) }
+})
+
+test("buildReadiness: sidecar de proveniência (graphify-provenance.json) resolve freshness quando o graph.json real não tem built_at_commit", async () => {
+  const { buildReadiness } = await imp(readyMod)
+  const { writeGraphifyProvenance } = await imp(path.join(repoRoot, "src", "tools", "graphify-provenance.js"))
+  const cwd = await mkdtemp(path.join(tmpdir(), "gstack-ready-"))
+  try {
+    await mkdir(path.join(cwd, "graphify-out"), { recursive: true })
+    await writeFile(path.join(cwd, "graphify-out", "graph.json"), JSON.stringify({ nodes: [], links: [] }))
+    writeGraphifyProvenance(cwd, { commit: "HEAD1", graphifyVersion: "0.8.30", nowIso: () => "2026-07-27T00:00:00.000Z" })
+    const probe = makeProbe({ "graphify --version": { ok: true, code: 0, stdout: "graphify 0.8.30", stderr: "" } })
+    const r = buildReadiness({ cwd, home: cwd, probe, git: () => "HEAD1" })
+    assert.equal(r.tools.graphify.freshness.state, "fresh")
+    assert.equal(r.tools.graphify.freshness.provenance, "sidecar")
+  } finally { await rm(cwd, { recursive: true, force: true }) }
+})
+
+test("buildReadiness: sidecar tem PRIORIDADE sobre built_at_commit inline quando os dois existem e discordam", async () => {
+  const { buildReadiness } = await imp(readyMod)
+  const { writeGraphifyProvenance } = await imp(path.join(repoRoot, "src", "tools", "graphify-provenance.js"))
+  const cwd = await mkdtemp(path.join(tmpdir(), "gstack-ready-"))
+  try {
+    await mkdir(path.join(cwd, "graphify-out"), { recursive: true })
+    // inline diz HEAD_ANTIGO (desatualizado); sidecar diz HEAD1 (real, escrito pelo GStack)
+    await writeFile(path.join(cwd, "graphify-out", "graph.json"), JSON.stringify({ built_at_commit: "HEAD_ANTIGO", nodes: [], links: [] }))
+    writeGraphifyProvenance(cwd, { commit: "HEAD1", nowIso: () => "2026-07-27T00:00:00.000Z" })
+    const probe = makeProbe({ "graphify --version": { ok: true, code: 0, stdout: "graphify 0.8.30", stderr: "" } })
+    const r = buildReadiness({ cwd, home: cwd, probe, git: () => "HEAD1" })
+    assert.equal(r.tools.graphify.freshness.state, "fresh", "sidecar vence o campo inline desatualizado")
+    assert.equal(r.tools.graphify.freshness.builtAtCommit, "HEAD1")
+  } finally { await rm(cwd, { recursive: true, force: true }) }
+})
+
+test("buildReadiness: graphSchemaDrift aparece nas métricas quando o graph.json tem chave de topo desconhecida", async () => {
+  const { buildReadiness } = await imp(readyMod)
+  const cwd = await mkdtemp(path.join(tmpdir(), "gstack-ready-"))
+  try {
+    await mkdir(path.join(cwd, "graphify-out"), { recursive: true })
+    await writeFile(path.join(cwd, "graphify-out", "graph.json"), JSON.stringify({ nodes: [], links: [], schema_version: 3 }))
+    const probe = makeProbe({ "graphify --version": { ok: true, code: 0, stdout: "graphify 0.8.30", stderr: "" } })
+    const r = buildReadiness({ cwd, home: cwd, probe, git: () => "HEAD1" })
+    assert.deepEqual(r.tools.graphify.metrics.schemaDrift, ["schema_version"])
+  } finally { await rm(cwd, { recursive: true, force: true }) }
+})
+
 test("buildReadiness: tool ausente → missing (sem arquivo, comando falha)", async () => {
   const { buildReadiness } = await imp(readyMod)
   const cwd = await mkdtemp(path.join(tmpdir(), "gstack-ready-"))
