@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs"
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { execFileSync } from "node:child_process"
 import { join } from "node:path"
 import { audit } from "../dream/auditor.js"
@@ -6,6 +6,7 @@ import { scoreboardFromAudit, renderScoreboardLine } from "../dream/scoreboard.j
 import { HARNESS_CAPABILITIES } from "../dream/capabilities.js"
 import { createProposal, promoteProposal, rejectProposal, listProposals, learningSummary } from "../dream/learning.js"
 import { dreamImprove } from "../dream/runner.js"
+import { markStale, revokeCandidate } from "../dream/freshness.js"
 import { success, warn, error, info, section } from "../cli/index.js"
 
 /**
@@ -181,6 +182,41 @@ function candidatesCmd(ctx) {
   })
 }
 
+// PRD46 S46.6 / PRD51 S51.6.7 — freshness/revogação via CLI real. O candidate
+// vive embutido no closeout.json do run que o detectou (S46.2, sem storage
+// próprio) — localiza por id, aplica a transição PURA (freshness.js/
+// candidate.js, nunca muta em memória) e regrava SÓ esse arquivo. Preserva
+// provenance sempre (nunca apaga; `revokedAt`/`revokedReason` só se somam).
+function findCandidateRun(cwd, candidateId) {
+  const dir = join(cwd, ".gstack", "runs")
+  if (!existsSync(dir)) return null
+  const runIds = readdirSync(dir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name)
+  for (const runId of runIds) {
+    const closeout = loadCloseout(cwd, runId)
+    if (closeout?.learning?.candidate?.id === candidateId) return { runId, closeout }
+  }
+  return null
+}
+function writeCandidateTransition(cwd, runId, closeout, nextCandidate) {
+  const p = join(cwd, ".gstack", "runs", runId, "closeout.json")
+  const next = { ...closeout, learning: { ...closeout.learning, candidate: nextCandidate } }
+  writeFileSync(p, JSON.stringify(next, null, 2) + "\n")
+  return next
+}
+function transitionCmd(ctx, verb, applyTransition) {
+  const id = ctx.args.filter((a) => !a.startsWith("-"))[1]
+  if (!id) return emit(ctx.json, { error: "missing_candidate_id" }, () => error(`Uso: dream ${verb} <candidateId> [--reason <texto>]`))
+  const found = findCandidateRun(ctx.cwd, id)
+  if (!found) return emit(ctx.json, { error: "candidate_not_found", id }, () => error(`Candidate não encontrado: ${id}`))
+  let next
+  try { next = applyTransition(found.closeout.learning.candidate, flagValue(ctx.args, "--reason")) }
+  catch (e) { return emit(ctx.json, { error: "invalid_transition", id, message: e.message }, () => error(e.message)) }
+  writeCandidateTransition(ctx.cwd, found.runId, found.closeout, next)
+  return emit(ctx.json, { ok: true, candidate: next }, () => success(`Candidate ${id} -> ${next.status}`))
+}
+const revokeCmd = (ctx) => transitionCmd(ctx, "revoke", (c, reason) => revokeCandidate(c, reason))
+const staleCmd = (ctx) => transitionCmd(ctx, "stale", (c) => markStale(c))
+
 function trustLabel(level) {
   return level === "strong" ? "✓ forte" : level === "partial" ? "~ parcial" : "⚠ best-effort"
 }
@@ -209,6 +245,8 @@ const SUBCOMMANDS = {
   proposals: proposalsCmd,
   candidates: candidatesCmd,
   metrics: metricsCmd,
+  revoke: revokeCmd,
+  stale: staleCmd,
   plan: notImplementedCmd,
   improve: improveCmd,
   inspect: notImplementedCmd,

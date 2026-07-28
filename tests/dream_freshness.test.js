@@ -109,12 +109,13 @@ test("candidateCommandDrift: candidate sem procedure/steps não quebra (fail-saf
   assert.deepEqual(d.stale, [])
 })
 
-test("dream audit: claim dream-freshness existe e é NOT_PROVED em modo comportamental (honesto — sem CLI E2E de revoke ainda)", async () => {
+// PRD51 S51.6.7 fechou o gap que este teste documentava: `dream revoke`/
+// `dream stale` agora são comandos CLI reais (tests/dream_freshness_cli.test.js)
+// que persistem a transição no closeout.json — a claim graduou REAL.
+test("dream audit: claim dream-freshness é REAL em modo comportamental (CLI E2E de revoke/stale real, S51.6.7)", async () => {
   const { audit } = await imp("src/dream/auditor.js")
   const behavioral = audit({ root: repoRoot, behavioral: true })
   const claim = behavioral.claims.find((c) => c.id === "dream-freshness")
   assert.ok(claim, "claim registrada")
-  assert.equal(claim.status, "NOT_PROVED")
-  const filesOnly = audit({ root: repoRoot, behavioral: false })
-  assert.equal(filesOnly.claims.find((c) => c.id === "dream-freshness").status, "REAL", "arquivo+CLI existem de verdade")
+  assert.equal(claim.status, "REAL")
 })

@@ -1,5 +1,38 @@
 # Changelog - gstack-vibehard
 
+## [5.83.0] - 2026-07-28 — PRD51 S51.6.7: dream-freshness graduou REAL (comandos `dream revoke`/`dream stale` novos)
+
+Sétima parte do Sprint 51.6 (ação #3, continuação). Diferente das partes
+anteriores (só teste novo pra comportamento já existente), esta parte
+adicionou uma capacidade genuinamente nova: o próprio codebase se
+auto-documentava honesto — `dream_freshness.test.js` tinha um teste
+afirmando NOT_PROVED porque não existia nenhum comando CLI que disparasse
+`revokeCandidate`/`markStale` (`src/dream/freshness.js`, já pronto desde
+PRD46) e persistisse a transição de volta no disco.
+
+- `src/commands/dream.js`: novos subcomandos `dream revoke <candidateId>
+  [--reason <texto>]` e `dream stale <candidateId>`. O candidate vive
+  embutido no `closeout.json` do run que o detectou (S46.2, sem storage
+  próprio) — `findCandidateRun` localiza por id, aplica a transição PURA
+  (nunca muta em memória) e regrava SÓ aquele arquivo. Respeita o
+  fail-closed da máquina de estados (`candidate.js`): só `promoted` pode
+  virar `stale`/`revoked`/`superseded` — qualquer outro salto é recusado
+  com erro honesto (`invalid_transition`), nunca um `sys.exit`/crash.
+- `tests/dream_freshness_cli.test.js` (5 testes, novo): transição via CLI
+  persiste no `closeout.json` relido do disco (não só o retorno em
+  memória); controle negativo — candidate fora de `promoted` é recusado
+  sem mutar nada; candidate inexistente nunca finge sucesso
+  (`candidate_not_found`); ponta a ponta — `dream metrics`/`dream
+  candidates` (que só leem) refletem a transição depois do `revoke`.
+- `src/dream/claim-contract.js`: novo contrato `dream-freshness`. Placar do
+  commit: **22 REAL / 2 NOT_PROVED → 23 REAL / 1 NOT_PROVED** (só
+  `type-coverage` resta — S51.6.8).
+- `tests/dream_freshness.test.js`: o teste que se auto-documentava
+  NOT_PROVED foi atualizado para refletir REAL, citando o gap fechado.
+- QG strict `blocking_severity_count:0`, suíte JS 2097/2098 (1 skip
+  pré-existente; máquina sob carga pesada nesta leva — testes 5-10x mais
+  lentos que o normal, mas 0 falhas reais).
+
 ## [5.82.0] - 2026-07-28 — PRD51 S51.6.6: governance graduou REAL (npm sbom real, passando E falhando)
 
 Sexta parte do Sprint 51.6 (ação #3, continuação). Achado real: `tests/governance.test.js`
