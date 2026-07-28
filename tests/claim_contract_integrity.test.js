@@ -46,13 +46,19 @@ test("contratos comportamentais continuam completos (4 campos) — senão o grad
   }
 })
 
+// PRD51 S51.6.4 atualizou este teste: `qa-multi-lens` GANHOU contrato próprio
+// nessa sprint (16 claims promovidos, ver claim-contract.js) — deixou de ser o
+// exemplo de "sem contrato". `governance` continua genuinamente sem contrato
+// (nenhum controle negativo comportamental existe ainda, só presença de
+// arquivo — S51.6.6 é quem resolve isso).
 test("behavioral segue rebaixando REAL SEM contrato para NOT_PROVED (proteção intacta)", async () => {
   const { audit } = await imp(auditorMod)
+  const { CLAIM_CONTRACTS } = await imp(contractMod)
   const claims = audit({ behavioral: true }).claims
-  // qa-multi-lens NÃO tem contrato (é outra capacidade que qa-lens) → continua NOT_PROVED.
-  const qaMulti = claims.find((c) => c.id === "qa-multi-lens")
-  assert.ok(qaMulti, "qa-multi-lens existe")
-  assert.equal(qaMulti.status, "NOT_PROVED", "sem contrato próprio, REAL vira NOT_PROVED (comportamento preservado)")
+  const governance = claims.find((c) => c.id === "governance")
+  assert.ok(governance, "governance existe")
+  assert.ok(!CLAIM_CONTRACTS.governance, "controle: governance genuinamente não tem contrato ainda")
+  assert.equal(governance.status, "NOT_PROVED", "sem contrato próprio, REAL vira NOT_PROVED (comportamento preservado)")
 })
 
 test("proof/publish-guard: nenhum RISK/PLACEBO novo (adicionar claims REAL não desestabiliza)", async () => {
@@ -60,5 +66,7 @@ test("proof/publish-guard: nenhum RISK/PLACEBO novo (adicionar claims REAL não 
   const s = audit({ behavioral: true }).summary
   assert.equal(s.RISK || 0, 0, "sem RISK")
   assert.equal(s.PLACEBO || 0, 0, "sem PLACEBO")
-  assert.ok((s.REAL || 0) >= 4, `≥4 claims REAL agora (verify + os 3): veio ${s.REAL}`)
+  // PRD51 S51.6.4 registrou contrato pra 16 claims a mais (controle negativo
+  // real já existente, investigado a fundo) — 4 REAL vira 20 REAL.
+  assert.ok((s.REAL || 0) >= 20, `≥20 claims REAL agora (4 originais + 16 do S51.6.4): veio ${s.REAL}`)
 })

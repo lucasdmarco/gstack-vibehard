@@ -53,6 +53,89 @@ export const CLAIM_CONTRACTS = Object.freeze({
     evidenceAdapter: "src/skills/loop-checkpoint.js", e2eCommand: "node src/index.js loop checkpoint/rollback --run <id>",
     negativeControl: "tests/checkpoint_security.test.js — tamper/traversal/.env abortam", freshness: "por-checkpoint",
   },
+  // PRD51 S51.6.4 — 16 contratos com cobertura de controle negativo REAL já
+  // existente (investigados a fundo, teste lido linha a linha, não citação de
+  // fé): cada um teria FALHADO se a capacidade tivesse quebrado/sumido.
+  "auto-dream": {
+    evidenceAdapter: "src/dream/runner.js", e2eCommand: "node src/index.js dream improve && node src/index.js dream promote <id> --reviewed",
+    negativeControl: "tests/dream_improve.test.js + tests/dream_learning.test.js — merge nunca automático, worktree sempre limpo mesmo com erro, promoção sem --reviewed é recusada, proposta sabotada é bloqueada pelo AgentShield",
+    freshness: "por-ciclo",
+  },
+  "rollback": {
+    evidenceAdapter: "src/installer/uninstall.js", e2eCommand: "node src/index.js uninstall --restore-only --yes",
+    negativeControl: "tests/uninstall_restore.test.js + tests/doctor_integrity.test.js — arquivo editado pós-instalação NUNCA é sobrescrito sem --resolve-drift; backup ausente é detectado (safeToUninstall:false)",
+    freshness: "por-instalação",
+  },
+  "opencode-safe": {
+    evidenceAdapter: "src/installer/opencode-jsonc.js", e2eCommand: "node src/index.js doctor --fix opencode --apply",
+    negativeControl: "tests/opencode_jsonc_doctor.test.js — .jsonc com chaves OAuth/provider/plugin fica byte-a-byte intacto (sha256 antes/depois) mesmo com --apply",
+    freshness: "por-fix",
+  },
+  "task-loop": {
+    evidenceAdapter: "src/project-plan/task-loop.js", e2eCommand: "node src/index.js task run <planId> --yes",
+    negativeControl: "tests/task_run.test.js — passo com debugger é rejeitado por diff-hygiene e a branch é apagada; .env rastreado bloqueia o loop inteiro (repo git real)",
+    freshness: "por-execução",
+  },
+  "runtime-supervisor": {
+    evidenceAdapter: "src/runtime/supervisor.js", e2eCommand: "node src/index.js dev && node src/index.js stop",
+    negativeControl: "tests/runtime_supervisor.test.js — stopAll NUNCA mata um PID reutilizado/estrangeiro (verificação de idade, fail-closed sem startedAt); env não-allowlisted nunca chega ao serviço",
+    freshness: "por-sessão",
+  },
+  "secrets-broker": {
+    evidenceAdapter: "src/secrets/broker.js", e2eCommand: "node src/index.js secrets run -- <cmd>",
+    negativeControl: "tests/secrets.test.js — o índice em disco NUNCA contém o valor do segredo (só nomes); nomes com path-traversal são rejeitados antes do provider do SO",
+    freshness: "por-operação",
+  },
+  "runtime-manifest": {
+    evidenceAdapter: "src/runtime/manifest.js", e2eCommand: "node src/index.js dev --json",
+    negativeControl: "tests/runtime_manifest.test.js — CONTROLE NEGATIVO: schemaVersion errado/nome com ../../../PWNED são rejeitados; preview só vira ready com probe de saúde real (nunca 'verde' por chegar)",
+    freshness: "por-run",
+  },
+  "package-manager": {
+    evidenceAdapter: "src/installer/package-manager.js", e2eCommand: "node src/index.js doctor --package-manager",
+    negativeControl: "tests/package_manager.test.js — dois lockfiles → lockfile_conflict; binário pnpm ausente do PATH → missing_binary com reparo concreto",
+    freshness: "por-diagnóstico",
+  },
+  "full-contract": {
+    evidenceAdapter: "src/installer/full-contract.js", e2eCommand: "node src/index.js install",
+    negativeControl: "tests/full_contract.test.js — componente obrigatório degradado sem --allow-degraded bloqueia; componente opcional degradado ao lado de um obrigatório degradado AINDA bloqueia (opcional não dilui o gate real)",
+    freshness: "por-instalação",
+  },
+  "agent-factory": {
+    evidenceAdapter: "src/agents/factory.js", e2eCommand: "node scripts/scripts/build_agents.js --check",
+    negativeControl: "tests/build_agents.test.js — adapter gerado editado à mão faz --check sair 1 (drift guard); diferença de CRLF não gera falso-positivo",
+    freshness: "por-build",
+  },
+  "agentshield": {
+    evidenceAdapter: "src/agents/scanner.js", e2eCommand: "node scripts/scripts/build_agents.js",
+    negativeControl: "tests/build_agents.test.js — frase real de prompt-injection em knowledge/evil.md faz o build E o --check saírem 1 (CRITICO bloqueia)",
+    freshness: "por-build",
+  },
+  "adapter-matrix": {
+    evidenceAdapter: "src/agents/adapter-matrix.js", e2eCommand: "node src/index.js agents doctor --json",
+    negativeControl: "tests/agents_adapter_matrix.test.js — harness instrucional que reivindica enforcement real_hooks é rejeitado (\"não pode reivindicar\") pelo validateScorecard",
+    freshness: "por-diagnóstico",
+  },
+  "qa-multi-lens": {
+    evidenceAdapter: "src/project-plan/qa-lenses.js", e2eCommand: "node src/index.js qa --json",
+    negativeControl: "tests/qa_lenses.test.js — cada lente (eval/any/bare-except/unbounded-query/shell-exec/shell-true/new-function) dispara em código real E não produz falso-positivo em código limpo",
+    freshness: "por-run",
+  },
+  "vfa-provenance": {
+    evidenceAdapter: "src/vfa/attestation.js", e2eCommand: "node src/index.js audit verify [runId]",
+    negativeControl: "tests/vfa_attestation.test.js — cadeia adulterada/recibo removido quebra verifyChain; actions.jsonl adulterado NO DISCO faz verifyRun retornar valid:false",
+    freshness: "por-run",
+  },
+  "challenge-response": {
+    evidenceAdapter: "src/vfa/challenge.js", e2eCommand: "node src/index.js challenge evaluate --intent edit_file --target <path> --scope global --harness <id> --evidence <k1,k2>",
+    negativeControl: "tests/vfa_challenge.test.js — challengeCommand via CLI: ação de alto risco sem evidência completa é DENY; harness instrucional vira posthoc_audit_only (nunca bloqueio pré-ação)",
+    freshness: "por-ação",
+  },
+  "meta-harness": {
+    evidenceAdapter: "src/meta/orchestrator.js", e2eCommand: "node src/index.js orchestrate <planId> --yes",
+    negativeControl: "tests/meta_orchestrator.test.js + tests/orchestrate.test.js — reviewer (LLM) aprovando NUNCA salva um gate QG reprovado (regra de ouro); passo com debugger falha via git real, sem branch órfã",
+    freshness: "por-run",
+  },
 })
 
 export function contractFor(claimId) {
