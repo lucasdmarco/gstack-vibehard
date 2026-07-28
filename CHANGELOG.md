@@ -1,5 +1,39 @@
 # Changelog - gstack-vibehard
 
+## [5.86.0] - 2026-07-28 — PRD51 S51.7.2: decision presenter wired em superfície real (fecha PRD48 P1.4)
+
+Segunda parte do Sprint 51.7. Achado real: `src/policy/decision-presenter.js`
+(PRD48 S48.4) era código real e testado, mas o ÚNICO arquivo em `src/` que o
+importava era `rc-checklist-prd48.js` — e só como referência textual de
+checklist, nunca em runtime. Nenhum call site de `evaluate()` chamava
+`presentDecision`.
+
+- **Elo que faltava (achado mais significativo desta parte)**:
+  `canPersistChoice(category)`/`yesFlagBypassesGate(category)` recebiam uma
+  CATEGORIA, mas nada no repo inteiro derivava categoria de um alvo real —
+  as duas funções eram estruturalmente inalcançáveis fora de teste unitário.
+  Novo `categorizeTarget(parsed)` deriva a categoria do alvo tipado da
+  própria Policy DSL (`parseTarget`), sem inventar taxonomia nova:
+  `Write(.env)`→`secret`, `Exec(rm -rf …)`→`destructive`,
+  `Exec(npm publish)`→`deploy`, `Exec(git push …)`→`network_sensitive`,
+  `mcp__*`→`cloud_handoff`, path absoluto/`..`→`outside_project`; leitura
+  comum→`read_only`, resto→`standard`.
+- `src/commands/policy.js`: `policy eval` — a superfície REAL onde um humano
+  vê uma decisão de policy — agora emite o presenter completo
+  (ação/alvo/risco/escolhas seguras/categoria/`canPersist`) em vez de só uma
+  linha de veredito. `deny` continua NUNCA oferecendo `allow_once`;
+  categoria sensível avisa explicitamente que nunca vira "permitir sempre".
+- `presentDecision` ganhou `category` opcional (retrocompatível: sem
+  categoria, o output é idêntico ao anterior).
+- `tests/decision_presenter.test.js` (+4 testes): categorias sensíveis
+  derivadas de alvos reais; controle negativo (alvo comum NÃO vira sensível
+  por engano); `policy eval --json` inclui o presenter real com
+  `canPersist:false` em `secret`; alvo `ask` apresenta as 3 escolhas seguras.
+- `src/dream/rc-checklist-prd48.js`: P1.4 promovido de `partial` para
+  `delivered`.
+- QG strict `blocking_severity_count:0` (limpo de primeira), suíte JS
+  2114/2115 (1 skip pré-existente).
+
 ## [5.85.0] - 2026-07-28 — PRD51 S51.7.1: intake real de harness/modelo no `start` (fecha PRD48 P1.1)
 
 Início do Sprint 51.7 ("Fechamento dos residuais PRD48/49"). Achado real: o

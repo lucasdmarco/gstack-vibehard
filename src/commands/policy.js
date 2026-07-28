@@ -1,7 +1,8 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, appendFileSync } from "fs"
 import { join } from "path"
 import { ADAPTER_MATRIX } from "../agents/adapter-matrix.js"
-import { DEFAULT_POLICY, evaluate, validatePolicy } from "../policy/schema.js"
+import { DEFAULT_POLICY, evaluate, validatePolicy, parseTarget } from "../policy/schema.js"
+import { presentDecision, categorizeTarget } from "../policy/decision-presenter.js"
 import { compilePolicy } from "../policy/compiler.js"
 import { loadEffectivePolicy, localsGitignored, layerPath, REQUIRED_GITIGNORE } from "../policy/layers.js"
 import { section, success, warn, error, info } from "../cli/index.js"
@@ -45,16 +46,44 @@ function showCmd(ctx) {
   })
 }
 
+// PRD51 S51.7.2 — o presenter (`decision-presenter.js`, PRD48 S48.4) existia
+// real e testado mas NUNCA era chamado por nenhum call site de runtime: só
+// `rc-checklist-prd48.js` o importava, como referência de checklist. `policy
+// eval` é a superfície REAL onde um humano vê uma decisão de policy — aqui o
+// presenter passa a explicar a decisão (ação/alvo/risco/escolhas seguras +
+// categoria derivada), em vez de só imprimir uma linha de veredito.
+const ACTION_BY_KIND = Object.freeze({ Read: "ler", Write: "escrever em", Exec: "executar", mcp: "chamar ferramenta MCP" })
+const RISK_BY_DECISION = Object.freeze({
+  deny: "bloqueado pela policy — nenhuma execução é autorizada",
+  ask: "exige confirmação humana antes de executar",
+  allow: "auto-aprovado por regra específica da policy",
+  default: "sem regra explícita — cai no default seguro",
+})
+function buildEvalPresenter(targetStr, r) {
+  const parsed = parseTarget(targetStr)
+  return presentDecision({
+    action: ACTION_BY_KIND[parsed.kind] || "agir sobre",
+    target: parsed.pattern || targetStr,
+    risk: RISK_BY_DECISION[r.decision] || RISK_BY_DECISION.default,
+    evaluation: r,
+    category: categorizeTarget(parsed),
+  })
+}
+function renderEvalHuman(targetStr, r, presenter) {
+  section("policy eval")
+  const fn = r.decision === "deny" ? error : r.decision === "ask" ? warn : info
+  fn(`  ${targetStr} → ${r.decision.toUpperCase()}${r.rule ? ` (regra: ${r.rule})` : " (default seguro)"}`)
+  info(`  ação: ${presenter.action} · categoria: ${presenter.category} · risco: ${presenter.risk}`)
+  info(`  escolhas seguras: ${presenter.choices.join(" | ")}`)
+  if (!presenter.canPersist) warn("  categoria sensível — NUNCA vira 'permitir sempre' (mude a policy pelo comando `policy`)")
+}
 function evalCmd(ctx) {
   const targetStr = ctx.args.filter((a) => !a.startsWith("-"))[1]
   if (!targetStr) { error('Uso: policy eval "Exec(git push)"'); return { error: "missing_target" } }
   const { policy } = loadEffectivePolicy(ctx.cwd)
   const r = evaluate(policy, targetStr)
-  return emit(ctx.json, { target: targetStr, ...r }, () => {
-    section("policy eval")
-    const fn = r.decision === "deny" ? error : r.decision === "ask" ? warn : info
-    fn(`  ${targetStr} → ${r.decision.toUpperCase()}${r.rule ? ` (regra: ${r.rule})` : " (default seguro)"}`)
-  })
+  const presenter = buildEvalPresenter(targetStr, r)
+  return emit(ctx.json, { target: targetStr, ...r, presenter }, () => renderEvalHuman(targetStr, r, presenter))
 }
 
 function compileCmd(ctx) {
