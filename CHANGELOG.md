@@ -1,5 +1,34 @@
 # Changelog - gstack-vibehard
 
+## [5.81.0] - 2026-07-28 — PRD51 S51.6.5: output-guard graduou REAL (controle negativo do caminho pós-hoc/RBAC)
+
+Quinta parte do Sprint 51.6 (ação #3, continuação). Achado real confirmado
+por investigação: `redact_proxy.test.js`/`guard_status.test.js` só provavam
+o caminho PRE-RENDER (proxy opt-in via `gstack_vibehard proxy`) do Output
+Guard. O caminho PÓS-HOC (`hooks/hooks/_output_guard.py` + `stop.py`, que
+roda em TODO turno, sem nenhum opt-in — a defesa "sempre ligada" default)
+nunca tinha um teste sequer chamando `output_guard()` de verdade.
+
+- `tests/test_stop_output_guard_rbac.py` (3 testes, novo): roda `stop.py`
+  como subprocess REAL (mesmo padrão de `test_stop_non_intrusive.py`), com
+  um `transcript.jsonl` real contendo uma chave `sk_live_...`. Prova RBAC
+  de ponta a ponta: `GSTACK_USER_ROLE=viewer` com o transcript sensível é
+  **bloqueado** (exit 1, `decision:"block"`, `systemMessage` com "Porteiro
+  bloqueou"); `GSTACK_USER_ROLE=admin` com o MESMO transcript **não** é
+  bloqueado (prova que é RBAC de verdade — role_level≥3 tem bypass — não um
+  filtro cego); transcript limpo nunca bloqueia (sem falso-positivo).
+- `src/dream/claim-contract.js`: novo contrato `output-guard` citando o
+  teste acima. Placar do commit: **20 REAL / 4 NOT_PROVED → 21 REAL / 3
+  NOT_PROVED**.
+- `tests/claim_contracts_s51_6_4.test.js`: substituída a lista fixa
+  `STILL_NOT_PROVED_IDS` (que ficaria stale a cada sub-sprint) por uma
+  invariante robusta — qualquer claim SEM entrada em `CLAIM_CONTRACTS`
+  nunca pode aparecer `REAL` no auditor, verificado dinamicamente contra o
+  registro real. O teste de placar exato também virou piso (`>=20`), não
+  teto fixo, já que S51.6.6-8 continuam reduzindo `NOT_PROVED`.
+- QG strict `blocking_severity_count:0`, suíte JS 2087/2088 (1 skip
+  pré-existente), suíte Python 92/92 (+3 novos).
+
 ## [5.80.0] - 2026-07-28 — PRD51 S51.6.4: 16 claims graduam REAL com contrato comportamental real (ação #3, parte 1)
 
 Quarta parte do Sprint 51.6 (ação #3 — decidir o destino de cada uma das 20
