@@ -1,5 +1,51 @@
 # Changelog - gstack-vibehard
 
+## [5.80.0] - 2026-07-28 — PRD51 S51.6.4: 16 claims graduam REAL com contrato comportamental real (ação #3, parte 1)
+
+Quarta parte do Sprint 51.6 (ação #3 — decidir o destino de cada uma das 20
+capabilities `NOT_PROVED`). Decisão do usuário: escrever contratos
+comportamentais para as claims com cobertura de teste genuína já existente,
+promovendo-as de volta a REAL — em vez de rebaixar ou remover claims
+públicas que o produto genuinamente já cumpre.
+
+Investigação (2 agentes Explore, cada um lendo o CONTEÚDO real dos testes
+candidatos, não só os nomes de arquivo) confirmou: o mecanismo de contrato
+(`gradeClaimStatus`) só olha `claim.status` (já `"REAL"` a nível de arquivo
+para as 20) + presença de contrato — o array `missing` de cada claim é só
+uma nota informativa separada, nunca bloqueia a graduação. Isso permitiu
+registrar contrato pras 16 com controle negativo genuíno sem precisar
+fechar os gaps funcionais anotados em `missing` (esses continuam
+documentados, só não travam mais o placar).
+
+- `src/dream/claim-contract.js`: +16 entradas em `CLAIM_CONTRACTS` —
+  `auto-dream`, `rollback`, `opencode-safe`, `task-loop`,
+  `runtime-supervisor`, `secrets-broker`, `runtime-manifest`,
+  `package-manager`, `full-contract`, `agent-factory`, `agentshield`,
+  `adapter-matrix`, `qa-multi-lens`, `vfa-provenance`, `challenge-response`,
+  `meta-harness` — cada uma citando um teste de controle negativo REAL
+  (confirmado lendo o teste linha a linha: ex. `build_agents.test.js` prova
+  que um adapter editado à mão faz `--check` sair 1; `runtime_manifest.test.js`
+  prova que preview só vira `ready` com probe de saúde real, nunca "verde"
+  por chegar; `orchestrate.test.js` prova via git real que um reviewer LLM
+  aprovando NUNCA salva um gate QG reprovado).
+- Placar do commit: **4 REAL / 20 NOT_PROVED → 20 REAL / 4 NOT_PROVED**
+  (`verify` continua nunca aparecendo — placar honesto de sempre, nunca
+  inflado). Os 4 que ficam genuinamente `NOT_PROVED` (sem controle negativo
+  comportamental ainda — só presença de arquivo, ou o próprio código já se
+  auto-documenta como gap): `output-guard` (caminho pós-hoc/Stop-hook sem
+  teste), `governance` (só regex de presença, nunca roda `npm run sbom` de
+  verdade), `dream-freshness` (o próprio `dream_freshness.test.js` já
+  documenta a ausência de E2E via CLI), `type-coverage` (o gate de cobertura
+  nunca é provado FALHANDO de verdade). Cada um vira seu próprio sub-sprint
+  (S51.6.5-8) — controle negativo novo primeiro, contrato depois.
+- `tests/claim_contract_integrity.test.js`: teste que citava `qa-multi-lens`
+  como exemplo de "claim sem contrato" foi atualizado pra `governance`
+  (ainda genuinamente sem contrato) — `qa-multi-lens` ganhou contrato nesta
+  sprint. `tests/claim_contracts_s51_6_4.test.js` (4 testes, novo): prova
+  os 16 promovidos + os 4 restantes intactos + placar exato do auditor real.
+- QG strict `blocking_severity_count:0`, suíte JS 2086/2087 (1 skip
+  pré-existente).
+
 ## [5.79.0] - 2026-07-28 — PRD51 S51.6.2+S51.6.3: proof consome o auditor REAL em teste + comentário desatualizado corrigido (ações #5/#6)
 
 Segunda e terceira partes do Sprint 51.6.
