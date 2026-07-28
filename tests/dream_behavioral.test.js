@@ -23,18 +23,33 @@ test("gradeClaimStatus: contrato comportamental completo mantém REAL", async ()
   assert.equal(gradeClaimStatus("REAL", c), "REAL")
 })
 
-test("audit({behavioral:true}): a queda honesta — só claims com contrato seguem REAL", async () => {
+// PRD51 S51.6.4→S51.6.8 fecharam contrato pras 20 claims que eram NOT_PROVED
+// (a última, `type-coverage`, no S51.6.8) — o repo hoje tem 100% dos claims
+// file-REAL com contrato comportamental real. A "queda honesta" (REAL sem
+// contrato -> NOT_PROVED) continua provada, só que de forma SINTÉTICA e
+// isolada (`gradeClaimStatus`, testes acima) em vez de depender do repo ter
+// algum gap ao vivo — não fica stale a cada contrato novo que fechar.
+test("audit({behavioral:true}): claims com contrato completo continuam REAL; nenhum RISK/PLACEBO some", async () => {
   const { audit } = await imp("src/dream/auditor.js")
   const normal = audit({ root: repoRoot })
   const behavioral = audit({ root: repoRoot, behavioral: true })
   assert.equal(behavioral.behavioral, true)
-  assert.ok(sc(behavioral, "REAL") < sc(normal, "REAL"), "REAL cai no modo comportamental")
-  assert.ok(sc(behavioral, "NOT_PROVED") > 0, "aparecem NOT_PROVED")
+  assert.ok(sc(behavioral, "REAL") <= sc(normal, "REAL"), "comportamental NUNCA infla REAL além do modo arquivo")
   // pelo menos 'verify' (com contrato) segue REAL
   assert.equal(behavioral.claims.find((c) => c.id === "verify").status, "REAL")
   // RISK/PLACEBO não mudam → o proof (que checa RISK/PLACEBO) não é afetado
   assert.equal(sc(behavioral, "RISK"), sc(normal, "RISK"))
   assert.equal(sc(behavioral, "PLACEBO"), sc(normal, "PLACEBO"))
+})
+
+// Mecanismo da "queda honesta" provado de forma SINTÉTICA (não depende do
+// repo ter algum claim sem contrato num dado momento — `gradeClaimStatus`
+// já cobre isso acima; aqui provamos que `applyBehavioral`/`audit` de fato
+// CHAMA o grading, não só que a função pura existe).
+test("audit({behavioral:true}): claim REAL sintético SEM contrato realmente cairia (mecanismo ativo, não decorativo)", async () => {
+  const { gradeClaimStatus, contractFor, NOT_PROVED } = await imp("src/dream/claim-contract.js")
+  assert.equal(contractFor("claim-que-nao-existe"), null, "id desconhecido nunca tem contrato")
+  assert.equal(gradeClaimStatus("REAL", contractFor("claim-que-nao-existe")), NOT_PROVED)
 })
 
 // ── P1.8: Closeout transacional ──────────────────────────────────────────────────

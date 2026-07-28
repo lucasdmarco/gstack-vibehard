@@ -8,11 +8,18 @@ import path from "node:path"
 
 const repoRoot = path.resolve(import.meta.dirname, "..")
 
+// PRD51 S51.6.4→S51.6.8 fecharam contrato pras 20 claims que eram NOT_PROVED
+// no repo real — hoje o placar ao vivo tem 0 NOT_PROVED (100% dos claims
+// file-REAL têm contrato comportamental). Os 3 testes abaixo dependiam de
+// "aparece NOT_PROVED"/"REAL cai" como prova indireta de que o modo
+// behavioral está ativo — isso ficou stale (e vai continuar ficando, a cada
+// contrato novo). O mecanismo em si já é provado sinteticamente em
+// `dream_behavioral.test.js` (`gradeClaimStatus`); aqui a prova direta e
+// não-frágil é o campo `behavioral` no payload + o schema do summary.
 test("dream audit --json é COMPORTAMENTAL por padrão (behavioral:true)", async () => {
   const { dreamCommand } = await import("../src/commands/dream.js")
   const r = await dreamCommand(["audit", "--json"], { root: repoRoot })
   assert.equal(r.behavioral, true, "CLI default é behavioral")
-  assert.ok((r.summary.NOT_PROVED || 0) > 0, "aparecem claims NOT_PROVED (arquivo não basta)")
 })
 
 test("dream audit --files-only volta ao modo legado (behavioral:false) sob opt-in", async () => {
@@ -20,14 +27,16 @@ test("dream audit --files-only volta ao modo legado (behavioral:false) sob opt-i
   const legacy = await dreamCommand(["audit", "--json", "--files-only"], { root: repoRoot })
   assert.equal(legacy.behavioral, false, "--files-only desliga o behavioral")
   const behavioral = await dreamCommand(["audit", "--json"], { root: repoRoot })
-  assert.ok((behavioral.summary.REAL || 0) < (legacy.summary.REAL || 0), "behavioral rebaixa REAL sem contrato")
+  assert.equal(behavioral.behavioral, true)
+  assert.ok((behavioral.summary.REAL || 0) <= (legacy.summary.REAL || 0), "behavioral NUNCA infla REAL além do modo arquivo")
 })
 
 test("dream status usa o mesmo default comportamental", async () => {
   const { dreamCommand } = await import("../src/commands/dream.js")
+  const auditMod = await import("../src/dream/auditor.js")
   const r = await dreamCommand(["status", "--json"], { root: repoRoot })
-  // status expõe o summary do audit; NOT_PROVED presente prova o modo comportamental.
-  assert.ok((r.audit.NOT_PROVED || 0) > 0, "status reflete o audit comportamental")
+  const direct = auditMod.audit({ root: repoRoot, behavioral: true })
+  assert.deepEqual(r.audit, direct.summary, "status usa o MESMO summary que audit({behavioral:true}) produziria, não um modo diferente")
 })
 
 // PRD51 S51.5.5: perfil "release" aqui de propósito — o teste é sobre

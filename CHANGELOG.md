@@ -1,5 +1,53 @@
 # Changelog - gstack-vibehard
 
+## [5.84.0] - 2026-07-28 — PRD51 S51.6.8: type-coverage graduou REAL — as 20 claims NOT_PROVED originais chegam a ZERO (fecha ação #3 e Sprint 51.6)
+
+Oitava e última parte do Sprint 51.6. `tests/b3_typecheck.test.js` só
+confirmava presença de arquivo/chave de script — nunca provava que o gate
+de cobertura REALMENTE falha com cobertura baixa (alguém podia enfraquecer
+`--lines=0` e o teste continuaria passando).
+
+- `tests/type_coverage_gate_real.test.js` (3 testes, novo): roda o `c8`
+  real (mesmo binário de `npm run coverage:ci`) contra um fixture com
+  branch deliberadamente não coberta. Prova os dois lados: FALHA de
+  verdade (exit != 0, `ERROR: Coverage ... does not meet global threshold`)
+  quando o threshold não é atingido; passa quando é atingível pela
+  cobertura real; os thresholds do script (`--lines=70 --functions=72
+  --branches=65`) nunca foram enfraquecidos silenciosamente.
+- `src/dream/claim-contract.js`: novo contrato `type-coverage` — o último
+  dos 20 claims que estavam `NOT_PROVED` no início do Sprint 51.6. Placar
+  do commit: **23 REAL / 1 NOT_PROVED → 24 REAL / 0 NOT_PROVED** (só
+  `cross-harness-trust`, PARTIAL por design, não é REAL-elegível).
+- **Efeito em cascata real, não hipotético**: com 100% dos claims
+  file-REAL agora contratados, 6 testes em `tests/publish_guard_prd45.test.js`,
+  `tests/claim_contract_integrity.test.js`, `tests/dream_behavioral.test.js`
+  e `tests/dream_cli_behavioral.test.js` dependiam do repo AO VIVO ter
+  algum claim REAL sem contrato (pra provar a "queda honesta" do modo
+  comportamental) — quebraram de verdade a cada contrato novo fechado ao
+  longo do S51.6.4→S51.6.8. Reescritos pra provar a mesma invariante de
+  forma SINTÉTICA (`gradeClaimStatus` direto, ids fictícios) em vez de
+  depender do repo ter um gap ao vivo — não ficam mais stale a cada
+  contrato futuro.
+- QG strict `blocking_severity_count:0`, suíte JS 2102/2103 (1 skip
+  pré-existente).
+
+## Sprint 51.6 — FECHADO (8 de 8 partes, v5.78.0→v5.84.0)
+
+Ações #1/#2 (placar sem número fixo + publicado no CI) e #5/#6 (proof
+consome auditor real + comentário desatualizado corrigido) fechadas nas
+partes 1-3. Ação #3 (decidir o destino de cada uma das 20 claims
+`NOT_PROVED`) fechada nas partes 4-8 — decisão do usuário: escrever
+contrato comportamental real pra todas, não rebaixar/remover. 15 tinham
+`missing:[]` (só faltava registrar contrato citando teste já existente);
+5 tinham nota de gap futuro no `missing` mas o CORE já funcionava (contrato
+não depende do `missing` ficar vazio); `output-guard`/`governance`/
+`dream-freshness`/`type-coverage` precisaram de controle negativo NOVO
+(3 testes escritos do zero + `dream revoke`/`dream stale`, comandos CLI
+genuinamente novos). Ações #4 (tiers core/release/experimental/roadmap) e
+#7 (matriz de capacidade versionada) permanecem fora de escopo — dependiam
+da decisão de #3, que descartou a necessidade de tiers ao provar as 20
+capacidades reais em vez de rotulá-las como experimentais.
+
 ## [5.83.0] - 2026-07-28 — PRD51 S51.6.7: dream-freshness graduou REAL (comandos `dream revoke`/`dream stale` novos)
 
 Sétima parte do Sprint 51.6 (ação #3, continuação). Diferente das partes

@@ -46,19 +46,17 @@ test("contratos comportamentais continuam completos (4 campos) — senão o grad
   }
 })
 
-// PRD51 S51.6.4/S51.6.6 atualizaram este teste: `qa-multi-lens` (S51.6.4) e
-// `governance` (S51.6.6) GANHARAM contrato próprio — deixaram de ser exemplo
-// de "sem contrato". `type-coverage` continua genuinamente sem contrato
-// (o gate de cobertura nunca foi provado FALHANDO de verdade — S51.6.8
-// é quem resolve isso).
+// PRD51 S51.6.4→S51.6.8 fecharam contrato pras 20 claims que eram NOT_PROVED
+// (`type-coverage`, o último, no S51.6.8) — não sobra mais nenhum claim
+// file-REAL genuinamente sem contrato pra usar como exemplo ao vivo. A
+// invariante em si (REAL sem contrato -> NOT_PROVED) é testada direto na
+// função pura `gradeClaimStatus`, desacoplada de qual claim real está ou
+// não contratado num dado momento — não fica stale a cada sub-sprint novo.
 test("behavioral segue rebaixando REAL SEM contrato para NOT_PROVED (proteção intacta)", async () => {
-  const { audit } = await imp(auditorMod)
-  const { CLAIM_CONTRACTS } = await imp(contractMod)
-  const claims = audit({ behavioral: true }).claims
-  const typeCoverage = claims.find((c) => c.id === "type-coverage")
-  assert.ok(typeCoverage, "type-coverage existe")
-  assert.ok(!CLAIM_CONTRACTS["type-coverage"], "controle: type-coverage genuinamente não tem contrato ainda")
-  assert.equal(typeCoverage.status, "NOT_PROVED", "sem contrato próprio, REAL vira NOT_PROVED (comportamento preservado)")
+  const { gradeClaimStatus, NOT_PROVED } = await imp(contractMod)
+  assert.equal(gradeClaimStatus("REAL", null), NOT_PROVED, "REAL sem contrato -> NOT_PROVED")
+  assert.equal(gradeClaimStatus("REAL", { evidenceAdapter: "x" }), NOT_PROVED, "contrato INCOMPLETO (3/4 campos) -> NOT_PROVED")
+  assert.equal(gradeClaimStatus("PARTIAL", null), "PARTIAL", "status não-REAL nunca é tocado pelo grading")
 })
 
 test("proof/publish-guard: nenhum RISK/PLACEBO novo (adicionar claims REAL não desestabiliza)", async () => {
