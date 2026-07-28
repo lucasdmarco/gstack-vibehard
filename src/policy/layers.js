@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "fs"
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs"
 import { join } from "path"
 import { stripBom } from "../util/json.js"
 import { mergeJson } from "../installer/merge.js"
@@ -54,6 +54,24 @@ export function loadEffectiveConfig(cwd) {
   const eff = local ? mergeJson(base, local) : base
   if (local) layers.push("config.local.json")
   return { config: eff, layers }
+}
+
+/**
+ * PRD51 S51.7.1 — persiste preferência local (harness/modelo, `first-run.js`)
+ * em `config.local.json`. NUNCA sobrescreve o arquivo inteiro — faz merge raso
+ * sobre o que já existe (outras chaves locais do usuário sobrevivem). Só
+ * chamado com um objeto que já passou por `buildLocalProfileUpdate`
+ * (consent:true explícito é responsabilidade do chamador, não daqui).
+ */
+export function writeLocalProfileUpdate(cwd, update) {
+  if (!update) return null
+  const dir = gstackDir(cwd)
+  mkdirSync(dir, { recursive: true })
+  const p = layerPath(cwd, "configLocal")
+  const existing = readJson(p) || {}
+  const next = { ...existing, ...update }
+  writeFileSync(p, JSON.stringify(next, null, 2) + "\n")
+  return next
 }
 
 /** O .gitignore do projeto cobre os arquivos locais? { ok, missing, hasGitignore }. */

@@ -80,6 +80,31 @@ test("layers: default ← policy.json ← policy.local.json; local sobrepõe", a
   } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
 })
 
+// PRD51 S51.7.1 — writer novo: persiste preferência de harness/modelo
+// (first-run.js) sem NUNCA sobrescrever o arquivo inteiro (merge raso).
+test("writeLocalProfileUpdate: cria config.local.json e faz MERGE raso (nunca sobrescreve o arquivo inteiro)", async () => {
+  const cwd = await mkdtemp(path.join(tmpdir(), "gstack-pol-"))
+  try {
+    const { writeLocalProfileUpdate, loadEffectiveConfig } = await imp("src/policy/layers.js")
+    await mkdir(path.join(cwd, ".gstack"), { recursive: true })
+    await writeFile(path.join(cwd, ".gstack", "config.local.json"), JSON.stringify({ someUnrelatedKey: "preserved" }))
+    const written = writeLocalProfileUpdate(cwd, { schemaVersion: "gstack.local-profile.v1", preferredHarness: "codex", preferredModel: "auto" })
+    assert.equal(written.someUnrelatedKey, "preserved", "merge nunca apaga chave local não-relacionada")
+    assert.equal(written.preferredHarness, "codex")
+    const { config } = loadEffectiveConfig(cwd)
+    assert.equal(config.preferredHarness, "codex", "loadEffectiveConfig relê o que foi escrito")
+  } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
+})
+
+test("writeLocalProfileUpdate: update null/ausente -> no-op honesto (nunca cria arquivo vazio)", async () => {
+  const cwd = await mkdtemp(path.join(tmpdir(), "gstack-pol-"))
+  try {
+    const { writeLocalProfileUpdate } = await imp("src/policy/layers.js")
+    assert.equal(writeLocalProfileUpdate(cwd, null), null)
+    assert.equal(existsSync(path.join(cwd, ".gstack", "config.local.json")), false)
+  } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
+})
+
 test("localsGitignored: detecta locais fora do .gitignore", async () => {
   const cwd = await mkdtemp(path.join(tmpdir(), "gstack-pol-"))
   try {

@@ -63,7 +63,10 @@ test("CONTROLE NEGATIVO: c8 --check-coverage FALHA de verdade (exit != 0) quando
     }
     assert.ok(threw, "c8 deveria falhar (exit != 0) com branch não coberta e threshold 100%")
     assert.match(output, /ERROR|not met/i, "c8 reporta o motivo real da falha, não silencia")
-  } finally { rmSync(tmp, { recursive: true, force: true }) }
+  // maxRetries: o c8 é subprocess — no Windows o handle pode continuar aberto
+  // um instante após o exit (EBUSY/ENOTEMPTY sob carga). Mesmo padrão dos 36
+  // outros testes do repo que limpam tempdir depois de spawnar processo.
+  } finally { rmSync(tmp, { recursive: true, force: true, maxRetries: 5 }) }
 })
 
 test("c8 --check-coverage PASSA quando o threshold é atingível pela cobertura real", () => {
@@ -73,7 +76,10 @@ test("c8 --check-coverage PASSA quando o threshold é atingível pela cobertura 
     // threshold baixo o bastante pra cobertura real (só o branch "positivo" é exercitado).
     const out = runC8(tmp, ["--lines=1", "--functions=1", "--branches=1"])
     assert.match(out, /%/, "c8 roda e reporta um número de cobertura real")
-  } finally { rmSync(tmp, { recursive: true, force: true }) }
+  // maxRetries: o c8 é subprocess — no Windows o handle pode continuar aberto
+  // um instante após o exit (EBUSY/ENOTEMPTY sob carga). Mesmo padrão dos 36
+  // outros testes do repo que limpam tempdir depois de spawnar processo.
+  } finally { rmSync(tmp, { recursive: true, force: true, maxRetries: 5 }) }
 })
 
 test("npm run coverage:ci real: thresholds declarados no script batem com o que roda de verdade (nunca enfraquecidos silenciosamente)", () => {
