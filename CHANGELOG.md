@@ -1,5 +1,58 @@
 # Changelog - gstack-vibehard
 
+## [5.85.0] - 2026-07-28 — PRD51 S51.7.1: intake real de harness/modelo no `start` (fecha PRD48 P1.1)
+
+Início do Sprint 51.7 ("Fechamento dos residuais PRD48/49"). Achado real: o
+PRD48 S48.1 já tinha construído as peças puras do first-run
+(`detectTargetProfiles`/`decideFirstRun`/`applyFirstRunChoice`/
+`buildLocalProfileUpdate`), mas nada no caminho INTERATIVO real do `start`
+as chamava — só o preview de `--dry-run`. Quando `decideFirstRun` retornava
+`ask_user` (mais de um harness apto), ninguém perguntava de verdade, e
+nenhuma preferência era persistida. Confirmado explicitamente em
+`rc-checklist-prd48.js` P1.1: `status:"partial"`.
+
+- `src/commands/start.js`: novo `harnessIntakeGuard`, chamado no caminho
+  real do `startCommand` (depois do `workspaceGuard`, antes do wizard).
+  `ask_user` NUNCA decide sozinho — pergunta de verdade (mesmo padrão de
+  `canPromptSelect`). Preferência persistida SÓ com consentimento explícito
+  (nunca via `--yes`, DoD do PRD48 S48.1) via novo `confirm` dedicado.
+  Preferência já lembrada (`config.local.json`) nunca pergunta de novo —
+  auto-seleciona direto. `blocked` (nenhum harness apto) vira aviso
+  honesto, aditivo — não virou hard-gate novo nesta leva.
+- `src/policy/layers.js`: novo `writeLocalProfileUpdate(cwd, update)` —
+  merge raso sobre `config.local.json` (nunca sobrescreve o arquivo
+  inteiro; outras chaves locais do usuário sobrevivem).
+- `tests/start_harness_intake.test.js` (6 testes, novo): pergunta de
+  verdade com >1 apto; `--yes`/não-interativo nunca inventa escolha nem
+  persiste; persistência só com `confirm:true`; preferência lembrada não
+  pergunta de novo; exatamente 1 apto não pergunta; nenhum apto vira
+  `blocked` honesto sem travar o `start`.
+- **Achado real durante o teste** (não hipotético): um teste pré-existente
+  (`workspace_guard.test.js`) injetava um `select` genérico que
+  acidentalmente respondia à nova pergunta de harness, caindo então num
+  `confirm()` REAL sem guarda — pendurava no stdin por 25s até timeout.
+  Corrigido com o mesmo padrão `canPromptConfirm` já usado em
+  `visual.js`/`research.js` (opt-in explícito ou TTY real, nunca stdin
+  pendurado em teste hermético).
+- `src/dream/rc-checklist-prd48.js`: P1.1 promovido de `partial` para
+  `delivered`.
+- QG achou CRAP CRITICAL em `harnessIntakeGuard` (CC13/cognitive12) —
+  extraído em `askAndPersistHarness`/`maybePersistHarness`/
+  `skipsHarnessAsk` (2 rodadas de extração até ficar sob o limiar). QG
+  strict `blocking_severity_count:0`, suíte JS 2110/2111 (1 skip
+  pré-existente).
+- **Segundo achado real, pego pelo `verify --profile full` desta sprint**
+  (não pela suíte, que passou 2110/2111): `verify` deu `ready:false` com
+  `test` falhando por `EBUSY`/`ENOTEMPTY` ao limpar tempdir. Causa raiz —
+  os 2 testes que EU escrevi em S51.6.6/S51.6.8
+  (`governance_sbom_real.test.js`, `type_coverage_gate_real.test.js`)
+  spawnam subprocess real (`npm sbom`/`c8`) e limpavam o tempdir com
+  `rmSync(..., {recursive, force})` SEM `maxRetries` — no Windows o handle
+  do subprocess pode seguir aberto um instante após o exit, e sob carga o
+  cleanup falha. Corrigido com `maxRetries: 5`, o mesmo padrão já usado
+  por 36 outros testes do repo que limpam tempdir após spawnar processo
+  (bug real que eu introduzi, não flake pré-existente).
+
 ## [5.84.0] - 2026-07-28 — PRD51 S51.6.8: type-coverage graduou REAL — as 20 claims NOT_PROVED originais chegam a ZERO (fecha ação #3 e Sprint 51.6)
 
 Oitava e última parte do Sprint 51.6. `tests/b3_typecheck.test.js` só

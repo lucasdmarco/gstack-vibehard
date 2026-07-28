@@ -16,7 +16,8 @@ import { buildSkillRoute, buildModelIntake, MODEL_INTAKE_SOURCES } from "../skil
 import { registerDesignSystem, evaluatePreWriteGate, resolveDesignSystem } from "../skills/design-system.js"
 import { resolveLoopDecision, LOOP_MODES } from "../skills/loop-router.js"
 import { contractsForRoute } from "../skills/execution-contract.js"
-import { detectTargetProfiles, decideFirstRun } from "../onboarding/first-run.js"
+import { detectTargetProfiles, decideFirstRun, applyFirstRunChoice, buildLocalProfileUpdate } from "../onboarding/first-run.js"
+import { writeLocalProfileUpdate, loadEffectiveConfig } from "../policy/layers.js"
 import { discoverProject } from "../onboarding/project-discovery.js"
 import { proposeBrownfieldChoices, decideBrownfieldOrNew } from "../onboarding/brownfield-plan.js"
 import { openStateStore } from "../state/store.js"
@@ -469,14 +470,72 @@ async function workspaceGuard(cwd, opts) {
   return false
 }
 
+// PRD51 S51.7.1 — intake real de harness/modelo. PRD48 S48.1 já tinha as
+// peças puras (detectTargetProfiles/decideFirstRun/applyFirstRunChoice/
+// buildLocalProfileUpdate), mas nada no caminho interativo real as chamava
+// — só o preview de `--dry-run`. `ask_user` NUNCA decide sozinho (pergunta
+// de verdade, mesmo padrão de `canPromptSelect`/`workspaceGuard`); `blocked`
+// nunca inventa executor — só avisa honesto, sem virar hard-gate novo nesta
+// leva (aditivo, mesmo padrão do resto do programa).
+function warnBlockedHarness(json, decision) {
+  if (json || decision.status !== "blocked") return
+  warn(`Nenhum harness apto detectado e a tarefa exige LLM: ${decision.reason}`)
+}
+// "First-run" só pergunta a primeira vez: se já existe preferência persistida
+// (config.local.json) E ela continua apta entre os perfis detectados agora,
+// nunca pergunta de novo — auto-seleciona a preferência lembrada.
+function rememberedApt(cwd, profiles, opts) {
+  const preferred = (opts.loadConfig || loadEffectiveConfig)(cwd).config?.preferredHarness
+  if (!preferred) return null
+  const applied = applyFirstRunChoice(profiles, preferred)
+  return applied.status === "selected" ? applied : null
+}
+// `canPromptConfirm` mesmo padrão já usado em visual.js/research.js — sem
+// isso, o `confirm` real penduraria no stdin em contexto não-interativo/
+// herméticos de teste.
+const canPromptConfirm = (opts) => Boolean(opts.confirm) || Boolean(process.stdin.isTTY)
+// Persiste com consentimento explícito (nunca via --yes, DoD do PRD48 S48.1).
+async function maybePersistHarness(applied, opts, cwd) {
+  const wantsPersist = canPromptConfirm(opts) && await (opts.confirm || confirm)("Lembrar essa preferência de harness pras próximas vezes?", false)
+  if (wantsPersist) writeLocalProfileUpdate(cwd, buildLocalProfileUpdate({ preferredHarness: applied.harness, preferredModel: "auto", consent: true }))
+  return wantsPersist
+}
+// Pergunta de verdade — NUNCA decide sozinho quando há mais de um harness apto.
+async function askAndPersistHarness(profiles, decision, opts, cwd) {
+  const doSelect = opts.select || select
+  const chosen = await doSelect("Mais de um harness apto nesta máquina — qual usar agora?", decision.options)
+  const applied = applyFirstRunChoice(profiles, chosen)
+  if (applied.status !== "selected") return { profiles, decision, applied }
+  const persisted = await maybePersistHarness(applied, opts, cwd)
+  return { profiles, decision, applied, persisted }
+}
+// Não-interativo (ou --yes): nunca inventa escolha — segue sem persistir preferência.
+const skipsHarnessAsk = (flags, opts) => flags.yes === true || opts.yes === true || !canPromptSelect(opts)
+async function harnessIntakeGuard(flags, opts, json, cwd) {
+  // Detecção real faz probe de subprocess por harness (até 3s cada,
+  // `harness-probes.js`) — testes injetam `opts.detectHarnessProfiles` pra
+  // não pagar esse custo real a cada run herméticos (mesmo padrão de
+  // `opts.classify` em workspaceGuard).
+  const profiles = (opts.detectHarnessProfiles || detectTargetProfiles)()
+  const decision = decideFirstRun({ profiles, requiresLlm: true })
+  warnBlockedHarness(json, decision)
+  if (decision.status !== "ask_user") return { profiles, decision }
+  const remembered = rememberedApt(cwd, profiles, opts)
+  if (remembered) return { profiles, decision, applied: remembered, fromMemory: true }
+  if (skipsHarnessAsk(flags, opts)) return { profiles, decision }
+  return askAndPersistHarness(profiles, decision, opts, cwd)
+}
+
 export async function startCommand(args = [], opts = {}) {
   const { flags, objective, cwd, json } = resolveStartCtx(args, opts)
   if (flags.dryRun) return handleDryRun(flags, objective, json, cwd)
   if (startNeedsHelp(objective, opts)) return printNonInteractiveHelp()
   if (!(await workspaceGuard(cwd, opts))) return { executed: false, guarded: true }
+  const harnessIntake = await harnessIntakeGuard(flags, opts, json, cwd)
   const res = await collectPlan(flags, opts, objective, json, cwd)
-  if (!res) return
-  return confirmAndRunPipeline(res.plan, flags, opts, json, cwd, res.brief)
+  if (!res) return { executed: false, harnessIntake }
+  const result = await confirmAndRunPipeline(res.plan, flags, opts, json, cwd, res.brief)
+  return { ...result, harnessIntake }
 }
 
 function stageIcon(status) {

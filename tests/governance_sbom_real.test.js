@@ -60,7 +60,9 @@ test("CONTROLE NEGATIVO: npm sbom FALHA (exit != 0, sem JSON válido) sem packag
     try { JSON.parse(output) } catch { parsedOk = false }
     assert.ok(!parsedOk, "a saída de falha não deveria ser um CycloneDX JSON válido")
   } finally {
-    rmSync(tmp, { recursive: true, force: true })
+    // maxRetries: `npm sbom` é subprocess — no Windows o handle pode seguir
+    // aberto um instante após o exit (EBUSY/ENOTEMPTY sob carga).
+    rmSync(tmp, { recursive: true, force: true, maxRetries: 5 })
   }
 })
 
@@ -76,6 +78,8 @@ test("npm sbom passa com package.json mínimo mas válido (version pinada)", () 
     assert.equal(bom.bomFormat, "CycloneDX")
     assert.equal(bom.metadata.component.version, "1.0.0", "version pinada do fixture aparece no SBOM")
   } finally {
-    rmSync(tmp, { recursive: true, force: true })
+    // maxRetries: `npm sbom` é subprocess — no Windows o handle pode seguir
+    // aberto um instante após o exit (EBUSY/ENOTEMPTY sob carga).
+    rmSync(tmp, { recursive: true, force: true, maxRetries: 5 })
   }
 })
