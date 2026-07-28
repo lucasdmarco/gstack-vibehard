@@ -89,3 +89,13 @@ test("S51.6.7: dream-freshness graduou REAL (dream revoke/stale via CLI real)", 
   const df = claims.find((c) => c.id === "dream-freshness")
   assert.equal(df.status, "REAL", "dream-freshness agora tem contrato + controle negativo real")
 })
+
+// PRD51 S51.6.8 — type-coverage (o último dos 20) ganhou controle negativo
+// real (c8 provado falhando E passando) e graduou REAL. Fecha a ação #3.
+test("S51.6.8 (fecha ação #3): type-coverage graduou REAL — as 20 claims NOT_PROVED originais chegam a ZERO", async () => {
+  const { audit } = await imp("src/dream/auditor.js")
+  const r = audit({ behavioral: true })
+  const tc = r.claims.find((c) => c.id === "type-coverage")
+  assert.equal(tc.status, "REAL", "type-coverage agora tem contrato + controle negativo real")
+  assert.equal(r.summary.NOT_PROVED || 0, 0, "as 20 claims NOT_PROVED do início do Sprint 51.6 chegam a zero")
+})

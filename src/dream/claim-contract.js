@@ -161,6 +161,16 @@ export const CLAIM_CONTRACTS = Object.freeze({
     negativeControl: "tests/dream_freshness_cli.test.js — transição persiste no closeout.json (relido do disco); candidate fora de 'promoted' é recusado (sem salto de estado); candidate inexistente nunca finge sucesso; dream metrics/candidates refletem a mudança ponta a ponta",
     freshness: "por-revogação",
   },
+  // PRD51 S51.6.8 — b3_typecheck.test.js só confirmava presença de arquivo/
+  // chave de script, nunca que o gate de cobertura REALMENTE falha com
+  // cobertura baixa (alguém podia enfraquecer --lines=0 e passaria mesmo
+  // assim). Novo teste roda o c8 real (mesmo binário do coverage:ci) contra
+  // um fixture com branch não coberta de propósito.
+  "type-coverage": {
+    evidenceAdapter: "package.json (script coverage:ci)", e2eCommand: "npm run coverage:ci (c8 --check-coverage --lines=70 --functions=72 --branches=65)",
+    negativeControl: "tests/type_coverage_gate_real.test.js — c8 FALHA de verdade (exit != 0, ERROR reportado) quando o threshold não é atingido; passa quando é; thresholds do script nunca enfraquecidos silenciosamente",
+    freshness: "por-build",
+  },
 })
 
 export function contractFor(claimId) {
