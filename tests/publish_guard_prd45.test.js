@@ -49,10 +49,13 @@ test("dream-required: RISK/PLACEBO nunca publicam", () => {
 
 test("dream-required: claim SEM contrato pode ficar NOT_PROVED sem travar o release", () => {
   // Só o que o produto declarou provar é `required`. O resto é NOT_PROVED honesto —
-  // travar em todos tornaria o gate impossível (19 NOT_PROVED hoje) e ele viraria enfeite.
+  // travar em todos tornaria o gate impossível e ele viraria enfeite.
+  // `type-coverage` é usado aqui de propósito: PRD51 S51.6.4/5/6 já registraram
+  // contrato pra 18 dos 20 claims que eram NOT_PROVED — `type-coverage` é um
+  // dos 2 que genuinamente ainda não têm (S51.6.8 resolve isso).
   const r = publishGuard(baseOpts({
-    dream: () => ({ summary: { REAL: 1, RISK: 0, PLACEBO: 0, NOT_PROVED: 19 }, claims: [
-      { id: "verify", status: "REAL" }, { id: "governance", status: "NOT_PROVED" },
+    dream: () => ({ summary: { REAL: 1, RISK: 0, PLACEBO: 0, NOT_PROVED: 2 }, claims: [
+      { id: "verify", status: "REAL" }, { id: "type-coverage", status: "NOT_PROVED" },
     ] }),
     capabilityReport: capsOk,
   }))
