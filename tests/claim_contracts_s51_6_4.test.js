@@ -71,3 +71,12 @@ test("S51.6.5: output-guard graduou REAL (controle negativo novo do caminho pós
   const og = claims.find((c) => c.id === "output-guard")
   assert.equal(og.status, "REAL", "output-guard agora tem contrato + controle negativo real")
 })
+
+// PRD51 S51.6.6 — governance ganhou controle negativo novo (npm sbom real,
+// tests/governance_sbom_real.test.js) e graduou REAL.
+test("S51.6.6: governance graduou REAL (npm sbom real provado passando E falhando)", async () => {
+  const { audit } = await imp("src/dream/auditor.js")
+  const claims = audit({ behavioral: true }).claims
+  const gov = claims.find((c) => c.id === "governance")
+  assert.equal(gov.status, "REAL", "governance agora tem contrato + controle negativo real")
+})

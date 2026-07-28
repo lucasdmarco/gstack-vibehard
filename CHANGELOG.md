@@ -1,5 +1,34 @@
 # Changelog - gstack-vibehard
 
+## [5.82.0] - 2026-07-28 — PRD51 S51.6.6: governance graduou REAL (npm sbom real, passando E falhando)
+
+Sexta parte do Sprint 51.6 (ação #3, continuação). Achado real: `tests/governance.test.js`
+só verificava presença de arquivo/string (SECURITY.md/THREAT_MODEL.md/`"sbom"`
+no package.json) — o mesmo tipo de checagem que o próprio Dream Auditor já
+faz por conta própria. Nenhum teste jamais rodava `npm sbom` de verdade nem
+provava que o gate FALHA quando o projeto não tem manifesto válido.
+
+- `tests/governance_sbom_real.test.js` (3 testes, novo): roda `npm sbom
+  --sbom-format cyclonedx --omit dev` como subprocess real (não `npm run
+  sbom`, que mistura o header do npm no stdout). Prova os dois lados: contra
+  o repo real produz CycloneDX 1.5 bem-formado com componentes reais; contra
+  um diretório SEM `package.json` válido (sem `version` pinada) o comando
+  **falha de verdade** (`EINVALIDPURLTYPE`, exit != 0, sem JSON parseável) —
+  não é um comando decorativo que sempre passa. Terceiro teste confirma que
+  um manifesto mínimo mas válido (version pinada) volta a funcionar.
+- `src/dream/claim-contract.js`: novo contrato `governance`. Placar do
+  commit: **21 REAL / 3 NOT_PROVED → 22 REAL / 2 NOT_PROVED**.
+- **Achado colateral real** (não hipotético): `tests/publish_guard_prd45.test.js`
+  usava `governance` como fixture de "claim sem contrato" — quebrou de
+  verdade com este contrato novo (não um teste desatualizado por acaso, mas
+  uma dependência implícita entre módulos que só o teste completo revela).
+  Corrigido trocando pra `type-coverage` (um dos 2 que genuinamente ainda
+  não têm contrato). `tests/claim_contract_integrity.test.js` também
+  atualizado pelo mesmo motivo.
+- QG strict `blocking_severity_count:0`, suíte JS 2090/2092 (1 skip
+  pré-existente, 1 flake conhecido de `context_index_sources.test.js` sob
+  carga — confirmado passando limpo isolado, não é regressão real).
+
 ## [5.81.0] - 2026-07-28 — PRD51 S51.6.5: output-guard graduou REAL (controle negativo do caminho pós-hoc/RBAC)
 
 Quinta parte do Sprint 51.6 (ação #3, continuação). Achado real confirmado

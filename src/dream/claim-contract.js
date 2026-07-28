@@ -145,6 +145,14 @@ export const CLAIM_CONTRACTS = Object.freeze({
     negativeControl: "tests/test_stop_output_guard_rbac.py — viewer com segredo no transcript é BLOQUEADO (exit 1, decision:block); admin (role_level>=3) tem bypass; transcript limpo nunca bloqueia (sem falso-positivo)",
     freshness: "por-turno",
   },
+  // PRD51 S51.6.6 — governance.test.js só checava presença de arquivo/string
+  // (duplicava a lógica do próprio auditor). Novo teste roda `npm sbom` de
+  // verdade e prova o gate FALHANDO sem manifesto válido, não só passando.
+  "governance": {
+    evidenceAdapter: "package.json (script sbom)", e2eCommand: "npm sbom --sbom-format cyclonedx --omit dev",
+    negativeControl: "tests/governance_sbom_real.test.js — CycloneDX bem-formado com manifesto real; FALHA de verdade (exit != 0, sem JSON válido) sem package.json com version pinada",
+    freshness: "por-release",
+  },
 })
 
 export function contractFor(claimId) {

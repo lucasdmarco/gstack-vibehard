@@ -46,19 +46,19 @@ test("contratos comportamentais continuam completos (4 campos) — senão o grad
   }
 })
 
-// PRD51 S51.6.4 atualizou este teste: `qa-multi-lens` GANHOU contrato próprio
-// nessa sprint (16 claims promovidos, ver claim-contract.js) — deixou de ser o
-// exemplo de "sem contrato". `governance` continua genuinamente sem contrato
-// (nenhum controle negativo comportamental existe ainda, só presença de
-// arquivo — S51.6.6 é quem resolve isso).
+// PRD51 S51.6.4/S51.6.6 atualizaram este teste: `qa-multi-lens` (S51.6.4) e
+// `governance` (S51.6.6) GANHARAM contrato próprio — deixaram de ser exemplo
+// de "sem contrato". `type-coverage` continua genuinamente sem contrato
+// (o gate de cobertura nunca foi provado FALHANDO de verdade — S51.6.8
+// é quem resolve isso).
 test("behavioral segue rebaixando REAL SEM contrato para NOT_PROVED (proteção intacta)", async () => {
   const { audit } = await imp(auditorMod)
   const { CLAIM_CONTRACTS } = await imp(contractMod)
   const claims = audit({ behavioral: true }).claims
-  const governance = claims.find((c) => c.id === "governance")
-  assert.ok(governance, "governance existe")
-  assert.ok(!CLAIM_CONTRACTS.governance, "controle: governance genuinamente não tem contrato ainda")
-  assert.equal(governance.status, "NOT_PROVED", "sem contrato próprio, REAL vira NOT_PROVED (comportamento preservado)")
+  const typeCoverage = claims.find((c) => c.id === "type-coverage")
+  assert.ok(typeCoverage, "type-coverage existe")
+  assert.ok(!CLAIM_CONTRACTS["type-coverage"], "controle: type-coverage genuinamente não tem contrato ainda")
+  assert.equal(typeCoverage.status, "NOT_PROVED", "sem contrato próprio, REAL vira NOT_PROVED (comportamento preservado)")
 })
 
 test("proof/publish-guard: nenhum RISK/PLACEBO novo (adicionar claims REAL não desestabiliza)", async () => {
