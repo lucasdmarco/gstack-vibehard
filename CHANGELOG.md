@@ -1,5 +1,29 @@
 # Changelog - gstack-vibehard
 
+## [5.79.0] - 2026-07-28 — PRD51 S51.6.2+S51.6.3: proof consome o auditor REAL em teste + comentário desatualizado corrigido (ações #5/#6)
+
+Segunda e terceira partes do Sprint 51.6.
+
+- **S51.6.2 (ação #5)**: achado real — `checkDream(deps)` em `proof.js` já
+  cai pro `audit()` real quando `deps.dream` não é injetado, mas NENHUM
+  teste (unit ou e2e) jamais chamava `buildProof`/`proofCommand` sem
+  injetar um mock. A fiação real `audit()`→`buildProof` nunca tinha sido
+  verificada por teste automatizado — só manualmente via
+  `gstack_vibehard proof`. Novo teste em `tests/proof_release.test.js`
+  omite `deps.dream` de propósito e confirma que `p.checks.dreamAudit.summary`
+  bate exatamente com uma chamada direta e real a `audit({behavioral:true})`.
+- **S51.6.3 (ação #6)**: `src/meta/capability-verdict.js` (S51.5.4, ANTES
+  do S51.5.5) tinha um comentário afirmando "callable_not_routed NUNCA
+  bloqueia — routing é sempre opt-in (mesmo invariante de
+  headroom-policy.js)" — isso ficou desatualizado depois do S51.5.5 tornar
+  `headroom-routing` hard no perfil `full`. O COMPORTAMENTO deste módulo
+  continua certo (é um veredito profile-unaware, nunca recebe `profile` —
+  não é o mesmo caminho de `proof`), só o comentário alegava um invariante
+  universal que não é mais verdade em todo o sistema. Reescrito pra escopar
+  a alegação corretamente; título do teste correspondente também ajustado.
+- QG strict `blocking_severity_count:0`, suíte JS 2082/2083 (1 skip
+  pré-existente).
+
 ## [5.78.0] - 2026-07-28 — PRD51 S51.6.1: CI publica o placar real do commit (ação #2)
 
 Início do Sprint 51.6 ("Dream Audit e documentação pública derivada de

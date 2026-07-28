@@ -14,8 +14,11 @@
 export const CAPABILITY_VERDICT_SCHEMA = "gstack.capability-verdict.v1"
 
 // Status de `tools readiness` considerados bloqueantes pro veredito.
-// `callable_not_routed` NUNCA bloqueia — routing do Headroom é sempre opt-in
-// (mesmo invariante de `headroom-policy.js`).
+// `callable_not_routed` NUNCA bloqueia AQUI: este veredito é profile-UNAWARE
+// (agents doctor/tools reconciliation, não o `proof`). Desde PRD51 S51.5.5,
+// `gate-registry.js`/`proof.js` tratam `callable_not_routed` como blocker
+// real no perfil `full` (routing default-on prometido) — esse comportamento
+// profile-aware vive lá, não aqui; este módulo nunca recebe `profile`.
 const BLOCKING_TOOL_STATUSES = new Set(["missing", "installed_not_callable", "timeout_degraded"])
 
 function readinessBlockers(readiness) {
