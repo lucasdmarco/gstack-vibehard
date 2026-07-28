@@ -136,6 +136,15 @@ export const CLAIM_CONTRACTS = Object.freeze({
     negativeControl: "tests/meta_orchestrator.test.js + tests/orchestrate.test.js — reviewer (LLM) aprovando NUNCA salva um gate QG reprovado (regra de ouro); passo com debugger falha via git real, sem branch órfã",
     freshness: "por-run",
   },
+  // PRD51 S51.6.5 — o caminho PRE-RENDER (proxy opt-in) já tinha controle
+  // negativo (redact_proxy.test.js/guard_status.test.js); faltava o caminho
+  // PÓS-HOC (stop.py, roda em TODO turno, sem opt-in) — nenhum teste chamava
+  // output_guard() de verdade. Novo teste (subprocess real do hook) fecha isso.
+  "output-guard": {
+    evidenceAdapter: "hooks/hooks/_output_guard.py", e2eCommand: "python hooks/hooks/stop.py < payload.json (transcript_path aponta pro transcript real)",
+    negativeControl: "tests/test_stop_output_guard_rbac.py — viewer com segredo no transcript é BLOQUEADO (exit 1, decision:block); admin (role_level>=3) tem bypass; transcript limpo nunca bloqueia (sem falso-positivo)",
+    freshness: "por-turno",
+  },
 })
 
 export function contractFor(claimId) {

@@ -20,11 +20,6 @@ const PROMOTED_IDS = [
   "vfa-provenance", "challenge-response", "meta-harness",
 ]
 
-// Os 4 que ficaram genuinamente sem contrato (precisam de controle negativo
-// NOVO, ainda não escrito -- S51.6.5/6/7/8): output-guard, governance,
-// dream-freshness, type-coverage.
-const STILL_NOT_PROVED_IDS = ["output-guard", "governance", "dream-freshness", "type-coverage"]
-
 test("os 16 claims do S51.6.4 graduam REAL no auditor comportamental REAL (não mock)", async () => {
   const { audit } = await imp("src/dream/auditor.js")
   const claims = audit({ behavioral: true }).claims
@@ -35,12 +30,17 @@ test("os 16 claims do S51.6.4 graduam REAL no auditor comportamental REAL (não 
   }
 })
 
-test("CONTROLE: os 4 sem contrato novo ainda continuam NOT_PROVED honestamente (nada promovido por engano)", async () => {
+// Invariante ROBUSTA a sub-sprints futuros (S51.6.5+ reduz NOT_PROVED aos
+// poucos): qualquer claim SEM contrato registrado em CLAIM_CONTRACTS nunca
+// pode estar REAL — a mesma checagem que gradeClaimStatus faz, verificada
+// de fora, contra o registro real (não uma lista fixa que apodrece).
+test("CONTROLE: claim sem contrato NUNCA aparece REAL no auditor comportamental (nada promovido por engano)", async () => {
   const { audit } = await imp("src/dream/auditor.js")
+  const { CLAIM_CONTRACTS } = await imp("src/dream/claim-contract.js")
   const claims = audit({ behavioral: true }).claims
-  const byId = Object.fromEntries(claims.map((c) => [c.id, c]))
-  for (const id of STILL_NOT_PROVED_IDS) {
-    assert.equal(byId[id].status, "NOT_PROVED", `'${id}' ainda não tem contrato -> NOT_PROVED (S51.6.5-8 resolvem)`)
+  for (const c of claims) {
+    if (CLAIM_CONTRACTS[c.id]) continue
+    assert.notEqual(c.status, "REAL", `'${c.id}' sem contrato não pode estar REAL (senão gradeClaimStatus quebrou)`)
   }
 })
 
@@ -53,11 +53,21 @@ test("todo contrato novo tem os 4 campos obrigatórios (nunca fica incompleto po
   }
 })
 
-test("placar real do commit: 20 REAL / 4 NOT_PROVED após o S51.6.4 (nunca RISK/PLACEBO novo)", async () => {
+// Piso, não teto exato: sub-sprints seguintes (S51.6.5+) continuam reduzindo
+// NOT_PROVED -- um número fixo aqui ficaria stale a cada novo contrato.
+test("placar real do commit: pelo menos 20 REAL após o S51.6.4 (nunca RISK/PLACEBO novo)", async () => {
   const { audit } = await imp("src/dream/auditor.js")
   const s = audit({ behavioral: true }).summary
   assert.equal(s.RISK || 0, 0)
   assert.equal(s.PLACEBO || 0, 0)
   assert.ok((s.REAL || 0) >= 20, `esperado >=20 REAL, veio ${s.REAL}`)
-  assert.equal(s.NOT_PROVED || 0, 4, `esperado exatamente 4 NOT_PROVED restantes, veio ${s.NOT_PROVED}`)
+})
+
+// PRD51 S51.6.5 — output-guard ganhou controle negativo novo (caminho
+// pós-hoc/RBAC, tests/test_stop_output_guard_rbac.py) e graduou REAL.
+test("S51.6.5: output-guard graduou REAL (controle negativo novo do caminho pós-hoc)", async () => {
+  const { audit } = await imp("src/dream/auditor.js")
+  const claims = audit({ behavioral: true }).claims
+  const og = claims.find((c) => c.id === "output-guard")
+  assert.equal(og.status, "REAL", "output-guard agora tem contrato + controle negativo real")
 })
