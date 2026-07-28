@@ -57,6 +57,20 @@ jobs:
       - run: npm run coverage:ci
         name: "Coverage gate (c8, baseline ≥70%)"
 
+  # PRD51 S51.6.1 (ação #2): publica o placar REAL do commit (nunca um número
+  # fixo em doc) na aba Actions da run, via GITHUB_STEP_SUMMARY.
+  dream-scoreboard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+        name: "Install dependencies"
+      - run: npm run dream:scoreboard
+        name: "Dream scoreboard do commit"
+
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -105,9 +119,10 @@ jobs:
   # E2E lifecycle CROSS-OS (PRD 12 PR8): caixa-preta do produto PUBLICADO. Empacota
   # o tarball, instala num projeto temp e roda o BIN num HOME descartável pelo ciclo
   # doctor → dream audit → create → agents check → install --audit-only → uninstall.
-  # Prova em Linux/Windows/macOS: (1) o truth contract no tarball == repo (18 REAL/0
-  # PLACEBO — guard do fix v3.21.1); (2) isolamento de HOME (read-only e create não
-  # escrevem config gstack; --save-report grava só o relatório).
+  # Prova em Linux/Windows/macOS: (1) o truth contract no tarball == repo (parity de
+  # contagens REAL/PARTIAL/PLACEBO do commit atual — guard do fix v3.21.1, nunca um
+  # número fixo desde PRD51 S51.0A/S51.6.1); (2) isolamento de HOME (read-only e
+  # create não escrevem config gstack; --save-report grava só o relatório).
   e2e:
     strategy:
       fail-fast: false

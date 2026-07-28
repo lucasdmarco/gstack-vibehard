@@ -3,7 +3,8 @@
  * Package lifecycle E2E (PRD42 S42.0E). NÃO reimplementa: COMPÕE os provadores existentes —
  * `test-pack.mjs` (npm pack → instala .tgz em prefixo isolado → bin --version/--help/doctor/
  * install --audit-only) e `test-e2e-lifecycle.mjs` (pack→install→doctor→create→build→uninstall
- * com HOME isolado + contrato de verdade 18 REAL/0 PLACEBO). Roda os dois em sequência, propaga
+ * com HOME isolado + contrato de verdade tarball==repo, zero PLACEBO — nunca um número fixo,
+ * PRD51 S51.0A/S51.6.1). Roda os dois em sequência, propaga
  * o env de lifecycle e o primeiro exit não-zero. Cross-platform (sem shell env inline).
  */
 import { spawnSync } from "node:child_process"

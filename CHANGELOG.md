@@ -1,5 +1,31 @@
 # Changelog - gstack-vibehard
 
+## [5.78.0] - 2026-07-28 — PRD51 S51.6.1: CI publica o placar real do commit (ação #2)
+
+Início do Sprint 51.6 ("Dream Audit e documentação pública derivada de
+evidência"). Ações #1/#2 do PRD já estavam parcialmente satisfeitas pelo
+S51.0A (README sem placar fixo, `scoreboard.js` deriva do auditor real) —
+achado real confirmado: CI já roda `dream audit --json`
+(`test-e2e-lifecycle.mjs`), mas só pra comparar parity de contagens do
+tarball; o placar nunca era publicado em lugar nenhum.
+
+- `scripts/publish-dream-scoreboard.mjs` (novo): `buildScoreboardSummary()`
+  pura (auditFn injetável) gera o markdown do placar com proveniência do
+  commit real (`renderScoreboardLine`). CLI guardado (`isMain`, mesmo padrão
+  de `sync-qg-version.mjs`) escreve em `GITHUB_STEP_SUMMARY` quando
+  disponível (Actions), senão imprime no stdout.
+- `.github/workflows/test.yml`: nova job `dream-scoreboard` (roda
+  `npm run dream:scoreboard`) — publica o placar do commit na aba Actions
+  de cada run.
+- Cleanup lateral: comentários com número histórico "18 REAL/0 PLACEBO"
+  em `scripts/test-package.mjs` e `scripts/test-e2e-lifecycle.mjs`
+  (a lógica já era dinâmica desde uma correção anterior — só o texto
+  descritivo tinha ficado com o número velho) reescritos pra descrever o
+  contrato real (parity tarball==repo, nunca número fixo).
+- `tests/dream_scoreboard_publish.test.js` (2 testes, novo).
+- QG strict `blocking_severity_count:0`, suíte JS 2081/2082 (1 skip
+  pré-existente).
+
 ## [5.77.0] - 2026-07-27 — PRD51 S51.5.5: Headroom em 6 dimensões + gate `full` alinhado à regra (fecha Sprint 51.5)
 
 Quinta e última parte do Sprint 51.5 (ação #10 + regra Headroom). As 6
