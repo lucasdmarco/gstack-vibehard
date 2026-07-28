@@ -153,6 +153,14 @@ export const CLAIM_CONTRACTS = Object.freeze({
     negativeControl: "tests/governance_sbom_real.test.js — CycloneDX bem-formado com manifesto real; FALHA de verdade (exit != 0, sem JSON válido) sem package.json com version pinada",
     freshness: "por-release",
   },
+  // PRD51 S51.6.7 — o próprio codebase se auto-documentava NOT_PROVED aqui
+  // ("sem CLI E2E de revoke ainda"). `dream revoke`/`dream stale` (novos
+  // comandos) fecham o gap: transição persiste no closeout.json real.
+  "dream-freshness": {
+    evidenceAdapter: "src/dream/freshness.js", e2eCommand: "node src/index.js dream revoke <candidateId> --reason <texto> | dream stale <candidateId>",
+    negativeControl: "tests/dream_freshness_cli.test.js — transição persiste no closeout.json (relido do disco); candidate fora de 'promoted' é recusado (sem salto de estado); candidate inexistente nunca finge sucesso; dream metrics/candidates refletem a mudança ponta a ponta",
+    freshness: "por-revogação",
+  },
 })
 
 export function contractFor(claimId) {

@@ -80,3 +80,12 @@ test("S51.6.6: governance graduou REAL (npm sbom real provado passando E falhand
   const gov = claims.find((c) => c.id === "governance")
   assert.equal(gov.status, "REAL", "governance agora tem contrato + controle negativo real")
 })
+
+// PRD51 S51.6.7 — dream-freshness ganhou CLI E2E real (dream revoke/stale)
+// e graduou REAL.
+test("S51.6.7: dream-freshness graduou REAL (dream revoke/stale via CLI real)", async () => {
+  const { audit } = await imp("src/dream/auditor.js")
+  const claims = audit({ behavioral: true }).claims
+  const df = claims.find((c) => c.id === "dream-freshness")
+  assert.equal(df.status, "REAL", "dream-freshness agora tem contrato + controle negativo real")
+})
