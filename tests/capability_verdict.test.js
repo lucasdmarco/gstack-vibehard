@@ -34,7 +34,9 @@ test("buildCapabilityVerdict: os dois OK -> ok:true", async () => {
   assert.equal(v.agents.ok, true)
 })
 
-test("buildCapabilityVerdict: headroom 'callable_not_routed' NUNCA bloqueia (routing é sempre opt-in)", async () => {
+// PRD51 S51.6.3: este veredito é profile-UNAWARE (nunca recebe `profile`) — a
+// exceção hard-em-full de S51.5.5 vive em gate-registry.js/proof.js, não aqui.
+test("buildCapabilityVerdict: headroom 'callable_not_routed' NUNCA bloqueia AQUI (veredito profile-unaware)", async () => {
   const { buildCapabilityVerdict } = await imp()
   const v = buildCapabilityVerdict({ readiness: READY_OK, agentsDoctor: AGENTS_OK })
   assert.deepEqual(v.tools.blockers, [])

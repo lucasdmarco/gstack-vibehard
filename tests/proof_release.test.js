@@ -69,6 +69,22 @@ test("proof: dream audit mede O PRODUTO (package root), não o cwd", async () =>
   assert.equal(p.checks.dreamAudit.scope.target, "gstack_package")
 })
 
+// PRD51 S51.6.2 (ação #5) — achado real: NENHUM teste (unit ou e2e) jamais chamava
+// buildProof/proofCommand SEM injetar deps.dream mockado. A fiação real audit()→
+// buildProof nunca foi verificada por teste automatizado — só manualmente via
+// `gstack_vibehard proof`. Este teste omite deps.dream de propósito.
+test("proof: SEM deps.dream injetado, consome o auditor REAL (audit() de verdade, não mock)", async () => {
+  const { buildProof } = await imp("src/commands/proof.js")
+  const { audit } = await imp("src/dream/auditor.js")
+  const deps = greenDeps()
+  delete deps.dream
+  const p = buildProof({ cwd: repoRoot, deps })
+  const real = audit({ behavioral: true })
+  assert.deepEqual(p.checks.dreamAudit.summary, real.summary, "proof reflete o MESMO summary que uma chamada direta e real ao auditor")
+  assert.equal(p.checks.dreamAudit.scope.target, "gstack_package", "audita o package root do gstack, não o cwd injetado")
+  assert.equal(p.checks.dreamAudit.ok, real.summary.RISK === 0 && real.summary.PLACEBO === 0)
+})
+
 test("proof: timeout_degraded vira WARNING acionável, nunca 'missing' silencioso", async () => {
   const { buildProof } = await imp("src/commands/proof.js")
   const deps = greenDeps()
