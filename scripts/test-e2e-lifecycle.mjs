@@ -3,7 +3,8 @@
 // cross-OS, em caixa-preta: empacota o tarball real → instala num projeto temp →
 // roda o BIN INSTALADO num HOME DESCARTÁVEL pelo caminho doctor → dream audit →
 // create → build(agents) → install --audit-only → uninstall, exigindo:
-//   (1) o truth contract é o MESMO no tarball que no repo (18 REAL / 0 PLACEBO) — o
+//   (1) o truth contract é o MESMO no tarball que no repo (contagens REAL/PARTIAL/
+//       PLACEBO do commit atual — nunca um número fixo, PRD51 S51.0A/S51.6.1) — o
 //       guard de integração do fix v3.21.1, agora cross-OS;
 //   (2) ISOLAMENTO DE HOME: read-only é read-only; create é project-scoped (não
 //       toca o HOME); install --audit-only --save-report grava EXATAMENTE 1 arquivo.
