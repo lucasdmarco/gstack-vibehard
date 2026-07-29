@@ -8,6 +8,7 @@ import { getAdapterInfo, isInstructional } from "../agents/adapter-matrix.js"
 import { capabilityRow, validateScorecard } from "../harness/capabilities.js"
 import { stripBom } from "../util/json.js"
 import { runP0Conformance } from "../skills/behavioral-conformance.js"
+import { codexTrustStatus, codexTrustVerdict } from "../harness/codex-trust.js"
 import { section, success, warn, error, info } from "../cli/index.js"
 
 const PKG_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..")
@@ -78,6 +79,31 @@ function conformanceCmd(json) {
   else { error(`Não-conforme: ${agg.blocked.map((b) => `${b.skill}:${b.verdict}`).join(", ")}`); process.exitCode = 1 }
 }
 
+// PRD51 S51.7.7 — cenário 6 do PRD49 ("hook do Codex não-confiável reporta
+// aguardando aprovação") estava not_executed por assumirmos que não existia
+// conceito real de ambiente confiável. Existe, e é do próprio Codex CLI:
+// `[hooks.state]` no ~/.codex/config.toml registra o `trusted_hash` aprovado
+// pelo usuário. READ-ONLY: este comando NUNCA escreve config global.
+const TRUST_ICON = Object.freeze({ trusted_environment: success, awaiting_user_trust: warn, trust_stale: warn, codex_not_configured: info, gstack_hooks_absent: info })
+const readState = (found) => (found ? "lido" : "ausente/ilegível")
+function renderCodexTrust(status, verdict) {
+  section("agents codex-trust (read-only — nunca escreve config global)")
+  info(`  config: ${status.configPath} (${readState(status.configFound)})`)
+  info(`  hooks:  ${status.hooksPath} (${readState(status.hooksFound)})`)
+  for (const e of status.entries.filter((x) => x.gstackOwned)) {
+    (e.trust === "recorded" ? success : warn)(`  ${e.trust === "recorded" ? "✓" : "…"} ${e.event}[${e.groupIndex}.${e.hookIndex}]: ${e.trust}`)
+  }
+  ;(TRUST_ICON[verdict.verdict] || info)(`  veredito: ${verdict.verdict} — ${verdict.reason}`)
+  warn(`  LIMITE: ${status.limits.meaning}`)
+}
+function codexTrustCmd(json, opts = {}) {
+  const status = codexTrustStatus(opts)
+  const payload = { ...status, verdict: codexTrustVerdict(status) }
+  if (json) process.stdout.write(JSON.stringify(payload) + "\n")
+  else renderCodexTrust(status, payload.verdict)
+  return payload
+}
+
 const AGENTS_HANDLERS = {
   build: (args) => agentsBuild(args),
   check: (args, json) => agentsCheck(json),
@@ -86,15 +112,16 @@ const AGENTS_HANDLERS = {
   explain: (args, json) => explainCmd(explainId(args), json),
   doctor: (args, json) => doctorCmd(json),
   conformance: (args, json) => conformanceCmd(json),
+  "codex-trust": (args, json, opts) => codexTrustCmd(json, opts),
 }
 
 export async function agentsCommand(args = [], opts = {}) {
   const sub = args.find((a) => !a.startsWith("-")) || "doctor"
   const json = args.includes("--json")
   const handler = AGENTS_HANDLERS[sub]
-  if (handler) return handler(args, json)
+  if (handler) return handler(args, json, opts)
   warn(`Subcomando desconhecido: ${sub}`)
-  info("  Use: agents <build|check|diff|doctor|list|explain|conformance>")
+  info("  Use: agents <build|check|diff|doctor|list|explain|conformance|codex-trust>")
 }
 
 function listCmd(json, args = []) {

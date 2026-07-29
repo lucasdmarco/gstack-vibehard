@@ -221,7 +221,7 @@ const COMMANDS = [
   { name: "logs", group: "common", desc: "Logs de um serviço do runtime", usage: "gstack_vibehard logs [serviço] [--follow]" },
   { name: "open", group: "common", desc: "Abre o preview do serviço web", usage: "gstack_vibehard open" },
   { name: "secrets", group: "common", desc: "Broker de segredos (keychain do SO; sem .env)", usage: "gstack_vibehard secrets <doctor|list|set|delete|import|run>" },
-  { name: "agents", group: "advanced", desc: "Agent Factory: compila core/knowledge/agents → adapters por harness", usage: "gstack_vibehard agents <build|check|diff|doctor|list|explain>" },
+  { name: "agents", group: "advanced", desc: "Agent Factory: compila core/knowledge/agents → adapters por harness", usage: "gstack_vibehard agents <build|check|diff|doctor|list|explain|conformance|codex-trust>" },
   { name: "qa", group: "advanced", desc: "QA Multi-Lens: lentes determinísticas sobre o diff (eval/any/secret/...)", usage: "gstack_vibehard qa [--strict] [--json]" },
   { name: "audit", group: "advanced", desc: "Provenance/VFA: recibos com hash-chain (verifica ações críticas)", usage: "gstack_vibehard audit <status|inspect|verify|export|doctor> [runId]" },
   { name: "challenge", group: "advanced", desc: "Challenge-Response: exige justificativa antes de ação de alto risco", usage: "gstack_vibehard challenge <classify|evaluate> --intent <i> --target <t> [--scope global]" },

@@ -1,5 +1,45 @@
 # Changelog - gstack-vibehard
 
+## [5.91.0] - 2026-07-29 — PRD51 S51.7.7: estado de confiança REAL dos hooks do Codex (cenário 6 do PRD49 sai de not_executed)
+
+Sétima parte do Sprint 51.7. O cenário 6 do PRD49 ("hook do Codex
+não-confiável reporta aguardando aprovação") estava `not_executed` porque o
+repo assumia que **não existia** nenhum conceito real de "ambiente confiável".
+Investigando o Codex CLI instalado nesta máquina, ele **existe — e é do
+próprio Codex, não nosso**: `~/.codex/config.toml` carrega uma tabela
+`[hooks.state]` cujas chaves são `<arquivo>:<evento>:<grupo>:<hook>` e cujo
+valor é `trusted_hash = "sha256:…"`, o registro de que o usuário aprovou
+aquele hook. Hook sem entrada nunca foi aprovado.
+
+- `src/harness/codex-trust.js` (novo, **read-only**): `codexTrustStatus`
+  cruza `[hooks.state]` com os hooks reais do `~/.codex/hooks.json` e
+  classifica cada slot como `recorded` ou `awaiting_user_trust`;
+  `codexTrustVerdict` resolve em `trusted_environment` / `awaiting_user_trust`
+  / `trust_stale` (aprovação órfã apontando pra slot que sumiu) /
+  `codex_not_configured` / `gstack_hooks_absent`.
+- Achado real ao ler os dois arquivos da máquina: o Codex grava o evento em
+  **snake_case** na chave de estado (`pre_tool_use`) e em **PascalCase** no
+  `hooks.json` (`PreToolUse`). Sem normalizar, tudo apareceria como pendente.
+  A chave também começa com um caminho Windows contendo `:` no drive — o split
+  é pela DIREITA, nunca pela esquerda.
+- **Limite honesto verificado, não suposto**: a entrada exata do sha256 do
+  Codex é interna e não documentada. Testei 5 candidatos plausíveis (string do
+  comando, JSON da entrada em 3 formatações, JSON do grupo) contra os hashes
+  reais desta máquina e **nenhum bateu**. O módulo NUNCA recomputa o hash —
+  `recorded` significa "o usuário aprovou ALGUMA versão", jamais "esta versão
+  está aprovada". O limite viaja no payload (`limits`), não só em comentário,
+  e um controle negativo trava que o módulo não passe a hashear.
+- `agents codex-trust [--json]`: superfície real, read-only, nunca escreve
+  config global.
+- `tests/codex_trust.test.js` (15 testes), incluindo o cenário 6 exato, os
+  vereditos degradados e 3 controles negativos (TOML malformado, read-only,
+  proibição de hashing). Um teste executa contra o `~/.codex` **real** desta
+  máquina — o "ambiente confiável" que o sprint pede — e degrada honestamente
+  pra `codex_not_configured` onde o Codex não existe (CI).
+- `rc-checklist-prd49.js` cenário 6: `not_executed` → **`partial`**. Provamos
+  "nunca aprovado"; "aprovado antes, hook mudou depois" continua indetectável
+  e está declarado como tal.
+
 ## [5.90.0] - 2026-07-29 — PRD51 S51.7.6: uninstall REAL das projeções de hook de design (fecha o cenário 14 do PRD49)
 
 Sexta parte do Sprint 51.7. Achado real: `applyDesignHookProjections`

@@ -58,7 +58,14 @@ export const PRD49_SCENARIO_COVERAGE = Object.freeze([
   { id: 3, title: "Proveniência de vendor adulterada, módulo de regra ausente ou runtime incompatível falha honestamente", status: "partial", proof: "tests/impeccable_vendor_provenance.test.js", reason: "hash de cada arquivo vendorizado é verificado contra upstream-map.md (adulteração mudaria o hash); não há um teste dedicado de injeção de tamper" },
   { id: 4, title: "Fixtures de design P0/P1 conhecidas falham e fixtures corrigidas passam", status: "real", proof: "tests/design_detector.test.js", reason: null },
   { id: 5, title: "Payload de hook fica bounded enquanto o scan de fechamento de fase cobre a superfície aplicável completa", status: "partial", proof: "tests/design_feedback_budget.test.js", reason: "saída sempre limitada (bounded) é real e testada; 'scan de fechamento de fase cobrindo superfície completa' não está wireado a nenhum comando real" },
-  { id: 6, title: "Hook do Codex não-confiável reporta aguardando aprovação", status: "not_executed", proof: null, reason: "Codex nesta sessão só recebeu bloco instrucional (AGENTS.md, S49.3) — nenhum estado real de 'awaiting_user_trust' foi construído/testado" },
+  // PRD51 S51.7.7 — o conceito de "ambiente confiável" EXISTE, mas é do próprio
+  // Codex CLI e não nosso: `[hooks.state]` no ~/.codex/config.toml registra o
+  // `trusted_hash` aprovado pelo usuário. `codexTrustStatus` lê isso (read-only)
+  // e hook sem aprovação registrada reporta `awaiting_user_trust`. `partial` e
+  // não `real` por um limite verificado, não suposto: a entrada do sha256 é
+  // interna do Codex (5 candidatos testados contra hashes reais, nenhum bateu),
+  // então provamos "nunca aprovado", não "aprovado para ESTA versão".
+  { id: 6, title: "Hook do Codex não-confiável reporta aguardando aprovação", status: "partial", proof: "tests/codex_trust.test.js", reason: "ausência de aprovação é detectada e reportada de verdade; hash divergente (aprovado antes, hook mudou depois) NÃO é detectável — a entrada do sha256 do Codex é interna e não documentada" },
   { id: 7, title: "Config sagrada do OpenCode permanece byte-a-byte inalterada", status: "real", proof: "tests/opencode_config_conflict.test.js", reason: null },
   { id: 8, title: "Grafo do Graphify stale impede claim de arquitetura e o refresh corrige", status: "real", proof: "tests/proof_release.test.js", reason: null },
   { id: 9, title: "Escape de vault do Obsidian e ingestão de secret são negados", status: "real", proof: "tests/obsidian_skill_routes.test.js", reason: null },
