@@ -1,5 +1,37 @@
 # Changelog - gstack-vibehard
 
+## [5.93.0] - 2026-07-29 — PRD51 S51.8.1: `fullyValidated` deixa de ser impossível (pendência humana ≠ limite estrutural)
+
+Primeira parte do Sprint 51.8 (ações 5/6/7). **Defeito real corrigido**:
+`prd50Readiness()` calculava `fullyValidated = PENDING_CLAIMS.length === 0`, e
+essa lista misturava duas coisas incomparáveis — claims que esperam **rótulo
+humano** (alcançáveis: alguém rotula e a pendência fecha) com um claim
+`not_measurable_by_design` (o overhead do EV0 **dentro** do harness, que o
+GStack estruturalmente nunca observa). Somados, o segundo tornava
+`fullyValidated` **impossível**: nenhuma quantidade de trabalho humano zeraria
+a conta. O PRD chama isso de "pendência impossível" e manda tratar como
+limitação explícita.
+
+- `src/epistemic/validation-taxonomy.js` (novo): `partitionClaims` separa
+  `pendingHumanValidation` de `unobservableByDesign`;
+  `measurableValidationComplete` decide **só sobre o mensurável**.
+- **Fail-closed preservado em duas frentes** (herdado do S51.0C): lista vazia
+  é ausência de evidência (nunca "validado por omissão"), e qualquer claim com
+  `blockedBy` desconhecido derruba a validação — não sabemos se é dívida — e
+  aparece em `unclassified` em vez de ser engolido.
+- `rc-checklist-prd50.js`: `fullyValidated` passa a vir da taxonomia. Continua
+  `false` hoje, mas **pela razão certa** (2 rotulagens humanas reais em aberto)
+  e não pela impossível. Um teste prova que, fechada a fatia humana, o valor
+  finalmente **pode** virar `true`.
+- `benchmark.js`: `fullyValidated` era `false` **hardcoded**. Virou derivado
+  (`benchmarkFullyValidated`), igualmente fail-closed — exige gates objetivos
+  verdes E registro explícito `labelingPerformed:true` com zero casos abertos.
+  `count:0` por corpus vazio nunca vale como validação.
+- `tests/validation_taxonomy.test.js` (12 testes) com 5 controles negativos.
+  2 testes do `rc_checklist_prd50` que codificavam a semântica antiga foram
+  reescritos para a nova invariante (a mudança é um endurecimento: o caso
+  `[]` que antes passava por "validado" agora é explicitamente fail-closed).
+
 ## [5.92.0] - 2026-07-29 — PRD51 S51.7.8: classificação clara de enforcement por harness (fecha o Sprint 51.7)
 
 Oitava e última parte do Sprint 51.7. Achado: duas afirmações do próprio repo
