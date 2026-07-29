@@ -6,6 +6,8 @@ import { executePlan, sanitizeCommand } from "./executor.js"
 import { runVerify, projectHasRunScript } from "./verify-runner.js"
 import { runChangedFilesVerify } from "./changed-files.js"
 import { diffHygiene } from "./diff-hygiene.js"
+import { collectMinimalityEvidence } from "../skills/minimality-evidence.js"
+import { evaluateMinimality, buildMinimalityReviewItem } from "../skills/minimality.js"
 import { diagnoseObservation } from "../skills/diagnose-loop.js"
 import { loadRuntimeManifest, evaluatePreviewReadiness } from "../runtime/manifest.js"
 import { readAllState } from "../runtime/supervisor.js"
@@ -238,10 +240,29 @@ function reviewVerdict(hy) {
   return { status: "ready", detail: "diff-hygiene limpo nos arquivos mudados" }
 }
 
+/**
+ * PRD51 S51.7.4 — minimality com sinal REAL. `evaluateMinimality` (PRD49
+ * S49.5) era `declared-only` no gate-matrix: nenhum caminho populava
+ * `decision`. Agora a evidência vem do diff de verdade
+ * (`collectMinimalityEvidence`). Fica ADVISORY dentro do review — nunca vira
+ * gate novo nesta leva, e `minimalityNeverOutranksCorrectness` já garante
+ * que minimality jamais reescreve o veredito de correção (test/verify).
+ * Best-effort: falha do coletor nunca derruba o review.
+ */
+function minimalityFor(ctx) {
+  try {
+    const evidence = collectMinimalityEvidence({ cwd: ctx.projectDir, exec: ctx.gateExec, declared: ctx.minimalityDeclared || {} })
+    const verdict = evaluateMinimality(evidence)
+    return { evidence, ...verdict, item: buildMinimalityReviewItem(verdict) }
+  } catch { return null }
+}
 function reviewStage(ctx, stages) {
   if (!existsSync(ctx.projectDir)) { stages.review = { status: "advisory", detail: "revisão é ADVISORY — projeto não criado, nada a revisar" }; return }
-  try { stages.review = reviewVerdict(diffHygiene({ cwd: ctx.projectDir, exec: ctx.gateExec })) }
-  catch (e) { stages.review = { status: "advisory", detail: `revisão indisponível: ${String(e.message || "").slice(0, 80)}` } }
+  try {
+    const base = reviewVerdict(diffHygiene({ cwd: ctx.projectDir, exec: ctx.gateExec }))
+    const minimality = minimalityFor(ctx)
+    stages.review = minimality ? { ...base, minimality } : base
+  } catch (e) { stages.review = { status: "advisory", detail: `revisão indisponível: ${String(e.message || "").slice(0, 80)}` } }
 }
 
 function verifyStage(ctx, stages) {

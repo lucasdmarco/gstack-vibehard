@@ -88,22 +88,26 @@ export const SKILL_GATES = Object.freeze([
     note: "advisory nesta sprint — só a regra de color-contrast foi vendorizada (S49.2A); vira P1/blocking quando mais regras do motor Impeccable forem portadas.",
   },
   {
-    // Declared-only de propósito (sem implementedBy/provedBy): evaluateMinimality()
-    // é real e testado (src/skills/minimality.js), mas NENHUM caminho hoje popula
-    // `decision` a partir de uma implementação real (planner/reviewer não reportam
-    // decision-evidence ainda) — citar implementedBy aqui faria gate-truth.js
-    // computar executed:true/enforced:true FALSAMENTE (mesmo padrão honesto de
-    // db-migration-gate/rls-gate: declarado, nunca fingindo enforcement que não existe).
-    id: "minimality-gate", phase: "planning-spec", severity: "P2", mode: "blocking",
+    // PRD51 S51.7.4: deixou de ser declared-only. `collectMinimalityEvidence`
+    // popula `decision` a partir do diff REAL (dependência nova em package.json,
+    // arquivo-fonte novo, concerns protegidos pelo caminho) e `reviewStage`
+    // (run-loop.js) consome de verdade. Campos não-deriváveis do diff
+    // (existingReuse/platformOrStdlib/smallestCompleteApproach) ficam
+    // indefinidos de propósito — nunca chutados, o que torna o coletor
+    // conservador por construção (jamais gera bloqueio falso).
+    id: "minimality-gate", phase: "planning-spec", severity: "P2", mode: "advisory",
     skills: ["project-lifecycle", "guided-delivery"],
     appliesWhen: { introducesDependencyOrAbstraction: true },
     preconditions: ["minimality.verdict in pass|exempt"],
     requiredQuestions: [],
     requiredEvidence: [],
     verifier: "src/skills/minimality.js evaluateMinimality (decision evidence puro, nunca diff/LOC)",
-    fallback: "block_before_write",
-    note: "avaliador real e testado (tests/minimality_gate.test.js), mas SEM wiring real ainda — " +
-      "nenhum planner/reviewer popula decision-evidence hoje. protectedConcerns nunca são bloqueados.",
+    implementedBy: "src/skills/minimality-evidence.js collectMinimalityEvidence + run-loop.js reviewStage (PRD51 S51.7.4)",
+    provedBy: { test: "tests/minimality_evidence.test.js", name: "ponta a ponta: dependência nova SEM justificativa declarada -> blocked (sinal real, não fixture)" },
+    fallback: "warn_and_log",
+    note: "ADVISORY dentro do review: reporta evidência real, nunca bloqueia — " +
+      "`minimalityNeverOutranksCorrectness` garante que minimality jamais reescreve o veredito de test/verify. " +
+      "protectedConcerns nunca são bloqueados.",
   },
   {
     // Declared-only (mesmo padrão de minimality-gate): canWriteToVault existe e é
