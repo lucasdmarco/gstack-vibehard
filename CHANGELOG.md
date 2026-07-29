@@ -1,5 +1,40 @@
 # Changelog - gstack-vibehard
 
+## [5.90.0] - 2026-07-29 — PRD51 S51.7.6: uninstall REAL das projeções de hook de design (fecha o cenário 14 do PRD49)
+
+Sexta parte do Sprint 51.7. Achado real: `applyDesignHookProjections`
+(PRD49 S49.3) chamava `versionedBackup()` antes de escrever, mas **nada no
+repo inteiro lia ou restaurava desse backup**, e `visual hooks` só expunha
+`install`/`status` — não existia verbo de remoção. Instalação sem volta.
+O cenário 14 do `rc-checklist-prd49.js` estava honestamente marcado
+`not_executed` exatamente por isso.
+
+- `src/harness/design-hooks.js`: `removeMarkerBlock` é o **complemento exato**
+  de `mergeMarkerBlock` (round-trip devolve o conteúdo humano byte a byte),
+  mais `removeProjectClaudeHook` / `removeProjectAgentsMdBlock` /
+  `removeProjectCopilotInstructions` / `removeProjectCursorRule` e o agregado
+  `removeDesignHookProjections`.
+- **Disciplina "config sacred" (a mesma de `opencode-jsonc.js`)**: arquivo
+  COMPARTILHADO com o usuário (`.claude/settings.json`, `AGENTS.md`,
+  `.github/copilot-instructions.md`) nunca é apagado — sai só a NOSSA parte.
+  Hook de terceiro no MESMO evento `PostToolUse` sobrevive intacto. Arquivo
+  gstack-owned inteiro (`.cursor/rules/gstack-design-detector.mdc`, gerado e
+  marcado "não edite manualmente") é apagado. Arquivo que só existia por
+  nossa causa some; container de hook vazio é podado — nenhum lixo nosso fica.
+- `visual hooks uninstall [--json] [--yes]`: MESMO gate de consentimento do
+  `install` (S51.4.2) — remover também mexe em config do projeto, então nunca
+  age sem `--yes`/TTY/`confirm` injetado.
+- `settings.json` malformado **aborta sem mutação** também na remoção: não
+  apaga nem reescreve config que não conseguimos parsear.
+- `tests/design_hook_uninstall.test.js` (14 testes): round-trip real
+  install→uninstall com conteúdo humano nos 3 arquivos compartilhados,
+  idempotência, no-op honesto em projeto que nunca instalou, e 3 controles
+  negativos (malformado, hook de terceiro, nunca escreve fora do
+  `projectRoot`).
+- `rc-checklist-prd49.js` cenário 14: `not_executed` → **`real`**. O lado
+  global/manifest do cenário já era coberto por `tests/uninstall_restore.test.js`
+  desde o PRD45; faltava a metade project-local.
+
 ## [5.89.0] - 2026-07-29 — PRD51 S51.7.5: design context deixa de ser ilha — persiste e alimenta o gate (fecha PRD49 P1.1 wiring)
 
 Quinta parte do Sprint 51.7. Achado real: `design-context.js` (PRD49 S49.1)

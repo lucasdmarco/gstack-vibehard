@@ -66,6 +66,11 @@ export const PRD49_SCENARIO_COVERAGE = Object.freeze([
   { id: 11, title: "Provider pago/de rede negado produz um fallback estático usável", status: "real", proof: "tests/e2e/scroll_world_fixture.e2e.test.js", reason: null },
   { id: 12, title: "Rota transcript-first de vídeo usa zero frames quando suficiente", status: "real", proof: "tests/media_intake_router.test.js", reason: null },
   { id: 13, title: "NotebookLM indisponível degrada só o passo opcional de pesquisa", status: "real", proof: "tests/notebooklm_adapter.test.js", reason: null },
-  { id: 14, title: "Uninstall restaura toda config e remove só projeções de propriedade do manifest", status: "not_executed", proof: null, reason: "as projeções project-local novas (design-hooks.js, S49.3) não têm uma função de remoção/uninstall dedicada construída ainda" },
+  // PRD51 S51.7.6 — deixou de ser not_executed: `removeDesignHookProjections`
+  // + `visual hooks uninstall` são reais, e o round-trip prova as duas metades
+  // do cenário (restaura config compartilhada byte a byte; só remove o que é
+  // nosso — hook de terceiro no mesmo evento sobrevive). O lado global/manifest
+  // já era coberto por tests/uninstall_restore.test.js desde o PRD45.
+  { id: 14, title: "Uninstall restaura toda config e remove só projeções de propriedade do manifest", status: "real", proof: "tests/design_hook_uninstall.test.js", reason: null },
   { id: 15, title: "Inventário de pacote/SBOM/NOTICE contém a fonte Impeccable vendorizada e o commit auditado exato", status: "real", proof: "tests/impeccable_vendor_provenance.test.js", reason: null },
 ])

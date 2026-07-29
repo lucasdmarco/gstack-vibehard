@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs"
+import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from "fs"
 import { dirname, join } from "path"
 import { versionedBackup } from "../installer/safe-write.js"
 
@@ -76,6 +76,17 @@ export function mergeMarkerBlock(existing, block) {
   return (existing.trim() ? existing.trimEnd() + "\n\n" : "") + block + "\n"
 }
 
+/**
+ * PRD51 S51.7.6 — complemento exato de `mergeMarkerBlock`: remove SÓ o bloco
+ * entre os marcadores, preservando byte a byte todo o conteúdo do usuário ao
+ * redor. Sem marcador presente, devolve o original intacto (idempotente).
+ */
+export function removeMarkerBlock(existing) {
+  if (!existing.includes(MARKER_BEGIN)) return existing
+  const re = new RegExp(`\\n*${escapeRe(MARKER_BEGIN)}[\\s\\S]*?${escapeRe(MARKER_END)}\\n*`)
+  return existing.replace(re, "\n").replace(/^\n+/, "")
+}
+
 // ── escrita project-local (backup local puro, SEM manifest global) ───────
 function writeProjectFile(filePath, content) {
   if (existsSync(filePath)) versionedBackup(filePath)
@@ -138,6 +149,95 @@ export function applyDesignHookProjections(projectRoot, opts = {}) {
     projectAgentsMdBlock(projectRoot, readFileImpl),
     projectCopilotInstructions(projectRoot, readFileImpl),
     projectCursorRule(projectRoot),
+  ]
+  return {
+    schemaVersion: DESIGN_HOOK_SCHEMA,
+    generatedAt: new Date().toISOString(),
+    results,
+    ok: results.every((r) => r.ok),
+  }
+}
+
+// ── remoção project-local (PRD51 S51.7.6) ────────────────────────────────
+/**
+ * `applyDesignHookProjections` só INSTALAVA: fazia `versionedBackup` mas nada
+ * no repo inteiro lia ou restaurava desse backup, e `visual hooks` só expunha
+ * `install`/`status` — não havia verbo de remoção. Confirmado como
+ * `not_executed` no cenário 14 do `rc-checklist-prd49.js`.
+ *
+ * Disciplina "config sacred" (a mesma de `opencode-jsonc.js`): arquivo
+ * COMPARTILHADO com o usuário (settings.json, AGENTS.md, copilot-instructions)
+ * nunca é apagado — removemos só a NOSSA parte. Arquivo gstack-owned inteiro
+ * (a regra .mdc do Cursor) é apagado. Idempotente: remover duas vezes é seguro.
+ */
+const notInstalled = (harness, filePath) => ({ ok: true, harness, path: filePath, action: "not_installed" })
+
+function pruneEmptyHookContainers(merged) {
+  if (Array.isArray(merged.hooks?.PostToolUse) && merged.hooks.PostToolUse.length === 0) delete merged.hooks.PostToolUse
+  if (merged.hooks && Object.keys(merged.hooks).length === 0) delete merged.hooks
+  return merged
+}
+
+/** `null` = não havia nada nosso (hook de terceiro no MESMO evento sobrevive intacto). */
+function claudeSettingsWithoutGstack(existing) {
+  const prior = Array.isArray(existing.hooks?.PostToolUse) ? existing.hooks.PostToolUse : []
+  const cleaned = prior.filter((e) => !isGstackClaudeHookEntry(e))
+  if (cleaned.length === prior.length) return null
+  return pruneEmptyHookContainers({ ...existing, hooks: { ...existing.hooks, PostToolUse: cleaned } })
+}
+
+// Sobrou `{}`: o arquivo só existia por nossa causa — some, igual ao bloco marcado.
+function persistClaudeSettings(filePath, merged) {
+  if (Object.keys(merged).length === 0) { rmSync(filePath, { force: true }); return { ok: true, harness: "claude", path: filePath, action: "removed_file" } }
+  writeProjectFile(filePath, JSON.stringify(merged, null, 2) + "\n")
+  return { ok: true, harness: "claude", path: filePath, action: "removed" }
+}
+
+/** Claude: tira SÓ a entrada gstack de PostToolUse; nunca apaga o settings.json do usuário. */
+export function removeProjectClaudeHook(projectRoot, readFileImpl = readFileSync) {
+  const filePath = join(projectRoot, ".claude", "settings.json")
+  if (!existsSync(filePath)) return notInstalled("claude", filePath)
+  let existing
+  try { existing = JSON.parse(readFileImpl(filePath, "utf-8")) }
+  catch { return { ok: false, harness: "claude", path: filePath, reason: "malformed_json_abort_no_mutation" } }
+  const merged = claudeSettingsWithoutGstack(existing)
+  return merged ? persistClaudeSettings(filePath, merged) : notInstalled("claude", filePath)
+}
+
+/** Bloco marcado em arquivo COMPARTILHADO: tira só o bloco; some o arquivo só se ficar vazio (era só nosso). */
+function removeMarkedFile(projectRoot, rel, harness, readFileImpl) {
+  const filePath = join(projectRoot, ...rel)
+  if (!existsSync(filePath)) return notInstalled(harness, filePath)
+  const existing = readFileImpl(filePath, "utf-8")
+  if (!existing.includes(MARKER_BEGIN)) return notInstalled(harness, filePath)
+  const next = removeMarkerBlock(existing)
+  if (next.trim() === "") { rmSync(filePath, { force: true }); return { ok: true, harness, path: filePath, action: "removed_file" } }
+  writeProjectFile(filePath, next)
+  return { ok: true, harness, path: filePath, action: "removed" }
+}
+
+export const removeProjectAgentsMdBlock = (projectRoot, readFileImpl = readFileSync) =>
+  removeMarkedFile(projectRoot, ["AGENTS.md"], "codex+opencode", readFileImpl)
+
+export const removeProjectCopilotInstructions = (projectRoot, readFileImpl = readFileSync) =>
+  removeMarkedFile(projectRoot, [".github", "copilot-instructions.md"], "copilot", readFileImpl)
+
+/** Cursor: arquivo inteiro é gstack-owned (gerado, "não edite manualmente") — apaga. */
+export function removeProjectCursorRule(projectRoot) {
+  const filePath = join(projectRoot, ".cursor", "rules", "gstack-design-detector.mdc")
+  if (!existsSync(filePath)) return notInstalled("cursor", filePath)
+  rmSync(filePath, { force: true })
+  return { ok: true, harness: "cursor", path: filePath, action: "removed_file" }
+}
+
+/** Reverte as 4 projeções project-local. Idempotente; nunca toca config global. */
+export function removeDesignHookProjections(projectRoot, opts = {}) {
+  const readFileImpl = opts.readFile || readFileSync
+  const results = [
+    removeProjectClaudeHook(projectRoot, readFileImpl),
+    removeProjectAgentsMdBlock(projectRoot, readFileImpl),
+    removeProjectCopilotInstructions(projectRoot, readFileImpl),
+    removeProjectCursorRule(projectRoot),
   ]
   return {
     schemaVersion: DESIGN_HOOK_SCHEMA,

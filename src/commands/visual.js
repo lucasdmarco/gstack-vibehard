@@ -4,7 +4,7 @@ import { browserDriverAvailable, playwrightDriver, runVisualGate, VISUAL_GATE_SC
 import { detectColorContrastFindings } from "../skills/design-detector.js"
 import { renderCompactFeedback, renderFeedbackMarkdown } from "../skills/design-feedback.js"
 import { buildDesignRuleRegistry, getDesignRule } from "../skills/design-rule-registry.js"
-import { applyDesignHookProjections, designHookStatus } from "../harness/design-hooks.js"
+import { applyDesignHookProjections, removeDesignHookProjections, designHookStatus } from "../harness/design-hooks.js"
 import { resolveDesignSystem } from "../skills/design-system.js"
 import { designContextStatus, syncDesignContext } from "../skills/design-context-sync.js"
 import { section, success, warn, error, info, confirm } from "../cli/index.js"
@@ -153,9 +153,33 @@ async function hooksInstallCmd(cwd, json, args, opts) {
   return emitInstallResult(applyDesignHookProjections(cwd), json)
 }
 
+// PRD51 S51.7.6 — `install` existia sem contrapartida: nada no repo lia o
+// backup versionado e não havia verbo de remoção (cenário 14 do PRD49 estava
+// `not_executed`). Mesmo gate de consentimento do install — remover também
+// mexe em config do projeto.
+async function hooksUninstallGate(cwd, json, autoYes, doConfirm) {
+  if (autoYes) return true
+  if (!json) {
+    section("visual hooks uninstall (project-local — nunca toca config global)")
+    info("  Vai remover SÓ a parte gstack de: .claude/settings.json, AGENTS.md, .github/copilot-instructions.md")
+    info("  e apagar o arquivo gstack-owned .cursor/rules/gstack-design-detector.mdc")
+  }
+  const ok = await doConfirm(`Remover as projeções de hook de design deste projeto (${cwd})?`, false)
+  if (!ok && !json) info("Remoção cancelada.")
+  return ok
+}
+async function hooksUninstallCmd(cwd, json, args, opts) {
+  const autoYes = wantsAutoYes(args, opts)
+  if (hooksInstallRefused(json, autoYes, opts)) return { error: "needs_confirmation" }
+  const granted = await hooksUninstallGate(cwd, json, autoYes, opts.confirm || confirm)
+  if (!granted) return emitCancelled(json)
+  return emitInstallResult(removeDesignHookProjections(cwd), json)
+}
+
 const HOOKS_ACTIONS = Object.freeze({
   status: (cwd, json) => hooksStatusCmd(cwd, json),
   install: (cwd, json, args, opts) => hooksInstallCmd(cwd, json, args, opts),
+  uninstall: (cwd, json, args, opts) => hooksUninstallCmd(cwd, json, args, opts),
 })
 
 // PRD51 S51.7.5 — design context deixou de ser ilha. `buildProjections` só era
@@ -220,7 +244,7 @@ function contextCmd(cwd, args, json, opts) {
 function hooksCmd(cwd, args, json, opts) {
   const action = HOOKS_ACTIONS[positionalAfter(args, "hooks")]
   if (action) return action(cwd, json, args, opts)
-  error("visual hooks: use `install` ou `status`")
+  error("visual hooks: use `install`, `uninstall` ou `status`")
   process.exitCode = 1
   return null
 }
@@ -231,7 +255,7 @@ function printUsage() {
   info("  visual doctor [--json]                                 status do motor/regras nativas de design")
   info("  visual detect <elements.json> [--json]                 detecta findings (só color-contrast por ora)")
   info("  visual explain <rule-id> [--json]                      explica uma regra do registry")
-  info("  visual hooks install|status [--json] [--yes]           projeções de hook project-local por harness")
+  info("  visual hooks install|uninstall|status [--json] [--yes] projeções de hook project-local por harness")
   info("  visual context status|sync [--json] [--yes]            design context (PRODUCT.md/DESIGN.md/.impeccable) e drift")
   warn("  visual hooks install pede confirmação (--yes ou TTY) antes de escrever — nunca sem consentimento.")
   warn("  sem playwright instalado, reporta needs_browser (blocked) — nunca finge verde.")
