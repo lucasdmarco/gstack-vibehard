@@ -6,6 +6,7 @@ import { presentDecision, categorizeTarget } from "../policy/decision-presenter.
 import { compilePolicy } from "../policy/compiler.js"
 import { loadEffectivePolicy, localsGitignored, layerPath, REQUIRED_GITIGNORE } from "../policy/layers.js"
 import { section, success, warn, error, info } from "../cli/index.js"
+import { safeNextAction, renderSafeNextAction } from "../skills/safe-next-action.js"
 
 /**
  * `policy` — a Policy DSL canônica do GStack (PRD15 §7.1/§7.2/§7.6).
@@ -76,6 +77,8 @@ function renderEvalHuman(targetStr, r, presenter) {
   info(`  ação: ${presenter.action} · categoria: ${presenter.category} · risco: ${presenter.risk}`)
   info(`  escolhas seguras: ${presenter.choices.join(" | ")}`)
   if (!presenter.canPersist) warn("  categoria sensível — NUNCA vira 'permitir sempre' (mude a policy pelo comando `policy`)")
+  // PRD51 S51.7.3: falha importante SEMPRE oferece a próxima ação segura.
+  if (r.decision === "deny") info(`  ${renderSafeNextAction(safeNextAction("policy_denied", r.rule))}`)
 }
 function evalCmd(ctx) {
   const targetStr = ctx.args.filter((a) => !a.startsWith("-"))[1]

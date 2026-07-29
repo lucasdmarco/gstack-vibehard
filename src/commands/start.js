@@ -18,6 +18,7 @@ import { resolveLoopDecision, LOOP_MODES } from "../skills/loop-router.js"
 import { contractsForRoute } from "../skills/execution-contract.js"
 import { detectTargetProfiles, decideFirstRun, applyFirstRunChoice, buildLocalProfileUpdate } from "../onboarding/first-run.js"
 import { writeLocalProfileUpdate, loadEffectiveConfig } from "../policy/layers.js"
+import { safeNextAction, renderSafeNextAction } from "../skills/safe-next-action.js"
 import { discoverProject } from "../onboarding/project-discovery.js"
 import { proposeBrownfieldChoices, decideBrownfieldOrNew } from "../onboarding/brownfield-plan.js"
 import { openStateStore } from "../state/store.js"
@@ -174,7 +175,12 @@ async function collectPlan(flags, opts, objective, json, cwd) {
   const ui = { prompt: opts.prompt || prompt, select: opts.select || select }
   const res = await runWizard(ui, wizardInputs(flags, opts, objective))
   if (res.cancelled) { info("Cancelado — nenhum objetivo informado."); return null }
-  if (!res.validation.ok) { error(`Plano inválido: ${res.validation.errors.join("; ")}`); return null }
+  // PRD51 S51.7.3: falha importante SEMPRE oferece a próxima ação segura.
+  if (!res.validation.ok) {
+    error(`Plano inválido: ${res.validation.errors.join("; ")}`)
+    info(`  ${renderSafeNextAction(safeNextAction("plan_invalid"))}`)
+    return null
+  }
   printConsult(json, res.plan.objective, cwd)
   return res
 }
@@ -252,7 +258,12 @@ function enforceDesignSystemGate(route, dsChoice, cwd, planDir) {
   return { ok: !evidence.blocked, applicable: true, evidence }
 }
 function renderGateBlock(evidence, json) {
-  if (json) { process.stdout.write(JSON.stringify({ ok: false, blocked: "design-system-gate", gate: evidence }) + "\n"); return }
+  // PRD51 S51.7.3: o `requiredAction` real (design-system.js, específico do
+  // motivo do bloqueio) continua sendo a instrução principal — o registro
+  // compartilhado entra no JSON pra que consumidores automatizados tenham a
+  // MESMA forma de "próxima ação segura" de todas as outras falhas.
+  const nextAction = safeNextAction("design_system_missing", evidence.requiredAction)
+  if (json) { process.stdout.write(JSON.stringify({ ok: false, blocked: "design-system-gate", gate: evidence, nextAction }) + "\n"); return }
   warn("Design System Gate: escrita de UI bloqueada — nenhum design system declarado.")
   info(`  ${evidence.requiredAction}`)
 }
@@ -480,6 +491,8 @@ async function workspaceGuard(cwd, opts) {
 function warnBlockedHarness(json, decision) {
   if (json || decision.status !== "blocked") return
   warn(`Nenhum harness apto detectado e a tarefa exige LLM: ${decision.reason}`)
+  // PRD51 S51.7.3: falha importante SEMPRE oferece a próxima ação segura.
+  info(`  ${renderSafeNextAction(safeNextAction("first_run_blocked", decision.reason))}`)
 }
 // "First-run" só pergunta a primeira vez: se já existe preferência persistida
 // (config.local.json) E ela continua apta entre os perfis detectados agora,
@@ -553,6 +566,9 @@ function renderStageLines(stages) {
 function renderPipelineOutcome(pipeline, plan) {
   if (pipeline.status === "done") { success(`Concluído (${pipeline.attempts} tentativa(s)). Journal: .gstack/runs/${pipeline.runId}/journal.jsonl`); return }
   warn(`Parou com handoff após ${pipeline.attempts} tentativa(s) — hard cap respeitado (sem loop infinito).`)
+  // PRD51 S51.7.3: a próxima ação já existia aqui (ad hoc, desde o PRD47) —
+  // agora adota a forma compartilhada, com os caminhos REAIS deste run.
+  info(`  ${renderSafeNextAction(safeNextAction("pipeline_handoff"))}`)
   info(`  Leia: ${pipeline.handoffPath}`)
   info(`  Retome: gstack_vibehard plan run ${plan.id}`)
 }
