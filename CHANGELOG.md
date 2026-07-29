@@ -1,5 +1,40 @@
 # Changelog - gstack-vibehard
 
+## [5.92.0] - 2026-07-29 — PRD51 S51.7.8: classificação clara de enforcement por harness (fecha o Sprint 51.7)
+
+Oitava e última parte do Sprint 51.7. Achado: duas afirmações do próprio repo
+pareciam se contradizer — `design-hooks.js` diz "Codex e OpenCode não têm API
+de hook project-local" e `codex.js` escreve hooks **reais** em
+`~/.codex/config.toml`. **As duas são verdadeiras**: respondem a perguntas
+diferentes. A `ADAPTER_MATRIX` declarava o NÍVEL de enforcement
+(`real_hooks`/`partial`/`rules_only`/…) mas não tinha nenhum eixo pra **ONDE**
+esse enforcement mora — sem ele, as duas frases leem como conflito.
+
+- `src/harness/enforcement-scope.js` (novo): o eixo que faltava, ortogonal à
+  matriz. `ENFORCEMENT_SCOPE` declara por harness o escopo (`global_only`,
+  `project_local_only`, `both`, `none`), quais superfícies existem de cada
+  lado, **qual delas realmente bloqueia**, e a nota que explica o porquê.
+- **A declaração não pode virar prosa desatualizada**: cada superfície aponta
+  o módulo que a escreve e um fragmento literal que precisa existir nele.
+  `scopeDrift()` acusa `missingWriter` (o módulo sumiu) e `missingEvidence`
+  (o módulo existe mas não escreve mais aquilo). Rodou limpo de primeira nas
+  10 declarações.
+- `PROJECT_LOCAL_HOOK_API` torna a reconciliação um **dado**, não um
+  comentário: Codex tem `enforcement: partial` (mecanismo real) E
+  `projectLocalHookApi: false` — as duas coisas ao mesmo tempo, sem conflito.
+- Fatos que o eixo deixa explícitos: o hook que bloqueia no Claude é o
+  **global** (a projeção project-local do design é PostToolUse advisory); no
+  Cursor só o `~/.cursor/hooks.json` bloqueia (as regras `.mdc` são
+  rules_only); **Devin é o único harness cujo hook real é project-local**.
+- `agents enforcement [--json]`: a tabela como superfície real; sai 1 se
+  houver drift.
+- `scopeMatrixGaps()` + teste amarram escopo e `ADAPTER_MATRIX` — nenhum dos
+  dois pode ganhar/perder harness sem o outro.
+- `tests/enforcement_scope.test.js` (11 testes) com 2 controles negativos que
+  provam o detector de drift falhando de verdade.
+- O comentário do `design-hooks.js` qualificou a afirmação original (não a
+  apagou) e aponta pro eixo — um teste garante que essa ponte não some.
+
 ## [5.91.0] - 2026-07-29 — PRD51 S51.7.7: estado de confiança REAL dos hooks do Codex (cenário 6 do PRD49 sai de not_executed)
 
 Sétima parte do Sprint 51.7. O cenário 6 do PRD49 ("hook do Codex

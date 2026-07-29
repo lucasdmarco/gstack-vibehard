@@ -9,6 +9,7 @@ import { capabilityRow, validateScorecard } from "../harness/capabilities.js"
 import { stripBom } from "../util/json.js"
 import { runP0Conformance } from "../skills/behavioral-conformance.js"
 import { codexTrustStatus, codexTrustVerdict } from "../harness/codex-trust.js"
+import { enforcementScopeReport } from "../harness/enforcement-scope.js"
 import { section, success, warn, error, info } from "../cli/index.js"
 
 const PKG_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..")
@@ -104,6 +105,29 @@ function codexTrustCmd(json, opts = {}) {
   return payload
 }
 
+// PRD51 S51.7.8 — a matriz declarava o NÍVEL de enforcement mas não ONDE ele
+// mora. Sem esse eixo, "Codex tem hook real" e "Codex não tem hook
+// project-local" liam como contradição — são respostas a perguntas diferentes.
+const scopeLine = (h) => `  ${h.harness}: ${h.enforcement} · escopo ${h.scope} · bloqueia em ${h.blockingSurface || "lugar nenhum"}`
+function renderEnforcement(report) {
+  section("agents enforcement — onde o enforcement de cada harness realmente mora")
+  for (const h of report.harnesses) {
+    (h.blockingSurface ? info : warn)(scopeLine(h))
+    if (h.global.length) info(`      global:        ${h.global.join(", ")}`)
+    if (h.projectLocal.length) info(`      project-local: ${h.projectLocal.join(", ")}`)
+    info(`      ${h.note}`)
+  }
+  if (report.ok) success("  toda superfície declarada confere com o módulo que a escreve.")
+  else error(`  DRIFT: ${report.drift.length} superfície(s) declarada(s) que o código não sustenta mais.`)
+}
+function enforcementCmd(json) {
+  const report = enforcementScopeReport()
+  if (json) process.stdout.write(JSON.stringify(report) + "\n")
+  else renderEnforcement(report)
+  if (!report.ok) process.exitCode = 1
+  return report
+}
+
 const AGENTS_HANDLERS = {
   build: (args) => agentsBuild(args),
   check: (args, json) => agentsCheck(json),
@@ -113,6 +137,7 @@ const AGENTS_HANDLERS = {
   doctor: (args, json) => doctorCmd(json),
   conformance: (args, json) => conformanceCmd(json),
   "codex-trust": (args, json, opts) => codexTrustCmd(json, opts),
+  enforcement: (args, json) => enforcementCmd(json),
 }
 
 export async function agentsCommand(args = [], opts = {}) {
@@ -121,7 +146,7 @@ export async function agentsCommand(args = [], opts = {}) {
   const handler = AGENTS_HANDLERS[sub]
   if (handler) return handler(args, json, opts)
   warn(`Subcomando desconhecido: ${sub}`)
-  info("  Use: agents <build|check|diff|doctor|list|explain|conformance|codex-trust>")
+  info("  Use: agents <build|check|diff|doctor|list|explain|conformance|codex-trust|enforcement>")
 }
 
 function listCmd(json, args = []) {
