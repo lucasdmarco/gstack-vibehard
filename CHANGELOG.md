@@ -1,5 +1,49 @@
 # Changelog - gstack-vibehard
 
+## [5.88.0] - 2026-07-29 — PRD51 S51.7.4: minimality gate alimentado por sinal REAL do diff (fecha PRD49 P1.4)
+
+Quarta parte do Sprint 51.7. `evaluateMinimality` (PRD49 S49.5) era puro,
+testado e correto — mas `gate-matrix.js` o declarava **declared-only de
+propósito**, com o comentário honesto: *"NENHUM caminho hoje popula
+`decision` a partir de uma implementação real (planner/reviewer não reportam
+decision-evidence ainda)"*. Este sprint fecha exatamente esse vão.
+
+- `src/skills/minimality-evidence.js` (novo): `collectMinimalityEvidence`
+  deriva do diff REAL do git — dependência nova em `package.json`
+  (`git diff HEAD -- package.json`), arquivo-fonte novo (`--name-status`
+  status `A`), e concerns protegidos pelo CAMINHO dos arquivos mudados.
+- **Honestidade por construção**: os campos que o diff NÃO contém
+  (`existingReuse`, `platformOrStdlib`, `smallestCompleteApproach`) ficam
+  `undefined` de propósito — nunca chutados. Como `redundantAbstraction` só
+  bloqueia quando reuse está disponível (`=== true`), isso torna o coletor
+  conservador por construção: jamais gera bloqueio falso. `newDependencyReason`
+  é justificativa HUMANA — vem de `declared` (plano/brief) quando existe;
+  ausente, a dependência nova fica genuinamente "sem justificativa
+  registrada", que é o sinal real que o gate existe pra pegar.
+- `run-loop.js`: `reviewStage` consome de verdade (`minimalityFor`),
+  anexando `stages.review.minimality`. **ADVISORY** — nunca vira gate novo
+  nesta leva, e `minimalityNeverOutranksCorrectness` já garante que
+  minimality jamais reescreve o veredito de test/verify.
+- `gate-matrix.js`: `minimality-gate` deixou de ser declared-only — agora
+  cita `implementedBy` + `provedBy` REAIS (validados por `gate-truth.js`,
+  que exige o teste existir E conter o nome citado). `mode` ajustado de
+  `blocking` para `advisory` — honesto com o que o wiring realmente faz.
+- **Bug real pego pelo próprio controle negativo**: a 1ª versão do parser
+  contava como "nova" uma dependência preexistente que só reapareceu como
+  `+` no diff por ter ganhado uma vírgula — falso-positivo que teria gerado
+  bloqueio indevido. Corrigido subtraindo nomes que também aparecem em `-`.
+- `tests/minimality_evidence.test.js` (10 testes, novo): repositório git
+  REAL (não fixture), incluindo 4 controles negativos e 2 testes ponta a
+  ponta (evidência real → `evaluateMinimality` → veredito real).
+- `src/dream/rc-checklist-prd49.js`: P1.4 promovido de `partial` para
+  `delivered`. Dois testes do checklist que hard-codavam "S49.5 é partial
+  pra sempre" foram reescritos para invariantes que não ficam stale
+  (`delivered` exige proof que existe em disco; cobertura de sprint aceita
+  item citando dois sprints).
+- QG achou CRAP HIGH em `addedDependencies` (CC9/cognitive13) — extraído
+  `depBlockLines`. QG strict `blocking_severity_count:0`, suíte JS
+  2134/2135 (1 skip pré-existente).
+
 ## [5.87.0] - 2026-07-28 — PRD51 S51.7.3: próxima ação segura em toda falha importante (fecha PRD48 P2.2)
 
 Terceira parte do Sprint 51.7. Fecha o P2.2 — o ÚNICO item da checklist do

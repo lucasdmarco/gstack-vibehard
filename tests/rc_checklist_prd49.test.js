@@ -37,19 +37,40 @@ test("cada item com proof aponta um arquivo que EXISTE de verdade (sem enfeite)"
   }
 })
 
+// PRD51 S51.7.4: um item que era `partial` pode ganhar wiring real depois e
+// passar a citar DOIS sprints (ex.: "S49.5/S51.7.4"). A cobertura continua
+// exigida — só deixa de exigir correspondência exata da string.
 test("cobre os 10 sprints de produto do PRD49 (S49.0-S49.9)", async () => {
   const { PRD49_RC_ITEMS } = await imp()
-  const sprints = new Set(PRD49_RC_ITEMS.map((i) => i.sprint))
+  const sprints = PRD49_RC_ITEMS.map((i) => i.sprint)
   for (const s of ["S49.0", "S49.1", "S49.2A", "S49.2B", "S49.3", "S49.4", "S49.5", "S49.6", "S49.7", "S49.8", "S49.9"]) {
-    assert.ok(sprints.has(s), `checklist cobre ${s}`)
+    assert.ok(sprints.some((x) => x.split("/").includes(s)), `checklist cobre ${s}`)
   }
 })
 
-test("itens partial (S49.5/S49.6/S49.7/S49.9) permanecem honestamente partial, nunca inflados a delivered", async () => {
+// PRD51 S51.7.4 fechou o S49.5 (minimality) com wiring real — este teste
+// deixou de ser "esses 4 são partial pra sempre" e passou a proteger a
+// invariante que realmente importa e não fica stale: `delivered` só se houver
+// prova REAL que existe em disco. (Não checa a REDAÇÃO do título de itens
+// `partial`: exigir palavras específicas seria adivinhar prosa, não invariante —
+// P1.5 declara seu gap como "defuddle excluído por achado real do auditor",
+// sem nenhuma das palavras que uma regex ingênua esperaria.)
+test("nenhum item PRD49 é inflado: 'delivered' exige proof real que existe em disco", async () => {
   const { PRD49_RC_ITEMS } = await imp()
-  const partials = PRD49_RC_ITEMS.filter((i) => ["S49.5", "S49.6", "S49.7", "S49.9"].includes(i.sprint))
-  assert.ok(partials.length >= 4)
-  for (const i of partials) assert.equal(i.status, "partial", `${i.id} (${i.sprint}) deveria ser partial`)
+  const delivered = PRD49_RC_ITEMS.filter((i) => i.status === "delivered")
+  assert.ok(delivered.length > 0)
+  for (const i of delivered) {
+    assert.ok(i.proof, `${i.id} delivered ⇒ precisa de proof`)
+    assert.ok(existsSync(path.join(repoRoot, i.proof)), `proof de ${i.id} existe: ${i.proof}`)
+  }
+})
+
+test("S51.7.4: minimality (S49.5) graduou delivered com wiring real e prova que existe", async () => {
+  const { PRD49_RC_ITEMS } = await imp()
+  const item = PRD49_RC_ITEMS.find((i) => i.sprint.split("/").includes("S49.5"))
+  assert.equal(item.status, "delivered")
+  assert.equal(item.proof, "tests/minimality_evidence.test.js")
+  assert.ok(existsSync(path.join(repoRoot, item.proof)))
 })
 
 test("PRD49_SCENARIO_COVERAGE: cobre os 15 cenários obrigatórios do plano, cada um com status real|partial|not_executed", async () => {
