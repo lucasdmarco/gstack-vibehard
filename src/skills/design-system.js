@@ -197,16 +197,34 @@ function gateDecision(ds, uiFiles, touchesUi) {
   }
 }
 
-export function evaluatePreWriteGate({ root, runId = null, files = [], uiIntended = false, bypass = null, io = defaultIo } = {}) {
+/**
+ * PRD51 S51.7.5 — o gate passa a CONSULTAR o design context (drift das
+ * projeções), que até aqui era uma ilha separada: `buildProjections` só era
+ * calculado no preview de `--dry-run` e nada o consumia.
+ *
+ * ADVISORY de propósito: drift `stale`/`absent` NUNCA bloqueia — só informa.
+ * O que bloqueia continua sendo exclusivamente a ausência/invalidez do design
+ * system canônico (`gateDecision`). Injetável (`contextStatus`) e best-effort:
+ * qualquer falha na leitura do contexto jamais derruba o gate.
+ */
+function designContextSignal(root, ds, contextStatus) {
+  if (typeof contextStatus !== "function") return null
+  try { return contextStatus({ cwd: root, ds }) } catch { return null }
+}
+
+export function evaluatePreWriteGate({ root, runId = null, files = [], uiIntended = false, bypass = null, io = defaultIo, contextStatus = null } = {}) {
   const ds = resolveDesignSystem({ root, bypass, io })
   const uiFiles = files.filter(isUiWrite)
   const touchesUi = uiIntended || uiFiles.length > 0
   const d = gateDecision(ds, uiFiles, touchesUi)
+  const ctx = designContextSignal(root, ds, contextStatus)
   return {
     schemaVersion: DESIGN_SYSTEM_GATE_SCHEMA, gate: "design-system-gate",
     generatedAt: new Date().toISOString(), runId,
     designSystem: ds, uiFiles, touchesUi, blocked: d.blocked,
     violations: d.violations, requiredAction: d.requiredAction,
+    // Sinal advisory — presente só quando um leitor de contexto foi injetado.
+    ...(ctx ? { designContext: { status: ctx.status, sourceHash: ctx.sourceHash, advisory: true } } : {}),
   }
 }
 
