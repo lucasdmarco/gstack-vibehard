@@ -1,5 +1,44 @@
 # Changelog - gstack-vibehard
 
+## [5.89.0] - 2026-07-29 — PRD51 S51.7.5: design context deixa de ser ilha — persiste e alimenta o gate (fecha PRD49 P1.1 wiring)
+
+Quinta parte do Sprint 51.7. Achado real: `design-context.js` (PRD49 S49.1)
+era código real, puro e testado — mas o ÚNICO chamador de `buildProjections`
+em todo o `src/` era `start.js` dentro de `dryRunReport()`. As projeções
+(`PRODUCT.md`/`DESIGN.md`/`.impeccable/design.json`) só eram **calculadas**
+pra um preview de `--dry-run`: nunca escritas, nunca reconciliadas, e o
+design gate nunca consultava `projectionDriftStatus`. Duas ilhas separadas.
+
+- `src/skills/design-context-sync.js` (novo): toda a I/O mora aqui —
+  `design-context.js` continua PURO. `designContextStatus` (read-only, seguro
+  pra gate) e `syncDesignContext` (`apply:false` por default = PLANO, nada
+  escrito). Proveniência em `.gstack/design-context.json` guarda o
+  `sourceHash` E o conteúdo gerado — é o que permite distinguir depois "o
+  usuário editou" de "o canônico mudou".
+- **Invariante central herdada do PRD49, agora enforced e testada**: edição
+  humana NUNCA é sobrescrita em silêncio. Arquivo divergente do que o GStack
+  geraria vira `reconcile` (conflito com plano de 3 vias), nunca `update`.
+  Arquivo preexistente SEM proveniência é tratado como possivelmente humano —
+  conservador de propósito. Dois controles negativos cobrem isso.
+- `src/commands/visual.js`: novos `visual context status` (read-only) e
+  `visual context sync` (escreve, com o MESMO gate de consentimento do
+  `hooks install` — sem `--yes` e sem TTY devolve o plano, nunca pendura no
+  stdin nem escreve).
+- `src/skills/design-system.js`: `evaluatePreWriteGate` ganhou
+  `contextStatus` injetável e passa a reportar `designContext` — **ADVISORY**,
+  drift `stale`/`absent` JAMAIS bloqueia (só a ausência/invalidez do design
+  system canônico bloqueia, como antes). Retrocompat explícita: sem leitor
+  injetado, o output é idêntico ao anterior. Best-effort: leitor que lança
+  nunca derruba o gate. Os 3 casos têm teste.
+- `start.js` injeta o leitor REAL no gate — o sinal chega em produção, não
+  só em teste.
+- `tests/design_context_sync.test.js` (14 testes, novo): 4 controles
+  negativos + 3 testes de wiring REAL via CLI.
+- QG achou 3 CRAP HIGH introduzidos (`contextSyncCmd`, `planFor`,
+  `emitSyncResult`) — extraídos `actionFor`/`isHumanAuthored`/`confirmSync`/
+  `syncSummary`. QG strict `blocking_severity_count:0`, suíte JS 2148/2149
+  (1 skip pré-existente).
+
 ## [5.88.0] - 2026-07-29 — PRD51 S51.7.4: minimality gate alimentado por sinal REAL do diff (fecha PRD49 P1.4)
 
 Quarta parte do Sprint 51.7. `evaluateMinimality` (PRD49 S49.5) era puro,

@@ -5,6 +5,8 @@ import { detectColorContrastFindings } from "../skills/design-detector.js"
 import { renderCompactFeedback, renderFeedbackMarkdown } from "../skills/design-feedback.js"
 import { buildDesignRuleRegistry, getDesignRule } from "../skills/design-rule-registry.js"
 import { applyDesignHookProjections, designHookStatus } from "../harness/design-hooks.js"
+import { resolveDesignSystem } from "../skills/design-system.js"
+import { designContextStatus, syncDesignContext } from "../skills/design-context-sync.js"
 import { section, success, warn, error, info, confirm } from "../cli/index.js"
 
 /**
@@ -156,6 +158,65 @@ const HOOKS_ACTIONS = Object.freeze({
   install: (cwd, json, args, opts) => hooksInstallCmd(cwd, json, args, opts),
 })
 
+// PRD51 S51.7.5 — design context deixou de ser ilha. `buildProjections` só era
+// CALCULADO no preview de `--dry-run` (start.js), nunca escrito nem consumido
+// pelo gate. `visual context status` (read-only) e `visual context sync`
+// (escreve, com o MESMO gate de consentimento do `hooks install`) fecham isso.
+function resolveDsOrExplain(cwd, json) {
+  const ds = resolveDesignSystem({ root: cwd, importLegacy: false })
+  if (["complete", "generated", "bypassed"].includes(ds.status)) return ds
+  const payload = { error: "no_design_system", status: ds.status, hint: "declare o design system antes (start ou --design-system <caminho>)" }
+  if (json) process.stdout.write(JSON.stringify(payload) + "\n")
+  else { section("visual context"); warn(`Sem design system canônico (status=${ds.status}) — nada a projetar.`) }
+  return null
+}
+function contextStatusCmd(cwd, json) {
+  const ds = resolveDsOrExplain(cwd, json)
+  if (!ds) return { error: "no_design_system" }
+  const st = designContextStatus({ cwd, ds })
+  if (json) { process.stdout.write(JSON.stringify(st) + "\n"); return st }
+  section("visual context status (read-only)")
+  info(`  drift: ${st.status} · sourceHash ${String(st.sourceHash).slice(0, 12)}`)
+  if (st.status === "stale") warn("  canônico mudou desde a última sincronização — rode `visual context sync`")
+  if (st.status === "absent") info("  nunca sincronizado — rode `visual context sync` pra gerar as projeções")
+  return st
+}
+const syncSummary = (r) => (r.applied ? `Sincronizado (${(r.written || []).length} arquivo(s)).` : "Plano acima (nada escrito) — repita com --yes para aplicar.")
+function emitSyncResult(r, json) {
+  if (json) { process.stdout.write(JSON.stringify(r) + "\n"); return r }
+  for (const p of r.plans) info(`  ${p.action}: ${p.file}`)
+  if (r.conflicts.length) warn(`  ${r.conflicts.length} arquivo(s) com edição humana — NUNCA sobrescritos; reconcilie à mão.`)
+  ;(r.applied ? success : info)(syncSummary(r))
+  return r
+}
+// Pergunta mostrando o plano ANTES — nunca escreve sem o humano ver o que muda.
+async function confirmSync(cwd, ds, json, opts) {
+  const plan = syncDesignContext({ cwd, ds, apply: false })
+  if (!json) { section("visual context sync"); plan.plans.forEach((p) => info(`  ${p.action}: ${p.file}`)) }
+  return (opts.confirm || confirm)(`Escrever as projeções de design context em ${cwd}?`, false)
+}
+async function contextSyncCmd(cwd, json, args, opts) {
+  const ds = resolveDsOrExplain(cwd, json)
+  if (!ds) return { error: "no_design_system" }
+  const autoYes = wantsAutoYes(args, opts)
+  // Sem --yes e sem como perguntar: devolve o PLANO (nada escrito) — nunca
+  // pendura no stdin nem escreve sem consentimento (mesmo padrão do hooks install).
+  if (!autoYes && !canPromptConfirm(opts)) return emitSyncResult(syncDesignContext({ cwd, ds, apply: false }), json)
+  if (!autoYes && !(await confirmSync(cwd, ds, json, opts))) return emitCancelled(json)
+  return emitSyncResult(syncDesignContext({ cwd, ds, apply: true }), json)
+}
+const CONTEXT_ACTIONS = Object.freeze({
+  status: (cwd, json) => contextStatusCmd(cwd, json),
+  sync: (cwd, json, args, opts) => contextSyncCmd(cwd, json, args, opts),
+})
+function contextCmd(cwd, args, json, opts) {
+  const action = CONTEXT_ACTIONS[positionalAfter(args, "context")]
+  if (action) return action(cwd, json, args, opts)
+  error("visual context: use `status` ou `sync`")
+  process.exitCode = 1
+  return null
+}
+
 function hooksCmd(cwd, args, json, opts) {
   const action = HOOKS_ACTIONS[positionalAfter(args, "hooks")]
   if (action) return action(cwd, json, args, opts)
@@ -171,6 +232,7 @@ function printUsage() {
   info("  visual detect <elements.json> [--json]                 detecta findings (só color-contrast por ora)")
   info("  visual explain <rule-id> [--json]                      explica uma regra do registry")
   info("  visual hooks install|status [--json] [--yes]           projeções de hook project-local por harness")
+  info("  visual context status|sync [--json] [--yes]            design context (PRODUCT.md/DESIGN.md/.impeccable) e drift")
   warn("  visual hooks install pede confirmação (--yes ou TTY) antes de escrever — nunca sem consentimento.")
   warn("  sem playwright instalado, reporta needs_browser (blocked) — nunca finge verde.")
   warn("  visual detect lê um JSON de elementos já extraídos — não faz scraping de DOM/URL ao vivo ainda.")
@@ -183,6 +245,7 @@ const SUBCOMMANDS = Object.freeze({
   detect: (cwd, args, json) => detectCmd(cwd, args, json),
   explain: (cwd, args, json) => explainCmd(args, json),
   hooks: (cwd, args, json, opts) => hooksCmd(cwd, args, json, opts),
+  context: (cwd, args, json, opts) => contextCmd(cwd, args, json, opts),
 })
 
 export async function visualCommand(args = [], opts = {}) {

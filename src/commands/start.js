@@ -24,6 +24,7 @@ import { proposeBrownfieldChoices, decideBrownfieldOrNew } from "../onboarding/b
 import { openStateStore } from "../state/store.js"
 import { listSessions, activeSession } from "../state/session-index.js"
 import { buildProjections } from "../skills/design-context.js"
+import { designContextStatus } from "../skills/design-context-sync.js"
 import { resolveBriefAcceptances, mapJourney } from "../project-plan/acceptance-verification.js"
 import { buildToolRefresh } from "../tools/refresh.js"
 
@@ -252,7 +253,9 @@ function enforceDesignSystemGate(route, dsChoice, cwd, planDir) {
   const applies = route.blockingGates.includes("design-system-gate") || route.detectedCapabilities.touchesFrontend
   if (!applies) return { ok: true, applicable: false, evidence: null }
   if (dsChoice) registerDesignSystem({ root: cwd, choice: dsChoice })
-  const evidence = evaluatePreWriteGate({ root: cwd, uiIntended: true, bypass: dsChoice === "none" ? "none" : null })
+  // PRD51 S51.7.5: injeta o leitor REAL de design context — o gate passa a
+  // reportar drift das projeções (advisory, nunca bloqueia).
+  const evidence = evaluatePreWriteGate({ root: cwd, uiIntended: true, bypass: dsChoice === "none" ? "none" : null, contextStatus: designContextStatus })
   writeFileSync(join(planDir, "design-system-gate.json"), JSON.stringify(evidence, null, 2) + "\n")
   if (evidence.blocked) writeFileSync(join(planDir, "skill-gate-violations.json"), JSON.stringify({ gate: "design-system-gate", violations: evidence.violations }, null, 2) + "\n")
   return { ok: !evidence.blocked, applicable: true, evidence }
