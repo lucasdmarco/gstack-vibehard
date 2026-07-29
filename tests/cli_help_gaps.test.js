@@ -43,7 +43,11 @@ test("helpFor('visual'): alcança o usage MULTI-SUBCOMANDO real (printUsage), n�
   try { await helpFor("visual") } finally { cap.restore() }
   const out = cap.get()
   assert.match(out, /visual doctor/, "usage detalhado de visual alcançado via --help")
-  assert.match(out, /visual hooks install\|status/, "subcomando hooks documentado")
+  // Invariante = "o subcomando hooks aparece no usage com os verbos que existem",
+  // não a string literal de uma versão: casar o texto exato deixava o teste
+  // stale a cada verbo novo (quebrou ao entrar `uninstall`, PRD51 S51.7.6).
+  assert.match(out, /visual hooks .*install/, "subcomando hooks documentado")
+  assert.match(out, /visual hooks .*uninstall/, "verbo de remoção documentado (S51.7.6)")
 })
 
 test("helpFor('doctor'): comando SEM DETAILED_HELP continua funcionando (regressão)", async () => {
