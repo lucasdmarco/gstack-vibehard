@@ -1,5 +1,46 @@
 # Changelog - gstack-vibehard
 
+## [5.87.0] - 2026-07-28 — PRD51 S51.7.3: próxima ação segura em toda falha importante (fecha PRD48 P2.2)
+
+Terceira parte do Sprint 51.7. Fecha o P2.2 — o ÚNICO item da checklist do
+PRD48 que nenhum sprint anterior havia endereçado (`sprint:"-"`,
+`status:"pending"`, `proof:null`).
+
+Achado que motivou o desenho: o repo JÁ tinha próximas-ações reais e boas —
+mas ad hoc, cada uma num formato próprio, e só em 2 superfícies
+(`design-system.js:requiredActionFor` e o handoff do pipeline em
+`start.js`). As demais falhas importantes reportavam o problema e paravam
+ali, sem dizer o que fazer em seguida.
+
+- `src/skills/safe-next-action.js` (novo): NÃO é um framework — é UMA forma
+  pequena e compartilhada (`{failureId, humanText, command|null, safe}`) +
+  o registro das 6 falhas reais com superfície no produto: first-run
+  bloqueado, plano/brief inválido, pipeline em handoff, proof reprovado,
+  policy `deny`, design system ausente. Falha desconhecida devolve `null`
+  (honesto: nunca inventa uma ação).
+- **Invariante de segurança explícita**: `safe:true` significa que a ação
+  sugerida nunca destrói trabalho nem contorna gate — é sempre
+  diagnóstico/retomada. Coberto por controle negativo que reprova se
+  qualquer ação passar a sugerir `--force`/`--no-verify`/`--skip`/`rm -rf`/
+  `--allow-degraded` ou "desligue o gate".
+- Retrofit nas superfícies REAIS: `start.js` (first-run bloqueado, plano
+  inválido, handoff — este já tinha a ação, agora adota a forma
+  compartilhada), `proof.js` (proof reprovado), `policy.js` (`deny` aponta
+  `policy show`, nunca um bypass), `renderGateBlock` (o `requiredAction`
+  específico continua sendo a instrução principal; o registro compartilhado
+  entra no `--json` pra consumidores automatizados terem a mesma forma).
+- `tests/safe_next_action.test.js` (8 testes, novo): inclui 3 testes de
+  wiring REAL (start com harness bloqueado, `policy eval` com deny,
+  design-system-gate `--json`) — não só o módulo isolado.
+- `src/dream/rc-checklist-prd48.js`: P2.2 promovido de `pending` para
+  `delivered`. O teste que afirmava "P2.2 é honestamente pending" foi
+  reescrito para a invariante genérica que realmente importa e não fica
+  stale: nenhum item sai de `pending` sem um `proof` que EXISTE de verdade.
+- QG achou CRAP HIGH em `renderProof` (CC7/cognitive8, cruzou o limiar com
+  a linha nova) — extraído em `renderProofChecks`/`renderProofVerdict`. QG
+  strict `blocking_severity_count:0`, suíte JS 2123/2124 (1 skip
+  pré-existente).
+
 ## [5.86.0] - 2026-07-28 — PRD51 S51.7.2: decision presenter wired em superfície real (fecha PRD48 P1.4)
 
 Segunda parte do Sprint 51.7. Achado real: `src/policy/decision-presenter.js`

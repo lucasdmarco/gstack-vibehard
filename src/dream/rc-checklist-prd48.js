@@ -24,7 +24,7 @@ export const PRD48_RC_ITEMS = Object.freeze([
   { id: "P1.5", tier: "P1", sprint: "S48.4", version: "5.33.0", status: "delivered", title: "Checkpoint como produto — task checkpoints/restore reais, restore com provenance append-only, tamper aborta sem gravar sucesso falso", proof: "tests/task_checkpoint_ux.test.js" },
   { id: "P1.6", tier: "P1", sprint: "S48.5", version: "5.34.0", status: "delivered", title: "Contexto/quota/custo como decisão única — contrato de 4 qualidades tipadas, quota unknown nunca suficiente, budget nunca reservado 2x", proof: "tests/usage_accounting.test.js" },
   { id: "P2.1", tier: "P1", sprint: "S48.6", version: "5.35.0", status: "partial", title: "Idioma da CLI como preferência formal — infraestrutura real (catálogo+resolver+messageId), mas só `task inspect/restore` retrofitados; resto da CLI continua só em português", proof: "tests/cli_i18n.test.js" },
-  { id: "P2.2", tier: "P1", sprint: "-", version: "-", status: "pending", title: "Ajuda contextual geral (uma única próxima ação segura ao falhar, além de mensagens localizadas) — nenhum sprint endereçou isso diretamente", proof: null },
+  { id: "P2.2", tier: "P1", sprint: "S51.7.3", version: "5.87.0", status: "delivered", title: "Ajuda contextual geral — forma compartilhada `safe-next-action.js` (`{failureId,humanText,command,safe}`) + retrofit nas 6 falhas REAIS (first-run bloqueado, plano inválido, pipeline handoff, proof reprovado, policy deny, design system ausente); controle negativo garante que nenhuma ação sugerida contorna gate", proof: "tests/safe_next_action.test.js" },
 ])
 
 const byTier = (tier) => PRD48_RC_ITEMS.filter((i) => i.tier === tier)

@@ -10,6 +10,7 @@ import { resolveGateOutcomes, buildGateRegistry } from "../skills/gate-registry.
 import { explainProof } from "../skills/acceptance-demo.js"
 import { detectColorContrastFindings } from "../skills/design-detector.js"
 import { success, warn, error, info, section } from "../cli/index.js"
+import { safeNextAction, renderSafeNextAction } from "../skills/safe-next-action.js"
 
 /**
  * `gstack_vibehard proof [--profile release|full|quick] [--json]` (PRD26 26.B).
@@ -147,8 +148,7 @@ export function buildProof(opts = {}) {
   }
 }
 
-function renderProof(p) {
-  section(`proof — perfil ${p.profile} (${PROOF_SCHEMA})`)
+function renderProofChecks(p) {
   const rows = [
     ["verify", p.checks.verify.ok], ["dream audit", p.checks.dreamAudit.ok],
     ["graphify fresh", p.checks.graphifyFreshness.ok], ["git tree", p.checks.gitTree.ok],
@@ -156,9 +156,18 @@ function renderProof(p) {
   ]
   for (const [name, ok] of rows) (ok ? success : error)(`  ${name}: ${ok ? "ok" : "FALHOU"}`)
   info(`  headroom: ${p.checks.headroomRouting.status} (honesto; routing é opt-in)`)
+}
+// PRD51 S51.7.3: falha importante SEMPRE oferece a próxima ação segura.
+function renderProofVerdict(p) {
+  ;(p.ready ? success : error)(p.ready ? "\n  PRONTO — todos os gates determinísticos verdes." : "\n  NÃO PRONTO — resolva os bloqueios acima.")
+  if (!p.ready) info(`  ${renderSafeNextAction(safeNextAction("proof_blocked"))}`)
+}
+function renderProof(p) {
+  section(`proof — perfil ${p.profile} (${PROOF_SCHEMA})`)
+  renderProofChecks(p)
   p.warnings.forEach((w) => warn(`  aviso: ${w}`))
   p.blockers.forEach((b) => error(`  bloqueio: ${b}`))
-  ;(p.ready ? success : error)(p.ready ? "\n  PRONTO — todos os gates determinísticos verdes." : "\n  NÃO PRONTO — resolva os bloqueios acima.")
+  renderProofVerdict(p)
 }
 
 const profileFrom = (args) => {

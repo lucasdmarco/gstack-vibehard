@@ -36,13 +36,25 @@ test("cada item com proof aponta um teste que EXISTE (sem enfeite)", async () =>
   }
 })
 
-test("P2.2 (ajuda contextual geral) é honestamente 'pending' — nenhum sprint endereçou, sem proof forjado", async () => {
-  const { PRD48_RC_ITEMS, prd48Readiness } = await imp()
+// PRD51 S51.7.3 fechou o P2.2 (era o único item que nenhum sprint tinha
+// endereçado). A invariante que este teste protege continua a MESMA e é a
+// que importa: um item só sai de `pending` com uma prova REAL que existe —
+// nunca um `proof` forjado. Verificada agora de forma genérica, pra não
+// ficar stale a cada item fechado.
+test("nenhum item declara status 'delivered'/'partial' sem proof real (sem proof forjado)", async () => {
+  const { PRD48_RC_ITEMS } = await imp()
+  for (const item of PRD48_RC_ITEMS) {
+    if (item.status === "pending") { assert.equal(item.proof, null, `${item.id} pendente não tem proof`); continue }
+    assert.ok(item.proof, `${item.id} está '${item.status}' ⇒ precisa de proof declarado`)
+    assert.ok(existsSync(path.join(repoRoot, item.proof)), `proof de ${item.id} existe de verdade: ${item.proof}`)
+  }
+})
+
+test("S51.7.3: P2.2 (próxima ação segura ao falhar) graduou delivered com prova real", async () => {
+  const { PRD48_RC_ITEMS } = await imp()
   const p22 = PRD48_RC_ITEMS.find((i) => i.id === "P2.2")
-  assert.equal(p22.status, "pending")
-  assert.equal(p22.proof, null)
-  const r = prd48Readiness()
-  assert.ok(r.p1Open.some((i) => i.id === "P2.2"))
+  assert.equal(p22.status, "delivered")
+  assert.equal(p22.proof, "tests/safe_next_action.test.js")
 })
 
 test("cobre as 8 lacunas do PRD48 §3.2 (P1.1-P1.6, P2.1-P2.2) + o baseline P0.1", async () => {
