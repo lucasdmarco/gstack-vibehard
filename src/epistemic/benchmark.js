@@ -83,6 +83,9 @@ export function pendingHumanLabeling(cases) {
     metrics: ["citation_support_precision_on_ambiguous", "answer_relevance_to_intent"],
     reason: "julgamento subjetivo auto-avaliado pelo autor do sistema seria circular (PRD50 §2.3 item 1)",
     status: "pending_human_labeling",
+    // S51.8.1: sem registro explícito de que a rotulagem cega ocorreu, nada
+    // aqui pode fechar validação — `count:0` por corpus vazio não é validação.
+    labelingPerformed: false,
   }
 }
 
@@ -104,8 +107,23 @@ export function buildBenchmarkReport(results) {
     ...results,
     gates,
     objectiveGatesReady: gates.every((g) => g.passed),
-    // Nunca `ready:true` global: a fatia humana continua aberta por design.
-    fullyValidated: false,
+    // PRD51 S51.8.1 — antes era `false` hardcoded. Fica fail-closed do mesmo
+    // jeito (sem registro de rotulagem, nunca validado), mas passa a ser
+    // DERIVADO: se um dia os rótulos humanos cegos chegarem, o número muda
+    // sozinho em vez de mentir por constante.
+    fullyValidated: benchmarkFullyValidated(results),
     note: "gates objetivos medidos nesta máquina; métricas subjetivas exigem rótulo humano cego (ver pendingHumanLabeling)",
   }
+}
+
+/**
+ * Fail-closed: só é `true` com gates objetivos verdes E registro explícito de
+ * que a rotulagem humana cega aconteceu e não sobrou caso. Ausência de
+ * `pendingHuman` é ausência de evidência — nunca "zero pendências".
+ */
+export function benchmarkFullyValidated(results = {}) {
+  const gatesOk = PROMOTION_GATES.every((g) => g.pass(results))
+  const pending = results.pendingHuman
+  if (!pending || pending.labelingPerformed !== true) return false
+  return gatesOk && pending.count === 0
 }

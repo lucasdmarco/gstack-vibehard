@@ -9,6 +9,8 @@
  *   AUTORIZADO  — provado por teste/E2E/CI nesta entrega
  *   PENDENTE    — depende de avaliação humana; corpus e script prontos
  */
+import { validationTaxonomy } from "../epistemic/validation-taxonomy.js"
+
 export const PRD50_RC_CHECKLIST_SCHEMA = "gstack.rc-checklist.prd50.v1"
 
 export const PRD50_RC_ITEMS = Object.freeze([
@@ -46,21 +48,32 @@ const isDelivered = (i) => i.status === "delivered"
 
 /**
  * Prontidão de RC. `ready` exige todos os P0 `delivered` (mesma semântica do
- * PRD47/48/49). `fullyValidated` é separado e SÓ vira true quando não houver
- * claim pendente — hoje é false por design, não por esquecimento.
+ * PRD47/48/49).
+ *
+ * PRD51 S51.8.1 — correção de um defeito real: `fullyValidated` era
+ * `pending.length === 0`, e `PENDING_CLAIMS` misturava claims que esperam
+ * rótulo humano (alcançáveis) com o claim `not_measurable_by_design` (o
+ * overhead do EV0 dentro do harness, que o GStack estruturalmente nunca
+ * observa). Somados, o segundo tornava `fullyValidated` IMPOSSÍVEL — nenhuma
+ * quantidade de trabalho humano zeraria a conta. Agora as categorias são
+ * separadas: só a fatia mensurável decide, e o não-observável sai declarado.
  */
 export function prd50Readiness(items = PRD50_RC_ITEMS, pending = PENDING_CLAIMS) {
   const p0 = items.filter((i) => i.tier === "P0")
   const p0Pending = p0.filter((i) => !isDelivered(i))
   const p1Open = items.filter((i) => i.tier === "P1" && !isDelivered(i))
+  const taxonomy = validationTaxonomy(pending)
   return {
     schemaVersion: PRD50_RC_CHECKLIST_SCHEMA,
     ready: p0Pending.length === 0,
-    fullyValidated: pending.length === 0,
+    fullyValidated: taxonomy.measurableValidationComplete,
+    validation: taxonomy,
     counts: {
       p0: p0.length, p0Delivered: p0.length - p0Pending.length,
       p1: items.filter((i) => i.tier === "P1").length, p1Open: p1Open.length,
-      authorizedClaims: AUTHORIZED_CLAIMS.length, pendingClaims: pending.length,
+      authorizedClaims: AUTHORIZED_CLAIMS.length,
+      pendingClaims: taxonomy.counts.pendingHumanValidation,
+      unobservableByDesign: taxonomy.counts.unobservableByDesign,
     },
     p0Pending: p0Pending.map((i) => i.id),
     p1Open: p1Open.map((i) => ({ id: i.id, status: i.status, title: i.title })),

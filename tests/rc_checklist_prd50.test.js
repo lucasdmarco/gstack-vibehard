@@ -73,17 +73,28 @@ test("CONTROLE NEGATIVO: nenhum claim proibido pelo §17.2 aparece como autoriza
   }
 })
 
+// PRD51 S51.8.1 recalibrou a semântica: `pendingClaims` passou a contar SÓ o
+// que rotulagem humana pode fechar. O claim `not_measurable_by_design` saiu da
+// conta (virou `unobservableByDesign`) porque, somado, tornava `fullyValidated`
+// impossível — nenhuma quantidade de trabalho humano zeraria a lista.
 test("fullyValidated é FALSE enquanto houver claim pendente (por design, não esquecimento)", async () => {
   const { prd50Readiness } = await imp()
   const r = prd50Readiness()
   assert.equal(r.ready, true, "os P0 estão entregues")
   assert.equal(r.fullyValidated, false, "mas a validação completa depende de rótulo humano")
-  assert.ok(r.counts.pendingClaims >= 3)
+  assert.ok(r.counts.pendingClaims >= 1, "há rotulagem humana REAL pendente")
+  assert.equal(r.counts.unobservableByDesign, 1, "e o inobservável fica declarado à parte, não como dívida")
 })
 
-test("controle inverso: sem claims pendentes, fullyValidated vira true", async () => {
+test("controle inverso: fechada a fatia humana, fullyValidated vira true (o inobservável não trava)", async () => {
   const { prd50Readiness, PRD50_RC_ITEMS } = await imp()
-  assert.equal(prd50Readiness(PRD50_RC_ITEMS, []).fullyValidated, true)
+  const soInobservavel = [{ claim: "overhead do EV0 no harness", blockedBy: "not_measurable_by_design", missing: "o GStack nunca vê a resposta do harness" }]
+  assert.equal(prd50Readiness(PRD50_RC_ITEMS, soInobservavel).fullyValidated, true)
+})
+
+test("CONTROLE NEGATIVO: lista de claims VAZIA é ausência de evidência, nunca validação completa", async () => {
+  const { prd50Readiness, PRD50_RC_ITEMS } = await imp()
+  assert.equal(prd50Readiness(PRD50_RC_ITEMS, []).fullyValidated, false, "fail-closed (S51.0C) também aqui")
 })
 
 test("o E2E epistêmico está ligado à matriz de 3 SOs do CI", async () => {
