@@ -9,8 +9,15 @@ import { versionedBackup } from "../installer/safe-write.js"
  * plano original descrevia): cada harness recebe exatamente o mecanismo que
  * REALMENTE tem hoje, per `src/harness/events.js`/`src/agents/adapter-matrix.js`:
  *   - Claude: hook real (PostToolUse, advisory — tool.after já é "advisory" hoje)
- *   - Codex + OpenCode: nenhum tem API de hook project-local; ambos leem
+ *   - Codex + OpenCode: nenhum tem API de hook PROJECT-LOCAL; ambos leem
  *     AGENTS.md, então recebem o MESMO bloco instrucional compartilhado
+ *
+ * PRD51 S51.7.8 — reconciliação: "Codex não tem API de hook project-local"
+ * (acima) e "codex.js escreve hooks REAIS" (em `harness/codex.js`) são AMBAS
+ * verdadeiras — respondem a perguntas diferentes. O hook real do Codex é
+ * GLOBAL (`~/.codex/config.toml`), vale pra todos os projetos da máquina;
+ * project-local ele só recebe texto. O eixo que separa as duas coisas mora em
+ * `harness/enforcement-scope.js` (e `agents enforcement` mostra a tabela).
  *   - Copilot: sem hooks (instructional-only); bloco em .github/copilot-instructions.md
  *   - Cursor: regra .mdc project-local (rules_only — mesmo formato já usado
  *     em agents/generated/cursor/rules/*.mdc)
