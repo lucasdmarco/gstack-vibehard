@@ -1,5 +1,34 @@
 # Changelog - gstack-vibehard
 
+## [5.94.0] - 2026-07-29 — PRD51 S51.8.2: congelamento verificável de corpus e holdout antes dos rótulos
+
+Segunda parte do Sprint 51.8 (ações 1 e 4). O que isto fecha é metodológico,
+não de código: enquanto o corpus puder ser editado **depois** de ver os
+rótulos, qualquer número medido sobre ele é negociável — dá pra apagar o caso
+que deu errado, reescrever o enunciado ambíguo, mover um caso do holdout pro
+conjunto de rotulagem. Sem congelamento verificável, nada disso deixa rastro.
+
+- `src/epistemic/corpus-freeze.js` (novo): `freezeCorpus` grava id + hash +
+  partição de cada caso e o `corpusHash` do conjunto; `verifyFrozenCorpus`
+  detecta caso **editado**, **removido** e **adicionado** separadamente;
+  `acceptLabels` rejeita lote de rótulos sobre corpus modificado, sobre caso
+  do holdout (contaminaria a fatia reservada) ou fora do corpus congelado.
+- **Congelamos a pergunta, não a resposta**: as chaves de rotulagem ficam fora
+  do hash do caso, senão rotular quebraria o próprio congelamento.
+- Partição determinística por `seed` + id — reordenar o corpus não muda quem
+  cai no holdout, e ninguém "escolhe" a fatia reservada depois de ver os
+  resultados. Freeze sem semente **falha**; id duplicado **falha**.
+- **Achado do próprio controle negativo deste sub-sprint**: na primeira versão
+  o `corpusHash` cobria só a partição, então duas sementes que por acaso
+  produzissem a **mesma divisão** davam hashes iguais — seria impossível
+  provar depois qual semente foi declarada antes dos rótulos. A metodologia
+  (`seed` + `holdoutRatio`) passou a entrar no hash.
+- **Ação 4** (versionar rótulos e metodologia, nunca os dados): o artefato
+  carrega só ids, hashes e partição. `assertNoRawContent` prova isso e devolve
+  **quais** chaves vazariam — testado inclusive contra o corpus REAL do PRD50.
+- `tests/corpus_freeze.test.js` (18 testes, 4 controles negativos), um deles
+  rodando sobre `tests/fixtures/epistemic/corpus.json` de verdade.
+
 ## [5.93.0] - 2026-07-29 — PRD51 S51.8.1: `fullyValidated` deixa de ser impossível (pendência humana ≠ limite estrutural)
 
 Primeira parte do Sprint 51.8 (ações 5/6/7). **Defeito real corrigido**:

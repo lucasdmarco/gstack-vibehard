@@ -23,6 +23,19 @@ const repoRoot = path.resolve(import.meta.dirname, "..")
 // PRD26/testes existentes (runtime_e2e.test.js): npm.cmd não spawna com
 // shell:false no Windows — mesmo padrão de test-pack.mjs/test-e2e-lifecycle.mjs.
 const isWin = process.platform === "win32"
+
+/**
+ * Limpeza BEST-EFFORT. No Windows, apagar um tmpdir logo após um subprocess
+ * pode dar EPERM/EBUSY mesmo com `maxRetries` — o handle fica preso por
+ * antivírus/indexador, não pelo nosso código (observado com o diretório já
+ * praticamente vazio). O que este teste prova é o comportamento do `npm sbom`;
+ * falhar a suíte porque o SO não liberou um diretório temporário seria um
+ * falso negativo — e chega a `verify --profile full`, que roda `npm test`.
+ */
+function cleanupTmp(dir) {
+  try { rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }) }
+  catch { /* resíduo de tmpdir não invalida a asserção acima */ }
+}
 function runNpmSbom(cwd, opts = {}) {
   const args = ["sbom", "--sbom-format", "cyclonedx", "--omit", "dev"]
   return isWin
@@ -59,11 +72,7 @@ test("CONTROLE NEGATIVO: npm sbom FALHA (exit != 0, sem JSON válido) sem packag
     let parsedOk = true
     try { JSON.parse(output) } catch { parsedOk = false }
     assert.ok(!parsedOk, "a saída de falha não deveria ser um CycloneDX JSON válido")
-  } finally {
-    // maxRetries: `npm sbom` é subprocess — no Windows o handle pode seguir
-    // aberto um instante após o exit (EBUSY/ENOTEMPTY sob carga).
-    rmSync(tmp, { recursive: true, force: true, maxRetries: 5 })
-  }
+  } finally { cleanupTmp(tmp) }
 })
 
 // Controle positivo complementar: com um package.json MÍNIMO mas VÁLIDO
@@ -77,9 +86,5 @@ test("npm sbom passa com package.json mínimo mas válido (version pinada)", () 
     const bom = JSON.parse(out)
     assert.equal(bom.bomFormat, "CycloneDX")
     assert.equal(bom.metadata.component.version, "1.0.0", "version pinada do fixture aparece no SBOM")
-  } finally {
-    // maxRetries: `npm sbom` é subprocess — no Windows o handle pode seguir
-    // aberto um instante após o exit (EBUSY/ENOTEMPTY sob carga).
-    rmSync(tmp, { recursive: true, force: true, maxRetries: 5 })
-  }
+  } finally { cleanupTmp(tmp) }
 })
