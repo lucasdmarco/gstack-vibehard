@@ -1,5 +1,46 @@
 # Changelog - gstack-vibehard
 
+## [5.99.0] - 2026-07-30 — PRD51 S51.9.4: TGZ validado em ambiente limpo + detector de teste invisível (fecha o Sprint 51.9)
+
+Quarta parte do Sprint 51.9 (ação 6). **Aqui a infraestrutura já existia e é
+séria — não foi preciso construir nada novo.** O trabalho honesto foi
+*executar* e registrar a verdade.
+
+**Execução REAL desta sessão** (Windows, node v24.14.0),
+`npm run test:e2e:package` → **exit 0**:
+
+- tarball com 1022 arquivos, sem `node_modules`/`__pycache__`/`.pyc`/`.tgz`;
+- instalado em prefixo isolado; `--version`, `--help`, `doctor --json` (JSON
+  puro) OK;
+- `dream audit` **dentro do tarball**: `REAL=24 PLACEBO=0 (== repo)` —
+  comparado com o placar do repo do commit, **nunca** um número fixo;
+- read-only é read-only: **zero footprint** gstack no HOME após
+  version/doctor/audit;
+- `create --lite` é project-scoped (zero footprint no HOME);
+- `install --audit-only` grava **só** o relatório; `uninstall --restore-only`
+  sai 0.
+
+- `tests/tgz_clean_env.test.js` (8 testes) trava o que sustenta a alegação: os
+  scripts existem, o ciclo de vida do tarball roda na CI nos **três** sistemas
+  (`ubuntu`/`windows`/`macos`), o HOME é descartável e o contrato de verdade é
+  **comparação com o repo**, não constante.
+
+**Detector de teste invisível** (achado do S51.9.3, agora ferramenta):
+
+- `scripts/check-test-visibility.mjs` + `npm run test:visibility`. Compara as
+  declarações `test(` de cada arquivo com o total que o `node --test`
+  **reporta**. Divergência = teste que sumiu do placar sem falhar.
+- **Varredura completa: 70 arquivos que sequestram `process.stdout.write`
+  global, ZERO escondendo teste.** Ou seja: o risco é real (o S51.9.3 perdeu 2
+  testes assim), mas **não está se manifestando em nenhum outro lugar hoje** —
+  medido, não suposto. O detector fica como guarda contra ele reaparecer.
+
+Correção de rota registrada: a primeira versão do teste do contrato de verdade
+reprovou por casar um **comentário** que documenta o bug histórico
+("o CI quebrou com `REAL===18` hardcoded"), não o código — que sempre comparou
+`s.REAL === r.REAL`. Passou a checar a invariante **positiva**, ignorando
+comentários.
+
 ## [5.98.0] - 2026-07-30 — PRD51 S51.9.3: `logs --follow` deixa de ser flag anunciada e inerte
 
 Terceira parte do Sprint 51.9 (ação 5: "decidir se `logs --follow` será
