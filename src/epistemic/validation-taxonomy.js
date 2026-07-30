@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * PRD51 S51.8.1 — taxonomia de validação (§51.8, ações 5/6/7).
  *

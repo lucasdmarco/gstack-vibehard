@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Knowledge/Execution firewall (PRD22 §4.3, consolidado no PRD23 Fase3).
  *

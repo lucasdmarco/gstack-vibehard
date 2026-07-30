@@ -1,5 +1,45 @@
 # Changelog - gstack-vibehard
 
+## [5.97.0] - 2026-07-30 — PRD51 S51.9.2: `typecheck` passa a checar TIPO de verdade (tsc --noEmit)
+
+Segunda parte do Sprint 51.9 (ações 3 e 4). Estado verificado antes:
+`npm run typecheck` e `npm run syntaxcheck` eram **o mesmo comando**
+(`node scripts/lint.mjs --typecheck`) — o nome prometia checagem de tipo e
+entregava checagem de sintaxe. Existia um `typecheck:ts`
+(`tsc --noEmit -p jsconfig.json`), mas com `checkJs: false` e **zero** arquivos
+marcados `// @ts-check` no repo inteiro: um comando que passava sempre, incapaz
+de reprovar qualquer erro de tipo em `src/`. O rótulo impresso pelo script
+ainda dizia "typecheck (ESM puro… sem TS)", assumindo o problema em voz alta.
+
+**Medição que definiu o desenho** (não suposição): ligar `checkJs: true` no
+repo inteiro produz **~490 erros** hoje — 327 `TS2339`, 97 `TS2353`, … — e o
+§10 do PRD51 lista "migrar todo JavaScript para TypeScript" como **fora de
+escopo**. Então o gate é por **adoção incremental**: quem declara
+`// @ts-check` é verificado de verdade e **bloqueia**.
+
+- `tsconfig.typecheck.json` (novo): `tsc --noEmit`, `checkJs: false`
+  (opt-in por arquivo) e `strict: true` — com **apenas** `noImplicitAny`
+  desligado, porque só ele exigiria anotar o repo todo. Medi cada flag
+  isolada antes de ligar: `strictNullChecks`, `noImplicitReturns`,
+  `noFallthroughCasesInSwitch`, `noUnusedLocals` e `strictBindCallApply` dão
+  **zero erro** nos módulos optados — ou seja, ganho real a custo zero.
+- `npm run typecheck` = `tsc --noEmit -p tsconfig.typecheck.json`.
+  `npm run syntaxcheck` segue sendo `node --check` em todo o `src/`,
+  **separado**, e o rótulo impresso deixou de se chamar "typecheck".
+- **8 módulos já type-clean** optaram com `// @ts-check` (medidos, não
+  escolhidos a esmo): `epistemic/validation-taxonomy`, `epistemic/schema`,
+  `harness/enforcement-scope`, `harness/codex-trust`, `skills/safe-next-action`,
+  `meta/operation-registry`, `meta/command-layers`, `release/source-parity`.
+  Um teste falha se o opt-in cair abaixo de 5 — gate vazio não prova nada.
+- **CI não rodava typecheck em job nenhum.** O job `lint` ganhou `npm ci` +
+  `npm run typecheck` + `npm run syntaxcheck`.
+- `tests/typecheck_real_gate.test.js` (9 testes) com **4 controles negativos
+  que rodam o `tsc` de verdade**: argumento de tipo errado reprova (`TS2345`),
+  propriedade inexistente reprova (`TS2339`), acesso a possivelmente-nulo
+  reprova (`strictNullChecks` ativo), e o **limite declarado** — sem
+  `// @ts-check` o mesmo erro passa, que é exatamente por que o opt-in precisa
+  crescer.
+
 ## [5.96.0] - 2026-07-29 — PRD51 S51.9.1: Runtime Manifest V3 PROMOVIDO e fim do downgrade silencioso
 
 Primeira parte do Sprint 51.9 (ações 1 e 2). Estado verificado antes de

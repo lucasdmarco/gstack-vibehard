@@ -1,0 +1,20 @@
+{
+  "//": "PRD51 S51.9.2 — typecheck REAL (tsc --noEmit), separado do syntaxcheck (node --check). `checkJs:false` de propósito: o gate é por ADOÇÃO INCREMENTAL — só os arquivos que declaram `// @ts-check` no topo são verificados, e ESSES bloqueiam de verdade. Ligar checkJs no repo inteiro produz ~490 erros hoje (medido), e o §10 do PRD51 lista 'migrar todo JavaScript para TypeScript' como fora de escopo.",
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "target": "es2022",
+    "checkJs": false,
+    "allowJs": true,
+    "noEmit": true,
+    "strict": true,
+    "noImplicitAny": false,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["src/**/*.js", "types/**/*.d.ts"],
+  "exclude": ["node_modules", "templates", "agents/generated"]
+}

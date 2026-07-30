@@ -1,3 +1,4 @@
+// @ts-check
 import { layerOf } from "./command-layers.js"
 
 /**
