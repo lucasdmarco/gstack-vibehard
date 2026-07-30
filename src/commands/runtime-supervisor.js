@@ -1,5 +1,5 @@
 import { spawn, execFileSync } from "child_process"
-import { openSync, closeSync, mkdirSync, existsSync, readFileSync } from "fs"
+import { openSync, closeSync, readSync, statSync, mkdirSync, existsSync, readFileSync } from "fs"
 import { join } from "path"
 import { loadRuntimeManifest, validateManifestForVersion, manifestExecutionScope } from "../runtime/manifest.js"
 import { evaluateManifestExec, evaluateManifestExecForProject, manifestTrustDigest, writeTrustedDigest } from "../runtime/exec-policy.js"
@@ -307,16 +307,76 @@ export async function stopCommand(args = [], opts = {}) {
 }
 
 const noLogFile = (t) => !t || !t.log || !existsSync(t.log)
+
+/**
+ * PRD51 S51.9.3 — `--follow` REAL (§51.9 ação 5: "decidir se `logs --follow`
+ * será implementado ou removido do help").
+ *
+ * Estado anterior: o help anunciava `logs [serviço] [--follow]` e a flag só
+ * imprimia "(--follow contínuo chega no refinamento; por ora mostra o
+ * acumulado.)" — flag anunciada e inerte. Decisão: **implementar**.
+ *
+ * Lê os bytes NOVOS por polling do tamanho (não mantém handle aberto, o que no
+ * Windows atrapalharia o writer). Trata truncamento/rotação: se o arquivo
+ * encolheu, relê do início em vez de calcular um offset negativo.
+ */
+function readTail(logPath, from, to) {
+  const fd = openSync(logPath, "r")
+  try {
+    const buf = Buffer.alloc(to - from)
+    const bytes = readSync(fd, buf, 0, buf.length, from)
+    return buf.subarray(0, bytes).toString("utf-8")
+  } finally { closeSync(fd) }
+}
+
+export function followLog(logPath, opts = {}) {
+  const write = opts.write || ((s) => process.stdout.write(s))
+  const intervalMs = opts.intervalMs ?? 300
+  const maxMs = opts.maxMs ?? null // null = até SIGINT (uso interativo real)
+  let offset = opts.fromOffset ?? 0
+  const started = opts.now ? opts.now() : Date.now()
+  const nowMs = () => (opts.now ? opts.now() : Date.now())
+  return new Promise((resolve) => {
+    const finish = (reason) => { clearInterval(timer); process.off("SIGINT", onSigint); resolve({ reason, offset }) }
+    const onSigint = () => finish("interrupted")
+    const tick = () => {
+      let size
+      try { size = statSync(logPath).size } catch { return finish("log_gone") }
+      if (size < offset) offset = 0 // truncado/rotado — relê do começo
+      if (size > offset) { write(readTail(logPath, offset, size)); offset = size }
+      if (maxMs !== null && nowMs() - started >= maxMs) finish("timeout")
+    }
+    const timer = setInterval(tick, intervalMs)
+    process.once("SIGINT", onSigint)
+    tick()
+  })
+}
+
+const logTargetFor = (state, svc) => (svc ? state.find((s) => s.name === svc) : state[0])
+
+// Continua do fim do que já foi impresso: nada é duplicado nem perdido.
+const followFrom = (target, acumulado, opts) => followLog(target.log, {
+  fromOffset: Buffer.byteLength(acumulado, "utf-8"),
+  intervalMs: opts.followIntervalMs,
+  maxMs: opts.followMaxMs ?? null,
+  write: opts.followWrite,
+})
+
 /** `gstack_vibehard logs [serviço] [--follow]`. */
-export function logsCommand(args = [], opts = {}) {
+export async function logsCommand(args = [], opts = {}) {
   const cwd = opts.cwd || process.cwd()
   const svc = args.find((a) => !a.startsWith("-"))
-  const state = readAllState(cwd)
-  const target = svc ? state.find((s) => s.name === svc) : state[0]
+  const target = logTargetFor(readAllState(cwd), svc)
   if (noLogFile(target)) return warn(`Sem log para '${svc || "(primeiro serviço)"}'. Rode \`gstack_vibehard dev\` primeiro.`)
   section(`logs — ${target.name}`)
-  process.stdout.write(readFileSync(target.log, "utf-8"))
-  if (args.includes("--follow")) info("\n  (--follow contínuo chega no refinamento; por ora mostra o acumulado.)")
+  const acumulado = readFileSync(target.log, "utf-8")
+  // Seam de escrita: sem ele, o teste teria que sequestrar `process.stdout.write`
+  // global — e isso engole a própria saída do test runner, escondendo resultado
+  // (aconteceu ao escrever este sub-sprint: 2 testes sumiram do placar).
+  ;(opts.write || ((s) => process.stdout.write(s)))(acumulado)
+  if (!args.includes("--follow")) return undefined
+  info(`\n  (--follow ativo — Ctrl+C para sair. Seguindo ${target.log})`)
+  return followFrom(target, acumulado, opts)
 }
 
 /** `gstack_vibehard open` — abre o preview do serviço web. */

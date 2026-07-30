@@ -1,5 +1,36 @@
 # Changelog - gstack-vibehard
 
+## [5.98.0] - 2026-07-30 — PRD51 S51.9.3: `logs --follow` deixa de ser flag anunciada e inerte
+
+Terceira parte do Sprint 51.9 (ação 5: "decidir se `logs --follow` será
+implementado ou removido do help"). Estado anterior: o help anunciava
+`logs [serviço] [--follow]` e a flag **só imprimia** "(--follow contínuo chega
+no refinamento; por ora mostra o acumulado.)". Promessa sem entrega.
+**Decisão: implementar.**
+
+- `followLog(logPath, opts)` (novo, exportado): segue o arquivo por polling do
+  tamanho e escreve **apenas os bytes novos**. Não mantém handle aberto — no
+  Windows isso atrapalharia o processo que escreve o log.
+- **Truncamento/rotação tratados**: se o arquivo encolheu, relê do início em
+  vez de calcular offset negativo. Arquivo removido encerra com
+  `reason: "log_gone"` em vez de girar para sempre.
+- Encerra em `SIGINT` (Ctrl+C) e devolve o `offset` final — retomável, sem
+  duplicar nem perder byte.
+- `logsCommand` virou `async` (o dispatch do CLI já fazia `await`) e emenda o
+  follow exatamente no fim do que já foi impresso: o acumulado não é
+  reimpresso.
+- Help atualizado para descrever o comportamento **real**.
+- `tests/logs_follow.test.js` (9 testes) cobrindo bytes-novos-apenas,
+  truncamento, arquivo removido, offset retomável, os dois caminhos do comando
+  e um controle negativo (sem log, `--follow` não fica pendurado).
+
+**Achado de processo no caminho**: os dois testes de wiring sequestravam
+`process.stdout.write` global — e isso **engole a saída do próprio test
+runner**. Dois testes sumiram do placar (9 escritos, 7 reportados) sem
+nenhuma falha aparente. `logsCommand` ganhou o seam `opts.write` e os testes
+deixaram de tocar o stdout global. Vale como aviso geral: teste que sequestra
+stdout global pode esconder resultado.
+
 ## [5.97.0] - 2026-07-30 — PRD51 S51.9.2: `typecheck` passa a checar TIPO de verdade (tsc --noEmit)
 
 Segunda parte do Sprint 51.9 (ações 3 e 4). Estado verificado antes:
