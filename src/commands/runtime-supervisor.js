@@ -1,7 +1,7 @@
 import { spawn, execFileSync } from "child_process"
 import { openSync, closeSync, mkdirSync, existsSync, readFileSync } from "fs"
 import { join } from "path"
-import { loadRuntimeManifest, validateRuntimeManifest } from "../runtime/manifest.js"
+import { loadRuntimeManifest, validateManifestForVersion, manifestExecutionScope } from "../runtime/manifest.js"
 import { evaluateManifestExec, evaluateManifestExecForProject, manifestTrustDigest, writeTrustedDigest } from "../runtime/exec-policy.js"
 import { classifyWorkspace } from "../runtime/workspace.js"
 import { routeDefaultOn } from "../tools/headroom-policy.js"
@@ -59,11 +59,22 @@ function enforceExecPolicy(m, cwd) {
   }
   return false
 }
+// PRD51 S51.9.1 — o `dev` chamava `validateRuntimeManifest` (v2) sem saber que
+// o v3 existia: um manifest v3 legítimo era reprovado por "schemaVersion deve
+// ser 2". Agora a validação despacha por versão, e o escopo REAL de execução é
+// dito em voz alta — os campos de projeto do v3 são preservados mas o supervisor
+// executa só `services`.
+function announceExecutionScope(m) {
+  const scope = manifestExecutionScope(m)
+  if (!scope.declaredNotExecuted.length) return
+  warn(`  manifest v${scope.schemaVersion}: ${scope.declaredNotExecuted.join(", ")} declarado(s) mas NÃO executado(s) — o supervisor roda apenas \`services\`.`)
+}
 function loadValidDevManifest(cwd, args = []) {
   const m = loadRuntimeManifest(cwd)
   if (!m) { explainNoManifest(cwd); return null }
-  const v = validateRuntimeManifest(m)
+  const v = validateManifestForVersion(m)
   if (!v.valid) { v.errors.forEach((e) => warn(`  ✗ ${e}`)); error("Runtime manifest inválido — corrija antes do `dev`."); return null }
+  announceExecutionScope(m)
   if (args.includes("--trust")) return trustAndLoad(m, cwd)
   if (!enforceExecPolicy(m, cwd)) return null
   return m

@@ -38,16 +38,34 @@ test("cada item `delivered` aponta um teste de prova que EXISTE (sem enfeite)", 
   }
 })
 
-test("cobre os 16 achados do PRD45 (4 P0 + 12 P1); P1.3 é o parcial honesto documentado", async () => {
+test("cobre os 16 achados do PRD45 (4 P0 + 12 P1), cada um com status honesto", async () => {
   const { PRD45_RC_ITEMS, prd45Readiness } = await imp()
   const ids = new Set(PRD45_RC_ITEMS.map((i) => i.id))
   for (let n = 1; n <= 4; n++) assert.ok(ids.has(`P0.${n}`), `tem P0.${n}`)
   for (let n = 1; n <= 12; n++) assert.ok(ids.has(`P1.${n}`), `tem P1.${n}`)
-  // P1.3 (loader V3 canônico) é o único parcial — declarado honestamente, não escondido.
-  const p13 = PRD45_RC_ITEMS.find((i) => i.id === "P1.3")
-  assert.equal(p13.status, "partial", "P1.3 é partial (schema/migração existem; loader dormente)")
+  // Invariante que NÃO envelhece: todo aberto aparece em p1Open, todo entregue
+  // cita prova que existe. Antes este teste fixava "P1.3 é partial" e ficou
+  // stale quando o PRD51 S51.9.1 promoveu o loader V3.
   const r = prd45Readiness()
-  assert.ok(r.p1Open.some((i) => i.id === "P1.3"), "P1.3 aparece como P1 aberto (transparente)")
+  const abertos = new Set(r.p1Open.map((i) => i.id))
+  for (const i of PRD45_RC_ITEMS.filter((x) => x.tier === "P1")) {
+    if (i.status === "delivered") assert.ok(i.proof, `${i.id} delivered precisa citar prova`)
+    else assert.ok(abertos.has(i.id), `${i.id} não-entregue tem que aparecer como P1 aberto (transparência)`)
+  }
+})
+
+// PRD51 S51.9.1 — o P1.3 saiu de `partial` porque o loader deixou de reconstruir
+// um manifest v3 como v2 (descartando workflows/postMerge/deploy/health em
+// silêncio). Guarda de regressão do MOTIVO, não do rótulo.
+test("P1.3: o loader V3 canônico está de fato entregue e a prova citada existe", async () => {
+  const { PRD45_RC_ITEMS } = await imp()
+  const p13 = PRD45_RC_ITEMS.find((i) => i.id === "P1.3")
+  assert.equal(p13.status, "delivered")
+  assert.ok(existsSync(path.join(repoRoot, p13.proof)), `prova do P1.3 existe: ${p13.proof}`)
+  const { loadRuntimeManifest } = await import(`${pathToFileURL(path.join(repoRoot, "src/runtime/manifest.js"))}?t=${Date.now()}`)
+  const v3 = { schemaVersion: 3, services: [{ name: "w", command: ["node", "s.js"] }], workflows: [{ name: "b" }] }
+  const got = loadRuntimeManifest("/fake", { exists: () => true, readJson: () => v3 })
+  assert.equal(got.schemaVersion, 3, "sem downgrade silencioso — é isso que sustenta o `delivered`")
 })
 
 test("cada item mapeia sprint + versão (rastreabilidade achado→sprint→release)", async () => {
