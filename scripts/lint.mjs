@@ -51,7 +51,10 @@ for (let i = 0; i < files.length; i += concurrency) {
 // honestidade — o projeto é ESM puro (sem TypeScript), então "typecheck" aqui é
 // verificação de sintaxe/parse de cada módulo, não inferência de tipos.
 const label = process.argv.includes("--typecheck")
-  ? "typecheck (ESM puro — parse/sintaxe via node --check, sem TS)"
+  // PRD51 S51.9.2: este passo é SYNTAXCHECK, não typecheck. O rótulo antigo
+  // dizia "typecheck" e o nome enganava — `npm run typecheck` agora é
+  // `tsc --noEmit` de verdade (tsconfig.typecheck.json).
+  ? "syntaxcheck (ESM puro — parse/sintaxe via node --check; typecheck de tipo é `npm run typecheck`)"
   : "lint"
 console.log(`${label}: ${files.length} arquivos checados, ${errors} com erro de sintaxe`)
 process.exit(errors ? 1 : 0)

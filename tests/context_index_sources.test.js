@@ -31,6 +31,24 @@ function captureStdout() {
   return { restore: () => { process.stdout.write = orig }, get: () => buf }
 }
 
+/**
+ * PRD51 S51.9.2 — diagnóstico honesto do passo de índice.
+ *
+ * Estes testes chamavam `context index` sem checar o resultado e só depois
+ * asseveravam a saída de `status`. Quando o indexador Python falha (aconteceu
+ * sob carga dentro do `verify`, com a suíte em paralelo + tsc), `context index`
+ * reporta o erro corretamente — mas o teste quebrava com a mensagem ERRADA
+ * (".docs/RESEARCH conta como fonte research") em vez de "o indexador falhou".
+ * Asseverar o índice primeiro faz o teste dizer a verdade sobre a causa.
+ */
+async function indexOrExplain(contextCommand, cwd, args = ["index", "--reindex"]) {
+  const cap = captureStdout()
+  try { await contextCommand(args, { cwd }) } finally { cap.restore() }
+  const out = cap.get()
+  assert.match(out, /Indexados \d+ doc/, `\`context index\` não concluiu — saída real:\n${out}`)
+  return out
+}
+
 test("PRD24 24.4: .docs/RESEARCH indexa como 'research' e `search PRD22` acha o doc", async () => {
   const cwd = await mkdtemp(path.join(tmpdir(), "gstack-cidx24-"))
   try {
@@ -39,7 +57,7 @@ test("PRD24 24.4: .docs/RESEARCH indexa como 'research' e `search PRD22` acha o 
     await writeFile(path.join(cwd, ".docs", "PLANS", "prd22.md"), "# PRD22\n\nPRD22 sobre economia real de tokens.\n")
     await writeFile(path.join(cwd, ".docs", "RESEARCH", "registry.md"), "# Registry\nrepositorios comparados AIDD.\n")
     const { contextCommand } = await imp()
-    await contextCommand(["index", "--reindex"], { cwd })
+    await indexOrExplain(contextCommand, cwd)
 
     const s = captureStdout()
     try { await contextCommand(["status", "--db"], { cwd }) } finally { s.restore() }
@@ -59,7 +77,7 @@ test("context index cobre .docs/PLANS/.docs/ADRS + raiz; status --db conta por f
   const cwd = await seedProject()
   try {
     const { contextCommand } = await imp()
-    await contextCommand(["index", "--reindex"], { cwd })
+    await indexOrExplain(contextCommand, cwd)
     const cap = captureStdout()
     try { await contextCommand(["status", "--db"], { cwd }) } finally { cap.restore() }
     const out = cap.get()
@@ -77,7 +95,7 @@ test("context scout --mode decision_context --json: decisão + evidência + arqu
   const cwd = await seedProject()
   try {
     const { contextCommand } = await imp()
-    await contextCommand(["index", "--reindex"], { cwd })
+    await indexOrExplain(contextCommand, cwd)
     const cap = captureStdout()
     try { await contextCommand(["scout", "worktree", "--mode", "decision_context", "--json"], { cwd }) } finally { cap.restore() }
     const parsed = JSON.parse(cap.get().trim()) // JSON PURO
@@ -96,7 +114,7 @@ test("context scout normal (--json) inclui tokenAccounting.isEstimate", async ()
   const cwd = await seedProject()
   try {
     const { contextCommand } = await imp()
-    await contextCommand(["index", "--reindex"], { cwd })
+    await indexOrExplain(contextCommand, cwd)
     const cap = captureStdout()
     try { await contextCommand(["scout", "worktree", "--json"], { cwd }) } finally { cap.restore() }
     const parsed = JSON.parse(cap.get().trim())

@@ -93,6 +93,15 @@ jobs:
         run: npm run build:agents -- --check
       - name: Command-lint (README só cita comando que existe — PRD30 F7-A)
         run: npm run lint:commands
+      # PRD51 S51.9.2: o typecheck REAL (tsc --noEmit) não rodava em CI nenhuma —
+      # `typecheck` era o mesmo `node --check` do syntaxcheck. Precisa de `npm ci`
+      # porque o tsc é devDependency (os passos acima são node puro, sem deps).
+      - name: Install dependencies (para o tsc)
+        run: npm ci
+      - name: Typecheck REAL (tsc --noEmit; bloqueia erro de tipo nos arquivos // @ts-check)
+        run: npm run typecheck
+      - name: Syntaxcheck (node --check em todo o src — separado do typecheck)
+        run: npm run syntaxcheck
 
   # Smoke de empacotamento + scaffold. O test:pack prova o TARBALL real (pegaria,
   # p.ex., o strip do .gitignore pelo npm); o test:templates valida o scaffold lite.

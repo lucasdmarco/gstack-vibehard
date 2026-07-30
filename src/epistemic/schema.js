@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Schema do resultado epistêmico (PRD50 S50.1, §10) — `gstack.epistemic-review.v1`.
  *

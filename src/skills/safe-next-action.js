@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * PRD51 S51.7.3 — "uma próxima ação segura para cada falha importante"
  * (PRD48 §3.2 P2.2, o único item da checklist que NENHUM sprint anterior
