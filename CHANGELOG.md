@@ -1,5 +1,44 @@
 # Changelog - gstack-vibehard
 
+## [5.95.0] - 2026-07-29 — PRD51 S51.8.3: mecânica da avaliação cega dupla (fecha o Sprint 51.8)
+
+Terceira e última parte do Sprint 51.8 (ações 2, 3 e 8). O módulo constrói a
+**mecânica** da validação subjetiva do PRD50 e a torna verificável — e
+**não produz rótulo nenhum**. Os rótulos humanos reais continuam pendentes e
+declarados; fabricá-los aqui seria exatamente a circularidade que o PRD50
+§2.3 item 1 rejeita, e um controle negativo trava isso (sem `Math.random`, sem
+rótulo embutido).
+
+- `src/epistemic/blind-evaluation.js` (novo):
+  - **Ação 8 (anti-autoavaliação)**: rótulo do próprio sistema sob teste, de um
+    modelo com o **mesmo `modelId`** do avaliado, ou de quem **construiu** o
+    sistema é **inelegível** — não "conta menos", não conta. Avaliador sem
+    identidade também é inelegível (independência não-verificável).
+  - **Ação 2**: `MIN_INDEPENDENT_EVALUATORS = 2`. Um avaliador só nunca fecha.
+  - **Ação 3**: concordância bruta + **kappa de Cohen real**, e divergência só
+    é resolvida por adjudicação **registrada de um terceiro** com motivo — o
+    adjudicador não pode ser um dos que divergiram. Sem isso fica `unresolved`,
+    nunca resolvida por maioria silenciosa.
+  - **Cegueira**: rótulo que revela a origem da resposta (`systemId`,
+    `producedBy`, `modelId`, …) invalida o pipeline e os campos vazados são
+    listados.
+  - `kappa` é `null` quando **não é definível** (categoria única, tamanhos
+    diferentes, 3+ rotuladores) em vez de um número inventado.
+- **§4.6 do PRD pedia CINCO estados, e o S51.8.1 só tinha entregue dois.**
+  Agora existem `validated` / `rejected` / `pendingHumanValidation` /
+  `unobservableByDesign` / `outOfScope`, com `validated`/`rejected` alcançáveis
+  **somente** por pipeline `complete`. `validation-taxonomy.js` reexporta o
+  vocabulário — fonte única, e um teste proíbe cópia paralela.
+- **Erro de design meu, achado por um controle negativo**: a 1ª versão exigia
+  que **todos** os elegíveis rotulassem tudo, então a simples presença do
+  adjudicador terceiro (que só desempata, não rotula) marcava cada caso como
+  sub-coberto e zerava as divergências. O critério correto é **≥2 avaliadores
+  por caso**, e `raters` passou a ser quem **rotulou**, não quem era elegível.
+  Corrigi o módulo e adicionei o caso como teste de regressão.
+- `tests/blind_evaluation.test.js` (28 testes), 9 deles controles negativos.
+  Um teste de integração amarra o pipeline ao congelamento do S51.8.2: só se
+  rotula o conjunto rotulável, e o holdout nunca entra na cobertura exigida.
+
 ## [5.94.0] - 2026-07-29 — PRD51 S51.8.2: congelamento verificável de corpus e holdout antes dos rótulos
 
 Segunda parte do Sprint 51.8 (ações 1 e 4). O que isto fecha é metodológico,
