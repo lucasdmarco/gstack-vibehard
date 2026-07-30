@@ -1,10 +1,11 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { mkdtempSync, rmSync, existsSync, writeFileSync } from "node:fs"
+import { mkdtempSync, existsSync, writeFileSync } from "node:fs"
 import { execFileSync } from "node:child_process"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
+import { cleanupTmp } from "./helpers/tmp.js"
 
 const repoRoot = path.resolve(import.meta.dirname, "..")
 const imp = (rel) => import(`${pathToFileURL(path.join(repoRoot, rel))}?t=${Date.now()}`)
@@ -24,7 +25,7 @@ test("freebuff --yes NÃO pula a disclosure de rede na 1ª vez (needs_acceptance
     const r = await delegateCommand(["freebuff", "--task", "revisar", "--worktree", "--yes"], { cwd, confirm: async () => true })
     assert.equal(r.status, "needs_acceptance")
     assert.ok(Array.isArray(r.disclosure) && r.disclosure.length)
-  } finally { rmSync(cwd, { recursive: true, force: true }) }
+  } finally { cleanupTmp(cwd) }
 })
 
 test("freebuff com --accept-disclosure roda; 2ª vez não repete o gate", async () => {
@@ -40,7 +41,7 @@ test("freebuff com --accept-disclosure roda; 2ª vez não repete o gate", async 
     // 2ª vez: sem --accept-disclosure, já aceito → não volta a pedir
     const r2 = await delegateCommand(["freebuff", "--task", "y", "--worktree", "--yes"], { cwd, confirm: async () => true })
     assert.notEqual(r2.status, "needs_acceptance")
-  } finally { rmSync(cwd, { recursive: true, force: true }) }
+  } finally { cleanupTmp(cwd) }
 })
 
 test("acceptanceGate: --yes sozinho não aceita; --accept-disclosure aceita e persiste", async () => {
@@ -54,5 +55,5 @@ test("acceptanceGate: --yes sozinho não aceita; --accept-disclosure aceita e pe
     const ok = acceptanceGate({ candidate: FREEBUFF, cwd, acceptDisclosure: true })
     assert.equal(ok.ok, true)
     assert.equal(hasAccepted(cwd, "freebuff"), true)
-  } finally { rmSync(cwd, { recursive: true, force: true }) }
+  } finally { cleanupTmp(cwd) }
 })

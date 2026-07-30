@@ -3,9 +3,10 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { execFileSync } from "node:child_process"
-import { mkdtempSync, rmSync, existsSync } from "node:fs"
+import { mkdtempSync, existsSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
+import { cleanupTmp } from "../helpers/tmp.js"
 
 const bin = path.resolve(import.meta.dirname, "..", "..", "src", "index.js")
 
@@ -20,7 +21,7 @@ test("E2E delegate sem args: imprime uso e sai limpo (nada é executado)", () =>
     const r = run(["delegate"], cwd)
     assert.match(r.out, /delegate/)
     assert.equal(existsSync(path.join(cwd, ".gstack", "worktrees")), false)
-  } finally { rmSync(cwd, { recursive: true, force: true }) }
+  } finally { cleanupTmp(cwd) }
 })
 
 test("E2E delegate não-interativo SEM --yes: cancela (não roda sem consentimento)", () => {
@@ -29,5 +30,5 @@ test("E2E delegate não-interativo SEM --yes: cancela (não roda sem consentimen
     // sem TTY e sem --yes → confirmação nega; nenhuma delegação ocorre
     const r = run(["delegate", "codebuff", "--task", "revisar", "--worktree"], cwd)
     assert.match(r.out, /cancel|confirme|--yes/i)
-  } finally { rmSync(cwd, { recursive: true, force: true }) }
+  } finally { cleanupTmp(cwd) }
 })

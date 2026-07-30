@@ -1,10 +1,11 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { mkdtempSync, rmSync, existsSync, writeFileSync } from "node:fs"
+import { mkdtempSync, existsSync, writeFileSync } from "node:fs"
 import { execFileSync } from "node:child_process"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
+import { cleanupTmp } from "./helpers/tmp.js"
 
 const repoRoot = path.resolve(import.meta.dirname, "..")
 const imp = (rel) => import(`${pathToFileURL(path.join(repoRoot, rel))}?t=${Date.now()}`)
@@ -29,7 +30,7 @@ test("delegate codebuff: worktree obrigatória, verify final, provenance registr
     assert.equal(r.reviewer, "advisory")
     // provenance gravada
     assert.ok(existsSync(path.join(cwd, ".gstack", "provenance")) || existsSync(path.join(cwd, ".gstack")), "provenance dir")
-  } finally { rmSync(cwd, { recursive: true, force: true }) }
+  } finally { cleanupTmp(cwd) }
 })
 
 test("delegate codebuff SEM --worktree é recusado (não roda fora de worktree)", async () => {
@@ -39,7 +40,7 @@ test("delegate codebuff SEM --worktree é recusado (não roda fora de worktree)"
     const { delegateCommand } = await imp("src/commands/delegate.js")
     const r = await delegateCommand(["codebuff", "--task", "x", "--yes"], { cwd, confirm: async () => true })
     assert.equal(r.status, "worktree_required")
-  } finally { rmSync(cwd, { recursive: true, force: true }) }
+  } finally { cleanupTmp(cwd) }
 })
 
 test("delegate codebuff BLOQUEIA com .env rastreado (segredo não vai a modelo externo)", async () => {
@@ -49,5 +50,5 @@ test("delegate codebuff BLOQUEIA com .env rastreado (segredo não vai a modelo e
     const { delegateCommand } = await imp("src/commands/delegate.js")
     const r = await delegateCommand(["codebuff", "--task", "x", "--worktree", "--yes"], { cwd, confirm: async () => true })
     assert.equal(r.status, "blocked_tracked_secrets")
-  } finally { rmSync(cwd, { recursive: true, force: true }) }
+  } finally { cleanupTmp(cwd) }
 })

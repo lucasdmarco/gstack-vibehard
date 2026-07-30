@@ -1,7 +1,8 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { execFileSync } from "node:child_process"
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs"
+import { mkdtempSync, writeFileSync } from "node:fs"
+import { cleanupTmp } from "./helpers/tmp.js"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
@@ -24,18 +25,6 @@ const repoRoot = path.resolve(import.meta.dirname, "..")
 // shell:false no Windows — mesmo padrão de test-pack.mjs/test-e2e-lifecycle.mjs.
 const isWin = process.platform === "win32"
 
-/**
- * Limpeza BEST-EFFORT. No Windows, apagar um tmpdir logo após um subprocess
- * pode dar EPERM/EBUSY mesmo com `maxRetries` — o handle fica preso por
- * antivírus/indexador, não pelo nosso código (observado com o diretório já
- * praticamente vazio). O que este teste prova é o comportamento do `npm sbom`;
- * falhar a suíte porque o SO não liberou um diretório temporário seria um
- * falso negativo — e chega a `verify --profile full`, que roda `npm test`.
- */
-function cleanupTmp(dir) {
-  try { rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }) }
-  catch { /* resíduo de tmpdir não invalida a asserção acima */ }
-}
 function runNpmSbom(cwd, opts = {}) {
   const args = ["sbom", "--sbom-format", "cyclonedx", "--omit", "dev"]
   return isWin

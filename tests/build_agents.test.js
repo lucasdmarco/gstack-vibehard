@@ -1,10 +1,11 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises"
+import { mkdtemp, mkdir, writeFile, readFile } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { spawnSync } from "node:child_process"
+import { cleanupTmp } from "./helpers/tmp.js"
 
 const repoRoot = path.resolve(import.meta.dirname, "..")
 const buildScript = path.join(repoRoot, "scripts", "scripts", "build_agents.js")
@@ -143,7 +144,7 @@ Use clear API design boundaries.
     assert.equal(driftResult.status, 1, "edição manual em generated deve falhar o --check")
     assert.match((driftResult.stderr || "") + (driftResult.stdout || ""), /desatualiz/i)
   } finally {
-    await rm(root, { recursive: true, force: true })
+    cleanupTmp(root)
   }
 })
 
@@ -174,7 +175,7 @@ test("AgentShield: 'ignore all previous instructions' em knowledge → build CR�
     const checkBlocked = spawnSync(process.execPath, [buildScript, "--root", root, "--check"], { cwd: repoRoot, encoding: "utf8" })
     assert.equal(checkBlocked.status, 1, "injeção crítica deve bloquear o --check (gate CI)")
   } finally {
-    await rm(root, { recursive: true, force: true })
+    cleanupTmp(root)
   }
 })
 
@@ -229,6 +230,6 @@ test("Skill Packs: agent-packs/ compila skill nos adapters com Execution Contrac
     const drift = spawnSync(process.execPath, [buildScript, "--root", root, "--check"], { cwd: repoRoot, encoding: "utf8" })
     assert.equal(drift.status, 1, "editar fonte do pack sem rebuild deve falhar o --check")
   } finally {
-    await rm(root, { recursive: true, force: true })
+    cleanupTmp(root)
   }
 })

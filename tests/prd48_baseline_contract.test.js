@@ -1,10 +1,11 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { execFileSync } from "node:child_process"
-import { mkdtempSync, rmSync, existsSync, writeFileSync, cpSync } from "node:fs"
+import { mkdtempSync, existsSync, writeFileSync, cpSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
+import { cleanupTmp } from "./helpers/tmp.js"
 
 /**
  * PRD48 S48.0 — baseline pós-PRD47 e controles negativos. Garante que o PRD48 parte do
@@ -57,7 +58,7 @@ test("baseline: start --dry-run --json roda a partir da árvore fonte, JSON puro
     const d = JSON.parse(r.out)
     assert.equal(d.dryRun, true)
     assert.equal(existsSync(path.join(cwd, ".gstack")), false, "dry-run não escreve .gstack")
-  } finally { rmSync(cwd, { recursive: true, force: true }) }
+  } finally { cleanupTmp(cwd) }
 })
 
 // --- Controles negativos exigidos pelo DoD do sprint 48.0 ---
@@ -92,7 +93,7 @@ test("CONTROLE NEGATIVO — checkpoint adulterado: rollback detecta tamper e ABO
     assert.equal(rb.ok, false)
     assert.equal(rb.reason, "tamper_detected")
     assert.deepEqual(rb.restored, [], "nada é restaurado quando há tamper — falha fechada")
-  } finally { rmSync(root, { recursive: true, force: true }) }
+  } finally { cleanupTmp(root) }
 })
 
 test("CONTROLE NEGATIVO — projeto existente sujo (dirty tree): detectado, NUNCA descartado", async () => {
@@ -111,7 +112,7 @@ test("CONTROLE NEGATIVO — projeto existente sujo (dirty tree): detectado, NUNC
     // a alteração continua lá — nada neste teste (nem qualquer motor) descarta o arquivo do usuário
     const content = await import("node:fs").then((fs) => fs.readFileSync(path.join(root, "index.js"), "utf-8"))
     assert.match(content, /alterado sem commit/, "alteração do usuário preservada, nunca descartada")
-  } finally { rmSync(root, { recursive: true, force: true }) }
+  } finally { cleanupTmp(root) }
 })
 
 test("CONTROLE NEGATIVO — policy 'ask': NUNCA resolvido silenciosamente para 'allow'", async () => {

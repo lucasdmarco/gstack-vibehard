@@ -1,11 +1,12 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import path from "node:path"
-import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises"
+import { mkdtemp, writeFile, mkdir } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { execFileSync } from "node:child_process"
 import { tmpdir } from "node:os"
 import { pathToFileURL } from "node:url"
+import { cleanupTmp } from "./helpers/tmp.js"
 
 const repoRoot = path.resolve(import.meta.dirname, "..")
 const imp = (rel) => import(`${pathToFileURL(path.join(repoRoot, rel))}?t=${Date.now()}`)
@@ -45,7 +46,7 @@ test("research skills audit --repo SEM --yes (não-interativo): recusa honesta, 
     const out = JSON.parse(await captureStdout(() => researchCommand(["skills", "audit", "--repo", remote, "--json"], { cwd })))
     assert.equal(out.error, "needs_confirmation")
     assert.ok(!existsSync(path.join(cwd, ".gstack", "research", "mirrors")), "nenhum clone sem consentimento")
-  } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
+  } finally { cleanupTmp(cwd) }
 })
 
 test("research skills audit --repo: usuário recusa no prompt (confirm injetado) -> cancelado, nada clonado", async () => {
@@ -56,7 +57,7 @@ test("research skills audit --repo: usuário recusa no prompt (confirm injetado)
     const out = JSON.parse(await captureStdout(() => researchCommand(["skills", "audit", "--repo", remote, "--json"], { cwd, confirm: async () => false })))
     assert.equal(out.cancelled, true)
     assert.ok(!existsSync(path.join(cwd, ".gstack", "research", "mirrors")))
-  } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
+  } finally { cleanupTmp(cwd) }
 })
 
 test("research skills audit --repo --yes: clona de verdade e audita com o commit real do remoto", async () => {
@@ -68,7 +69,7 @@ test("research skills audit --repo --yes: clona de verdade e audita com o commit
     const out = JSON.parse(await captureStdout(() => researchCommand(["skills", "audit", "--repo", remote, "--json", "--yes"], { cwd })))
     assert.equal(out.provenance.commit, remoteHead)
     assert.equal(out.provenance.auditedFiles, 1)
-  } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
+  } finally { cleanupTmp(cwd) }
 })
 
 test("research skills audit --repo --yes: 2ª chamada ATUALIZA o mirror (staleness corrigida, não serve snapshot velho)", async () => {
@@ -88,5 +89,5 @@ test("research skills audit --repo --yes: 2ª chamada ATUALIZA o mirror (stalene
     const second = JSON.parse(await captureStdout(() => researchCommand(["skills", "audit", "--repo", remote, "--json", "--yes"], { cwd })))
     assert.equal(second.provenance.commit, newHead, "2ª auditoria reflete o commit NOVO, não o snapshot do 1º clone")
     assert.equal(second.provenance.auditedFiles, 2, "arquivo novo aparece -- mirror foi atualizado de verdade")
-  } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
+  } finally { cleanupTmp(cwd) }
 })

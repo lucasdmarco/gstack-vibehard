@@ -2,9 +2,10 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { execFileSync } from "node:child_process"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
+import { cleanupTmp } from "../helpers/tmp.js"
 
 const bin = path.resolve(import.meta.dirname, "..", "..", "src", "index.js")
 
@@ -31,7 +32,7 @@ test("E2E dev: sem runtime manifest → resposta HONESTA sem crash (exit 0)", ()
     const d = lastJson(r.out)
     const honest = (d && ("services" in d || "error" in d || "status" in d)) || /manifest|runtime|create/i.test(r.out)
     assert.ok(honest, "dev responde de forma honesta (JSON ou aviso de manifest)")
-  } finally { rmSync(cwd, { recursive: true, force: true }) }
+  } finally { cleanupTmp(cwd) }
 })
 
 test("E2E verify --changed-files --json: docs-only passa, JSON puro", () => {
@@ -41,7 +42,7 @@ test("E2E verify --changed-files --json: docs-only passa, JSON puro", () => {
     const d = lastJson(r.out)
     assert.ok(d, "verify emite JSON")
     assert.ok("status" in d || "fallback" in d)
-  } finally { rmSync(cwd, { recursive: true, force: true }) }
+  } finally { cleanupTmp(cwd) }
 })
 
 test("E2E verify --profile release --dry-run --json: lista comandos, NÃO executa (rápido)", () => {
@@ -55,5 +56,5 @@ test("E2E verify --profile release --dry-run --json: lista comandos, NÃO execut
     assert.ok(d && d.dryRun === true, "dry-run declarado")
     assert.ok(Array.isArray(d.plan) && d.plan.some((s) => s.id === "test"))
     assert.ok(Date.now() - started < 15000, "dry-run é rápido (não roda npm install/test)")
-  } finally { rmSync(cwd, { recursive: true, force: true }) }
+  } finally { cleanupTmp(cwd) }
 })

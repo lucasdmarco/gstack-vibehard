@@ -1,10 +1,11 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { execFileSync } from "node:child_process"
-import { mkdtempSync, rmSync, writeFileSync, readFileSync } from "node:fs"
+import { mkdtempSync, writeFileSync, readFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
+import { cleanupTmp } from "../../helpers/tmp.js"
 
 /**
  * PRD48 S48.7 — Terminal E2E: prova que os 10 golden scenarios do sprint são realmente
@@ -33,7 +34,7 @@ test("golden 2: start --dry-run entrega plano + harnessSession real juntos (mesm
     const r = await startCommand(["--dry-run"], { cwd, objective: "app novo com login" })
     assert.ok(r.plan && r.plan.id)
     assert.ok(r.harnessSession && r.harnessSession.profiles.length === 3)
-  } finally { rmSync(cwd, { recursive: true, force: true }) }
+  } finally { cleanupTmp(cwd) }
 })
 
 // --- Cenário 3: projeto existente com dirty tree preservada (S48.2) ---
@@ -55,7 +56,7 @@ test("golden 3: ativar GStack em projeto existente NUNCA descarta alteração n�
     assert.equal(plan.dirtyTreePreserved, true)
     const content = readFileSync(path.join(cwd, "package.json"), "utf-8")
     assert.match(content, /"test"/, "alteração do usuário intacta")
-  } finally { rmSync(cwd, { recursive: true, force: true }) }
+  } finally { cleanupTmp(cwd) }
 })
 
 // --- Cenário 4: run falha, compara checkpoint, restaura, retoma (S48.3+S48.4) ---
@@ -75,7 +76,7 @@ test("golden 4: falha real -> compara checkpoints -> restaura COM provenance -> 
     const restored = restoreWithProvenance({ root, runId: "run-g4", seq: green.seq })
     assert.equal(restored.ok, true)
     assert.equal(readFileSync(path.join(root, "app.js"), "utf-8"), "console.log('v1 verde')")
-  } finally { rmSync(root, { recursive: true, force: true }) }
+  } finally { cleanupTmp(root) }
 })
 
 // --- Cenário 5: sessão encerrada abruptamente, retomada via Context Delta (S48.3+S47.7) ---
@@ -94,7 +95,7 @@ test("golden 5: sessão interrompida (State Store real) + Context Delta -> resum
     const delta = buildContextDelta({ checkpoint: { seq: 1, hash: "sha256:x", green: true } })
     const load = resolveContextDeltaLoad(delta, { graphState: "fresh" })
     assert.equal(load.action, "reuse", "resume sem reler o repositório")
-  } finally { rmSync(cwd, { recursive: true, force: true }) }
+  } finally { cleanupTmp(cwd) }
 })
 
 // --- Cenário 6: policy pede aprovação, explica efeito/rollback (S48.4) ---
@@ -138,7 +139,7 @@ test("golden 9: --json é IDÊNTICO em qualquer locale (JSON nunca traduz keys/e
     const pt = await runOnce("pt-BR")
     const en = await runOnce("en")
     assert.deepEqual(pt, en, "mesmo enum/messageId/campos — locale não muda o contrato de máquina")
-  } finally { rmSync(cwd, { recursive: true, force: true }) }
+  } finally { cleanupTmp(cwd) }
 })
 
 // --- Cenário 10: uninstall/restore do PRD45 continua íntegro após uso do PRD48 ---

@@ -1,10 +1,11 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises"
+import { mkdtemp, writeFile, mkdir } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { execFileSync } from "node:child_process"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
+import { cleanupTmp } from "./helpers/tmp.js"
 
 const repoRoot = path.resolve(import.meta.dirname, "..")
 const cmdMod = path.join(repoRoot, "src", "commands", "orchestrate.js")
@@ -41,7 +42,7 @@ test("orchestrate: passo limpo → passed com verifier independente; branch pron
     const intents = readRun(dir, "p1").map((x) => x.intent)
     assert.ok(intents.includes("orchestrate:llm_review_advisory"))
     assert.ok(intents.includes("orchestrate:deterministic_gate"))
-  } finally { await rm(dir, { recursive: true, force: true, maxRetries: 5 }) }
+  } finally { cleanupTmp(dir) }
 })
 
 // ── DoD: gate determinístico falha (debugger) → NÃO passa, branch descartado ──
@@ -52,5 +53,5 @@ test("orchestrate: passo com `debugger` → gate falha (failed), sem branch", as
     assert.equal(r.steps[0].status, "failed")
     assert.notEqual(r.status, "done")
     assert.doesNotMatch(git(dir, "branch", "--list", "orch/p1-s1"), /orch\/p1-s1/, "branch descartado")
-  } finally { await rm(dir, { recursive: true, force: true, maxRetries: 5 }) }
+  } finally { cleanupTmp(dir) }
 })

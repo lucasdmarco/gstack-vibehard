@@ -1,9 +1,10 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { execFileSync } from "node:child_process"
-import { mkdtempSync, rmSync, readdirSync } from "node:fs"
+import { mkdtempSync, readdirSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
+import { cleanupTmp } from "./helpers/tmp.js"
 
 const repoRoot = path.resolve(import.meta.dirname, "..")
 const bin = path.join(repoRoot, "src", "index.js")
@@ -34,7 +35,7 @@ test("no-args: exit 0, sugere `start`, NÃO instala nem escreve no HOME", () => 
     assert.match(r.out, /gstack_vibehard start/)
     assert.doesNotMatch(r.out, /Instalando pacote|Impacto desta inst/)
     assert.equal(readdirSync(home).length, before, "no-args não escreve no HOME")
-  } finally { rmSync(home, { recursive: true, force: true }) }
+  } finally { cleanupTmp(home) }
 })
 
 test("--help e -h: exit 0, sem 'Comando desconhecido'", () => {
@@ -67,7 +68,7 @@ test("install --help: mostra ajuda e NÃO entra no instalador", () => {
     assert.doesNotMatch(r.out, /Instalando pacote|Impacto desta inst|Harnesses detectados/)
     assert.match(r.out, /install/)
     assert.equal(readdirSync(home).length, before)
-  } finally { rmSync(home, { recursive: true, force: true }) }
+  } finally { cleanupTmp(home) }
 })
 
 test("create --help: ajuda do subcomando, exit 0, não executa", () => {

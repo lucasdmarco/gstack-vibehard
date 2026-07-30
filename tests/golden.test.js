@@ -1,11 +1,12 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { spawnSync } from "node:child_process"
-import { mkdtempSync, cpSync, rmSync, readFileSync, writeFileSync } from "node:fs"
+import { mkdtempSync, cpSync, readFileSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 import { normalize, treeIsDirtyOutside, compareCase, GOLDEN_CASES } from "../scripts/golden.mjs"
+import { cleanupTmp } from "./helpers/tmp.js"
 
 // PRD42 S42.0E — o Golden Harness trava contratos de saída determinísticos como regressão
 // byte-a-byte (em especial a Verdade de Capacidade do S42.0A). Os testes provam: (1) os
@@ -31,7 +32,7 @@ test("CONTROLE NEGATIVO: fixture corrompido => golden PEGA o drift (exit 1)", ()
     assert.equal(res.status, 1, "golden deveria falhar com fixture adulterado")
     assert.match(res.stderr + res.stdout, /drift/i)
   } finally {
-    rmSync(dir, { recursive: true, force: true })
+    cleanupTmp(dir)
   }
 })
 

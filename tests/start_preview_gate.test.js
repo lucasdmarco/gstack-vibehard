@@ -1,10 +1,11 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises"
+import { mkdtemp, mkdir, writeFile } from "node:fs/promises"
 import { execFileSync } from "node:child_process"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
+import { cleanupTmp } from "./helpers/tmp.js"
 
 const repoRoot = path.resolve(import.meta.dirname, "..")
 const imp = (rel) => import(`${pathToFileURL(path.join(repoRoot, rel))}?t=${Date.now()}`)
@@ -40,7 +41,7 @@ test("pipeline: preview unhealthy SEM --golden-run -> comportamento legado intac
     })
     assert.equal(r.stages.preview.status, "unhealthy")
     assert.equal(r.status, "done", "sem a flag, preview não é gate — zero regressão")
-  } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
+  } finally { cleanupTmp(cwd) }
 })
 
 test("pipeline: preview unhealthy COM --golden-run em projeto UI (hasRunScript) -> handoff (preview vira gate real)", async () => {
@@ -57,7 +58,7 @@ test("pipeline: preview unhealthy COM --golden-run em projeto UI (hasRunScript) 
     })
     assert.equal(r.stages.preview.status, "unhealthy")
     assert.equal(r.status, "handoff", "com a flag, projeto UI com preview unhealthy vira gate real")
-  } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
+  } finally { cleanupTmp(cwd) }
 })
 
 test("pipeline: preview unhealthy COM --golden-run em projeto SEM scripts.dev/start (CLI/lib) -> continua 'done' (não regride não-UI)", async () => {
@@ -82,7 +83,7 @@ test("pipeline: preview unhealthy COM --golden-run em projeto SEM scripts.dev/st
     // diretamente, não sobre o status agregado.
     assert.ok(!gateStagesFor({ goldenRun: true, projectDir: proj }).has("preview"), "sem scripts.dev/start, preview não entra no gate mesmo com a flag ligada")
     assert.equal(r.stages.preview.status, "unhealthy", "estado real do preview continua honesto")
-  } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
+  } finally { cleanupTmp(cwd) }
 })
 
 test("pipeline: preview 'ready' COM --golden-run -> continua 'done' (só unhealthy gateia, não ready)", async () => {
@@ -115,7 +116,7 @@ test("pipeline: preview 'ready' COM --golden-run -> continua 'done' (só unhealt
     assert.equal(r.stages.test.status, "ready", "árvore git limpa -> changed-files 'clean' -> stage 'ready'")
     assert.equal(r.stages.preview.status, "ready")
     assert.equal(r.status, "done")
-  } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
+  } finally { cleanupTmp(cwd) }
 })
 
 test("startCommand: --golden-run (flag CLI, não opts direto) chega até o pipeline de ponta a ponta e gateia preview unhealthy", async () => {
@@ -131,7 +132,7 @@ test("startCommand: --golden-run (flag CLI, não opts direto) chega até o pipel
       proofRunner: async () => ({ ready: false }), // S51.2.5: --golden-run roda proof por padrão — isola do proof real
     })
     assert.equal(r.pipeline.status, "handoff", "--golden-run parseado por parseStartArgs, propagado por confirmAndRunPipeline até runPipeline")
-  } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
+  } finally { cleanupTmp(cwd) }
 })
 
 test("startCommand: SEM --golden-run, o mesmo cenário unhealthy continua 'done' (default do CLI intacto)", async () => {
@@ -146,5 +147,5 @@ test("startCommand: SEM --golden-run, o mesmo cenário unhealthy continua 'done'
       verifyRunner: () => ({ status: "ready", usable: true, failed: [] }),
     })
     assert.equal(r.pipeline.status, "done")
-  } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
+  } finally { cleanupTmp(cwd) }
 })

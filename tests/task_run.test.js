@@ -1,10 +1,11 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises"
+import { mkdtemp, writeFile, mkdir } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { execFileSync } from "node:child_process"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
+import { cleanupTmp } from "./helpers/tmp.js"
 
 const repoRoot = path.resolve(import.meta.dirname, "..")
 const cmdMod = path.join(repoRoot, "src", "commands", "task-run.js")
@@ -53,7 +54,7 @@ test("task run: passo limpo aceita e deixa branch pronto pra merge (sem auto-mer
     assert.match(filesInBranch, /feature\.js/)
     // main NÃO foi tocado (sem auto-merge)
     assert.doesNotMatch(git(dir, "ls-tree", "-r", "--name-only", "main"), /feature\.js/)
-  } finally { await rm(dir, { recursive: true, force: true, maxRetries: 5 }) }
+  } finally { cleanupTmp(dir) }
 })
 
 // ── ABUSO: diff com `debugger` → diff-hygiene REJEITA (needs_review), branch descartado ──
@@ -66,7 +67,7 @@ test("task run: passo com `debugger` no diff é rejeitado (hygiene), não vira b
     assert.equal(r.rejected[0].reason, "hygiene")
     // branch rejeitado foi removido
     assert.doesNotMatch(git(dir, "branch", "--list", "task/t2-s1"), /task\/t2-s1/)
-  } finally { await rm(dir, { recursive: true, force: true, maxRetries: 5 }) }
+  } finally { cleanupTmp(dir) }
 })
 
 // ── guarda: .env RASTREADO no git bloqueia o loop (segredo iria pra worktree) ──
@@ -80,5 +81,5 @@ test("task run: .env rastreado bloqueia (não roda o loop)", async () => {
     // sem worktree criado; saída de erro (não JSON de resultado) → r pode ser null/erro
     // valida que NENHUM branch task/ foi criado
     assert.doesNotMatch(git(dir, "branch", "--list", "task/*"), /task\//)
-  } finally { await rm(dir, { recursive: true, force: true, maxRetries: 5 }) }
+  } finally { cleanupTmp(dir) }
 })

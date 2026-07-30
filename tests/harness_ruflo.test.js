@@ -1,10 +1,11 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { execFileSync } from "node:child_process"
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
+import { cleanupTmp } from "./helpers/tmp.js"
 
 const repoRoot = path.resolve(import.meta.dirname, "..")
 const bin = path.join(repoRoot, "src", "index.js")
@@ -50,5 +51,5 @@ test("doctor --ruflo --json: JSON PURO, read-only, MCP default-deny", () => {
     assert.equal(d.schemaVersion, "gstack.ruflo.v1")
     assert.equal(d.fullInitRecommended, false)
     assert.equal(d.mcpPolicy.default, "deny")
-  } finally { rmSync(home, { recursive: true, force: true }) }
+  } finally { cleanupTmp(home) }
 })

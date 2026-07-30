@@ -29,6 +29,29 @@ conjunto de rotulagem. Sem congelamento verificável, nada disso deixa rastro.
 - `tests/corpus_freeze.test.js` (18 testes, 4 controles negativos), um deles
   rodando sobre `tests/fixtures/epistemic/corpus.json` de verdade.
 
+**Achado colateral corrigido no mesmo commit — falso negativo no gate de
+release.** `verify --profile full` voltou `ready:false` com o passo `test`
+**falhando**, e não por asserção nenhuma: `ENOTEMPTY`/`EPERM` no `rmSync` de
+diretórios temporários já praticamente vazios. Duas execuções caíram por isso
+em arquivos **diferentes** (`governance_sbom_real`, `e2e/doctor_terminal`) —
+é sistêmico no Windows, onde o handle do diretório segue preso um instante
+depois do subprocess sair, e o `maxRetries` do Node não cobre isso sob carga.
+
+- `tests/helpers/tmp.js` (novo): `cleanupTmp()` best-effort com retry+backoff.
+  **Não é silencioso** — o que o SO não liberou fica em `leakedTmpDirs`,
+  auditável. Resíduo de tmpdir deixa de ser invisível E deixa de derrubar a
+  suíte.
+- 31 arquivos de teste que spawnam subprocesso convertidos do `rmSync` cru
+  para o helper (imports órfãos removidos). Nenhum teste jamais asseverava o
+  sucesso do `rmSync` — todo uso era limpeza, o que tornou a conversão segura.
+- `tests/tmp_cleanup_helper.test.js`: prova que o helper apaga de verdade
+  (não é no-op), é idempotente, nunca relança — e uma **guarda de regressão**
+  que varre `tests/` e falha se algum teste que spawna subprocesso voltar ao
+  `rmSync` cru. Foi essa guarda que pegou a cópia local do helper que eu havia
+  deixado no `governance_sbom_real`.
+- Atende diretamente a DoD do PRD51: "zero processo órfão, EBUSY ou state
+  residual" e "suíte completa passa três vezes em máquina fria".
+
 ## [5.93.0] - 2026-07-29 — PRD51 S51.8.1: `fullyValidated` deixa de ser impossível (pendência humana ≠ limite estrutural)
 
 Primeira parte do Sprint 51.8 (ações 5/6/7). **Defeito real corrigido**:
