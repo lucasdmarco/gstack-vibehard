@@ -218,7 +218,7 @@ const COMMANDS = [
   { name: "runtime", group: "common", desc: "Runtime do projeto (status do manifest)", usage: "gstack_vibehard runtime status [--json]" },
   { name: "dev", group: "common", desc: "Sobe os serviços do projeto (port alloc + health)", usage: "gstack_vibehard dev [--open] [--trust] [--json]" },
   { name: "stop", group: "common", desc: "Encerra o runtime (árvore de processos)", usage: "gstack_vibehard stop [--json]" },
-  { name: "logs", group: "common", desc: "Logs de um serviço do runtime", usage: "gstack_vibehard logs [serviço] [--follow]" },
+  { name: "logs", group: "common", desc: "Logs de um serviço do runtime", usage: "gstack_vibehard logs [serviço] [--follow]  (--follow segue o arquivo em tempo real; Ctrl+C sai)" },
   { name: "open", group: "common", desc: "Abre o preview do serviço web", usage: "gstack_vibehard open" },
   { name: "secrets", group: "common", desc: "Broker de segredos (keychain do SO; sem .env)", usage: "gstack_vibehard secrets <doctor|list|set|delete|import|run>" },
   { name: "agents", group: "advanced", desc: "Agent Factory: compila core/knowledge/agents → adapters por harness", usage: "gstack_vibehard agents <build|check|diff|doctor|list|explain|conformance|codex-trust|enforcement>" },
