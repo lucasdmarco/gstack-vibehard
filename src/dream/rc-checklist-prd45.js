@@ -20,7 +20,12 @@ export const PRD45_RC_ITEMS = Object.freeze([
   { id: "P0.4", tier: "P0", sprint: "S45.0", version: "5.2.0", status: "delivered", title: "Casdoor seguro: digest/loopback + credencial rotacionada", proof: "tests/create_full_casdoor_rotate.test.js" },
   { id: "P1.1", tier: "P1", sprint: "S45.1", version: "5.3.0", status: "delivered", title: "Ownership de PID fail-closed (unverified_baseline)", proof: "tests/runtime_stop_ownership.test.js" },
   { id: "P1.2", tier: "P1", sprint: "S45.2", version: "5.4.0", status: "delivered", title: "Policy de execução do Runtime Manifest (código inline/cwd escape)", proof: "tests/runtime_exec_policy.test.js" },
-  { id: "P1.3", tier: "P1", sprint: "S45.2", version: "5.4.0", status: "partial", title: "Loader V3 canônico — schema/migração existem; loader+create ainda v2 (v3 dormente)", proof: "tests/runtime_manifest.test.js (migrateManifestToV3/validateRuntimeManifestV3)" },
+  // PRD51 S51.9.1 — V3 promovido: o loader reconhece v3 e o preserva íntegro
+  // (antes RECONSTRUÍA como v2, descartando workflows/postMerge/deploy/health em
+  // silêncio), `dev` valida por versão, e há rollback explícito que lista o que
+  // descarta. `create` segue emitindo v2 de propósito — os templates declaram
+  // apenas `services`, e emitir v3 com campos de projeto vazios seria ruído.
+  { id: "P1.3", tier: "P1", sprint: "S45.2", version: "5.96.0", status: "delivered", title: "Loader V3 canônico — v3 carrega íntegro, valida por versão e tem rollback explícito; v2 segue válido", proof: "tests/manifest_v3_promotion.test.js" },
   { id: "P1.4", tier: "P1", sprint: "S45.4", version: "5.6.0", status: "delivered", title: "Headroom routing no dev só após probe de tráfego real", proof: "tests/headroom_route_dev.test.js" },
   { id: "P1.5", tier: "P1", sprint: "S45.3", version: "5.5.0", status: "delivered", title: "Journal com redação recursiva (segredo em campo não literal)", proof: "tests/workflow_journal_redact.test.js" },
   { id: "P1.6", tier: "P1", sprint: "S45.4", version: "5.6.0", status: "delivered", title: "Redact-proxy seguro (loopback/nonce/gzip/rolling-window)", proof: "tests/redact_proxy_hardening.test.js" },

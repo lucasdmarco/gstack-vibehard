@@ -116,6 +116,61 @@ export function validateRuntimeManifestV3(m) {
   return { valid: errors.length === 0, errors }
 }
 
+/**
+ * PRD51 S51.9.1 — V3 PROMOVIDO (§51.9 ação 1, opção "promover com migração
+ * V2→V3, rollback e compatibilidade").
+ *
+ * Antes desta decisão o V3 era **dormente**: schema, migração e validação
+ * existiam e eram testados, mas o único consumidor em todo o `src/` era… nada.
+ * Só os testes o exercitavam. O loader devolvia v2 mesmo diante de um arquivo
+ * v3 (ver `loadV2Preferred`), e o `dev` chamava `validateRuntimeManifest` (v2)
+ * sem saber que v3 existia.
+ *
+ * Promovido significa: **carrega, valida e roda** nas duas versões, com v2
+ * seguindo válido (compatibilidade) e um caminho de downgrade EXPLÍCITO
+ * (rollback). Não significa que os campos de projeto do v3 executem — eles são
+ * declarados e reportados como `declared_not_executed`, porque o supervisor
+ * consome `services` e nada mais. Alegar execução de `workflows`/`deploy`
+ * seria claim sem prova.
+ */
+export function validateManifestForVersion(m) {
+  if (!m || typeof m !== "object") return { valid: false, errors: ["manifest ausente/inválido"], schemaVersion: null }
+  const isV3 = m.schemaVersion === RUNTIME_MANIFEST_SCHEMA_V3
+  const result = isV3 ? validateRuntimeManifestV3(m) : validateRuntimeManifest(m)
+  return { ...result, schemaVersion: m.schemaVersion ?? null }
+}
+
+/** Campos que só o v3 tem — declarados, NÃO executados pelo supervisor. */
+export const V3_PROJECT_FIELDS = Object.freeze(["workflows", "postMerge", "deploy", "health"])
+
+/**
+ * O que um manifest v3 declara além do que o runtime realmente executa. Serve
+ * pra dizer a verdade na superfície em vez de deixar o usuário supor que
+ * `workflows`/`deploy` rodam.
+ */
+export function manifestExecutionScope(m) {
+  const isV3 = m?.schemaVersion === RUNTIME_MANIFEST_SCHEMA_V3
+  const declared = isV3 ? V3_PROJECT_FIELDS.filter((f) => hasProjectField(m[f])) : []
+  return {
+    schemaVersion: m?.schemaVersion ?? null,
+    executed: ["services"],
+    declaredNotExecuted: declared,
+    note: declared.length
+      ? "campos de projeto do v3 são declarados e preservados, mas o supervisor executa apenas `services`"
+      : null,
+  }
+}
+const hasProjectField = (v) => (Array.isArray(v) ? v.length > 0 : v != null)
+
+/**
+ * Rollback EXPLÍCITO v3→v2 (§51.9 ação 1 exige rollback). Devolve o manifest v2
+ * E a lista do que foi perdido — downgrade nunca é silencioso, nem aqui.
+ */
+export function downgradeManifestToV2(m = {}) {
+  const dropped = V3_PROJECT_FIELDS.filter((f) => hasProjectField(m[f]))
+  return { manifest: buildRuntimeManifest({ services: m.services || [] }), dropped }
+}
+
 export const PREVIEW_READINESS_SCHEMA = "gstack.preview-readiness.v1"
 
 /**
@@ -137,11 +192,26 @@ const manifestIo = (io) => ({
   readJson: io.readJson || ((p) => { try { return JSON.parse(stripBom(readFileSync(p, "utf-8"))) } catch { return null } }),
 })
 
+/**
+ * PRD51 S51.9.1 — DEFEITO REAL corrigido aqui (§51.9 ação 2, "não permitir
+ * downgrade silencioso de V3 para V2").
+ *
+ * A versão anterior era `m.schemaVersion === 2 ? m : buildRuntimeManifest(...)`.
+ * Um arquivo com `schemaVersion: 3` caía no `else` e voltava RECONSTRUÍDO como
+ * v2 — **descartando em silêncio** `workflows`, `postMerge`, `deploy` e
+ * `health`. Sem aviso, sem erro. Verificado rodando o loader antes da correção:
+ * `schemaVersion` voltava 2 e os quatro campos vinham `undefined`.
+ *
+ * Agora o v3 é carregado COMO v3, íntegro. Só o que NÃO declara versão
+ * conhecida é normalizado para v2 (compatibilidade com manifests antigos).
+ */
 function loadV2Preferred(rt, io) {
   if (!io.exists(rt)) return null
   const m = io.readJson(rt)
   if (!m) return null
-  return m.schemaVersion === 2 ? m : buildRuntimeManifest({ services: m.services || [] })
+  if (m.schemaVersion === RUNTIME_MANIFEST_SCHEMA_V3) return m
+  if (m.schemaVersion === 2) return m
+  return buildRuntimeManifest({ services: m.services || [] })
 }
 
 function loadV1Derived(svcPath, io) {

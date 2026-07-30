@@ -1,5 +1,46 @@
 # Changelog - gstack-vibehard
 
+## [5.96.0] - 2026-07-29 — PRD51 S51.9.1: Runtime Manifest V3 PROMOVIDO e fim do downgrade silencioso
+
+Primeira parte do Sprint 51.9 (ações 1 e 2). Estado verificado antes de
+decidir: o **V3 era dormente**. Schema, migração (`migrateManifestToV3`) e
+validação (`validateRuntimeManifestV3`) existiam e eram testados, mas o único
+lugar do repo que os chamava eram os **testes** — nenhum consumidor em `src/`.
+O `rc-checklist-prd45` já marcava o P1.3 como `partial` por isso.
+
+**Defeito real encontrado no caminho** (§51.9 ação 2, "não permitir downgrade
+silencioso de V3 para V2"): `loadV2Preferred` fazia
+`m.schemaVersion === 2 ? m : buildRuntimeManifest(...)`. Um arquivo com
+`schemaVersion: 3` caía no `else` e voltava **reconstruído como v2**,
+descartando **em silêncio** `workflows`, `postMerge`, `deploy` e `health`.
+Confirmado rodando o loader antes da correção: `schemaVersion` voltava `2` e os
+quatro campos vinham `undefined`. Nenhum aviso, nenhum erro.
+
+**Decisão: promover** (a opção "migração V2→V3, rollback e compatibilidade").
+
+- `loadRuntimeManifest` reconhece v3 e o devolve **íntegro**; v2 segue
+  carregando igual; manifest sem versão conhecida continua normalizado para v2
+  (compatibilidade com legado).
+- `validateManifestForVersion` despacha por versão. Antes o `dev` chamava
+  `validateRuntimeManifest` (v2-only) e **reprovava um v3 legítimo** com
+  "schemaVersion deve ser 2".
+- **Escopo honesto**: promover não é alegar execução. `manifestExecutionScope`
+  reporta `executed: ["services"]` e `declaredNotExecuted` com os campos de
+  projeto do v3, e o `dev` **avisa em voz alta** que `workflows`/`deploy` são
+  preservados mas não rodam. Alegar o contrário seria claim sem prova.
+- **Rollback explícito** (exigido pela ação 1): `downgradeManifestToV2` devolve
+  o v2 **e a lista do que descartou** — downgrade nunca é silencioso, nem no
+  caminho intencional.
+- `rc-checklist-prd45` P1.3: `partial` → **`delivered`**. `create` segue
+  emitindo v2 de propósito — os templates declaram apenas `services`, e emitir
+  v3 com campos de projeto vazios seria ruído.
+- `tests/manifest_v3_promotion.test.js` (17 testes, 6 controles negativos),
+  incluindo o controle que reproduz exatamente o downgrade silencioso.
+- Um teste do `rc_checklist_prd45` fixava o literal "P1.3 é partial" e ficou
+  stale com a promoção: reescrito para a invariante que **não envelhece**
+  (todo item não-entregue aparece em `p1Open`; todo entregue cita prova que
+  existe), mais uma guarda do MOTIVO da promoção.
+
 ## [5.95.0] - 2026-07-29 — PRD51 S51.8.3: mecânica da avaliação cega dupla (fecha o Sprint 51.8)
 
 Terceira e última parte do Sprint 51.8 (ações 2, 3 e 8). O módulo constrói a
