@@ -3,6 +3,7 @@ import { join, isAbsolute } from "path"
 import { runWizard } from "../project-plan/wizard.js"
 import { buildPlan } from "../project-plan/planner.js"
 import { sanitizeCommand } from "../project-plan/executor.js"
+import { setPlanStatus } from "../project-plan/state.js"
 import { runPipeline, renderPlanMarkdown, PIPELINE_STAGES, runsDir } from "../project-plan/run-loop.js"
 import { runCloseoutSync } from "../skills/closeout.js"
 import { detectGoldenPath } from "../dream/detector.js"
@@ -40,7 +41,7 @@ import { buildToolRefresh } from "../tools/refresh.js"
 
 // Flags do start: valor (consomem o próximo token) e booleanas (tabela → cc baixa).
 const VALUE_FLAGS = { "--name": "projectName", "--mode": "mode", "--skills": "skills", "--design-system": "designSystem", "--loop": "loop", "--journeys": "journeys" }
-const BOOL_FLAGS = { "--dry-run": "dryRun", "--json": "json", "--yes": "yes", "-y": "yes", "--assume-no-existing-model": "assumeNoExistingModel", "--proof": "proof", "--golden-run": "goldenRun", "--no-proof": "noProof", "--refresh-on-close": "refreshOnClose" }
+const BOOL_FLAGS = { "--dry-run": "dryRun", "--json": "json", "--yes": "yes", "-y": "yes", "--assume-no-existing-model": "assumeNoExistingModel", "--proof": "proof", "--golden-run": "goldenRun", "--no-golden-run": "noGoldenRun", "--no-proof": "noProof", "--refresh-on-close": "refreshOnClose" }
 
 function parseStartArgs(args) {
   const out = { _: [] }
@@ -311,10 +312,26 @@ function resolvedAcceptance(brief, opts, flags, cwd) {
   return resolveBriefAcceptances(brief.acceptances, journeys)
 }
 
-// PRD51 S51.2.3+ — feature flag temporária do cutover do Golden Run (§11 do
-// prd51.md), idioma de `--agentshield` (verify.js): CLI flag OU env var, default
-// OFF. Nada muda no comportamento default sem opt-in explícito.
-const wantsGoldenRun = (flags, opts) => flags.goldenRun === true || opts.goldenRun === true || process.env.GSTACK_GOLDEN_RUN === "1"
+// PRD51 S51.2.3+ — feature flag do cutover do Golden Run (§11 do prd51.md),
+// idioma de `--agentshield` (verify.js).
+//
+// PRD51 S51.10.0 — DEFAULT FLIPADO PARA ON. O §11 adia essa virada para "decisão
+// humana explícita antes do RC"; o Sprint 51.10 É o RC e a decisão foi tomada:
+// o Golden Run passa a governar `start` por padrão (preview gateia, acceptance
+// real, proof automático). O caminho legado NÃO foi removido — continua
+// alcançável por `--no-golden-run`/`GSTACK_GOLDEN_RUN=0` como escape hatch para
+// regressão. Remover o legado é uma decisão separada, fora desta leva.
+//
+// Precedência: opt-out explícito (flag/opts/env) sempre vence o default.
+export const GOLDEN_RUN_DEFAULT = true
+
+const goldenRunOptOut = (flags, opts) =>
+  flags.noGoldenRun === true || opts.goldenRun === false || process.env.GSTACK_GOLDEN_RUN === "0"
+
+// Com o default ON, só o opt-out decide. Os marcadores de opt-in (`--golden-run`,
+// `GSTACK_GOLDEN_RUN=1`) viraram no-ops — mantidos porque eram A forma de entrar
+// antes do flip e scripts existentes ainda os passam; quebrá-los não teria ganho.
+export const wantsGoldenRun = (flags = {}, opts = {}) => !goldenRunOptOut(flags, opts)
 
 /** Persiste, confirma e roda o pipeline. Retorna o contrato público do start. */
 /**
@@ -364,20 +381,58 @@ export async function confirmAndRunPipeline(plan, flags, opts, json, cwd, brief)
     goldenRun: wantsGoldenRun(flags, opts),
   })
 
+  reconcilePlanStatus(planDir, plan, pipeline)
   return emitAndProof(plan, pipeline, { skillRoute, loopDecision }, flags, opts, json, cwd)
+}
+
+/**
+ * PRD51 S51.10.0 — `plan status` podia MENTIR, e o flip do default expôs.
+ *
+ * `executor.js:125` grava o status do PLANO como `"done"` assim que os passos de
+ * create passam; o veredito do PIPELINE (gates e, agora, o Golden Run) é escrito
+ * em `.gstack/runs/<runId>/status.json` — outro arquivo. As duas superfícies
+ * podiam discordar desde sempre (create ok + verify falho já dava plano `done`
+ * com pipeline `handoff`), só que era raro. Com o Golden Run governando por
+ * padrão, `handoff` virou comum e `plan status` passaria a dizer "done" para
+ * runs que não entregaram.
+ *
+ * `task-run.js:95` já reconciliava assim; o caminho do `start`/`plan run` nunca
+ * adotou. Reusa o mesmo vocabulário do pipeline — não inventa estado novo.
+ */
+function reconcilePlanStatus(planDir, plan, pipeline) {
+  if (!pipeline || !pipeline.status) return
+  setPlanStatus(planDir, plan.id, pipeline.status)
 }
 
 // PRD51 S51.2.5 (ações #6/#7) — achado que recalibrou o plano: não existe (e não
 // deveria existir) um classificador de "intenção de entrega" separado — `start`
 // SEMPRE significa "construir/rodar algo" (consulta/planejamento são outros
 // comandos: `consult`/`plan`); `--dry-run` já sai antes de chegar aqui
-// (`startCommand`), então a ação #7 já é estrutural. Atrás da flag `--golden-run`,
-// toda run real roda proof por padrão — `--no-proof` é o opt-out explícito. Sem a
-// flag, comportamento inalterado (proof continua opt-in via `--proof`).
+// (`startCommand`), então a ação #7 já é estrutural. Sob o Golden Run, toda run
+// real roda proof por padrão — `--no-proof` é o opt-out explícito.
+//
+// PRD51 S51.10.0: como o Golden Run virou default, o proof automático também
+// virou o caminho padrão do `start`. Os dois opt-outs continuam válidos e
+// independentes: `--no-proof` desliga só o proof; `--no-golden-run` volta o
+// pipeline inteiro ao comportamento legado (e, com ele, o proof a opt-in).
 const wantsProof = (flags, opts) => {
   if (flags.proof === true) return true
   if (flags.noProof === true || opts.noProof === true) return false
   return wantsGoldenRun(flags, opts)
+}
+
+// PRD51 S51.10.0 — defeito real destapado pelo flip do default: `emitAndProof`
+// rodava o proof sem olhar o status do pipeline. Com proof opt-in isso era
+// inócuo (só rodava se o usuário pedisse); como DEFAULT, todo run que terminou
+// em `handoff` passaria a pagar um proof completo — caro e sem sentido, já que
+// o pipeline acabou de registrar que NÃO entregou.
+//
+// Regra: `--proof` explícito sempre roda (o usuário pediu, a intenção é dele).
+// O automático só roda quando houve entrega de fato — coerente com a premissa
+// do S51.2.5 ("proof por intenção de entrega"): handoff não é entrega.
+export const proofShouldRun = (flags = {}, opts = {}, pipeline = {}) => {
+  if (flags.proof === true) return true
+  return wantsProof(flags, opts) && pipeline.status === "done"
 }
 
 // PRD51 S51.5.2 (ação #1) — "no closeout, após o commit final: atualizar
@@ -426,7 +481,7 @@ function resyncCloseoutAfterRun(cwd, pipeline, proof, refreshFn) {
 async function emitAndProof(plan, pipeline, decl, flags, opts, json, cwd) {
   if (json) process.stdout.write(JSON.stringify({ ok: pipeline.status === "done", runId: pipeline.runId, status: pipeline.status, stages: pipeline.stages, planId: plan.id, skillRoute: { selectedSkills: decl.skillRoute.selectedSkills, modelIntake: decl.skillRoute.modelIntake.status } }) + "\n")
   else renderPipelineHuman(pipeline, plan)
-  const proof = wantsProof(flags, opts) ? await runStartProof(cwd, json, opts) : null
+  const proof = proofShouldRun(flags, opts, pipeline) ? await runStartProof(cwd, json, opts) : null
   const refreshFn = wantsToolRefresh(flags, opts) ? (opts.refreshRunner || defaultToolRefreshRunner(cwd, pipeline.runId)) : null
   resyncCloseoutAfterRun(cwd, pipeline, proof, refreshFn)
   return { plan, result: pipeline.execResult, pipeline, executed: true, skillRoute: decl.skillRoute, loopDecision: decl.loopDecision, ...(proof ? { proof } : {}) }

@@ -49,11 +49,14 @@ test("closeout.json reflete o proof REAL (não o proxy verify-gate) quando --gol
   } finally { cleanupTmp(cwd) }
 })
 
-test("closeout.json NÃO é resincronizado quando proof não rodou (sem --golden-run/--proof) — comportamento original preservado", async () => {
+// PRD51 S51.10.0: a intenção deste teste é o caminho SEM proof. Até o flip do
+// default isso era "não passar flag nenhuma"; agora exige `--no-golden-run`
+// explícito (o default passou a rodar proof em entrega real).
+test("closeout.json NÃO é resincronizado quando proof não rodou (--no-golden-run) — comportamento original preservado", async () => {
   const cwd = await mkdtemp(path.join(tmpdir(), "gstack-closeout-2-"))
   try {
     const { startCommand } = await imp("src/commands/start.js")
-    const r = await startCommand([], {
+    const r = await startCommand(["--no-golden-run"], {
       cwd, objective: "web app", projectName: "app", mode: "lite", designSystem: "none",
       confirm: async () => true, exec: () => {},
     })

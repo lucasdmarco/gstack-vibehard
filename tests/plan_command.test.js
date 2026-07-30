@@ -58,7 +58,12 @@ test("plan run <id> inexistente: erro not_found em JSON", async () => {
   }
 })
 
-test("plan run: gera, executa com exec injetado (--yes) e reporta done; status reflete", async () => {
+// PRD51 S51.10.0: com o Golden Run como default, um run de `exec` INJETADO não
+// cria projeto de verdade e não resolve acceptance — o veredito honesto do motor
+// é `handoff`, não `done`. O que este teste sempre provou (e segue provando) é o
+// round-trip: o status que `plan run` reporta é o mesmo que `plan status` lê do
+// disco depois. O valor concreto do status é consequência do modo, não a claim.
+test("plan run: gera, executa com exec injetado (--yes) e o status persistido bate com o reportado", async () => {
   const tmp = await mkdtemp(path.join(tmpdir(), "gstack-plan4-"))
   try {
     const { planCommand } = await import(`${pathToFileURL(cmdMod)}?t=${Date.now()}`)
@@ -71,11 +76,11 @@ test("plan run: gera, executa com exec injetado (--yes) e reporta done; status r
     // "web app" toca frontend, precisa de --design-system (none = opt-out honesto).
     const runBuf = await capture(() => planCommand(["run", planId, "--json", "--yes", "--design-system", "none"], { cwd: tmp, exec: (c) => ran.push(c.join(" ")) }))
     const res = JSON.parse(runBuf.trim())
-    assert.equal(res.status, "done")
-    assert.ok(ran.some((c) => c.includes("create loja")))
-    // 3) status reflete done
+    assert.equal(res.status, "handoff", "default Golden Run: exec fake não entrega — handoff honesto")
+    assert.ok(ran.some((c) => c.includes("create loja")), "o pipeline REALMENTE executou o create")
+    // 3) o status lido do disco é o mesmo reportado pelo run (a claim real deste teste)
     const stBuf = await capture(() => planCommand(["status", planId, "--json"], { cwd: tmp }))
-    assert.equal(JSON.parse(stBuf.trim()).status, "done")
+    assert.equal(JSON.parse(stBuf.trim()).status, res.status)
   } finally {
     await rm(tmp, { recursive: true, force: true })
   }

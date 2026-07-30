@@ -37,12 +37,17 @@ test("start SEM --golden-run e SEM --proof: proof não roda (comportamento legad
   } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
 })
 
-test("start COM --golden-run, SEM --proof/--no-proof: proof roda automaticamente (default novo, atrás da flag)", async () => {
+// PRD51 S51.10.0 refinou esta regra: o proof automático passou a ser condicionado
+// à ENTREGA. `exec` injetado não cria projeto real, o motor devolve `handoff`, e
+// um handoff não paga proof. O ramo `done` (proof roda) é provado direto em
+// tests/golden_run_default.test.js, que exercita `proofShouldRun` nos dois lados.
+test("start COM --golden-run em run que NÃO entregou: proof automático é suprimido (handoff não é entrega)", async () => {
   const cwd = await mkdtemp(path.join(tmpdir(), "gstack-proof-2-"))
   try {
     const { r, proofCalls } = await run(cwd, ["--golden-run"])
-    assert.equal(proofCalls, 1)
-    assert.ok(r.proof)
+    assert.equal(r.pipeline.status, "handoff", "premissa do teste: exec fake não entrega sob Golden Run")
+    assert.equal(proofCalls, 0, "S51.10.0: automático só com entrega real")
+    assert.equal(r.proof, undefined)
   } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
 })
 
