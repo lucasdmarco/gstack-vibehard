@@ -44,12 +44,18 @@ test("start --dry-run sem objetivo → erro honesto (não trava esperando TTY)",
   assert.equal(JSON.parse(cap.get().trim()).ok, false)
 })
 
-test("pipeline: run done cria journal/status por run e estágios honestos (sem projeto real)", async () => {
+// PRD51 S51.10.0 — este teste É o controle negativo do escape hatch: prova que o
+// caminho LEGADO continua inteiro e alcançável depois do flip do default (§11).
+// `--no-golden-run` é o que preserva a semântica solta antiga, na qual create ok +
+// verify not_applicable já basta para `done`. Sem a flag, o motor exige os 4
+// portões e devolve `handoff` — o comportamento novo, coberto em
+// tests/golden_run_default.test.js.
+test("LEGADO (--no-golden-run): run done cria journal/status por run e estágios honestos (sem projeto real)", async () => {
   const cwd = await mkdtemp(path.join(tmpdir(), "gstack-pipe-"))
   try {
     const { startCommand } = await imp("src/commands/start.js")
     const ran = []
-    const r = await startCommand([], {
+    const r = await startCommand(["--no-golden-run"], {
       cwd, objective: "quero um web app fullstack", projectName: "loja", mode: "lite",
       designSystem: "none", // testa o pipeline, não o design-system gate (F2-B)
       confirm: async () => true, exec: (c) => ran.push(c.join(" ")),

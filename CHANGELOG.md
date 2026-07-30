@@ -1,5 +1,55 @@
 # Changelog - gstack-vibehard
 
+## [5.100.0] - 2026-07-30 — PRD51 S51.10.0: Golden Run vira o default do `start` (decisão do §11, tomada no RC)
+
+Abre o Sprint 51.10 (RC). O §11 do `prd51.md` adia "flipar o default de
+`--golden-run` e remover o código legado" para **decisão humana explícita antes
+do RC**. O Sprint 51.10 É o RC, a decisão foi tomada, e o flip está feito.
+
+**O que mudou para quem usa `start`:**
+
+- o pipeline passa a ser julgado pelo motor do Golden Run: `preview` gateia,
+  acceptance real conta, proof roda automaticamente na entrega;
+- o veredito público (`done`/`handoff`) deriva do vocabulário estrito do motor,
+  não mais do critério solto antigo;
+- **o código legado NÃO foi removido** — `--no-golden-run` (ou
+  `GSTACK_GOLDEN_RUN=0`) devolve o comportamento anterior inteiro. Remover o
+  legado é decisão separada, fora desta leva.
+
+Os marcadores de opt-in (`--golden-run`, `GSTACK_GOLDEN_RUN=1`) viraram no-ops
+mantidos por compatibilidade: eram A forma de entrar antes do flip e scripts
+existentes ainda os passam.
+
+**Dois defeitos REAIS destapados pelo flip — nenhum deles previsto no plano:**
+
+1. **Proof rodava em run que não entregou.** `emitAndProof` chamava o proof sem
+   olhar `pipeline.status`. Com proof opt-in isso era inócuo (só rodava a
+   pedido); como default, todo `handoff` passaria a pagar um proof completo.
+   Novo `proofShouldRun`: o automático exige entrega; `--proof` explícito segue
+   sempre rodando (a intenção é do usuário), `--no-proof` segue vencendo.
+
+2. **`plan status` podia mentir — e isso é ANTERIOR ao flip.** `executor.js:125`
+   grava o status do *plano* como `done` quando os passos de create passam,
+   enquanto o veredito do *pipeline* vai para `.gstack/runs/<runId>/status.json`
+   — outro arquivo. Create ok + verify falho já produzia plano `done` com
+   pipeline `handoff` desde sempre; era raro, o flip tornou comum.
+   `task-run.js:95` já reconciliava; o caminho `start`/`plan run` nunca adotou.
+   Corrigido no ponto compartilhado (`confirmAndRunPipeline`), reusando o
+   vocabulário do pipeline — sem inventar estado novo.
+
+**Raio de impacto na suíte, tratado por intenção (não por conveniência):** 6
+testes escritos quando "sem flag" *significava* legado. Os que provam o contrato
+antigo passaram a dizê-lo explicitamente com `--no-golden-run` (viraram os
+controles negativos do escape hatch); os que provam comportamento default foram
+atualizados para o veredito honesto do motor.
+
+- `tests/golden_run_default.test.js` (novo, 13 testes): prova as duas direções do
+  flip — que o default mudou e que o escape hatch devolve o caminho antigo
+  inteiro. Um flip que não pode ser desfeito não é flip, é remoção.
+- QG strict 0 (extração de CC em `wantsGoldenRun`: a cadeia de `||` cruzou o
+  limiar bloqueante, mesmo padrão de extração usado o programa inteiro), lint 0,
+  typecheck 0, suíte JS 2310/2311 (1 skip pré-existente).
+
 ## [5.99.0] - 2026-07-30 — PRD51 S51.9.4: TGZ validado em ambiente limpo + detector de teste invisível (fecha o Sprint 51.9)
 
 Quarta parte do Sprint 51.9 (ação 6). **Aqui a infraestrutura já existia e é

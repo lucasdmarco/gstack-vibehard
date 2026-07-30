@@ -135,12 +135,15 @@ test("startCommand: --golden-run (flag CLI, não opts direto) chega até o pipel
   } finally { cleanupTmp(cwd) }
 })
 
-test("startCommand: SEM --golden-run, o mesmo cenário unhealthy continua 'done' (default do CLI intacto)", async () => {
+// PRD51 S51.10.0: o par negativo do preview-gate. Antes do flip, "default do CLI"
+// e "caminho legado" eram a mesma coisa; depois do flip, o legado é `--no-golden-run`.
+// O teste continua provando o mesmo: fora do Golden Run, preview NÃO gateia.
+test("startCommand: com --no-golden-run, o mesmo cenário unhealthy continua 'done' (legado intacto)", async () => {
   const cwd = await mkdtemp(path.join(tmpdir(), "gstack-pg-6-"))
   try {
     await unhealthyUiProject(cwd)
     const { startCommand } = await imp("src/commands/start.js")
-    const r = await startCommand([], {
+    const r = await startCommand(["--no-golden-run"], {
       cwd, objective: "web app", projectName: "app", mode: "lite", designSystem: "none",
       confirm: async () => true, exec: () => {},
       devRunner: () => ({ services: [{ name: "web", status: "unhealthy" }] }),
