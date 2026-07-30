@@ -23,6 +23,14 @@ export const VALIDATION_TAXONOMY_SCHEMA = "gstack.validation-taxonomy.v1"
  */
 export const BLOCKED_BY_KINDS = Object.freeze(["human_labeling", "not_measurable_by_design"])
 
+/**
+ * PRD51 S51.8.3 — o §4.6 do PRD pede CINCO estados, não dois. `validated` e
+ * `rejected` só são alcançáveis pelo pipeline de avaliação cega
+ * (`blind-evaluation.js`); `outOfScope` é decisão declarada com motivo.
+ * Reexportado daqui para que exista UMA fonte do vocabulário.
+ */
+export { CLAIM_STATES, resolveClaimState } from "./blind-evaluation.js"
+
 const isUnobservable = (c) => c.blockedBy === "not_measurable_by_design"
 
 /**
