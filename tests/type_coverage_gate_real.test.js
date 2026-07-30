@@ -1,9 +1,10 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { execFileSync } from "node:child_process"
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from "node:fs"
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
+import { cleanupTmp } from "./helpers/tmp.js"
 
 const repoRoot = path.resolve(import.meta.dirname, "..")
 
@@ -66,7 +67,7 @@ test("CONTROLE NEGATIVO: c8 --check-coverage FALHA de verdade (exit != 0) quando
   // maxRetries: o c8 é subprocess — no Windows o handle pode continuar aberto
   // um instante após o exit (EBUSY/ENOTEMPTY sob carga). Mesmo padrão dos 36
   // outros testes do repo que limpam tempdir depois de spawnar processo.
-  } finally { rmSync(tmp, { recursive: true, force: true, maxRetries: 5 }) }
+  } finally { cleanupTmp(tmp) }
 })
 
 test("c8 --check-coverage PASSA quando o threshold é atingível pela cobertura real", () => {
@@ -79,7 +80,7 @@ test("c8 --check-coverage PASSA quando o threshold é atingível pela cobertura 
   // maxRetries: o c8 é subprocess — no Windows o handle pode continuar aberto
   // um instante após o exit (EBUSY/ENOTEMPTY sob carga). Mesmo padrão dos 36
   // outros testes do repo que limpam tempdir depois de spawnar processo.
-  } finally { rmSync(tmp, { recursive: true, force: true, maxRetries: 5 }) }
+  } finally { cleanupTmp(tmp) }
 })
 
 test("npm run coverage:ci real: thresholds declarados no script batem com o que roda de verdade (nunca enfraquecidos silenciosamente)", () => {

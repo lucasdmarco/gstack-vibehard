@@ -2,9 +2,10 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { execFileSync } from "node:child_process"
-import { mkdtempSync, rmSync, existsSync } from "node:fs"
+import { mkdtempSync, existsSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
+import { cleanupTmp } from "../helpers/tmp.js"
 
 const bin = path.resolve(import.meta.dirname, "..", "..", "src", "index.js")
 
@@ -36,7 +37,7 @@ test("E2E start --dry-run --json: JSON puro e NADA é escrito no disco", () => {
     assert.match(d.designContext.sourceHash, /^sha256:/)
     assert.deepEqual(d.designContext.files.sort(), ["DESIGN.md", "PRODUCT.md", ".impeccable/design.json"].sort())
     assert.equal(existsSync(path.join(cwd, "PRODUCT.md")), false, "dry-run não escreve as projeções")
-  } finally { rmSync(cwd, { recursive: true, force: true }) }
+  } finally { cleanupTmp(cwd) }
 })
 
 test("E2E policy doctor --json: JSON puro (precedência declarada), read-only", () => {
@@ -45,7 +46,7 @@ test("E2E policy doctor --json: JSON puro (precedência declarada), read-only", 
     const d = JSON.parse(run(["policy", "doctor", "--json"], cwd).out)
     assert.equal(typeof d.valid, "boolean")
     assert.ok(Array.isArray(d.layers))
-  } finally { rmSync(cwd, { recursive: true, force: true }) }
+  } finally { cleanupTmp(cwd) }
 })
 
 test("E2E context scout --json: read-only, devolve paths+razão (nunca dump)", () => {
@@ -55,5 +56,5 @@ test("E2E context scout --json: read-only, devolve paths+razão (nunca dump)", (
     assert.equal(d.ok, true)
     assert.ok(Array.isArray(d.results))
     assert.ok(Array.isArray(d.backendsUsed))
-  } finally { rmSync(cwd, { recursive: true, force: true }) }
+  } finally { cleanupTmp(cwd) }
 })

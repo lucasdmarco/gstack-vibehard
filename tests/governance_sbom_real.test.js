@@ -1,7 +1,8 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { execFileSync } from "node:child_process"
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs"
+import { mkdtempSync, writeFileSync } from "node:fs"
+import { cleanupTmp } from "./helpers/tmp.js"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
@@ -23,6 +24,7 @@ const repoRoot = path.resolve(import.meta.dirname, "..")
 // PRD26/testes existentes (runtime_e2e.test.js): npm.cmd não spawna com
 // shell:false no Windows — mesmo padrão de test-pack.mjs/test-e2e-lifecycle.mjs.
 const isWin = process.platform === "win32"
+
 function runNpmSbom(cwd, opts = {}) {
   const args = ["sbom", "--sbom-format", "cyclonedx", "--omit", "dev"]
   return isWin
@@ -59,11 +61,7 @@ test("CONTROLE NEGATIVO: npm sbom FALHA (exit != 0, sem JSON válido) sem packag
     let parsedOk = true
     try { JSON.parse(output) } catch { parsedOk = false }
     assert.ok(!parsedOk, "a saída de falha não deveria ser um CycloneDX JSON válido")
-  } finally {
-    // maxRetries: `npm sbom` é subprocess — no Windows o handle pode seguir
-    // aberto um instante após o exit (EBUSY/ENOTEMPTY sob carga).
-    rmSync(tmp, { recursive: true, force: true, maxRetries: 5 })
-  }
+  } finally { cleanupTmp(tmp) }
 })
 
 // Controle positivo complementar: com um package.json MÍNIMO mas VÁLIDO
@@ -77,9 +75,5 @@ test("npm sbom passa com package.json mínimo mas válido (version pinada)", () 
     const bom = JSON.parse(out)
     assert.equal(bom.bomFormat, "CycloneDX")
     assert.equal(bom.metadata.component.version, "1.0.0", "version pinada do fixture aparece no SBOM")
-  } finally {
-    // maxRetries: `npm sbom` é subprocess — no Windows o handle pode seguir
-    // aberto um instante após o exit (EBUSY/ENOTEMPTY sob carga).
-    rmSync(tmp, { recursive: true, force: true, maxRetries: 5 })
-  }
+  } finally { cleanupTmp(tmp) }
 })

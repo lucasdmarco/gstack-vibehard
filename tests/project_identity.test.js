@@ -1,11 +1,12 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises"
+import { mkdtemp, mkdir, writeFile } from "node:fs/promises"
 import { existsSync, readFileSync, renameSync } from "node:fs"
 import { spawnSync } from "node:child_process"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
+import { cleanupTmp } from "./helpers/tmp.js"
 
 const repoRoot = path.resolve(import.meta.dirname, "..")
 const mod = path.join(repoRoot, "src", "project", "identity.js")
@@ -27,7 +28,7 @@ test("writeProjectMarker grava project.json com schema canônico e root resolvid
     assert.equal(onDisk.schemaVersion, PROJECT_MARKER_SCHEMA)
     assert.ok(hasValidMarker(tmp), "marcador recém-escrito é válido")
   } finally {
-    await rm(tmp, { recursive: true, force: true })
+    cleanupTmp(tmp)
   }
 })
 
@@ -38,7 +39,7 @@ test("hasValidMarker: bare .gstack (sem project.json) é INVÁLIDO — o defeito
     await mkdir(path.join(tmp, ".gstack"), { recursive: true })
     assert.equal(hasValidMarker(tmp), false, "`.gstack/` vazio não ativa (anti-vazamento)")
   } finally {
-    await rm(tmp, { recursive: true, force: true })
+    cleanupTmp(tmp)
   }
 })
 
@@ -53,7 +54,7 @@ test("hasValidMarker: root divergente (pasta movida) invalida o marcador", async
     renameSync(proj, moved)  // marcador aponta pro root antigo
     assert.equal(hasValidMarker(moved), false, "root do marcador != diretório → inerte")
   } finally {
-    await rm(tmp, { recursive: true, force: true })
+    cleanupTmp(tmp)
   }
 })
 
@@ -66,7 +67,7 @@ test("writeProjectMarker é idempotente: preserva projectId ao reescrever", asyn
     assert.equal(b.projectId, a.projectId, "mesmo projectId")
     assert.equal(b.mode, "full", "atualiza mode")
   } finally {
-    await rm(tmp, { recursive: true, force: true })
+    cleanupTmp(tmp)
   }
 })
 
@@ -81,7 +82,7 @@ test("schemaVersion errado não é aceito por hasValidMarker", async () => {
     )
     assert.equal(hasValidMarker(tmp), false, "schema desconhecido = inválido")
   } finally {
-    await rm(tmp, { recursive: true, force: true })
+    cleanupTmp(tmp)
   }
 })
 
@@ -115,6 +116,6 @@ test("marcador JS ativa o find_gstack_root do Python (contrato cross-language)",
       "root ativado == diretório do projeto",
     )
   } finally {
-    await rm(tmp, { recursive: true, force: true })
+    cleanupTmp(tmp)
   }
 })

@@ -6,6 +6,7 @@ import { execFileSync } from "node:child_process"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
+import { cleanupTmp } from "./helpers/tmp.js"
 
 const repoRoot = path.resolve(import.meta.dirname, "..")
 const imp = (rel) => import(`${pathToFileURL(path.join(repoRoot, rel))}?t=${Date.now()}`)
@@ -25,9 +26,9 @@ async function mkRepo() {
   return dir
 }
 
-async function rmRetry(dir) {
-  await rm(dir, { recursive: true, force: true, maxRetries: 5 }).catch(() => {})
-}
+// `cleanupTmp` é síncrono e já faz retry+backoff e nunca relança (S51.8.2b);
+// este wrapper existe só pelos call sites que o chamam com `await`.
+const rmRetry = (dir) => cleanupTmp(dir)
 
 test("lifecycle real: idle → merge-ready → dirty → merged num repo git de verdade", async () => {
   const repo = await mkRepo()

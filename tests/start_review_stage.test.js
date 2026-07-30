@@ -1,10 +1,11 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises"
+import { mkdtemp, mkdir, writeFile } from "node:fs/promises"
 import { execFileSync } from "node:child_process"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
+import { cleanupTmp } from "./helpers/tmp.js"
 
 const repoRoot = path.resolve(import.meta.dirname, "..")
 const imp = (rel) => import(`${pathToFileURL(path.join(repoRoot, rel))}?t=${Date.now()}`)
@@ -37,7 +38,7 @@ test("pipeline: review stage real detecta debugger statement via diff-hygiene (F
     assert.equal(r.stages.review.status, "failed")
     assert.match(r.stages.review.detail, /debugger/)
     assert.equal(r.status, "done", "review ainda não é gate — falha de review não bloqueia o pipeline nesta sprint")
-  } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
+  } finally { cleanupTmp(cwd) }
 })
 
 test("pipeline: review stage real SEM achados -> ready (diff limpo, evidência real, não mais string fake)", async () => {
@@ -51,7 +52,7 @@ test("pipeline: review stage real SEM achados -> ready (diff limpo, evidência r
     const planDir = path.join(cwd, ".gstack", "plans", plan.id)
     const r = runPipeline({ plan, planDir, cwd, exec: () => {}, verifyRunner: () => ({ status: "ready", usable: true, failed: [] }) })
     assert.equal(r.stages.review.status, "ready")
-  } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
+  } finally { cleanupTmp(cwd) }
 })
 
 test("pipeline: projeto não criado -> review continua advisory (comportamento preservado, sem regressão)", async () => {
@@ -63,5 +64,5 @@ test("pipeline: projeto não criado -> review continua advisory (comportamento p
     const planDir = path.join(cwd, ".gstack", "plans", plan.id)
     const r = runPipeline({ plan, planDir, cwd, exec: () => {} })
     assert.equal(r.stages.review.status, "advisory")
-  } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
+  } finally { cleanupTmp(cwd) }
 })

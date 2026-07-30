@@ -1,10 +1,11 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { mkdtemp, rm, mkdir, readFile } from "node:fs/promises"
+import { mkdtemp, mkdir, readFile } from "node:fs/promises"
 import { execFileSync } from "node:child_process"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
+import { cleanupTmp } from "./helpers/tmp.js"
 
 const repoRoot = path.resolve(import.meta.dirname, "..")
 const imp = (rel) => import(`${pathToFileURL(path.join(repoRoot, rel))}?t=${Date.now()}`)
@@ -45,7 +46,7 @@ test("closeout.json reflete o proof REAL (não o proxy verify-gate) quando --gol
     assert.equal(closeout.proof.state, "ran")
     assert.equal(closeout.proof.ready, false, "closeout reflete o proof REAL (ready:false), não o proxy verify-gate")
     assert.deepEqual(closeout.proof.blockers, ["release-source-parity: sem remoto"])
-  } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
+  } finally { cleanupTmp(cwd) }
 })
 
 test("closeout.json NÃO é resincronizado quando proof não rodou (sem --golden-run/--proof) — comportamento original preservado", async () => {
@@ -60,5 +61,5 @@ test("closeout.json NÃO é resincronizado quando proof não rodou (sem --golden
     const closeout = JSON.parse(await readFile(closeoutPath, "utf-8"))
     // sem proof real, o closeout original (verify-gate proxy) continua de pé
     assert.equal(closeout.proof.state, "ran", "closeoutReadiness (proxy) ainda roda — comportamento pré-S51.2.6 intacto")
-  } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
+  } finally { cleanupTmp(cwd) }
 })

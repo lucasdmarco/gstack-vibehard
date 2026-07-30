@@ -1,10 +1,11 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs"
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs"
 import { execFileSync } from "node:child_process"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
+import { cleanupTmp } from "./helpers/tmp.js"
 
 const repoRoot = path.resolve(import.meta.dirname, "..")
 const imp = (rel) => import(`${pathToFileURL(path.join(repoRoot, rel))}?t=${Date.now()}`)
@@ -31,7 +32,7 @@ function realRepo() {
   git("commit", "-m", "base")
   return { dir, git }
 }
-const cleanup = (dir) => rmSync(dir, { recursive: true, force: true, maxRetries: 5 })
+const cleanup = (dir) => cleanupTmp(dir)
 
 test("collectMinimalityEvidence: dependência NOVA no package.json real é detectada no diff", async () => {
   const { collectMinimalityEvidence } = await imp("src/skills/minimality-evidence.js")

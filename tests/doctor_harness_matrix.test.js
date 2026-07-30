@@ -1,10 +1,11 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { execFileSync } from "node:child_process"
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
+import { cleanupTmp } from "./helpers/tmp.js"
 
 const repoRoot = path.resolve(import.meta.dirname, "..")
 const bin = path.join(repoRoot, "src", "index.js")
@@ -37,7 +38,7 @@ test("collectDoctorJson: campo conformance resumido, coerente e sem claim falsa"
     for (const id of Object.keys(h)) {
       if (h[id].enforcement === "instructional") assert.equal(h[id].enforcedEvents, 0, `${id} instrucional sem enforced`)
     }
-  } finally { rmSync(home, { recursive: true, force: true }) }
+  } finally { cleanupTmp(home) }
 })
 
 test("doctor --conformance --json: JSON PURO por harness (enforced/partial/advisory)", () => {
@@ -50,7 +51,7 @@ test("doctor --conformance --json: JSON PURO por harness (enforced/partial/advis
     assert.equal(d.ok, true)
     assert.ok(d.harnesses.claude.enforcedEvents.includes("tool.before"))
     assert.equal(d.harnesses.gemini.enforcedEvents.length, 0)
-  } finally { rmSync(home, { recursive: true, force: true }) }
+  } finally { cleanupTmp(home) }
 })
 
 test("doctor --conformance --strict --json: sem violações → exit 0", () => {
@@ -58,5 +59,5 @@ test("doctor --conformance --strict --json: sem violações → exit 0", () => {
   try {
     const r = run(["doctor", "--conformance", "--strict", "--json"], { HOME: home, USERPROFILE: home })
     assert.equal(r.code, 0, "matriz honesta não tem violação → strict passa")
-  } finally { rmSync(home, { recursive: true, force: true }) }
+  } finally { cleanupTmp(home) }
 })

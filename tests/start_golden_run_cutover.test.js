@@ -1,10 +1,11 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises"
+import { mkdtemp, mkdir, writeFile } from "node:fs/promises"
 import { execFileSync } from "node:child_process"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
+import { cleanupTmp } from "./helpers/tmp.js"
 
 const repoRoot = path.resolve(import.meta.dirname, "..")
 const imp = (rel) => import(`${pathToFileURL(path.join(repoRoot, rel))}?t=${Date.now()}`)
@@ -44,7 +45,7 @@ test("SEM --golden-run: status deriva do critério legado mesmo que o motor não
     })
     assert.equal(r.status, "done", "legado: verify ready + create ok -> done, mesmo sem acceptance resolvido")
     assert.notEqual(r.goldenRun.status, "completed", "controle: o motor por si NÃO consideraria isso completed (sem acceptance)")
-  } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
+  } finally { cleanupTmp(cwd) }
 })
 
 test("COM --golden-run, SEM journeys: status vira 'handoff' mesmo com tudo tecnicamente verde (honesto — acceptanceResolved:false)", async () => {
@@ -60,7 +61,7 @@ test("COM --golden-run, SEM journeys: status vira 'handoff' mesmo com tudo tecni
     })
     assert.equal(r.status, "handoff", "sem journeys, acceptanceResolved:false -> nunca completed -> handoff")
     assert.equal(r.goldenRun.gates.acceptanceResolved, false)
-  } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
+  } finally { cleanupTmp(cwd) }
 })
 
 test("COM --golden-run E acceptance real resolvida (todos os 4 portões verdes): status vira 'done' via goldenRun.status==='completed'", async () => {
@@ -77,7 +78,7 @@ test("COM --golden-run E acceptance real resolvida (todos os 4 portões verdes):
     })
     assert.equal(r.goldenRun.status, "completed")
     assert.equal(r.status, "done")
-  } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
+  } finally { cleanupTmp(cwd) }
 })
 
 test("COM --golden-run, gate falho (verify blocked): status 'handoff' (goldenRun.status !== completed) — mesmo veredito do legado aqui, mas por motor", async () => {
@@ -94,5 +95,5 @@ test("COM --golden-run, gate falho (verify blocked): status 'handoff' (goldenRun
     })
     assert.equal(r.status, "handoff")
     assert.ok(r.diagnosis, "S51.2.4 continua funcionando: diagnóstico real anexado")
-  } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
+  } finally { cleanupTmp(cwd) }
 })

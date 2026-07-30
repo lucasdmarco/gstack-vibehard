@@ -1,10 +1,11 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { execFileSync } from "node:child_process"
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs"
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
+import { cleanupTmp } from "./helpers/tmp.js"
 
 const repoRoot = path.resolve(import.meta.dirname, "..")
 const bin = path.join(repoRoot, "src", "index.js")
@@ -29,7 +30,7 @@ test("collectDoctorJson: objeto estruturado, EPERM-safe, sem crash em HOME vazio
     assert.ok(Array.isArray(r.warnings))
     assert.ok(Array.isArray(r.impactCategories))
     assert.ok(r.integrity && typeof r.integrity.manifestExists === "boolean")
-  } finally { rmSync(home, { recursive: true, force: true }) }
+  } finally { cleanupTmp(home) }
 })
 
 test("doctor --json: stdout é JSON PURO (sem banner/ANSI/prosa)", () => {
@@ -40,7 +41,7 @@ test("doctor --json: stdout é JSON PURO (sem banner/ANSI/prosa)", () => {
     assert.doesNotMatch(r.out, /Diagnostico do Ambiente|GStack VibeHard Installer/)
     const d = JSON.parse(r.out) // não lança = JSON puro
     assert.equal(typeof d.ok, "boolean")
-  } finally { rmSync(home, { recursive: true, force: true }) }
+  } finally { cleanupTmp(home) }
 })
 
 test("doctor --impact --json: array estruturado puro", () => {
@@ -49,7 +50,7 @@ test("doctor --impact --json: array estruturado puro", () => {
     const r = run(["doctor", "--impact", "--json"], { HOME: home, USERPROFILE: home })
     const d = JSON.parse(r.out)
     assert.ok(Array.isArray(d) && d.some((c) => c.category === "hooks"))
-  } finally { rmSync(home, { recursive: true, force: true }) }
+  } finally { cleanupTmp(home) }
 })
 
 test("doctor --install-integrity --strict --json: manifest com problema → exit≠0 + issue no JSON", () => {
@@ -66,5 +67,5 @@ test("doctor --install-integrity --strict --json: manifest com problema → exit
     const d = JSON.parse(r.out)
     assert.equal(d.safeToUninstall, false)
     assert.ok(d.issues.length > 0)
-  } finally { rmSync(home, { recursive: true, force: true }) }
+  } finally { cleanupTmp(home) }
 })

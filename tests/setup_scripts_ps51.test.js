@@ -1,10 +1,11 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { spawnSync } from "node:child_process"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp } from "node:fs/promises"
 import { existsSync, readFileSync, readdirSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
+import { cleanupTmp } from "./helpers/tmp.js"
 
 // S0 (PRD36 36.7): os setup-*.ps1 sao o caminho REAL de onboarding no Windows e
 // precisam rodar em Windows PowerShell 5.1 — a versao que TODA maquina Windows tem.
@@ -102,6 +103,6 @@ test("setup-*.ps1 executam no Windows PowerShell 5.1: exit 0 + TODOS os artefato
     assert.equal(help.status, 0, `run.ps1 help exit=${help.status}\n${help.stderr}`)
     assert.match(help.stdout, /Superpowers/)
   } finally {
-    await rm(proj, { recursive: true, force: true })
+    cleanupTmp(proj)
   }
 })

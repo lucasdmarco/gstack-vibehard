@@ -1,10 +1,11 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { execFileSync } from "node:child_process"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp } from "node:fs/promises"
 import { existsSync, readdirSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
+import { cleanupTmp } from "../helpers/tmp.js"
 
 const repoRoot = path.resolve(import.meta.dirname, "..", "..")
 const BIN = path.join(repoRoot, "src", "index.js")
@@ -27,7 +28,7 @@ function runCli(args, { cwd, home }) {
 async function sandbox() {
   const home = await mkdtemp(path.join(tmpdir(), "gstack-ep-home-"))
   const cwd = await mkdtemp(path.join(tmpdir(), "gstack-ep-cwd-"))
-  return { home, cwd, cleanup: async () => { await rm(home, { recursive: true, force: true }); await rm(cwd, { recursive: true, force: true }) } }
+  return { home, cwd, cleanup: async () => { cleanupTmp(home); cleanupTmp(cwd) } }
 }
 
 test("E2E: `research validate --json` produz review válido pelo binário real", async () => {

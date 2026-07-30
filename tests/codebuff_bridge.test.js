@@ -1,10 +1,11 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs"
+import { mkdtempSync, existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs"
 import { execFileSync } from "node:child_process"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
+import { cleanupTmp } from "./helpers/tmp.js"
 
 const repoRoot = path.resolve(import.meta.dirname, "..")
 const imp = (rel) => import(`${pathToFileURL(path.join(repoRoot, rel))}?t=${Date.now()}`)
@@ -50,7 +51,7 @@ test("bridge exige worktree/git, escreve contexto seguro na worktree e roda veri
     assert.equal(r.concluded, true)
     // metadados project-scoped, nada global
     assert.ok(existsSync(path.join(cwd, ".gstack", "harness", "codebuff.json")))
-  } finally { rmSync(cwd, { recursive: true, force: true }) }
+  } finally { cleanupTmp(cwd) }
 })
 
 test("verify determinístico falho IMPEDE conclusão (reviewer não aprova nada)", async () => {
@@ -65,7 +66,7 @@ test("verify determinístico falho IMPEDE conclusão (reviewer não aprova nada)
     })
     assert.equal(r.status, "verify_failed")
     assert.equal(r.concluded, false)
-  } finally { rmSync(cwd, { recursive: true, force: true }) }
+  } finally { cleanupTmp(cwd) }
 })
 
 test("sem worktree ou fora de git → recusa honesta, nenhum efeito", async () => {
@@ -75,5 +76,5 @@ test("sem worktree ou fora de git → recusa honesta, nenhum efeito", async () =
     const { CODEBUFF } = await imp("src/harness/codebuff.js")
     assert.equal(runCandidateBridge({ candidate: CODEBUFF, task: "x", cwd, worktree: false }).status, "worktree_required")
     assert.equal(runCandidateBridge({ candidate: CODEBUFF, task: "x", cwd, worktree: true }).status, "not_git")
-  } finally { rmSync(cwd, { recursive: true, force: true }) }
+  } finally { cleanupTmp(cwd) }
 })

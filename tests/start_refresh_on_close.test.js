@@ -1,11 +1,12 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { mkdtemp, rm, mkdir, readFile } from "node:fs/promises"
+import { mkdtemp, mkdir, readFile } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import { execFileSync } from "node:child_process"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
+import { cleanupTmp } from "./helpers/tmp.js"
 
 const repoRoot = path.resolve(import.meta.dirname, "..")
 const imp = (rel) => import(`${pathToFileURL(path.join(repoRoot, rel))}?t=${Date.now()}`)
@@ -50,7 +51,7 @@ test("--refresh-on-close: refresh injetado roda quando a run fecha 'done', close
     assert.equal(closeout.toolsRefresh.state, "ok")
     assert.equal(closeout.toolsRefresh.provenance.builtAtCommit, "abc123")
     assert.equal(closeout.fresh, true, "refresh ok -> fresh:true (closeout.js:isFresh)")
-  } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
+  } finally { cleanupTmp(cwd) }
 })
 
 test("sem --refresh-on-close: toolsRefresh continua 'not_run' (comportamento original preservado, zero regressão)", async () => {
@@ -64,7 +65,7 @@ test("sem --refresh-on-close: toolsRefresh continua 'not_run' (comportamento ori
     const closeoutPath = path.join(cwd, ".gstack", "runs", r.pipeline.runId, "closeout.json")
     const closeout = JSON.parse(await readFile(closeoutPath, "utf-8"))
     assert.equal(closeout.toolsRefresh.state, "not_run")
-  } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
+  } finally { cleanupTmp(cwd) }
 })
 
 test("--refresh-on-close SEM 'done' (gate falho -> handoff): refresh NÃO roda (só em run bem-sucedida)", async () => {
@@ -82,7 +83,7 @@ test("--refresh-on-close SEM 'done' (gate falho -> handoff): refresh NÃO roda (
     })
     assert.notEqual(r.pipeline.status, "done")
     assert.equal(called, 0, "refresh nunca roda em run que não fechou 'done'")
-  } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
+  } finally { cleanupTmp(cwd) }
 })
 
 test("GSTACK_REFRESH_ON_CLOSE=1 (env var): mesmo efeito da flag CLI", async () => {
@@ -106,6 +107,6 @@ test("GSTACK_REFRESH_ON_CLOSE=1 (env var): mesmo efeito da flag CLI", async () =
   } finally {
     if (prev === undefined) delete process.env.GSTACK_REFRESH_ON_CLOSE
     else process.env.GSTACK_REFRESH_ON_CLOSE = prev
-    await rm(cwd, { recursive: true, force: true, maxRetries: 5 })
+    cleanupTmp(cwd)
   }
 })
