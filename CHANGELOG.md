@@ -1,5 +1,61 @@
 # Changelog - gstack-vibehard
 
+## [5.101.0] - 2026-07-31 — PRD51 S51.10.1: checklist canônico do próprio PRD51 + DoD do §9 verificável
+
+O PRD51 era o único programa SEM checklist canônico: `prd status` agregava
+PRD45-PRD50 e deixava de fora justamente quem audita os outros. Sem isso, o RC do
+PRD51 não é um objeto verificável — é uma narrativa.
+
+**`src/dream/rc-checklist-prd51.js`** traz duas listas, porque são duas perguntas
+diferentes:
+
+- `PRD51_RC_ITEMS` — 47 itens (S51.0A→S51.10.1), cada um com sprint, versão, tier
+  (herdado do achado do §4 que fecha, não de julgamento retroativo) e a prova que
+  reprova se a capacidade sumir. Cada prova foi verificada em disco antes de ser
+  citada;
+- `PRD51_DOD_ITEMS` — as 24 caixas do §9 verbatim, com `kind` separando o que um
+  arquivo pode provar (`static`) do que só uma EXECUÇÃO prova (`runtime`: suíte em
+  máquina fria, proof no HEAD do commit final, TGZ nos três sistemas).
+
+`ready` (os sprints fecharam) e `programComplete` (o DoD está satisfeito) são
+deliberadamente separados, pela mesma razão que o S51.0B separou os 4 estados do
+baseline: `ready:true` nunca autorizou "concluído", e aqui não passa a autorizar.
+Placar honesto de hoje: **ready:true, programComplete:false, DoD 13/24**.
+
+Três invariantes protegidas por teste, que são o ponto do arquivo: caixa `runtime`
+nunca é `satisfied` por existir código que faria aquilo; caixa não-satisfeita é
+obrigada a dizer o que falta; caixa satisfeita é obrigada a apontar evidência que
+exista em disco.
+
+**PRD47 reconciliado (decisão humana).** As descrições dos 4 P0 estavam
+factualmente desatualizadas — descreviam gaps que o Sprint 51.2 fechou. P0.1/P0.3/
+P0.4 passam a `delivered` porque governam o caminho PADRÃO do `start` após o
+S51.10.0 — não porque a capacidade existe em algum módulo (essa distinção era
+exatamente o que os mantinha `partial`). P0.2 vira **non-goal explícito**: o ciclo
+de reparo pressupõe loop agêntico e `runPipeline` é síncrono; o S51.2.4 anexou
+diagnóstico real em vez de fabricar autocorreção. `prd47Readiness` passou a tratar
+non-goal como fechado **exigindo a razão registrada** — non-goal sem justificativa
+não fecha nada, senão vira porta dos fundos para esvaziar checklist. `p0NonGoal`
+sai separado de `p0Delivered` para que "pronto" nunca esconda "decidimos não
+fazer". PRD47: `ready:false` → `ready:true`.
+
+`prd status` agrega PRD51 e imprime o DoD com cada pendência aberta e o que falta.
+
+- `tests/rc_checklist_prd51.test.js` (12 testes), `tests/rc_checklist_prd47.test.js`
+  reescrito com 2 controles negativos novos (non-goal sem razão não fecha; P0 que
+  regride derruba `ready`).
+- QG strict 0, lint 0, typecheck 0, suíte JS 2325/2326 (1 skip pré-existente).
+
+**Nota de execução honesta:** a suíte falhou 3 testes em duas rodadas paralelas
+(`delegate codebuff`, `verify --changed-files` E2E, `npm sbom`). Atribuição
+perseguida até o fim em vez de rotulada como flake: os dois primeiros reportavam
+`ERR_ASSERTION`, mas o helper do E2E converte timeout de subprocess em falha de
+asserção (`out: e.stdout || ""` → sem JSON → asserção quebra), então o tipo do erro
+não distinguia carga de lógica. O mesmo teste levou 48s isolado nesta máquina.
+Prova final: mesmo código e mesma árvore com `--test-concurrency=2` → 0 falhas,
+exit 0. Era contenção de CPU (um processo externo à sessão acumulava ~31h de CPU),
+não regressão.
+
 ## [5.100.0] - 2026-07-30 — PRD51 S51.10.0: Golden Run vira o default do `start` (decisão do §11, tomada no RC)
 
 Abre o Sprint 51.10 (RC). O §11 do `prd51.md` adia "flipar o default de

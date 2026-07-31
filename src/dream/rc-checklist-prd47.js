@@ -6,23 +6,32 @@
  * `rc-checklist.js`/`rc-checklist-prd45.js`: `prd47Readiness()` só declara `ready:true` quando
  * todos os P0 estão `delivered`.
  *
- * ACHADO HONESTO deste fechamento: os 4 P0 originais (S47.0 — GAP-A preview gating, GAP-B
- * observe/diagnose fora do `start`, GAP-C pending_verifier sempre, GAP-D proof opcional) têm
- * a LÓGICA DE DECISÃO correta construída e testada (S47.1/S47.4/S47.5/S47.6), mas o pipeline
- * padrão do `start`/`run-loop.js` ainda NÃO foi cortado para usá-la como autoridade — cada
- * sprint escolheu deliberadamente o caminho aditivo (novo campo ao lado do antigo) para não
- * arriscar regressão sem escopo dedicado (mesma cautela repetida a cada sprint desta sessão).
- * Por isso os 4 P0 são `partial`, não `delivered` — `ready:false` é o resultado HONESTO, não
- * um defeito deste checklist. A generalização/cutover real fica para um programa futuro.
+ * HISTÓRICO (S47.10): os 4 P0 originais (S47.0 — GAP-A preview gating, GAP-B observe/
+ * diagnose fora do `start`, GAP-C pending_verifier sempre, GAP-D proof opcional) tinham a
+ * LÓGICA DE DECISÃO correta construída e testada, mas `start`/`run-loop.js` nunca a usava
+ * como autoridade. Os 4 ficaram `partial` e `ready:false` foi o resultado honesto.
+ *
+ * ATUALIZAÇÃO (PRD51 S51.2 + S51.10.0/S51.10.1): o cutover foi feito. O Sprint 51.2 ligou
+ * as peças ao pipeline atrás da flag `--golden-run`, e o S51.10.0 flipou essa flag para
+ * DEFAULT (decisão humana do §11 do prd51.md, tomada no RC). Três dos quatro P0 passam a
+ * `delivered` porque governam o caminho padrão do `start` — não porque a capacidade existe
+ * em algum módulo.
+ *
+ * P0.2 é a exceção e vira NON-GOAL EXPLÍCITO, não `delivered` disfarçado. O ciclo de reparo
+ * pressupõe um loop AGÊNTICO (observa → diagnostica → LLM propõe correção → reobservação
+ * valida); `runPipeline` é síncrono e não tem como pausar e devolver controle ao LLM no
+ * meio. O S51.2.4 anexou diagnóstico REAL ao handoff em vez de fabricar autocorreção que o
+ * `start` não suporta. Converter em non-goal registra a decisão em vez de deixar um P0
+ * eternamente `partial` — `baseline.js` já trata `nonGoal` como item fechado.
  */
 export const PRD47_RC_CHECKLIST_SCHEMA = "gstack.rc-checklist.prd47.v1"
 
 // tier: P0 (bloqueador) | P1 (importante). status: delivered | partial | pending.
 export const PRD47_RC_ITEMS = Object.freeze([
-  { id: "P0.1", tier: "P0", sprint: "S47.1/S47.6", version: "5.24.0", status: "partial", title: "Preview saudável gate o status final — golden-run.js/delivery-verdict.js decidem certo; run-loop.js (GATE_STAGES) ainda não corta por preview", proof: "tests/delivery_verdict.test.js" },
-  { id: "P0.2", tier: "P0", sprint: "S47.4/S47.9", version: "5.26.0", status: "partial", title: "Observe/diagnose/repair dentro do start — runtime-repair-cycle.js real e provado em E2E (S47.9), mas run-loop.js nunca o importa/chama automaticamente", proof: "tests/runtime_repair_cycle.test.js" },
-  { id: "P0.3", tier: "P0", sprint: "S47.5", version: "5.23.0", status: "partial", title: "pending_verifier resolve pra verifier real com journey mapeada — acceptance-verification.js real; product-brief.js/start.js nunca chamam o resolver", proof: "tests/acceptance_verification.test.js" },
-  { id: "P0.4", tier: "P0", sprint: "S47.6", version: "5.24.0", status: "partial", title: "Proof obrigatório (não opt-in) pra intenção de entrega — delivery-verdict.js exige; start.js só roda proof com --proof explícito", proof: "tests/delivery_verdict.test.js" },
+  { id: "P0.1", tier: "P0", sprint: "S47.1/S47.6 → PRD51 S51.2.3/S51.10.0", version: "5.100.0", status: "delivered", title: "Preview saudável gate o status final — `gateStagesFor` coloca preview no gate e o Golden Run governa o `start` por DEFAULT (não mais atrás de flag)", proof: "tests/start_preview_gate.test.js" },
+  { id: "P0.2", tier: "P0", sprint: "S47.4/S47.9 → PRD51 S51.2.4", version: "5.63.0", status: "partial", nonGoal: true, nonGoalReason: "O ciclo de reparo exige loop AGÊNTICO (LLM propõe correção entre observação e revalidação); `runPipeline` é síncrono e não pausa. Em vez de fabricar autocorreção que o `start` não suporta, o S51.2.4 anexa diagnóstico REAL (`diagnoseObservation`) ao handoff. Decisão humana explícita, registrada em vez de deixar um P0 eternamente parcial.", title: "Observe/diagnose dentro do start — run-loop.js consulta diagnose-loop.js de verdade e anexa diagnóstico ao handoff; reparo automático é non-goal declarado", proof: "tests/start_repair_diagnosis.test.js" },
+  { id: "P0.3", tier: "P0", sprint: "S47.5 → PRD51 S51.2.1/S51.2.7", version: "5.66.0", status: "delivered", title: "pending_verifier resolve pra verifier real — `resolveBriefAcceptances` é chamado pelo pipeline e `--journeys` dá a fonte real de journeys; sem journey, o aceite segue honestamente pendente", proof: "tests/start_journeys_cli.test.js" },
+  { id: "P0.4", tier: "P0", sprint: "S47.6 → PRD51 S51.2.5/S51.10.0", version: "5.100.0", status: "delivered", title: "Proof não é mais opt-in — roda por default na entrega; `--no-proof` é o opt-out. S51.10.0 ainda o condicionou à entrega real (handoff não paga proof)", proof: "tests/golden_run_default.test.js" },
   { id: "P1.1", tier: "P1", sprint: "S47.0", version: "5.18.0", status: "delivered", title: "Baseline de controles negativos (12 gaps reais mapeados) + manifest global real limpo com autorização", proof: "tests/prd47_baseline_negative_controls.test.js" },
   { id: "P1.2", tier: "P1", sprint: "S47.1", version: "5.19.0", status: "delivered", title: "golden-run.js liga engine.finalize() de verdade (deixou de ser dead code)", proof: "tests/golden_run_controller.test.js" },
   { id: "P1.3", tier: "P1", sprint: "S47.2", version: "5.20.0", status: "delivered", title: "Product Brief v1→v2 + Design Direction guiada", proof: "tests/design_direction.test.js" },
@@ -38,19 +47,39 @@ export const PRD47_RC_ITEMS = Object.freeze([
 const byTier = (tier) => PRD47_RC_ITEMS.filter((i) => i.tier === tier)
 
 /**
- * Prontidão de RC do PRD47. `ready` exige TODOS os P0 `delivered` — como os 4 P0 são
- * `partial` (decisão correta construída, cutover do pipeline padrão adiado por cautela),
- * `ready:false` é o resultado HONESTO deste programa, registrado sem enfeite.
+ * Um item conta como fechado se entregue OU convertido em non-goal EXPLÍCITO (com razão
+ * registrada). Mesma regra de `release/baseline.js` (`itemIsClosed`) — non-goal sem razão
+ * nunca fecha nada, senão viraria a porta dos fundos para esvaziar o checklist.
+ */
+const itemIsClosed = (i) => i.status === "delivered" || (i.nonGoal === true && Boolean(i.nonGoalReason))
+
+/**
+ * Prontidão de RC do PRD47. `ready` exige todo P0 fechado.
+ *
+ * PRD51 S51.10.1: passou a `true`. Três P0 viraram `delivered` porque o cutover do Sprint
+ * 51.2 + o flip do default (S51.10.0) fizeram o Golden Run governar o caminho PADRÃO do
+ * `start` — não porque a capacidade passou a existir em algum módulo (ela já existia, e era
+ * exatamente essa a distinção que mantinha os itens `partial`). P0.2 fecha como non-goal
+ * declarado, com a razão registrada no item. `p0NonGoal` é exposto separado de
+ * `p0Delivered` para que "pronto" nunca esconda "decidimos não fazer".
  */
 export function prd47Readiness(items = PRD47_RC_ITEMS) {
   const p0 = items.filter((i) => i.tier === "P0")
-  const p0Pending = p0.filter((i) => i.status !== "delivered")
-  const p1Open = items.filter((i) => i.tier === "P1" && i.status !== "delivered")
+  const p0Pending = p0.filter((i) => !itemIsClosed(i))
+  const p0NonGoal = p0.filter((i) => itemIsClosed(i) && i.status !== "delivered")
+  const p1Open = items.filter((i) => i.tier === "P1" && !itemIsClosed(i))
   return {
     schemaVersion: PRD47_RC_CHECKLIST_SCHEMA,
     ready: p0Pending.length === 0,
-    counts: { p0: p0.length, p0Delivered: p0.length - p0Pending.length, p1: byTier("P1").length, p1Open: p1Open.length },
+    counts: {
+      p0: p0.length,
+      p0Delivered: p0.filter((i) => i.status === "delivered").length,
+      p0NonGoal: p0NonGoal.length,
+      p1: byTier("P1").length,
+      p1Open: p1Open.length,
+    },
     p0Pending: p0Pending.map((i) => i.id),
+    p0NonGoal: p0NonGoal.map((i) => ({ id: i.id, reason: i.nonGoalReason })),
     p1Open: p1Open.map((i) => ({ id: i.id, status: i.status, title: i.title })),
     items,
   }

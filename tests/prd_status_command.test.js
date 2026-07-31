@@ -14,14 +14,22 @@ function captureStdout() {
 }
 
 /**
- * PRD51 S51.3.4 — `prd status` agrega os checklists canônicos de PRD45-PRD50 no
- * schema comum do ledger. READ-ONLY (camada knowledge — nunca edita fonte).
+ * PRD51 S51.3.4 — `prd status` agrega os checklists canônicos no schema comum do ledger.
+ * READ-ONLY (camada knowledge — nunca edita fonte).
+ *
+ * S51.10.1 — PRD51 entrou no agregado: o programa de FECHAMENTO era o único fora do
+ * próprio ledger. As asserções deixaram de fixar a contagem para não precisarem de
+ * manutenção a cada PRD novo; o que importa é que TODO programa registrado tenha schema,
+ * evidência real e zero violação.
  */
 
-test("buildPrdStatusReport: cobre PRD45-PRD50, cada um com schema comum e SEM violações (todos delivered têm prova real)", async () => {
+test("buildPrdStatusReport: cobre PRD45-PRD51, cada um com schema comum e SEM violações (todos delivered têm prova real)", async () => {
   const { buildPrdStatusReport } = await imp("src/commands/prd.js")
   const report = buildPrdStatusReport(repoRoot)
-  assert.deepEqual(report.map((p) => p.prdId), ["PRD45", "PRD46", "PRD47", "PRD48", "PRD49", "PRD50"])
+  const ids = report.map((p) => p.prdId)
+  for (const esperado of ["PRD45", "PRD46", "PRD47", "PRD48", "PRD49", "PRD50", "PRD51"]) {
+    assert.ok(ids.includes(esperado), `${esperado} está no ledger`)
+  }
   for (const p of report) {
     assert.equal(p.schemaVersion, "gstack.prd-ledger.v1")
     assert.equal(p.violations.length, 0, `${p.prdId} não deveria ter violação de prova`)
@@ -29,16 +37,32 @@ test("buildPrdStatusReport: cobre PRD45-PRD50, cada um com schema comum e SEM vi
   }
 })
 
-test("prd status --json: JSON puro com os 6 programas", async () => {
-  const { prdCommand } = await imp("src/commands/prd.js")
+test("prd status --json: JSON puro com todos os programas registrados", async () => {
+  const { prdCommand, buildPrdStatusReport } = await imp("src/commands/prd.js")
+  const esperado = buildPrdStatusReport(repoRoot).length
   const cap = captureStdout()
   let r
   try { r = await prdCommand(["status", "--json"], { cwd: repoRoot }) }
   finally { cap.restore() }
   const parsed = JSON.parse(cap.get().trim())
   assert.equal(parsed.schemaVersion, "gstack.prd-status-report.v1")
-  assert.equal(parsed.programs.length, 6)
-  assert.equal(r.programs.length, 6)
+  assert.equal(parsed.programs.length, esperado)
+  assert.equal(r.programs.length, esperado)
+})
+
+// S51.10.1: o DoD do §9 sai no `--json` junto do ledger. Uma pendência que só existe no
+// código-fonte do checklist não serve para conduzir um RC.
+test("prd status --json carrega o DoD do PRD51, com as pendências abertas explícitas", async () => {
+  const { prdCommand } = await imp("src/commands/prd.js")
+  const cap = captureStdout()
+  try { await prdCommand(["status", "--json"], { cwd: repoRoot }) }
+  finally { cap.restore() }
+  const parsed = JSON.parse(cap.get().trim())
+  assert.ok(parsed.dod, "o bloco do DoD existe no contrato JSON")
+  assert.equal(parsed.dod.total, 24)
+  assert.equal(parsed.dod.programComplete, false, "não pode alegar concluído com caixa aberta")
+  assert.ok(parsed.dod.open.length > 0)
+  for (const d of parsed.dod.open) assert.ok(d.missing, `${d.id} diz o que falta`)
 })
 
 test("prd <subcomando desconhecido>: erro honesto, nunca lança nem finge sucesso", async () => {
