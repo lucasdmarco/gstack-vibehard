@@ -577,10 +577,25 @@ function printPreflightImpact(allHarnessIds, flags) {
   info("")
   info("Detalhe completo sem instalar: `gstack_vibehard install --audit-only`.")
 }
-async function confirmGlobalWrite(flags) {
+/**
+ * Gate de consentimento antes de QUALQUER escrita global (Safe Install).
+ *
+ * PRD51 S51.10.2 — exportado para teste. A auditoria da matriz de RC (§51.10) achou que o
+ * DoD "Full não modifica config global sem consentimento, backup e restore" tinha duas
+ * pernas provadas (backup e restore, em `uninstall_restore.test.js`) e uma NÃO: o
+ * consentimento existia aqui e o preflight era testado (`install_impact.test.js`), mas
+ * nenhum teste provava a RECUSA — que é a parte que protege o usuário.
+ *
+ * `deps.confirm` existe só para permitir esse teste: a 1ª tentativa forçou
+ * `stdin.isTTY = true` e o prompt real ficou pendurado esperando entrada que nunca vinha.
+ * Um gate cuja recusa não pode ser exercitada não é verificável. Em produção o default é
+ * o `confirm` importado — o comportamento é idêntico.
+ */
+export async function confirmGlobalWrite(flags, deps = {}) {
+  const ask = deps.confirm || confirm
   if (flags.globalConfirmed) return true
   if (process.stdin.isTTY) {
-    const ok = await confirm("Prosseguir com a instalação? (ou Ctrl-C e use --project-only)", false)
+    const ok = await ask("Prosseguir com a instalação? (ou Ctrl-C e use --project-only)", false)
     if (!ok) info("Instalação cancelada. Dica: `--project-only` (impacto mínimo) ou `--audit-only`.")
     return ok
   }

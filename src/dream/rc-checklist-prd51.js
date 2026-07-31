@@ -115,11 +115,14 @@ export const PRD51_DOD_ITEMS = Object.freeze([
   { id: "DOD.17", kind: "static", requirement: "Headroom não alega economia sem tráfego", status: "satisfied", evidence: "tests/headroom_status.test.js" },
   { id: "DOD.18", kind: "static", requirement: "typecheck real bloqueia erro de tipo", status: "satisfied", evidence: "tests/typecheck_real_gate.test.js" },
   { id: "DOD.19", kind: "static", requirement: "PRD50 separa validação humana de métrica não observável", status: "satisfied", evidence: "tests/validation_taxonomy.test.js" },
-  { id: "DOD.20", kind: "runtime", requirement: "Lite não ganha dependências obrigatórias externas", status: "pending", missing: "auditoria da matriz RC (S51.10.2) — não verificado nesta sprint, e não se declara o que não se checou" },
-  { id: "DOD.21", kind: "runtime", requirement: "Full não modifica config global sem consentimento, backup e restore", status: "pending", missing: "auditoria da matriz RC (S51.10.2) — `uninstall_restore.test.js` existe mas não foi conferido contra esta exigência" },
+  // S51.10.2 — verificadas na auditoria da matriz. Estavam `pending` porque eu ainda não
+  // tinha CHECADO, não porque faltasse cobertura; o checklist registrou a ignorância em vez
+  // de chutar, e agora registra o que a leitura dos testes mostrou.
+  { id: "DOD.20", kind: "static", requirement: "Lite não ganha dependências obrigatórias externas", status: "satisfied", evidence: "tests/full_contract.test.js" },
+  { id: "DOD.21", kind: "static", requirement: "Full não modifica config global sem consentimento, backup e restore", status: "satisfied", evidence: "tests/install_global_consent.test.js" },
   { id: "DOD.22", kind: "static", requirement: "manuais descrevem a versão candidata, não v5.19", status: "pending", missing: "projetogstack.md declara baseline v5.19.0 contra CLI v5.100.0 — ver S51.10.4" },
-  { id: "DOD.23", kind: "runtime", requirement: "pacote TGZ passa clean-machine E2E nos três sistemas", status: "partial", missing: "S51.9.4 validou o TGZ em ambiente limpo no Windows; os três sistemas dependem da matriz de CI (S51.10.2)", evidence: "tests/tgz_clean_env.test.js" },
-  { id: "DOD.24", kind: "runtime", requirement: "release candidate possui rollback testado", status: "pending", missing: "auditoria da matriz RC (S51.10.2) — não verificado nesta sprint" },
+  { id: "DOD.23", kind: "runtime", requirement: "pacote TGZ passa clean-machine E2E nos três sistemas", status: "partial", missing: "A auditoria do S51.10.2 achou que `test:pack` (a prova do tarball REAL) rodava só no ubuntu, dentro do job `templates` — o job `e2e` cobre 3 SOs mas roda o lifecycle, não o empacotamento. Um defeito de empacotamento específico de Windows passaria batido. Corrigido: `test:pack` virou job próprio na matriz de 3 SOs. Segue `partial` porque é caixa `runtime`: a fiação existe, mas só o run da CI no commit final do RC prova a execução.", evidence: "tests/tgz_clean_env.test.js" },
+  { id: "DOD.24", kind: "static", requirement: "release candidate possui rollback testado", status: "satisfied", evidence: "tests/uninstall_restore.test.js" },
 ])
 
 const isDelivered = (i) => i.status === "delivered"

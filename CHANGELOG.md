@@ -1,5 +1,65 @@
 # Changelog - gstack-vibehard
 
+## [5.102.0] - 2026-07-31 — PRD51 S51.10.2: matriz de RC auditada, com as lacunas declaradas
+
+O §51.10 lista 10 dimensões que o RC precisa provar. O risco óbvio era declarar
+cobertura por INFERÊNCIA — "existe um job de CI chamado `test` em três SOs, logo a
+matriz está coberta". `src/release/rc-matrix.js` faz o oposto, na disciplina do
+`meta/operation-registry.js` (S51.4.5): cada dimensão foi auditada contra o teste
+ou job REAL que a sustenta, e o que não é coberto sai declarado com o motivo.
+Vocabulário fechado (`proven`/`partial`/`missing`), e `complete` exige a matriz
+INTEIRA — "quase toda a matriz" não é a matriz. Hoje: **7/10 provadas**.
+
+**Três defeitos reais achados pela auditoria:**
+
+1. **Consentimento de escrita global sem controle negativo.** O DoD "Full não
+   modifica config global sem consentimento, backup e restore" tinha duas pernas
+   provadas (backup e restore, em `uninstall_restore.test.js`) e uma não: o gate
+   existia em `install.js` e o preflight era testado, mas nada provava a RECUSA —
+   a perna que protege o usuário. Um gate exercitado só no caminho do "sim" é
+   formalidade. `confirmGlobalWrite` ganhou `deps.confirm` injetável (a 1ª
+   tentativa de teste forçou `stdin.isTTY` e pendurou o prompt real esperando
+   entrada que nunca vinha; um gate cuja recusa não pode ser exercitada não é
+   verificável). Prova de brinde: o default do prompt é NÃO — enter distraído
+   nunca autoriza escrita global.
+
+2. **`test:pack` rodava só no Linux.** A prova do TARBALL real vivia dentro do job
+   `templates`, ubuntu-only; o job `e2e` cobre três SOs mas roda o *lifecycle*,
+   não o empacotamento. Um defeito de empacotamento específico de Windows
+   (caminhos, CRLF, permissões) passaria batido — a classe de bug que este projeto
+   mais sofreu. Virou job `pack` próprio na matriz de 3 SOs.
+
+3. **Node: matriz nominal, prova rasa.** As três versões (18/20/22) só rodavam no
+   job `doctor`, que executa UM comando; a suíte rodava só em 22. Novo
+   `test-node-matrix` roda a suíte INTEIRA em 18 (mínimo) e 20 (LTS). Segue
+   `partial` de propósito: 3 SOs × 3 Node triplicaria o custo de CI para cobrir
+   uma combinação improvável — recorte declarado, não inferido.
+
+`falha de rede` continua **`missing`**, e fica assim: os comandos que tocam rede
+não têm ponto de injeção para simular ENOTFOUND/ECONNREFUSED sem bater na rede de
+verdade, e fabricar um mock que só prova o mock seria pior que declarar a lacuna.
+
+**DoD do PRD51: 13/24 → 16/24.** DOD.20/21/24 saíram de `pending` para
+`satisfied` — não porque a cobertura apareceu, mas porque foi VERIFICADA; o
+checklist ter registrado ignorância em vez de chute foi o que tornou a correção
+possível. DOD.23 segue `partial` por ser caixa `runtime`: a fiação de 3 SOs existe
+agora, mas só o run da CI no commit final do RC prova a execução.
+
+`prd status` passou a imprimir a matriz junto do DoD, cada lacuna com o motivo.
+
+- `tests/rc_matrix.test.js` (9 testes — inclui um que valida que todo job de CI
+  citado EXISTE mesmo no workflow, não é nome inventado),
+  `tests/install_global_consent.test.js` (6 testes).
+- QG strict 0, lint 0, typecheck 0, suíte JS 2340/2341 (1 skip pré-existente).
+
+**Nota de processo.** O guard `b3_typecheck` ("install.js IMPORTA confirm") quebrou
+com a injeção, porque prendia a asserção à FORMA da chamada (`await confirm(`).
+A 1ª correção relaxou a asserção — e, ao simular a regressão, ela NÃO pegava mais
+o import morto: casava com `deps.confirm` e com menções em comentário. Um guard
+recém-reescrito tinha virado formalidade, a mesma crítica feita ao gate de
+consentimento. Versão final filtra imports, comentários e acesso por propriedade,
+com os dois lados provados: passa com o código atual, falha com o import morto.
+
 ## [5.101.0] - 2026-07-31 — PRD51 S51.10.1: checklist canônico do próprio PRD51 + DoD do §9 verificável
 
 O PRD51 era o único programa SEM checklist canônico: `prd status` agregava
