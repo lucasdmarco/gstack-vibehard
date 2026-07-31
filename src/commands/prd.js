@@ -6,6 +6,7 @@ import { PRD49_RC_ITEMS } from "../dream/rc-checklist-prd49.js"
 import { PRD50_RC_ITEMS } from "../dream/rc-checklist-prd50.js"
 import { PRD51_RC_ITEMS, prd51Readiness } from "../dream/rc-checklist-prd51.js"
 import { projectPrdLedger } from "../dream/prd-ledger.js"
+import { rcMatrixVerdict } from "../release/rc-matrix.js"
 import { section, info, warn, error } from "../cli/index.js"
 
 /**
@@ -65,10 +66,19 @@ function renderDoD(dod) {
   for (const d of dod.open) warn(`     ${d.id} [${d.kind}/${d.status}] ${d.requirement} — falta: ${d.missing}`)
 }
 
-function renderStatus(report, dod) {
+// S51.10.2 — a matriz do §51.10 sai junto pelo mesmo motivo do DoD: um registro que só
+// existe no código-fonte não conduz um RC. Cada lacuna vem com o motivo, nunca só a conta.
+function renderMatrix(m) {
+  info("")
+  info(`  Matriz RC (§51.10): ${m.counts.proven}/${m.counts.total} provadas — complete=${m.complete}`)
+  for (const d of m.open) warn(`     ${d.id} [${d.status}] ${d.dimension} — ${d.gap}`)
+}
+
+function renderStatus(report, dod, matrix) {
   section("prd status — ledger unificado (PRD45-PRD51)")
   for (const p of report) renderProgram(p)
   renderDoD(dod)
+  renderMatrix(matrix)
 }
 
 const SUBCOMMANDS = Object.freeze({ status: true })
@@ -84,7 +94,8 @@ export async function prdCommand(args = [], opts = {}) {
   }
   const report = buildPrdStatusReport(cwd)
   const dod = buildDoDSummary()
-  if (json) { process.stdout.write(JSON.stringify({ schemaVersion: PRD_STATUS_REPORT_SCHEMA, programs: report, dod }) + "\n"); return { programs: report, dod } }
-  renderStatus(report, dod)
-  return { programs: report, dod }
+  const rcMatrix = rcMatrixVerdict()
+  if (json) { process.stdout.write(JSON.stringify({ schemaVersion: PRD_STATUS_REPORT_SCHEMA, programs: report, dod, rcMatrix }) + "\n"); return { programs: report, dod, rcMatrix } }
+  renderStatus(report, dod, rcMatrix)
+  return { programs: report, dod, rcMatrix }
 }

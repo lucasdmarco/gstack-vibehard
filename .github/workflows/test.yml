@@ -38,6 +38,29 @@ jobs:
       - run: npm test
         name: "Unit tests (Node)"
 
+  # PRD51 S51.10.2 (§51.10, dimensão "Node suportado mínimo, LTS atual e versão usada no
+  # release"): as três versões só rodavam no job `doctor`, que executa UM comando. A suíte
+  # rodava exclusivamente em Node 22 — uma regressão exclusiva do Node 18 passaria batido.
+  # Aqui a suíte INTEIRA roda no mínimo e no LTS. Fica no Linux de propósito: a matriz
+  # 3 SOs × 3 Node triplicaria o custo de CI para cobrir uma combinação improvável
+  # (incompatibilidade de versão de Node que só se manifesta num SO). Recorte declarado
+  # em src/release/rc-matrix.js, não inferido.
+  test-node-matrix:
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [18, 20]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm ci
+        name: "Install dependencies"
+      - run: npm test
+        name: "Unit tests (Node ${{ matrix.node }})"
+
   pytest:
     runs-on: ubuntu-latest
     steps:
@@ -103,9 +126,29 @@ jobs:
       - name: Syntaxcheck (node --check em todo o src — separado do typecheck)
         run: npm run syntaxcheck
 
-  # Smoke de empacotamento + scaffold. O test:pack prova o TARBALL real (pegaria,
-  # p.ex., o strip do .gitignore pelo npm); o test:templates valida o scaffold lite.
-  # O build PESADO (turbo via pnpm) garante que o projeto fullstack gerado COMPILA.
+  # PRD51 S51.10.2 (§51.10, "pacote TGZ passa clean-machine E2E nos três sistemas"):
+  # o `test:pack` — que prova o TARBALL real, e pegaria p.ex. o strip do .gitignore pelo
+  # npm — rodava SÓ no ubuntu, dentro do job `templates`. O job `e2e` cobre três SOs, mas
+  # roda o lifecycle, não o empacotamento. Um defeito de empacotamento específico de
+  # Windows (caminhos, permissões, CRLF) passaria batido. Agora é job próprio na matriz.
+  pack:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+        name: "Install dependencies"
+      - run: npm run test:pack
+        name: "Pack smoke (tarball real)"
+
+  # Scaffold: `test:templates` valida o scaffold lite. O build PESADO (turbo via pnpm)
+  # garante que o projeto fullstack gerado COMPILA — fica no ubuntu por custo.
   templates:
     runs-on: ubuntu-latest
     steps:
@@ -117,8 +160,6 @@ jobs:
         name: "Enable corepack (pnpm)"
       - run: npm ci
         name: "Install dependencies"
-      - run: npm run test:pack
-        name: "Pack smoke (tarball real)"
       - run: npm run test:templates
         name: "Template smoke (scaffold lite)"
       - run: GSTACK_TEMPLATE_INSTALL=1 npm run test:templates
