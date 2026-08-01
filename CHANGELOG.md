@@ -1,5 +1,64 @@
 # Changelog - gstack-vibehard
 
+## [5.104.0] - 2026-08-01 — PRD51 S51.10.4: claims do RC reconciliados, matriz DERIVADA (fecha o Sprint 51.10)
+
+Correção de escopo do usuário aplicada antes de codar: **o manual GUIA o produto,
+não FAZ PARTE dele**. A redação do §51.10 ("Atualizar `projetogstack.md` para a
+versão candidata") lê-se como "colocar o manual na versão candidata". Verificado em
+disco antes de aceitar: o `files` do package.json é allowlist e não inclui `.docs/`;
+`.gitignore` ignora `.docs/`; `prd53.md` §1 diz literalmente "os manuais são fontes
+de curadoria, não runtime"; zero referências ao manual em `src/`/`agents/`/`skills/`/
+`hooks/`. Ou seja, o não-empacotamento **já era verdade** — o item de guarda é
+regressão, não conserto.
+
+**A matriz de 5 faixas não foi escrita: foi DERIVADA.** Escrevê-la à mão repetiria a
+doença que este sprint cura — o manual ficou preso em v5.19.0 justamente porque texto
+redigido à mão envelhece em silêncio. `src/meta/capability-bands.js` deriva quatro
+faixas de registries que já são autoridade:
+
+| Faixa | Fonte |
+|---|---|
+| `entregue` (24) | `CLAIM_CONTRACTS` — adapter de evidência + comando E2E + controle negativo |
+| `enforced` (6) | `PROOF_GATES` severity `hard` |
+| `advisory` (3) | `PROOF_GATES` severity `advisory` |
+| `roadmap` (3) | `PENDING_FEATURES` |
+
+A faixa `entregue` é literalmente o item 4 do §51.10 ("ligar cada etapa a comando,
+código, gate e prova") — cada linha da tabela carrega os três.
+
+**Lacuna honesta:** `experimental` NÃO tem fonte legível por máquina. O vocabulário
+existe (`OBLIGATIONS` em `capabilities/contract.js` inclui `"experimental"`), mas
+nada o popula — hoje "experimental" só aparece como prosa em texto de ajuda. Os dois
+itens reais foram declarados citando onde cada um está em código, e a faixa sai
+marcada `derived:false`. Inventar um registro para a matriz ficar simétrica produziria
+a claim não-verificável que o PRD51 combate.
+
+`scripts/capability-bands.mjs --write` regenera a seção do manual entre marcadores —
+a seção avisa que é gerada e que editar à mão reintroduz o drift.
+
+**Manual reconciliado:** baseline v5.19.0 → v5.104.0, com a fronteira ("guia o
+produto, não faz parte dele") escrita no próprio cabeçalho, e `npm run lint:manuals`
+agora passa (exit 0).
+
+**DoD do PRD51: 16/24 → 17/24.** DOD.22 satisfeito. DOD.15 segue `partial` com o
+motivo REAL reescrito: o manual entrou na versão candidata, mas nenhum teste prova
+que o próprio `prd51.md` é encontrável pela busca de contexto — indexá-lo é trivial,
+prová-lo exige um teste que não existe, e declarar sem provar seria a falha que este
+PRD combate.
+
+- `tests/manual_not_shipped.test.js` (9 testes), `scripts/capability-bands.mjs`,
+  `npm run docs:bands`.
+- QG strict 0 (decomposição de CC em `renderCapabilityBandsMarkdown`), lint 0,
+  typecheck 0, suíte JS 2359/2360 (1 skip pré-existente).
+
+**Duas notas de processo.** (1) A guarda de fronteira deu falso-positivo na 1ª versão:
+acusou `manual-lint.js` e `rc-checklist-prd51.js`, que citam o manual legitimamente
+(um é o linter dele, o outro tem o DOD.22 sobre ele). Corrigido com allowlist
+justificada — citar o manual passa a exigir razão escrita, e é aí que uma tentativa de
+injetá-lo em contexto de agente apareceria. (2) O teste do S51.10.1 fixava `DOD.22`
+como pendência aberta e quebrou no sprint que a FECHOU; prender teste a item específico
+do DoD garante churn a cada caixa resolvida. Reescrito para a invariante estrutural.
+
 ## [5.103.0] - 2026-08-01 — PRD51 S51.10.3: lint dos manuais internos, mirando o drift que existe
 
 O §51.10 pede "verificação automática de exemplos e comandos dos dois manuais".

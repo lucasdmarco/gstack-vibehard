@@ -1,6 +1,6 @@
 {
   "name": "@gstack-vibehard/installer",
-  "version": "5.103.0",
+  "version": "5.104.0",
   "description": "gstack_vibehard — Cross-harness installer & fullstack template kit with deep agent integration (Codex, Claude Code, OpenCode)",
   "license": "MIT",
   "type": "module",
@@ -30,6 +30,7 @@
     "lint": "node scripts/lint.mjs",
     "lint:commands": "node scripts/command-lint.mjs",
     "lint:manuals": "node scripts/manual-lint.mjs",
+    "docs:bands": "node scripts/capability-bands.mjs",
     "syntaxcheck": "node scripts/lint.mjs --typecheck",
     "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
     "typecheck:ts": "tsc --noEmit -p tsconfig.typecheck.json",
