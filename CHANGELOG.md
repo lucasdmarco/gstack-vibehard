@@ -1,5 +1,56 @@
 # Changelog - gstack-vibehard
 
+## [5.106.0] - 2026-08-01 — PRD48 P2.1 Fase 0: infraestrutura English-first (SEM cutover)
+
+Decisão humana na certificação do RC: **PRD48 P2.1 é BLOQUEANTE**, não adiável nem
+non-goal. A decisão de produto é English-first — toda mensagem pública pertencente
+ao GStack em inglês; `cliLocale` fixo em `en` (sem seletor exposto neste RC); o
+idioma de CONVERSA com as LLMs é preferência separada (`conversationLanguage`).
+JSON, schemas, enums, IDs, flags, comandos e exit codes permanecem invariantes em
+inglês.
+
+**Medição que sustenta o bloqueio:** ~1.792 saídas ao usuário na superfície
+empacotada (1.592 em `src/`, 105 em `scripts/`, ~65 nos hooks Python, 23 em
+`templates/`, 7 em `launchers/`) — e **4** delas usam a infraestrutura de mensagens.
+O título anterior do item dizia "infraestrutura real, mas só `task inspect/restore`
+retrofitados", o que soava como acabamento; a realidade é 0,25%.
+
+Esta fase **não migra nenhuma mensagem**. Estabelece a infraestrutura e os controles
+que impedem a migração de dar errado em silêncio:
+
+- **`DEFAULT_LOCALE` continua `pt-BR`.** O cutover é da Fase 6, depois que todas as
+  superfícies estiverem migradas. Virar agora produziria uma CLI híbrida — metade
+  inglês, metade português — pior para o usuário que qualquer dos dois estados
+  puros. `GSTACK_CLI_LOCALE_MIGRATION=1` é flag INTERNA para exercitar superfície já
+  migrada; some no cutover.
+- **Fim do fallback silencioso para português.** `t()` caía para `pt-BR` quando a
+  chave faltava: pedir `en`, esbarrar numa chave não migrada e receber PORTUGUÊS sem
+  sinal nenhum — indistinguível de migração bem-sucedida. Cadeia agora é `locale
+  pedido → canônico (en) → [missing:id]` explícito.
+- **`en` é o catálogo CANÔNICO; paridade com pt-BR deixa de ser exigida.** O teste
+  pedia conjuntos idênticos, o que dobraria o trabalho de cada mensagem e bloquearia
+  o RC por um catálogo declarado não-canônico. Substituído pela invariante que ainda
+  pega erro real: pt-BR não pode ter id ÓRFÃO (chave morta/renomeada).
+- **`conversationLanguage` nasce independente** (`src/cli/conversation-language.js`):
+  não valida contra `SUPPORTED_LOCALES` da CLI — o usuário pode conversar num idioma
+  que a interface não fala. O contrato que atravessa `handoff`/`resume` carrega
+  `cliLocale` FIXO, para que ninguém do outro lado infira o idioma da interface a
+  partir do da conversa (foi essa inferência que produziu a mistura original).
+  Preferência inválida é ignorada e nunca persistida.
+
+**Ledger:** `PRD48 P2.1` passa a `blocking:true` com `blockingReason` e
+`forbiddenClaim: "English-first CLI"`. `DOD.8` deixa de ter texto fixo (dizia "PRD47
+P1.8 e 4 P1 do PRD49" — errado: o PRD49 tem 3, e faltavam PRD48 P2.1 e PRD50 P1.7) e
+passa a DERIVAR de `residualReport()`, destacando bloqueantes.
+
+- `tests/english_first_phase0.test.js` (11 testes), `tests/cli_i18n.test.js`
+  atualizado.
+- QG strict 0, lint 0, typecheck 0, suíte JS 2379/2381 (1 skip pré-existente + 1
+  flake de subprocess-timeout sob carga, verificado passando isolado), pytest 93.
+
+**RC segue BLOQUEADO** até as sete fases, cutover final e Golden E2E completos.
+Máquina fria e certificação esperam.
+
 ## [5.105.1] - 2026-08-01 — `verify` deixa de culpar a causa errada em `ready_with_warnings`
 
 Achado ao rodar `proof --profile full --json` no HEAD para fechar o DOD.3 do §9.
