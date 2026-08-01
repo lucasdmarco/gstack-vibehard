@@ -242,6 +242,32 @@ class ContextDbTest(unittest.TestCase):
             st = json.loads(run("status", "--db", db, "--json").stdout)
             self.assertEqual(st["by_source"].get("prd"), 2, "prd49/prd50 classificados como source=prd (pelo nome do arquivo)")
 
+    # PRD51 DOD.15 do §9 — "busca de contexto encontra PRD49, PRD50, PRD51 e manual
+    # atual". As duas primeiras metades ja eram provadas acima. Faltavam o proprio
+    # PRD51 e o manual do projeto — e a ausencia estava REGISTRADA como pendencia no
+    # checklist em vez de presumida resolvida. Indexar era trivial; o que faltava era
+    # exatamente isto: a prova.
+    def test_prd51_e_manual_do_projeto_sao_encontraveis(self):
+        prd51 = REPO_ROOT / ".docs" / "PLANS" / "prd51.md"
+        manual = REPO_ROOT / ".docs" / "PLANS" / "projetogstack.md"
+        for p in (prd51, manual):
+            if not p.exists():
+                self.skipTest(f"{p} nao existe nesta arvore (`.docs/` e gitignored)")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "proj"
+            (root / ".docs" / "PLANS").mkdir(parents=True)
+            (root / ".docs" / "PLANS" / "prd51.md").write_text(prd51.read_text(encoding="utf-8"), encoding="utf-8")
+            (root / ".docs" / "PLANS" / "projetogstack.md").write_text(manual.read_text(encoding="utf-8"), encoding="utf-8")
+            db = str(root / ".gstack" / "context" / "context.db")
+            r = run("index", "--db", db, "--root", str(root), "--json")
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertEqual(json.loads(r.stdout)["indexed"], 2)
+            sr51 = json.loads(run("search", "--db", db, "--query", "PRD51", "--json").stdout)
+            self.assertTrue(any("prd51.md" in x["path"] for x in sr51["results"]), "PRD51 real deve ser encontravel")
+            # O manual e encontravel pelo termo que o identifica, nao por um id de PRD.
+            srm = json.loads(run("search", "--db", db, "--query", "GStack VibeHard", "--json").stdout)
+            self.assertTrue(any("projetogstack.md" in x["path"] for x in srm["results"]), "manual atual deve ser encontravel")
+
 
 if __name__ == "__main__":
     unittest.main()

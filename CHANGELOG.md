@@ -1,5 +1,59 @@
 # Changelog - gstack-vibehard
 
+## [5.105.0] - 2026-08-01 — PRD51 DOD.13 + DOD.15: contrato `--json` varrido e contexto provado
+
+Fecha as duas caixas do DoD do §9 que ainda dependiam só de engenharia (as demais
+exigem execução em CI/máquina fria ou decisão humana). **DoD: 17/24 → 19/24.**
+
+### DOD.13 — "todo `--json` anunciado gera stdout JSON puro"
+
+A lacuna nunca foi falta de teste: era falta da PERGUNTA. A pureza vinha sendo
+provada comando a comando, onde alguém lembrou, e nada respondia "quantos anunciam
+`--json` e quantos foram verificados?". Sem essa conta, cobertura parcial é
+indistinguível de cobertura total.
+
+`src/meta/json-contract.js` DERIVA do registry da CLI quem anuncia a flag — nunca
+uma lista paralela, que envelheceria como o manual envelheceu. O guard que mais
+importa não é a varredura: é `unaccountedCommands()`, que impede um `--json` novo de
+entrar sem que alguém decida como prová-lo (receita) ou por que não dá para provar
+automaticamente (exclusão com motivo obrigatório).
+
+O módulo pagou por si no primeiro uso: a contagem manual dizia 21 anunciantes; o
+registry real tem **25**, e quatro (`start`, `consult`, `loop`, `plan`) não tinham
+receita nem exclusão — invisíveis para qualquer verificação. Hoje: 25 = 14 varridos
++ 11 excluídos com motivo, **0 sem conta**.
+
+**Duas quebras REAIS de contrato**, ambas no caminho degradado, ambas corrigidas
+preservando o conteúdo honesto (só movido para dentro do JSON):
+
+- `dev --json` sem projeto imprimia orientação humana → `{"status":"no_runtime",
+  "workspace","description","actions"}`;
+- `actions ledger --json` sem runs imprimia aviso humano → `{"runId":null,
+  "actions":[],"reason":"no_runs"}`.
+
+Nos dois casos quem consome por máquina recebia prosa, sem distinguir "sem runtime"
+de "comando quebrado". **O e2e existente TOLERAVA isso explicitamente** ("ou JSON,
+ou aviso de manifest ausente") — a tolerância não era descuido, era uma decisão
+antiga que virou cobertura falsa. Asserção apertada: sob `--json` a resposta É JSON,
+sempre.
+
+### DOD.15 — "busca de contexto encontra PRD49, PRD50, PRD51 e manual atual"
+
+As duas primeiras metades já eram provadas desde o S51.5.3. Faltavam o próprio
+`prd51.md` e o manual do projeto — e a ausência estava REGISTRADA como pendência no
+checklist em vez de presumida resolvida. Novo teste indexa os arquivos REAIS do
+repositório (não fixture sintética) e prova ambos encontráveis.
+
+- `tests/json_contract_sweep.test.js` (5 testes, varredura real de 14 comandos),
+  `tests/test_context_db.py` (+1), `tests/e2e/dev_terminal.e2e.test.js` apertado.
+- QG strict 0, lint 0, typecheck 0, suíte JS 2364/2365 (1 skip pré-existente),
+  pytest 93 passed.
+
+**Nota de honestidade.** Das 4 falhas iniciais da varredura, **3 eram receitas
+erradas minhas** (`skills list` não existe — é `catalog`; `actions` precisa de
+`ledger`). Cada uma foi verificada à mão antes de reportar, em vez de anunciar
+quatro defeitos de produto que não existiam.
+
 ## [5.104.0] - 2026-08-01 — PRD51 S51.10.4: claims do RC reconciliados, matriz DERIVADA (fecha o Sprint 51.10)
 
 Correção de escopo do usuário aplicada antes de codar: **o manual GUIA o produto,

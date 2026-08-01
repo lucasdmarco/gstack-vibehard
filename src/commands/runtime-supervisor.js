@@ -35,8 +35,21 @@ function openUrl(url) {
 // Sem manifest: diagnóstico acionável pelo workspace classifier (PRD28 28.0) —
 // explica O QUE o diretório é e a trilha GStack correta. NUNCA sugere npm cru
 // (o bug real: usuário leigo instalou pacotes soltos no home p/ "consertar").
-function explainNoManifest(cwd) {
+function explainNoManifest(cwd, json = false) {
   const ws = classifyWorkspace(cwd)
+  // PRD51 DOD.13 — este caminho degradado imprimia orientação HUMANA mesmo sob `--json`,
+  // quebrando o contrato para todo consumidor de máquina (script/agente recebia texto).
+  // A varredura de contrato (`meta/json-contract.js`) achou. A degradação continua tão
+  // honesta quanto antes — só passa a caber dentro do JSON.
+  if (json) {
+    process.stdout.write(JSON.stringify({
+      status: "no_runtime",
+      workspace: ws.state,
+      description: ws.description,
+      actions: ws.actions,
+    }) + "\n")
+    return
+  }
   warn(`Sem runtime executável aqui — ${ws.description}.`)
   if (ws.state === "node_app") {
     const scripts = ws.signals.scripts
@@ -71,7 +84,7 @@ function announceExecutionScope(m) {
 }
 function loadValidDevManifest(cwd, args = []) {
   const m = loadRuntimeManifest(cwd)
-  if (!m) { explainNoManifest(cwd); return null }
+  if (!m) { explainNoManifest(cwd, args.includes("--json")); return null }
   const v = validateManifestForVersion(m)
   if (!v.valid) { v.errors.forEach((e) => warn(`  ✗ ${e}`)); error("Runtime manifest inválido — corrija antes do `dev`."); return null }
   announceExecutionScope(m)
