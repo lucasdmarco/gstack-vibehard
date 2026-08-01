@@ -1,0 +1,147 @@
+import test from "node:test"
+import assert from "node:assert/strict"
+import path from "node:path"
+import { pathToFileURL } from "node:url"
+
+/**
+ * PRD48 P2.1 — Fase 1: inventário determinístico da superfície de mensagem.
+ *
+ * O que este arquivo protege é a HONESTIDADE do inventário, não o número:
+ *
+ *  - escopo de `scripts/` é DERIVADO de import/spawn reais — comentário e string de
+ *    evidência não promovem nada a runtime (a 1ª versão contava menção textual e
+ *    "descobriu" 9 scripts runtime, um deles citado só dentro de um comentário);
+ *  - classificação é por CANAL, nunca por default — a 1ª versão marcava 1.850 pontos
+ *    como `public_diagnostic` por omissão, o que daria inventário "completo" com zero
+ *    análise;
+ *  - `unknown` é estado de primeira classe e BLOQUEIA a migração.
+ */
+
+const repoRoot = path.resolve(import.meta.dirname, "..")
+const imp = () => import(`${pathToFileURL(path.join(repoRoot, "src", "meta", "i18n-inventory.js"))}?t=${Date.now()}`)
+
+test("escopo de scripts é DERIVADO: menção em comentário/string NÃO promove a runtime", async () => {
+  const { runtimeScriptOrigins } = await imp()
+  const o = runtimeScriptOrigins(repoRoot)
+  // `capability-bands.mjs` é citado num COMENTÁRIO de src/meta/capability-bands.js.
+  // A 1ª versão deste extrator o promovia a runtime por isso — grep disfarçado de grafo.
+  assert.ok(!o["capability-bands.mjs"], "menção em comentário não é execução")
+  assert.ok(!o["vertical-saas-auth-stripe.mjs"], "path de evidência em checklist não é execução")
+})
+
+// CONTRAPROVA exigida na revisão humana: ausência de import/spawn em `src/` NÃO prova
+// que o script não roda — prova só que não roda por ali. O ciclo de vida do npm executa
+// scripts durante pack/version/install, e foi assim que a 1ª conclusão ("nenhum script é
+// runtime") se revelou incompleta.
+test("o grafo de raízes inclui ciclo de vida do npm, não só src/ e bin", async () => {
+  const { runtimeScriptOrigins } = await imp()
+  const o = runtimeScriptOrigins(repoRoot)
+  assert.deepEqual(o["clean-pkg.mjs"], ["lifecycle:prepack"], "roda ao empacotar")
+  assert.deepEqual(o["sync-qg-version.mjs"], ["lifecycle:version"], "roda ao versionar")
+})
+
+test("Fase 1A: estado declarado impede ler `extractor mergeado` como `inventário pronto`", async () => {
+  const { buildInventory, phaseStatus } = await imp()
+  const s = phaseStatus(buildInventory({ repoRoot }))
+  assert.equal(s.phaseStatus, "partial")
+  assert.equal(s.phase, "1A")
+  assert.equal(s.nextPhase, "1B")
+  assert.equal(s.rcBlocked, true)
+  assert.equal(s.englishFirstClaimAllowed, false, "nenhuma claim English-first antes do cutover")
+  assert.ok(s.unknown > 0)
+})
+
+test("CONTROLE POSITIVO: com unknown zerado, a Fase 1 encerra e libera a migração", async () => {
+  const { phaseStatus } = await imp()
+  const s = phaseStatus({ unknown: 0 })
+  assert.equal(s.phaseStatus, "complete")
+  assert.equal(s.nextPhase, "2")
+  assert.equal(s.englishFirstClaimAllowed, false, "encerrar a Fase 1 ainda NÃO autoriza a claim — isso é do cutover")
+})
+
+test("scripts de mantenedor/CI são listados como FORA da claim, por derivação", async () => {
+  const { maintainerOnlyScripts } = await imp()
+  const m = maintainerOnlyScripts(repoRoot)
+  assert.ok(m.includes("test-pack.mjs"), "ferramenta de teste fica fora")
+  assert.ok(m.includes("command-lint.mjs"), "ferramenta de mantenedor fica fora")
+  assert.ok(m.length > 5)
+})
+
+test("classificação é por CANAL: só o render sancionado é público por construção", async () => {
+  const { classifyJsPoint } = await imp()
+  assert.equal(classifyJsPoint({ sink: "cli_render" }).audience, "public_diagnostic")
+  assert.equal(classifyJsPoint({ sink: "console" }).audience, "unknown", "escrita crua não se auto-declara")
+  assert.equal(classifyJsPoint({ sink: "stdout" }).audience, "unknown")
+  assert.equal(classifyJsPoint({ sink: "stdout", emitsJson: true }).audience, "machine_protocol")
+})
+
+test("hook Python: classificação por canal/condição, jamais pelo conteúdo da frase", async () => {
+  const { classifyHookPoint } = await imp()
+  assert.equal(classifyHookPoint({ sink: "json" }).audience, "machine_protocol")
+  assert.equal(classifyHookPoint({ sink: "stdout" }).audience, "machine_protocol", "stdout de hook é protocolo")
+  assert.equal(classifyHookPoint({ sink: "stderr", insideExceptHandler: true }).audience, "public_diagnostic")
+  assert.equal(classifyHookPoint({ sink: "stderr", guardedByDebug: true }).audience, "internal_debug")
+})
+
+test("CONTROLE: stderr sem condição determinável fica `unknown`, NUNCA vira interno", async () => {
+  const { classifyHookPoint } = await imp()
+  const r = classifyHookPoint({ sink: "stderr" })
+  assert.equal(r.audience, "unknown", "assumir 'interno' é como uma mensagem PT-BR sobrevive à migração")
+})
+
+test("o gate da Fase 1 BLOQUEIA enquanto houver unknown", async () => {
+  const { buildInventory, phase1Gate } = await imp()
+  const inv = buildInventory({ repoRoot })
+  const g = phase1Gate(inv)
+  assert.equal(g.ok, inv.unknown === 0)
+  if (inv.unknown > 0) assert.match(g.reason, /classificar antes de migrar/)
+})
+
+test("CONTROLE POSITIVO: inventário sem unknown libera o gate (o caminho existe)", async () => {
+  const { phase1Gate } = await imp()
+  assert.deepEqual(phase1Gate({ unknown: 0 }), { ok: true, unknown: 0, reason: null })
+})
+
+test("todo ponto carrega file/line/sink/audience/owner/classification (registro auditável)", async () => {
+  const { buildInventory } = await imp()
+  const inv = buildInventory({ repoRoot })
+  for (const p of inv.points.slice(0, 40)) {
+    for (const campo of ["file", "line", "sink", "audience", "owner", "classification"]) {
+      assert.ok(p[campo] !== undefined, `ponto declara ${campo}`)
+    }
+  }
+})
+
+test("templates NÃO são excluídos em bloco — owner `generated`, classificados individualmente", async () => {
+  const { buildInventory } = await imp()
+  const inv = buildInventory({ repoRoot })
+  const t = inv.points.filter((p) => p.file.startsWith("templates/"))
+  assert.ok(t.length > 0, "templates entram no inventário")
+  assert.ok(t.every((p) => p.owner === "generated"), "owner distingue artefato gerado do GStack")
+})
+
+test("registry só REFINA unknown — nunca reclassifica audiência derivada", async () => {
+  const { buildInventory } = await imp()
+  const semRegistry = buildInventory({ repoRoot })
+  const alvo = semRegistry.points.find((p) => p.audience === "machine_protocol")
+  const comRegistry = buildInventory({ repoRoot, registry: { [alvo.file]: "public_diagnostic" } })
+  const depois = comRegistry.points.find((p) => p.file === alvo.file && p.line === alvo.line && p.sink === alvo.sink)
+  assert.equal(depois.audience, "machine_protocol", "declaração humana não pode virar contrato de máquina em texto público")
+})
+
+test("validateRegistry rejeita entrada morta e audiência inválida", async () => {
+  const { validateRegistry } = await imp()
+  const bom = validateRegistry({ "src/cli/index.js": "public_diagnostic" }, repoRoot)
+  assert.equal(bom.ok, true)
+  const ruim = validateRegistry({ "src/nao/existe.js": "public_diagnostic" }, repoRoot)
+  assert.equal(ruim.ok, false)
+  const invalida = validateRegistry({ "src/cli/index.js": "audiencia_inventada" }, repoRoot)
+  assert.equal(invalida.ok, false)
+})
+
+test("validateRegistry recusa script que NÃO é alcançado pelo runtime (não pertence à claim)", async () => {
+  const { validateRegistry } = await imp()
+  const r = validateRegistry({ "scripts/test-pack.mjs": "public_diagnostic" }, repoRoot)
+  assert.equal(r.ok, false)
+  assert.match(r.problemas[0].erro, /não é alcançado pelo runtime/)
+})
