@@ -110,10 +110,40 @@ function renderReleaseBaselineLine(report) {
   const verdict = b.completeVerdict.ok ? "pode renderizar 'concluído'" : b.completeVerdict.reason
   info(`  • release-baseline (advisory): releaseReady=${b.releaseReady} programComplete=${b.programComplete} operationallyProven=${b.operationallyProven} fullyValidated=${b.fullyValidated} — ${verdict}`)
 }
+/**
+ * PRD51 (fechamento do DOD.3) — `ready_with_warnings` tem DUAS causas
+ * (`pickStatus`, verify-runner.js): ferramenta ausente OU drift do hook QG. A mensagem
+ * culpava sempre a primeira e imprimia `toolMissing` — que, no caso de drift, é uma
+ * LISTA VAZIA. O usuário lia "faltou ferramenta esperada: " e não tinha como descobrir
+ * que a causa real era o hook global defasado em relação ao empacotado.
+ *
+ * Achado ao rodar `proof --profile full` no HEAD para fechar o DOD.3: o proof exige
+ * `status === "ready"` estrito, então o drift bloqueava o RC por um motivo que a
+ * própria mensagem escondia.
+ */
+const causaFerramenta = (report) => (report.toolMissing && report.toolMissing.length
+  ? `faltou ferramenta esperada: ${report.toolMissing.join(", ")}`
+  : null)
+
+const causaDrift = (report) => {
+  if (!report.qgDrift) return null
+  const q = report.qg || {}
+  const inst = q.version || "?"
+  const pack = q.packagedVersion || "?"
+  const origem = q.origin || "?"
+  return `hook QG divergente do empacotado (instalado v${inst} em ${origem} vs empacotado v${pack}) — rode \`npm run sync:qg\``
+}
+
+export function warningCause(report) {
+  const causas = [causaFerramenta(report), causaDrift(report)].filter(Boolean)
+  // Nunca inventa causa: se o status é `ready_with_warnings` por um motivo novo, diz isso.
+  return causas.length ? causas.join("; ") : "aviso sem causa identificada (verifique `--json`)"
+}
+
 // Mensagem honesta: "PRONTO" só em ready; nunca em pending_product/blocked/timeout.
 function renderVerifyStatus(report) {
   if (report.status === "ready") return success("Projeto PRONTO — todos os gates aplicáveis passaram.")
-  if (report.status === "ready_with_warnings") return warn(`Pronto COM AVISOS — faltou ferramenta esperada: ${report.toolMissing.join(", ")}. Não é Zero-Trust completo.`)
+  if (report.status === "ready_with_warnings") return warn(`Pronto COM AVISOS — ${warningCause(report)}. Não é Zero-Trust completo.`)
   if (report.status === "pending_product") return warn("NÃO declarado pronto: runtime/preview pendente (o app/preview não roda ainda). Build/testes passaram.")
   if (report.status === "timed_out") {
     error(`TIMEOUT — etapa(s) estouraram o tempo: ${(report.timedOut || []).join(", ")}`)

@@ -60,7 +60,11 @@ function writeVerifyCache(cwd, data) { try { mkdirSync(join(cwd, ".gstack"), { r
  * Status do run:
  *   blocked             = algum gate OBRIGATÓRIO falhou.
  *   pending_product     = runtime/preview pendente E o projeto precisa rodar (start/dev).
- *   ready_with_warnings = passou, mas faltou ferramenta esperada (ex.: Fallow/QG ausente).
+ *   ready_with_warnings = passou, mas há aviso: ferramenta esperada ausente (ex.: Fallow)
+ *                         OU drift do hook QG (instalado != empacotado). PRD51: o
+ *                         comentário citava só a primeira causa, e a mensagem humana
+ *                         herdava o erro — culpava ferramenta faltante e imprimia lista
+ *                         vazia quando a causa era drift.
  *   ready               = tudo aplicável passou, sem avisos.
  * `reducedTrust` = harness ativo não tem controle real (best_effort/partial).
  */

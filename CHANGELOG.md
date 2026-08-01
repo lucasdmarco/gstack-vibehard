@@ -1,5 +1,50 @@
 # Changelog - gstack-vibehard
 
+## [5.105.1] - 2026-08-01 — `verify` deixa de culpar a causa errada em `ready_with_warnings`
+
+Achado ao rodar `proof --profile full --json` no HEAD para fechar o DOD.3 do §9.
+
+`verify --profile full` retornava `ready_with_warnings` com `failed: []`,
+`toolMissing: []` e `reducedTrust: false` — nada faltando, nada falhando. A causa
+real era a SEGUNDA condição de `pickStatus` (`verify-runner.js`): **drift do hook
+QG** (instalado v5.99.0 em `~/.codex` vs empacotado v5.105.0). Mas a mensagem
+conhecia só a primeira causa e imprimia `toolMissing`, que nesse caminho é lista
+vazia:
+
+```
+Pronto COM AVISOS — faltou ferramenta esperada: . Não é Zero-Trust completo.
+```
+
+Não era cosmético: `proof` exige `status === "ready"` ESTRITO, então o drift
+**bloqueava o RC por um motivo que a própria mensagem escondia**. O operador via uma
+lista vazia e nenhuma pista do hook global defasado — a mesma família de defeito que
+o PRD51 caça: o sistema sabia a verdade e reportava outra coisa.
+
+`warningCause(report)` (exportado, puro) nomeia a causa REAL, as duas quando
+coexistem, e diz como corrigir:
+
+```
+Pronto COM AVISOS — hook QG divergente do empacotado
+(instalado v5.99.0 em codex vs empacotado v5.105.0) — rode `npm run sync:qg`
+```
+
+Causa desconhecida sai DECLARADA ("aviso sem causa identificada"), nunca como
+mensagem vazia — se surgir um terceiro motivo de warning, ele não vira silêncio.
+O comentário de contrato em `verify-runner.js` também citava só a causa de
+ferramenta; corrigido.
+
+- `tests/verify_warning_cause.test.js` (5 testes, incluindo o controle negativo do
+  defeito original: a mensagem nunca pode terminar em "causa: .").
+- QG strict 0 (extração de CC em `warningCause`), lint 0, typecheck 0, suíte JS
+  2369/2370 (1 skip pré-existente).
+
+**Não feito de propósito:** o hook global (`~/.codex/hooks/qg.py`) NÃO foi
+sincronizado e o Headroom NÃO foi roteado. Ambos fechariam o DOD.3, e ambos são
+ação do usuário — `.docs`/CLAUDE.md deste projeto pedem consentimento antes de
+tocar config central ou registrar routing. Forçar qualquer um produziria um
+`ready:true` comprado, exatamente o que o gate `headroom-routing-full` (S51.5.5)
+existe para impedir.
+
 ## [5.105.0] - 2026-08-01 — PRD51 DOD.13 + DOD.15: contrato `--json` varrido e contexto provado
 
 Fecha as duas caixas do DoD do §9 que ainda dependiam só de engenharia (as demais
