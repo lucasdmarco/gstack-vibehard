@@ -110,7 +110,7 @@ export const PRD51_DOD_ITEMS = Object.freeze([
   { id: "DOD.12", kind: "static", requirement: "command registry, help, dispatch e firewall têm uma fonte única", status: "partial", missing: "S51.4.5 deixou 2 das 5 detecções fora de escopo (subcomando inexistente / flag documentada não reconhecida) — exigiriam catálogo de subcomandos e flags que não existe", evidence: "tests/operation_registry.test.js" },
   { id: "DOD.13", kind: "static", requirement: "todo `--json` anunciado gera stdout JSON puro", status: "pending", missing: "não há verificação abrangente de pureza de stdout por comando; `doctor_json.test.js` cobre um comando só" },
   { id: "DOD.14", kind: "static", requirement: "Graphify freshness prova o HEAD", status: "satisfied", evidence: "tests/graphify_provenance.test.js" },
-  { id: "DOD.15", kind: "static", requirement: "busca de contexto encontra PRD49, PRD50, PRD51 e manual atual", status: "partial", missing: "PRD49/PRD50/manual provados reais; PRD51 e a versão candidata do manual ainda não (o manual está em v5.19.0 — ver S51.10.4)", evidence: "tests/context_index.test.js" },
+  { id: "DOD.15", kind: "static", requirement: "busca de contexto encontra PRD49, PRD50, PRD51 e manual atual", status: "partial", missing: "PRD49/PRD50/manual provados reais em `context_index.test.js`, e o S51.10.4 pôs o manual na versão candidata. Falta a metade do PRD51: nenhum teste prova que o próprio prd51.md é encontrável pela busca de contexto — indexá-lo é trivial, prová-lo exige um teste que não existe, e declarar sem provar seria a falha que este PRD combate.", evidence: "tests/context_index.test.js" },
   { id: "DOD.16", kind: "static", requirement: "mirrors externos não dominam resultados locais por padrão", status: "satisfied", evidence: "tests/context_index.test.js" },
   { id: "DOD.17", kind: "static", requirement: "Headroom não alega economia sem tráfego", status: "satisfied", evidence: "tests/headroom_status.test.js" },
   { id: "DOD.18", kind: "static", requirement: "typecheck real bloqueia erro de tipo", status: "satisfied", evidence: "tests/typecheck_real_gate.test.js" },
@@ -120,7 +120,10 @@ export const PRD51_DOD_ITEMS = Object.freeze([
   // de chutar, e agora registra o que a leitura dos testes mostrou.
   { id: "DOD.20", kind: "static", requirement: "Lite não ganha dependências obrigatórias externas", status: "satisfied", evidence: "tests/full_contract.test.js" },
   { id: "DOD.21", kind: "static", requirement: "Full não modifica config global sem consentimento, backup e restore", status: "satisfied", evidence: "tests/install_global_consent.test.js" },
-  { id: "DOD.22", kind: "static", requirement: "manuais descrevem a versão candidata, não v5.19", status: "pending", missing: "projetogstack.md declara baseline v5.19.0 contra CLI v5.100.0 — ver S51.10.4" },
+  // S51.10.4 — o manual saiu de v5.19.0 para a versão candidata, e a matriz de
+  // capacidades passou a ser GERADA dos registries (não reescrita à mão), que é o que
+  // impede o drift de voltar. `manual-lint` reprova baseline defasada em MAJOR/MINOR.
+  { id: "DOD.22", kind: "static", requirement: "manuais descrevem a versão candidata, não v5.19", status: "satisfied", evidence: "tests/manual_lint.test.js" },
   { id: "DOD.23", kind: "runtime", requirement: "pacote TGZ passa clean-machine E2E nos três sistemas", status: "partial", missing: "A auditoria do S51.10.2 achou que `test:pack` (a prova do tarball REAL) rodava só no ubuntu, dentro do job `templates` — o job `e2e` cobre 3 SOs mas roda o lifecycle, não o empacotamento. Um defeito de empacotamento específico de Windows passaria batido. Corrigido: `test:pack` virou job próprio na matriz de 3 SOs. Segue `partial` porque é caixa `runtime`: a fiação existe, mas só o run da CI no commit final do RC prova a execução.", evidence: "tests/tgz_clean_env.test.js" },
   { id: "DOD.24", kind: "static", requirement: "release candidate possui rollback testado", status: "satisfied", evidence: "tests/uninstall_restore.test.js" },
 ])

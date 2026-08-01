@@ -83,12 +83,18 @@ test("prd51Readiness: sprints fecharam (ready:true) mas o DoD NÃO (programCompl
   assert.equal(r.counts.dodSatisfied + r.counts.dodOpen, r.counts.dod)
 })
 
+// S51.10.4: a versão anterior fixava `DOD.22` como pendência aberta — e quebrou no
+// sprint que a FECHOU. Prender um teste a um item específico do DoD garante churn a cada
+// caixa resolvida, sem proteger nada a mais. A invariante que importa é estrutural:
+// toda pendência carrega o que falta, e nenhuma caixa `runtime` se declara satisfeita.
 test("openDoD expõe cada pendência com o que falta (o RC precisa saber, não descobrir)", async () => {
   const { prd51Readiness } = await imp()
   const r = prd51Readiness()
-  assert.ok(r.openDoD.length > 0)
-  for (const d of r.openDoD) assert.ok(d.missing, `${d.id} carrega o que falta`)
-  assert.ok(r.openDoD.some((d) => d.id === "DOD.22"), "manual em v5.19 é uma pendência declarada, não esquecida")
+  assert.ok(r.openDoD.length > 0, "enquanto houver caixa aberta, ela precisa aparecer")
+  for (const d of r.openDoD) {
+    assert.ok(d.missing, `${d.id} carrega o que falta`)
+    assert.ok(d.requirement, `${d.id} diz qual exigência ficou em aberto`)
+  }
 })
 
 test("CONTROLE NEGATIVO: um P0 que regredir derruba ready E programComplete", async () => {
