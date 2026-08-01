@@ -28,10 +28,14 @@ test("E2E dev: sem runtime manifest → resposta HONESTA sem crash (exit 0)", ()
   try {
     const r = run(["dev", "--json"], cwd)
     assert.equal(r.code, 0, "não crasha sem projeto")
-    // honesto: ou JSON com services/status, ou aviso de manifest ausente
+    // PRD51 DOD.13 — esta asserção ACEITAVA texto humano como resposta válida a `--json`
+    // ("ou JSON, ou aviso de manifest ausente"), e era essa tolerância que escondia a
+    // quebra: quem consome por máquina recebia prosa. Sob `--json` a resposta É JSON,
+    // sempre; a honestidade do conteúdo cabe dentro dele.
     const d = lastJson(r.out)
-    const honest = (d && ("services" in d || "error" in d || "status" in d)) || /manifest|runtime|create/i.test(r.out)
-    assert.ok(honest, "dev responde de forma honesta (JSON ou aviso de manifest)")
+    assert.ok(d, "`--json` obriga saída de máquina, mesmo no caminho degradado")
+    assert.equal(d.status, "no_runtime", "o diagnóstico honesto vira campo, não prosa")
+    assert.ok(Array.isArray(d.actions) && d.actions.length > 0, "e continua acionável")
   } finally { cleanupTmp(cwd) }
 })
 

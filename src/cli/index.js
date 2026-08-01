@@ -178,7 +178,11 @@ export async function multiSelect(question, options) {
 }
 
 // Registro de comandos — fonte única para help curto, avançado e por-comando.
-const COMMANDS = [
+// PRD51 DOD.13 — exportado para que a varredura do contrato `--json`
+// (`meta/json-contract.js`) DERIVE do registry quem anuncia a flag, em vez de manter
+// uma lista paralela que envelheceria em silêncio. Fonte única, mesma disciplina do
+// command-lint.
+export const COMMANDS = [
   { name: "start", group: "common", desc: "Assistente guiado: objetivo → consult → plano → skill route → execução", usage: "gstack_vibehard start [\"objetivo\"] [--skills a,b] [--assume-no-existing-model] [--yes] [--dry-run --json]" },
   { name: "consult", group: "common", desc: "Recomendação READ-ONLY: caminho único, preview e rollback (nada é escrito)", usage: "gstack_vibehard consult \"<objetivo>\" [--json]" },
   { name: "create", group: "common", desc: "Criar um app (LITE por padrão, escreve só ./<nome>)", usage: "gstack_vibehard create <nome> [--full] [--vault] [--dry-run --json]" },

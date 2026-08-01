@@ -44,7 +44,14 @@ function renderLedgerHuman(runId, actions) {
 
 function ledgerCmd(cwd, args, json) {
   const runId = flagValue(args, "--run") || latestRun(cwd)
-  if (!runId) { warn("Nenhum run em .gstack/runs — rode um fluxo antes."); return { runId: null, actions: [] } }
+  // PRD51 DOD.13 — o caso vazio saía como aviso HUMANO mesmo sob `--json`: quem
+  // consumia a saída por máquina recebia texto e não tinha como distinguir "sem runs"
+  // de "comando quebrado". Achado pela varredura de contrato (meta/json-contract.js).
+  if (!runId) {
+    if (json) process.stdout.write(JSON.stringify({ schemaVersion: ACTION_KERNEL_SCHEMA, runId: null, actions: [], reason: "no_runs" }) + "\n")
+    else warn("Nenhum run em .gstack/runs — rode um fluxo antes.")
+    return { runId: null, actions: [] }
+  }
   const actions = readActions({ root: cwd, runId })
   if (json) process.stdout.write(JSON.stringify({ schemaVersion: ACTION_KERNEL_SCHEMA, runId, actions }) + "\n")
   else renderLedgerHuman(runId, actions)

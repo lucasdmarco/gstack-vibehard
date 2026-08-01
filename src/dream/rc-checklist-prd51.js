@@ -108,9 +108,16 @@ export const PRD51_DOD_ITEMS = Object.freeze([
   { id: "DOD.10", kind: "static", requirement: "dream audit não usa placar fixo", status: "satisfied", evidence: "tests/public_claims_honesty.test.js" },
   { id: "DOD.11", kind: "static", requirement: "toda claim core pública possui contrato comportamental", status: "satisfied", evidence: "tests/claim_contracts_s51_6_4.test.js" },
   { id: "DOD.12", kind: "static", requirement: "command registry, help, dispatch e firewall têm uma fonte única", status: "partial", missing: "S51.4.5 deixou 2 das 5 detecções fora de escopo (subcomando inexistente / flag documentada não reconhecida) — exigiriam catálogo de subcomandos e flags que não existe", evidence: "tests/operation_registry.test.js" },
-  { id: "DOD.13", kind: "static", requirement: "todo `--json` anunciado gera stdout JSON puro", status: "pending", missing: "não há verificação abrangente de pureza de stdout por comando; `doctor_json.test.js` cobre um comando só" },
+  // Fechado após o PRD51: `meta/json-contract.js` deriva do registry quem anuncia
+  // `--json` (25) e obriga cada um a ter receita de varredura OU exclusão com motivo —
+  // 0 sem conta. A varredura achou 2 quebras reais (`dev` e `actions ledger` emitiam
+  // prosa no caminho degradado sob `--json`), ambas corrigidas.
+  { id: "DOD.13", kind: "static", requirement: "todo `--json` anunciado gera stdout JSON puro", status: "satisfied", evidence: "tests/json_contract_sweep.test.js" },
   { id: "DOD.14", kind: "static", requirement: "Graphify freshness prova o HEAD", status: "satisfied", evidence: "tests/graphify_provenance.test.js" },
-  { id: "DOD.15", kind: "static", requirement: "busca de contexto encontra PRD49, PRD50, PRD51 e manual atual", status: "partial", missing: "PRD49/PRD50/manual provados reais em `context_index.test.js`, e o S51.10.4 pôs o manual na versão candidata. Falta a metade do PRD51: nenhum teste prova que o próprio prd51.md é encontrável pela busca de contexto — indexá-lo é trivial, prová-lo exige um teste que não existe, e declarar sem provar seria a falha que este PRD combate.", evidence: "tests/context_index.test.js" },
+  // Fechado após o PRD51: a metade que faltava (o próprio prd51.md e o manual do
+  // projeto na versão candidata) ganhou prova real em `test_context_db.py`, indexando
+  // os arquivos REAIS do repositório — não fixture sintética.
+  { id: "DOD.15", kind: "static", requirement: "busca de contexto encontra PRD49, PRD50, PRD51 e manual atual", status: "satisfied", evidence: "tests/test_context_db.py" },
   { id: "DOD.16", kind: "static", requirement: "mirrors externos não dominam resultados locais por padrão", status: "satisfied", evidence: "tests/context_index.test.js" },
   { id: "DOD.17", kind: "static", requirement: "Headroom não alega economia sem tráfego", status: "satisfied", evidence: "tests/headroom_status.test.js" },
   { id: "DOD.18", kind: "static", requirement: "typecheck real bloqueia erro de tipo", status: "satisfied", evidence: "tests/typecheck_real_gate.test.js" },
