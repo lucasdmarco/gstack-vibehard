@@ -1,5 +1,66 @@
 # Changelog - gstack-vibehard
 
+## [5.107.0] - 2026-08-01 — PRD48 P2.1 Fase 1A: extractor de inventário + gate fail-closed
+
+**Fase 1A, NÃO Fase 1.** A infraestrutura do detector é mergeável; a fase **não está
+concluída**. Estado registrado em código (`phaseStatus()`), não em prosa:
+
+```json
+{ "phase": "1A", "phaseStatus": "partial", "unknown": 145,
+  "rcBlocked": true, "englishFirstClaimAllowed": false, "nextPhase": "1B" }
+```
+
+Há teste dedicado impedindo que "extractor mergeado" seja lido como "inventário
+pronto", e outro provando que encerrar a Fase 1 **ainda não autoriza a claim** —
+isso é do cutover da Fase 6.
+
+`src/meta/i18n-inventory.js` classifica ~1.924 pontos de saída por **emissor, canal,
+condição e consumidor** — nunca pelo conteúdo da frase, que é o que produz falso
+positivo em path, nome próprio e dado do usuário.
+
+**Dois defeitos meus, achados e corrigidos antes do merge:**
+
+1. **O grafo era um grep.** A 1ª versão contava qualquer menção textual a
+   `scripts/x` e "descobriu" 9 scripts runtime — um deles citado apenas dentro de um
+   comentário escrito no sprint anterior. Corrigido para exigir `import`/`require`/
+   `spawn` REAIS, com comentários removidos antes da varredura.
+
+2. **1.850 pontos classificados por omissão.** A 1ª versão marcava
+   `public_diagnostic` tudo que fosse do GStack e não caísse noutra regra — inventário
+   "completo" com zero análise. Agora só o canal SANCIONADO de render
+   (`info/warn/error/success/section`) é público por construção; escrita crua
+   (`console.*`, `stdout`, `stderr`) vira `unknown` e exige decisão. Por isso o número
+   de `unknown` SUBIU: 57 → 142 → 145.
+
+**Contraprova humana que derrubou a conclusão sobre `scripts/`.** Eu havia concluído
+"zero scripts são runtime" olhando import/spawn em `src/` e o campo `bin`. Ampliando
+as raízes (ciclo de vida do npm, launchers, hooks, comandos documentados), apareceram
+**dois**: `clean-pkg.mjs` via `lifecycle:prepack` (roda no `npm pack` — inclusive o da
+certificação) e `sync-qg-version.mjs` via `lifecycle:version` (roda em toda release).
+Ausência de import não prova ausência de execução; prova só ausência naquele caminho.
+O grafo agora registra a ORIGEM de cada alcance, então a próxima raiz aparece com
+procedência. Os outros 21 scripts caem em `internal_tooling` por derivação.
+
+**`unknown` é estado de primeira classe.** `stderr` de hook sem condição determinável
+NUNCA vira "interno" por omissão — é assim que uma mensagem em português sobrevive à
+migração. `unknown > 0` bloqueia a Fase 1B e a migração.
+
+**`templates/` não é excluído em bloco**: entra no inventário com `owner:"generated"`,
+para separar copy do app (segue o idioma do projeto) de superfície técnica do
+desenvolvedor (nasce em inglês).
+
+**Registry só REFINA `unknown`** — nunca reclassifica audiência derivada, e
+`validateRegistry` rejeita entrada morta, audiência inválida e script que não é
+alcançado pelo runtime.
+
+- `tests/i18n_inventory.test.js` (15 testes).
+- QG strict 0 (5 blockers de CC decompostos), lint 0, typecheck 0, suíte JS
+  2395/2396 (1 skip pré-existente).
+
+**RC segue BLOQUEADO.** Próximo: Fase 1B — classificar os 145 `unknown`
+(`src/cli/index.js` 27, `src/commands/monitor.js` 27, `src/cli/create.js` 17,
+`hooks/hooks/stop.py` 15), com regra reproduzível por helper/canal.
+
 ## [5.106.0] - 2026-08-01 — PRD48 P2.1 Fase 0: infraestrutura English-first (SEM cutover)
 
 Decisão humana na certificação do RC: **PRD48 P2.1 é BLOQUEANTE**, não adiável nem
