@@ -19,7 +19,24 @@
  * VERIFICADA em disco. `partial` é para caixa cujo escopo foi deliberadamente recortado —
  * com o recorte escrito. `pending` é ausência de evidência, nunca "provavelmente ok".
  */
+import { PRD45_RC_ITEMS } from "./rc-checklist-prd45.js"
+import { PRD46_RC_ITEMS } from "./rc-checklist-prd46.js"
+import { PRD47_RC_ITEMS } from "./rc-checklist-prd47.js"
+import { PRD48_RC_ITEMS } from "./rc-checklist-prd48.js"
+import { PRD49_RC_ITEMS } from "./rc-checklist-prd49.js"
+import { PRD50_RC_ITEMS } from "./rc-checklist-prd50.js"
+
 export const PRD51_RC_CHECKLIST_SCHEMA = "gstack.rc-checklist.prd51.v1"
+
+/** Programas cujos residuais o DOD.8 precisa contabilizar — a fonte, não uma cópia. */
+const PROGRAM_CHECKLISTS = Object.freeze([
+  { prdId: "PRD45", items: PRD45_RC_ITEMS },
+  { prdId: "PRD46", items: PRD46_RC_ITEMS },
+  { prdId: "PRD47", items: PRD47_RC_ITEMS },
+  { prdId: "PRD48", items: PRD48_RC_ITEMS },
+  { prdId: "PRD49", items: PRD49_RC_ITEMS },
+  { prdId: "PRD50", items: PRD50_RC_ITEMS },
+])
 
 // tier: P0 (bloqueador) | P1 (importante) | P2 (residual). O tier vem do achado do §4 do
 // prd51.md que o sprint fecha — não de julgamento retroativo sobre o esforço gasto.
@@ -95,6 +112,37 @@ export const PRD51_RC_ITEMS = Object.freeze([
  *             matriz cross-OS). Nunca `satisfied` por existir código que faria aquilo.
  *   derived — computado das outras listas, não declarado à mão.
  */
+/**
+ * Residuais ABERTOS de todos os programas, lidos dos checklists reais.
+ *
+ * `blocking:true` (decisão humana no RC) sai destacado: um residual bloqueante não é a
+ * mesma coisa que um residual à espera de classificação, e somá-los num número só
+ * esconderia justamente o que trava a certificação.
+ */
+const residualFechado = (i) => i.status === "delivered" || (i.nonGoal === true && Boolean(i.nonGoalReason))
+
+const residualRow = (prdId, i) => ({
+  prdId, id: i.id, tier: i.tier, status: i.status,
+  blocking: i.blocking === true, reason: i.blockingReason || null,
+})
+
+export function residualReport(programs = PROGRAM_CHECKLISTS) {
+  const abertos = programs.flatMap(({ prdId, items }) =>
+    items.filter((i) => !residualFechado(i)).map((i) => residualRow(prdId, i)))
+  return { total: abertos.length, blocking: abertos.filter((x) => x.blocking), open: abertos }
+}
+
+const residualSummary = (() => {
+  const r = residualReport()
+  const nome = (x) => `${x.prdId} ${x.id}`
+  const bloq = r.blocking.map(nome)
+  const outros = r.open.filter((x) => !x.blocking).map(nome)
+  const partes = []
+  if (bloq.length) partes.push(`BLOQUEANTE(S): ${bloq.join(", ")}`)
+  if (outros.length) partes.push(`aguardando classificação: ${outros.join(", ")}`)
+  return `${r.total} residual(is) aberto(s) — ${partes.join(" | ")}`
+})()
+
 export const PRD51_DOD_ITEMS = Object.freeze([
   { id: "DOD.1", kind: "runtime", requirement: "suíte completa passa três vezes em máquina fria", status: "pending", missing: "execução não realizada; a suíte passa nesta máquina, que não é fria" },
   { id: "DOD.2", kind: "static", requirement: "zero processo órfão, EBUSY ou state residual", status: "satisfied", evidence: "tests/runtime_windows_reconcile.test.js" },
@@ -103,7 +151,11 @@ export const PRD51_DOD_ITEMS = Object.freeze([
   { id: "DOD.5", kind: "static", requirement: "PRD47 retorna ready:true", status: "satisfied", evidence: "tests/rc_checklist_prd47.test.js" },
   { id: "DOD.6", kind: "static", requirement: "PRD45–PRD50 possuem checklist no schema comum", status: "satisfied", evidence: "tests/prd_ledger.test.js" },
   { id: "DOD.7", kind: "derived", requirement: "nenhum P0 permanece partial/pending", status: "satisfied", evidence: "computado de PRD51_RC_ITEMS e dos checklists agregados por `prd status`" },
-  { id: "DOD.8", kind: "derived", requirement: "residuais P1 são entregues ou convertidos explicitamente em non-goal", status: "pending", missing: "PRD47 P1.8 e 4 P1 do PRD49 seguem `partial` sem conversão declarada em non-goal" },
+  // DERIVADO do ledger (decisão humana na certificação do RC): o texto fixo anterior
+  // dizia "PRD47 P1.8 e 4 P1 do PRD49" e estava errado em duas frentes — o PRD49 tinha 3
+  // (o quarto foi fechado pelo S51.7.4) e faltavam PRD48 P2.1 e PRD50 P1.7. Contar à mão
+  // uma lista que muda a cada sprint garante divergência; agora sai de `residualReport()`.
+  { id: "DOD.8", kind: "derived", requirement: "residuais P1 são entregues ou convertidos explicitamente em non-goal", status: "pending", missing: residualSummary },
   { id: "DOD.9", kind: "static", requirement: "programComplete não depende apenas de ready", status: "satisfied", evidence: "tests/release_baseline_failclosed.test.js" },
   { id: "DOD.10", kind: "static", requirement: "dream audit não usa placar fixo", status: "satisfied", evidence: "tests/public_claims_honesty.test.js" },
   { id: "DOD.11", kind: "static", requirement: "toda claim core pública possui contrato comportamental", status: "satisfied", evidence: "tests/claim_contracts_s51_6_4.test.js" },

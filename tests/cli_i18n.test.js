@@ -50,10 +50,18 @@ test("t: locale desconhecido cai pro catálogo default sem lançar", async () =>
   assert.match(r, /x/)
 })
 
-test("catálogos PT-BR e EN têm exatamente o MESMO conjunto de messageIds (nenhum órfão)", async () => {
+// PRD48 P2.1 — a asserção era paridade ESTRITA PT-BR ↔ EN. A decisão English-first do RC
+// a invalida (correção #5): `en` é o catálogo CANÔNICO e vai crescer sozinho durante a
+// migração; exigir paridade transformaria cada mensagem migrada em trabalho dobrado e
+// bloquearia o RC por um catálogo que o próprio RC declarou não-canônico.
+//
+// A invariante que SUBSTITUI: pt-BR não pode conter id ÓRFÃO (que não exista no canônico).
+// Isso ainda pega o erro real — chave morta/renomeada — sem exigir tradução completa.
+test("pt-BR não tem messageId ÓRFÃO; `en` é canônico e pode estar à frente", async () => {
   const pt = (await imp("src/cli/messages/pt-BR.js")).default
   const en = (await imp("src/cli/messages/en.js")).default
-  assert.deepEqual(Object.keys(pt).sort(), Object.keys(en).sort())
+  const orfaos = Object.keys(pt).filter((k) => !(k in en))
+  assert.deepEqual(orfaos, [], "id em pt-BR sem contraparte no canônico é chave morta")
 })
 
 test("taskCommand inspect <inexistente> --json: JSON traz messageId estável, texto NUNCA vaza pro campo error (contrato de máquina)", async () => {

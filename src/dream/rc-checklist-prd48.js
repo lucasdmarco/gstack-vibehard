@@ -23,7 +23,17 @@ export const PRD48_RC_ITEMS = Object.freeze([
   { id: "P1.4", tier: "P1", sprint: "S48.4/S51.7.2", version: "5.86.0", status: "delivered", title: "Decisão de policy compreensível — decision-presenter.js real e testado, WIRED em `policy eval` (PRD51 S51.7.2), a superfície real onde um humano vê uma decisão; `categorizeTarget` fecha o elo que faltava (canPersistChoice era inalcançável sem categoria derivada de alvo real)", proof: "tests/decision_presenter.test.js" },
   { id: "P1.5", tier: "P1", sprint: "S48.4", version: "5.33.0", status: "delivered", title: "Checkpoint como produto — task checkpoints/restore reais, restore com provenance append-only, tamper aborta sem gravar sucesso falso", proof: "tests/task_checkpoint_ux.test.js" },
   { id: "P1.6", tier: "P1", sprint: "S48.5", version: "5.34.0", status: "delivered", title: "Contexto/quota/custo como decisão única — contrato de 4 qualidades tipadas, quota unknown nunca suficiente, budget nunca reservado 2x", proof: "tests/usage_accounting.test.js" },
-  { id: "P2.1", tier: "P1", sprint: "S48.6", version: "5.35.0", status: "partial", title: "Idioma da CLI como preferência formal — infraestrutura real (catálogo+resolver+messageId), mas só `task inspect/restore` retrofitados; resto da CLI continua só em português", proof: "tests/cli_i18n.test.js" },
+  // DECISÃO HUMANA (certificação do RC, 2026-08-01): este item é BLOQUEANTE, não
+  // adiável nem non-goal. A decisão de produto é English-first: toda a interface pública
+  // determinística da CLI em inglês; `cliLocale` fixo em `en` neste RC (sem seletor
+  // exposto); o idioma de CONVERSA com as LLMs é preferência separada
+  // (`conversationLanguage`). JSON, schemas, enums, IDs, flags, comandos e exit codes
+  // permanecem sempre em inglês.
+  //
+  // Medição real que sustenta o bloqueio: apenas 4 de 1.049 saídas ao usuário em
+  // `src/commands/` (0,4%) passam pela infraestrutura de mensagens. A infraestrutura é
+  // sólida e provada; a APLICAÇÃO é que não existe.
+  { id: "P2.1", tier: "P1", sprint: "S48.6", version: "5.35.0", status: "partial", blocking: true, blockingReason: "Decisão English-first do RC: a CLI pública ainda é PT-BR. Apenas 4/1.049 mensagens usam a infraestrutura de i18n; migração exige plano aprovado antes de qualquer edição de código.", forbiddenClaim: "English-first CLI", title: "Idioma da CLI — infraestrutura real (catálogo+resolver+messageId) provada, mas só 4/1.049 saídas migradas; a CLI pública NÃO atende à decisão English-first", proof: "tests/cli_i18n.test.js" },
   { id: "P2.2", tier: "P1", sprint: "S51.7.3", version: "5.87.0", status: "delivered", title: "Ajuda contextual geral — forma compartilhada `safe-next-action.js` (`{failureId,humanText,command,safe}`) + retrofit nas 6 falhas REAIS (first-run bloqueado, plano inválido, pipeline handoff, proof reprovado, policy deny, design system ausente); controle negativo garante que nenhuma ação sugerida contorna gate", proof: "tests/safe_next_action.test.js" },
 ])
 
