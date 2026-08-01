@@ -1,5 +1,53 @@
 # Changelog - gstack-vibehard
 
+## [5.103.0] - 2026-08-01 — PRD51 S51.10.3: lint dos manuais internos, mirando o drift que existe
+
+O §51.10 pede "verificação automática de exemplos e comandos dos dois manuais".
+Tomado ao pé da letra, produziria um detector que **não pega nada** — a
+investigação prévia mostrou por quê:
+
+- `command-lint.js` já protege a superfície PÚBLICA (README.md, README.en.md e
+  `docs/guides/*.md`) com gate real de CI. Reconstruir aquilo seria duplicação;
+- rodando o extrator existente contra os manuais: `projetogstack.md` cita 21
+  comandos e **zero** inexistentes; `manualdeengenhariacomia.md` cita **zero**
+  comandos (é vendor-neutral, não fala da CLI).
+
+O drift real do manual nunca foi comando inventado: é a **baseline declarada
+envelhecer em silêncio** (v5.19.0 contra a CLI atual) enquanto o texto segue
+afirmando capacidades como se fossem daquela versão. Nenhum linter de comando
+pega isso. `src/meta/manual-lint.js` verifica as duas coisas, e a segunda é a que
+tem valor hoje — rodando agora, ele acusa exatamente esse drift.
+
+Decisões de design registradas:
+
+- **não é gate de CI.** `.docs/` é gitignored, então a CI não tem os manuais.
+  Ausência sai como `skipped` e nunca reprova — um gate que pune a CI por um fato
+  de design é um gate quebrado;
+- **manual sem baseline declarada conta como drift** (`missing_baseline`), não
+  como neutro: um manual que não diz a que versão se refere não pode ser conferido
+  por ninguém, o que é a pior situação e não a ausência de problema;
+- **drift é por MAJOR/MINOR, não por patch** — o manual descreve capacidade, e
+  patch não muda capacidade;
+- `manualdeengenhariacomia.md` entra com os dois checks DESLIGADOS, com a razão
+  registrada no próprio registro (não é esquecimento).
+
+**Fronteira reafirmada em código e comentário:** o manual GUIA o produto, não FAZ
+PARTE dele. Não entra no tarball (o `files` do package.json é allowlist e não
+inclui `.docs/`), não é runtime de agente, não vai ao contexto padrão do usuário.
+Este lint existe para impedir que claim interna envelhecida vaze para a
+documentação pública — nunca para empacotar o manual.
+
+- `npm run lint:manuals`, `tests/manual_lint.test.js` (10 testes).
+- QG strict 0 (decomposição de CC em `evaluateManual`), lint 0, typecheck 0,
+  suíte JS 2350/2351 (1 skip pré-existente).
+
+**Nota de processo.** A 1ª versão do script imprimia `✓ comandos existem e
+baseline bate` para o manual com TODOS os checks desligados — verde vazio, a
+exata coisa que o docstring do módulo diz ser pior que não checar. Corrigido:
+manual sem check aplicável sai como `notApplicable` com a razão e não entra na
+conta de "verificados"; a linha de sucesso passou a afirmar só o que foi de fato
+verificado.
+
 ## [5.102.0] - 2026-07-31 — PRD51 S51.10.2: matriz de RC auditada, com as lacunas declaradas
 
 O §51.10 lista 10 dimensões que o RC precisa provar. O risco óbvio era declarar
