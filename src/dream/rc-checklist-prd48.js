@@ -44,6 +44,26 @@ export const CODEX_INTEGRATION_STATE = Object.freeze({
 })
 
 export const PRD48_RC_ITEMS = Object.freeze([
+  // ACHADO P1 — exit code inconsistente sob `--json`.
+  //
+  // Registrado no LEDGER, não apenas em comentário de teste: comentário não é
+  // registro durável de produto — some da vista, não entra em contagem derivada
+  // e não bloqueia nada. Aqui ele conta como residual e aparece no DOD.8.
+  //
+  // Descoberto ao endurecer o contrato `--json` (commit 6cd11f9). A correção NÃO
+  // foi autorizada nesta fase: o raio alcança todo comando da CLI e a política
+  // (qual exit code para qual classe de erro) é decisão humana ainda não tomada.
+  {
+    id: "P1.CLI-JSON-EXIT-CODE", tier: "P1", sprint: "certificação RC", version: "5.107.0",
+    status: "pending",
+    needsDecision: true,
+    evidence: "src/index.js chama runCLI(...) e DESCARTA o retorno; comandos que devolvem {error:true} (prd, plan) saem com exit 0, enquanto outros caminhos chamam process.exit(1) diretamente (cli/index.js:306,394; init.js:28,38,47; sprint.js:53,98; create.js:1867)",
+    impact: "automação não distingue erro por process exit status — um consumidor de máquina precisa parsear o JSON para saber se falhou; scripts que checam `$?` tratam erro como sucesso",
+    affectedScope: "comandos que anunciam --json",
+    fixAuthorized: false,
+    title: "Exit code inconsistente sob `--json`: erro sai 0 em parte dos comandos — automação não distingue falha pelo status do processo",
+    proof: null,
+  },
   // BLOQUEANTE DE SEGURANÇA DO RC (decisão humana, certificação 2026-08-02).
   // Este item sozinho impede publicação.
   //
