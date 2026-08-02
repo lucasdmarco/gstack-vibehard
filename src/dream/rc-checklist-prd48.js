@@ -16,6 +16,56 @@ export const PRD48_RC_CHECKLIST_SCHEMA = "gstack.rc-checklist.prd48.v1"
 
 // tier: P0 (bloqueador) | P1 (importante). status: delivered | partial | pending.
 export const PRD48_RC_ITEMS = Object.freeze([
+  // BLOQUEANTE DE SEGURANÇA DO RC (decisão humana, certificação 2026-08-02).
+  // Este item sozinho impede publicação.
+  //
+  // ESCOPO PRECISO — o que foi provado e o que NÃO foi:
+  //  - PROVADO: comportamento dos scripts com payload sintético VÁLIDO, em HOME
+  //    descartável (codex-cli 0.145.0, /c/Users/lucas/AppData/Roaming/npm/codex).
+  //  - NÃO PROVADO: descoberta, trust e enforcement em runtime pelo Codex
+  //    (Camadas 2-4). NÃO chamar de exploração E2E até isso rodar.
+  //
+  // Três precisões que a revisão humana impôs sobre a leitura inicial:
+  //  1. `PermissionRequest` SÓ participa quando o Codex pretende pedir aprovação —
+  //     não é barreira universal. Por isso `PreToolUse` precisa proteger de forma
+  //     INDEPENDENTE do permission mode; hoje não protege.
+  //  2. `permission_request.py` não permite tudo por default: permite o que casa
+  //     com SAFE_PATTERNS e NÃO decide o resto (provado: `comando-desconhecido-xyz`
+  //     e `Get-Content .env` saem sem decisão). O defeito é a allowlist ampla.
+  //  3. `UserPromptSubmit` fica INCONCLUSIVO: o HOME descartável não continha os
+  //     SKILL.md referenciados, e o script só injeta contexto quando os encontra.
+  //
+  // Medição direta das listas (leitura estática, confirmada por execução):
+  //   BLOCK_PATTERNS (PreToolUse): 9 padrões, só destruição de sistema. Passaram:
+  //     `curl … | sh`, `wget … | bash`, `cat/type/Get-Content .env`,
+  //     `echo > .env`, `apply_patch` em `.env`, MCP lendo `.env`.
+  //   SAFE_PATTERNS (PermissionRequest) auto-aprova: `node `, `python3? `,
+  //     `npm install`, `npm run`, `git push|pull`, `cat`, `type`.
+  //   Cinco caminhos atravessam AS DUAS camadas: cat .env, node -e, python -c,
+  //     npm install <pkg>, git push --force.
+  {
+    id: "P0.CODEX-SECURITY", tier: "P0", sprint: "certificação RC", version: "5.107.0",
+    status: "pending", blocking: true,
+    forbiddenClaim: "Zero-Trust / proteção real de PreToolUse no Codex",
+    blockingReason: "Security policy bypass when Codex hooks are routed: PreToolUse allows secret access and arbitrary execution primitives while PermissionRequest auto-allows cat/type, node, python, npm install/run and destructive/network Git commands. Script-level behavior proven with synthetic payloads; Codex discovery, trust and runtime enforcement remain pending.",
+    title: "Bypass de política de segurança com hooks do Codex roteados — PreToolUse não barreira independente + PermissionRequest com allowlist ampla",
+    proof: null,
+  },
+  // BLOQUEANTE DO RC (decisão humana, certificação 2026-08-02). Provado em HOME
+  // descartável (`--harness codex`), com o HOME real verificado intocado byte-a-byte.
+  // Confrontado com a doc oficial (learn.chatgpt.com/docs/hooks, ex-developers.openai.com).
+  {
+    id: "P0.CODEX-HOOKS", tier: "P0", sprint: "certificação RC", version: "5.107.0",
+    status: "pending", blocking: true,
+    forbiddenClaim: "integração de hooks do Codex correta/governada",
+    blockingReason: "Dois P0 provados em ambiente isolado. (1) `post_tool_use` é registrado apontando para `stop.py` (codex.js:64) — o hook de PostToolUse executa o stop hook, e existe `post_tool_use_review.py` que nunca é registrado; a doc oficial ainda diz que PostToolUse NÃO desfaz efeito, então o erro é puramente aditivo e silencioso. (2) `uninstall` remove os `.py` por NOME (uninstall.js:81) sem consultar ownership e nunca toca `hooks.json`: no teste isolado sobraram 5 de 6 referências apontando para scripts removidos — o ambiente fica pior do que antes de instalar. Agravantes: hooks não entram no manifest (0 itens `.py`), violando o invariante #9 do produto; e `mergeCodexConfig` escreve chaves `on_stop`/`on_session_start`/`pre_tool_use`/`post_tool_use` que NÃO existem na documentação oficial (os nomes são `Stop`/`SessionStart`/`PreToolUse`/`PostToolUse`).",
+    title: "Integração de hooks do Codex: PostToolUse aponta para stop.py, uninstall deixa referências quebradas em hooks.json, hooks sem ownership no manifest e chaves TOML fora do contrato oficial",
+    // `pending` NÃO declara proof: não existe prova de ENTREGA, existe prova de DEFEITO
+    // (relatório do teste isolado em HOME descartável). O invariante do checklist é que
+    // proof sustenta entrega — apontar um arquivo aqui seria exatamente o proof forjado
+    // que o teste `sem proof forjado` proíbe.
+    proof: null,
+  },
   { id: "P0.1", tier: "P0", sprint: "S48.0", version: "5.29.0", status: "delivered", title: "Baseline pós-PRD47 comprovado por comportamento (readiness/skill governance/Golden Run/Context Delta reais) + 5 controles negativos", proof: "tests/prd48_baseline_contract.test.js" },
   { id: "P1.1", tier: "P1", sprint: "S48.1/S51.7.1", version: "5.85.0", status: "delivered", title: "Primeiro uso fecha harness/modelo — detecção e perfil reais (tests/harness_session_profile.test.js); auth/modelo permanecem 'unknown' por design (nunca fabricado); prompt interativo REAL wired em start.js (PRD51 S51.7.1) — pergunta quando >1 apto, persiste só com consentimento explícito, lembra a preferência (não pergunta de novo)", proof: "tests/start_harness_intake.test.js" },
   { id: "P1.2", tier: "P1", sprint: "S48.2", version: "5.31.0", status: "delivered", title: "Onboarding brownfield read-only — discovery real, 3 opções sempre, dirty tree nunca descartada", proof: "tests/brownfield_discovery.test.js" },

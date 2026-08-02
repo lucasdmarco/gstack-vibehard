@@ -12,13 +12,18 @@ const repoRoot = path.resolve(import.meta.dirname, "..")
 const mod = path.join(repoRoot, "src", "dream", "rc-checklist-prd48.js")
 const imp = () => import(`${pathToFileURL(mod)}?t=${Date.now()}`)
 
-test("prd48Readiness: o P0 (baseline S48.0) é delivered -> ready:true", async () => {
+// CERTIFICAÇÃO RC (2026-08-02): PRD48 ganhou um P0 BLOQUEANTE real (P0.CODEX-HOOKS),
+// provado em HOME descartável. `ready` caiu para false — isso é o gate funcionando, não
+// regressão. O teste passa a fixar a INVARIANTE (todo P0 fechado <=> ready) em vez do
+// valor, que muda a cada bloqueante legítimo encontrado.
+test("prd48Readiness: ready reflete exatamente o fechamento dos P0", async () => {
   const { prd48Readiness, PRD48_RC_ITEMS } = await imp()
   const p0 = PRD48_RC_ITEMS.filter((i) => i.tier === "P0")
-  assert.equal(p0.length, 1)
-  assert.equal(p0[0].status, "delivered")
+  assert.ok(p0.length >= 1)
+  const abertos = p0.filter((i) => i.status !== "delivered")
   const r = prd48Readiness()
-  assert.equal(r.ready, true)
+  assert.equal(r.ready, abertos.length === 0)
+  assert.ok(abertos.some((i) => i.id === "P0.CODEX-HOOKS"), "o bloqueante da certificação está registrado")
 })
 
 test("CONTROLE NEGATIVO: P0 pendente derruba ready", async () => {
@@ -26,7 +31,7 @@ test("CONTROLE NEGATIVO: P0 pendente derruba ready", async () => {
   const tampered = PRD48_RC_ITEMS.map((i) => (i.id === "P0.1" ? { ...i, status: "pending" } : i))
   const r = prd48Readiness(tampered)
   assert.equal(r.ready, false)
-  assert.deepEqual(r.p0Pending, ["P0.1"])
+  assert.ok(r.p0Pending.includes("P0.1"))
 })
 
 test("cada item com proof aponta um teste que EXISTE (sem enfeite)", async () => {
