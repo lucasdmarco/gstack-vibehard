@@ -144,7 +144,7 @@ const residualSummary = (() => {
 })()
 
 export const PRD51_DOD_ITEMS = Object.freeze([
-  { id: "DOD.1", kind: "runtime", requirement: "suíte completa passa três vezes em máquina fria", status: "pending", missing: "execução não realizada; a suíte passa nesta máquina, que não é fria" },
+  { id: "DOD.1", kind: "runtime", requirement: "suíte completa passa três vezes em máquina fria", status: "pending", missing: "Execução não realizada; a suíte passa nesta máquina, que não é fria. ACHADO DA CERTIFICAÇÃO: a suíte tem 1 skip condicional (`tests/e2e/capabilities/docker-harness.e2e.test.js`, gated por `GSTACK_CAP_E2E=1`). Ele roda a sério em `capability-e2e.yml --strict`, MAS esse workflow é path-filtered (`src/capabilities/**`, `tests/e2e/capabilities/**`, `scripts/test-capabilities.mjs`); num commit de RC que não toque esses caminhos, o job NÃO dispara e o teste fica sem cobertura em lugar nenhum. Para certificar: acionar `workflow_dispatch` do capability-e2e no commit exato do RC e registrar o resultado — skip nunca conta como aprovado." },
   { id: "DOD.2", kind: "static", requirement: "zero processo órfão, EBUSY ou state residual", status: "satisfied", evidence: "tests/runtime_windows_reconcile.test.js" },
   { id: "DOD.3", kind: "runtime", requirement: "`proof --profile full --json` retorna ready:true no HEAD", status: "pending", missing: "prova só vale para o commit que a gerou (S51.0C); precisa rodar no commit final do RC" },
   { id: "DOD.4", kind: "static", requirement: "`start` não entrega sem gates aplicáveis, acceptance e proof real", status: "satisfied", evidence: "tests/golden_run_default.test.js" },
