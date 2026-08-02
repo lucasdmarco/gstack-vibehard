@@ -15,6 +15,34 @@
 export const PRD48_RC_CHECKLIST_SCHEMA = "gstack.rc-checklist.prd48.v1"
 
 // tier: P0 (bloqueador) | P1 (importante). status: delivered | partial | pending.
+/**
+ * ESTADO DECLARADO DA INTEGRAÇÃO CODEX (decisão humana, certificação 2026-08-02).
+ *
+ * A Camada 2 (descoberta/trust/enforcement pelo Codex real) NÃO pôde ser executada:
+ * esta máquina é Windows 11 Home Single Language, sem Windows Sandbox
+ * (`Containers-DisposableClientVM` inexistente) nem Hyper-V, e a tentativa de
+ * isolar por variáveis de ambiente falhou — o binário Rust do Codex leu
+ * `C:\Users\lucas\.agents` real mesmo com `USERPROFILE`/`HOME`/`CODEX_HOME`
+ * redirecionados.
+ *
+ * ROTA ESCOLHIDA (2 de 2): adiar a prova externa para o FECHAMENTO do PRD52,
+ * mantendo esta versão como BASELINE INTERNA. Enquanto a prova não existir,
+ * nenhuma claim de enforcement de hooks no Codex é permitida.
+ *
+ * Este bloco existe para que o estado não precise ser inferido de prosa: ele é
+ * legível por código e o teste o verifica.
+ */
+export const CODEX_INTEGRATION_STATE = Object.freeze({
+  support: "partial",
+  hook_enforcement: "unproven",
+  security_claim: "advisory",
+  blocker: "external_clean_machine_e2e",
+  provenBy: "camada 1 — payloads sintéticos válidos contra os scripts (codex-cli 0.145.0)",
+  notProven: "descoberta, trust, execução e enforcement pelo Codex; precedência hooks.json × config.toml; restauração no uninstall",
+  reentryCondition: "Camada 2 A–F em máquina Windows limpa, restaurada a snapshot antes de cada rodada — desinstalar o GStack NÃO equivale a máquina limpa, justamente porque o objeto da auditoria são resíduos globais",
+  targetMilestone: "fechamento do PRD52",
+})
+
 export const PRD48_RC_ITEMS = Object.freeze([
   // BLOQUEANTE DE SEGURANÇA DO RC (decisão humana, certificação 2026-08-02).
   // Este item sozinho impede publicação.
@@ -47,6 +75,9 @@ export const PRD48_RC_ITEMS = Object.freeze([
     id: "P0.CODEX-SECURITY", tier: "P0", sprint: "certificação RC", version: "5.107.0",
     status: "pending", blocking: true,
     forbiddenClaim: "Zero-Trust / proteção real de PreToolUse no Codex",
+    // Camada 2 impossível nesta máquina (Win 11 Home, sem Sandbox/Hyper-V).
+    // Adiado para o fechamento do PRD52 — ver CODEX_INTEGRATION_STATE.
+    externalE2E: "blocked_by_external_e2e",
     blockingReason: "Security policy bypass when Codex hooks are routed: PreToolUse allows secret access and arbitrary execution primitives while PermissionRequest auto-allows cat/type, node, python, npm install/run and destructive/network Git commands. Script-level behavior proven with synthetic payloads; Codex discovery, trust and runtime enforcement remain pending.",
     title: "Bypass de política de segurança com hooks do Codex roteados — PreToolUse não barreira independente + PermissionRequest com allowlist ampla",
     proof: null,
@@ -58,6 +89,9 @@ export const PRD48_RC_ITEMS = Object.freeze([
     id: "P0.CODEX-HOOKS", tier: "P0", sprint: "certificação RC", version: "5.107.0",
     status: "pending", blocking: true,
     forbiddenClaim: "integração de hooks do Codex correta/governada",
+    // Os DEFEITOS são provados por leitura de código e ciclo isolado; o que fica
+    // pendente de máquina limpa é a validação do enforcement, não o defeito.
+    externalE2E: "blocked_by_external_e2e",
     blockingReason: "Dois P0 provados em ambiente isolado. (1) `post_tool_use` é registrado apontando para `stop.py` (codex.js:64) — o hook de PostToolUse executa o stop hook, e existe `post_tool_use_review.py` que nunca é registrado; a doc oficial ainda diz que PostToolUse NÃO desfaz efeito, então o erro é puramente aditivo e silencioso. (2) `uninstall` remove os `.py` por NOME (uninstall.js:81) sem consultar ownership e nunca toca `hooks.json`: no teste isolado sobraram 5 de 6 referências apontando para scripts removidos — o ambiente fica pior do que antes de instalar. Agravantes: hooks não entram no manifest (0 itens `.py`), violando o invariante #9 do produto; e `mergeCodexConfig` escreve chaves `on_stop`/`on_session_start`/`pre_tool_use`/`post_tool_use` que NÃO existem na documentação oficial (os nomes são `Stop`/`SessionStart`/`PreToolUse`/`PostToolUse`).",
     title: "Integração de hooks do Codex: PostToolUse aponta para stop.py, uninstall deixa referências quebradas em hooks.json, hooks sem ownership no manifest e chaves TOML fora do contrato oficial",
     // `pending` NÃO declara proof: não existe prova de ENTREGA, existe prova de DEFEITO
