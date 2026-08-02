@@ -32,9 +32,14 @@ export const I18N_INVENTORY_SCHEMA = "gstack.i18n-inventory.v1"
 export const AUDIENCES = Object.freeze([
   "public_diagnostic",       // aparece normalmente ou após falha — entra, deve ser inglês
   "public_security_decision", // bloqueio/approval/alerta — entra, deve ser inglês
-  "machine_protocol",        // JSON/IDs/enums/códigos — inglês estável, sem texto localizado
+  // `machine_protocol` EXIGE consumidor/parser real, contrato e teste. Sem os três, a
+  // categoria vira depósito de "casos sem idioma" e some com o problema em vez de
+  // resolvê-lo — por isso duas classes foram extraídas dela:
+  "machine_protocol",        // contrato consumido por parser real — inglês estável
+  "terminal_control",        // byte de controle do terminal (BEL, ANSI) — não há idioma
+  "test_observability",      // marcador consumido por teste, sob ativação explícita
   "internal_debug",          // diagnóstico interno explicitamente ativado — fora da claim
-  "external_passthrough",    // saída de subprocesso externo — fora da claim
+  "external_passthrough",    // bytes de subprocesso externo, encaminhados sem transformação
   "generated_app_copy",      // texto do app do usuário — segue o idioma do projeto
   "generated_dev_surface",   // mensagem técnica no projeto gerado — entra, inglês
   "user_content",            // conteúdo do usuário — nunca traduzir
@@ -250,22 +255,189 @@ const ownerOf = (file) => (file.startsWith("templates/") ? "generated" : "gstack
  * cuja audiência não se prova não pode virar "interna" em silêncio, porque é
  * exatamente assim que uma mensagem em português sobrevive à migração.
  */
-export function classifyHookPoint({ sink, guardedByDebug = false, insideExceptHandler = false }) {
-  if (sink === "json") return { audience: "machine_protocol", trigger: "hook_protocol" }
-  if (guardedByDebug) return { audience: "internal_debug", trigger: "debug_flag" }
-  if (sink === "stderr" && insideExceptHandler) return { audience: "public_diagnostic", trigger: "hook_failure" }
-  if (sink === "stdout") return { audience: "machine_protocol", trigger: "hook_protocol" }
-  return { audience: "unknown", trigger: null }
+/**
+ * Regras de canal descobertas na Fase 1B (fatia `hooks/hooks/stop.py`). Cada uma é
+ * ESTRUTURAL — deriva do emissor, do canal, da condição do ramo e do consumidor. Nenhuma
+ * olha o texto da mensagem, porque texto é justamente o que não se pode usar como sinal:
+ * seria heurística sobre heurística, com falso positivo garantido em path e nome próprio.
+ *
+ * A ordem importa: condições mais específicas primeiro. `unknown` é o último recurso e
+ * NUNCA vira "interno" por default.
+ */
+const HOOK_RULES = Object.freeze([
+  {
+    id: "json-sink",
+    when: ({ sink }) => sink === "json",
+    audience: "machine_protocol", trigger: "hook_protocol",
+    reason: "sink é serialização — contrato de máquina por construção, independente do que carrega",
+  },
+  {
+    id: "stdout-hook-protocol",
+    when: ({ sink }) => sink === "stdout",
+    audience: "machine_protocol", trigger: "hook_protocol",
+    reason: "stdout de hook é o canal do protocolo com o harness, não superfície de leitura humana",
+  },
+  {
+    id: "control-char-only",
+    when: ({ payloadIsControlChar }) => payloadIsControlChar,
+    audience: "terminal_control", trigger: "terminal_bell",
+    reason: "payload é byte de controle do terminal (BEL/ANSI) — não existe idioma a migrar, e chamar isso de protocolo confundiria com contrato consumido por parser",
+  },
+  {
+    id: "test-observability-marker",
+    when: ({ envGuarded, emitsStructuredToken }) => envGuarded && emitsStructuredToken,
+    audience: "test_observability", trigger: "test_env_activation",
+    reason: "marcador consumido por teste sob ativação explícita de env (tests/test_stop_audio_cues.py) — precisa ser estável, mas NÃO é protocolo público do produto",
+  },
+  {
+    // CORREÇÃO da revisão humana: traceback gerado DENTRO do hook não é passthrough. Se
+    // o GStack decide imprimi-lo, a exposição é DELE — e traceback cru em fluxo normal
+    // ainda carrega risco de path, conteúdo e secret. `external_passthrough` passa a
+    // exigir subprocesso externo identificado e bytes encaminhados sem transformação.
+    id: "own-crash-traceback",
+    when: ({ inCrashHandler, guardedByDebug }) => inCrashHandler && !guardedByDebug,
+    audience: "public_diagnostic", trigger: "unhandled_exception",
+    reason: "traceback impresso por decisão do próprio GStack em fluxo de crash: a moldura vira mensagem inglesa e o traceback exige resumo redigido (risco de path/secret) — nunca passthrough",
+    risk: "traceback cru pode expor paths absolutos, conteúdo de variáveis e secrets",
+  },
+  {
+    id: "security-branch",
+    when: ({ securityBranch }) => securityBranch,
+    audience: "public_security_decision", trigger: "guard_block",
+    reason: "escrita no ramo de um predicado de bloqueio/guarda — comunica decisão de segurança ao usuário",
+  },
+  {
+    id: "debug-flag",
+    when: ({ guardedByDebug }) => guardedByDebug,
+    audience: "internal_debug", trigger: "debug_flag",
+    reason: "fora do fluxo padrão e exige ativação explícita de depuração",
+  },
+  {
+    id: "channel-prefixed-diagnostic",
+    when: ({ sink, channelPrefixed }) => sink === "stderr" && channelPrefixed,
+    audience: "public_diagnostic", trigger: "normal_flow",
+    reason: "stderr com prefixo de canal ([gitops]/[Porteiro]/…) é a superfície de leitura do usuário no fluxo normal",
+  },
+  {
+    id: "except-handler-diagnostic",
+    when: ({ sink, insideExceptHandler }) => sink === "stderr" && insideExceptHandler,
+    audience: "public_diagnostic", trigger: "hook_failure",
+    reason: "stderr em tratamento de exceção aparece ao usuário após falha",
+  },
+])
+
+export function classifyHookPoint(ctx = {}) {
+  const regra = HOOK_RULES.find((r) => r.when(ctx))
+  if (!regra) return { audience: "unknown", trigger: null, rule: null }
+  return { audience: regra.audience, trigger: regra.trigger, rule: regra.id }
+}
+
+export const hookRules = () => HOOK_RULES.map(({ id, audience, trigger, reason, risk }) => ({ id, audience, trigger, reason, ...(risk ? { risk } : {}) }))
+
+/**
+ * `machine_protocol` só é legítimo com CONSUMIDOR real provado — parser identificado,
+ * contrato declarado e teste que o exerça. Sem os três, a categoria vira depósito de
+ * "casos sem idioma" e a migração passa por cima deles sem ninguém perceber.
+ *
+ * Registro do que hoje sustenta a classificação nos hooks. Cada entrada é auditável:
+ * o consumidor existe, o contrato tem nome, e o teste pode ser aberto.
+ */
+export const MACHINE_PROTOCOL_CONSUMERS = Object.freeze([
+  {
+    sink: "json",
+    consumer: "harness (Claude Code / Codex) via protocolo de hook",
+    contract: "objeto JSON em stdout com decisão do hook (block/allow + reason)",
+    evidence: "tests/test_stop_output_guard_rbac.py — subprocess real do hook, parseia a decisão",
+  },
+  {
+    sink: "stdout",
+    consumer: "harness — stdout do hook É o canal do protocolo, não superfície de leitura",
+    contract: "payload serializado; texto humano vai para stderr",
+    evidence: "tests/test_stop_sandbox.py, tests/test_stop_test_gate.py",
+  },
+])
+
+/** Audiências que exigem consumidor provado para serem aceitas. */
+const REQUIRE_CONSUMER = new Set(["machine_protocol"])
+
+/**
+ * Verifica que todo ponto `machine_protocol` do inventário tem consumidor registrado
+ * para o seu sink. Um sink novo cair em `machine_protocol` sem entrada aqui é ERRO —
+ * é assim que a categoria segura viraria depósito.
+ */
+export function machineProtocolAudit(inventory, consumers = MACHINE_PROTOCOL_CONSUMERS) {
+  const cobertos = new Set(consumers.map((c) => c.sink))
+  const semConsumidor = inventory.points
+    .filter((p) => REQUIRE_CONSUMER.has(p.audience) && !cobertos.has(p.sink))
+    .map((p) => ({ file: p.file, line: p.line, sink: p.sink }))
+  return { ok: semConsumidor.length === 0, semConsumidor }
 }
 
 const DEBUG_GUARD = /\b(DEBUG|VERBOSE|GSTACK_DEBUG)\b/
 const EXCEPT_NEARBY = /\bexcept\b|\braise\b|\bsys\.exit\b/
+// Ativação explícita por variável de ambiente — evidência de "fora do fluxo padrão".
+const ENV_GUARD = /os\.environ\.get\(\s*["'][A-Z0-9_]+["']\s*(?:,[^)]*)?\)\s*==\s*["'][^"']+["']/
+// Predicados de bloqueio/guarda: o RAMO é a evidência, não a frase.
+const SECURITY_BRANCH = /\bif\s+(?:\w*blocked\b|_?redaction_events\b|\w*_blocked\b)|\ballow_dirty\b/
+// Prefixo de canal `[algo]` no início do payload — convenção de superfície de usuário.
+const CHANNEL_PREFIX = /["'f]*\s*["']\s*\[[A-Za-z][\w-]*\]/
+// Só escapes/controle no payload (ex.: "\a"), sem nada localizável.
+const CONTROL_ONLY = /\(\s*["'](?:\\[abfnrtv0])+["']\s*\)/
+// Token estruturado `chave:valor` sem prosa — consumido por parser, não lido como texto.
+const STRUCTURED_TOKEN = /["'f]*["'][a-z][\w-]*:\{?\w/
 
-/** Contexto local de uma linha Python — base objetiva para `classifyHookPoint`. */
+/**
+ * Contexto ESTRUTURAL de uma linha Python — a base objetiva de `classifyHookPoint`.
+ * Tudo aqui é sobre onde a chamada está e sob que condição roda; nada é sobre o que a
+ * mensagem diz.
+ */
+const indentOf = (l) => (l.match(/^[ \t]*/) || [""])[0].length
+const BLOCK_OPENER = /^\s*(if|elif|else|try|except|finally|for|while|with|def|class)\b/
+
+/**
+ * Condições que REALMENTE envolvem a linha, por indentação.
+ *
+ * Achado da Fase 1B: a 1ª versão usava janela de 6 linhas e classificou uma escrita de
+ * fluxo normal (`stop.py:1227`, "commit criado") como decisão de segurança, porque um
+ * `if allow_dirty:` aparecia 5 linhas acima — mas a escrita estava FORA desse ramo,
+ * depois do `subprocess.run`. Janela de linhas não é escopo; em Python, escopo é
+ * indentação. Aqui só entram os aberturas de bloco com indentação MENOR que a da
+ * chamada, subindo até o topo da função.
+ */
+const isTopLevelDef = (l) => /^\s*(def|class)\b/.test(l)
+
+/** Uma linha "sobe" o escopo quando tem conteúdo e indentação menor que o nível atual. */
+const dedents = (l, nivel) => Boolean(l.trim()) && indentOf(l) < nivel
+
+function enclosingConditions(linhas, line) {
+  const envolventes = []
+  let nivel = indentOf(linhas[line - 1] || "")
+  for (let i = line - 2; i >= 0; i--) {
+    const l = linhas[i]
+    if (!dedents(l, nivel)) continue
+    if (BLOCK_OPENER.test(l)) envolventes.push(l)
+    nivel = indentOf(l)
+    if (isTopLevelDef(l)) break
+  }
+  return envolventes.join("\n")
+}
+
 function pythonContext(text, line) {
   const linhas = text.split("\n")
-  const janela = linhas.slice(Math.max(0, line - 6), line).join("\n")
-  return { guardedByDebug: DEBUG_GUARD.test(janela), insideExceptHandler: EXCEPT_NEARBY.test(janela) }
+  const envolventes = enclosingConditions(linhas, line)
+  // A chamada pode abrir em `write(` e continuar na linha seguinte.
+  const chamada = linhas.slice(line - 1, line + 2).join("\n")
+  const funcao = linhas.slice(Math.max(0, line - 25), line).join("\n")
+  return {
+    guardedByDebug: DEBUG_GUARD.test(envolventes),
+    insideExceptHandler: EXCEPT_NEARBY.test(envolventes),
+    envGuarded: ENV_GUARD.test(envolventes),
+    securityBranch: SECURITY_BRANCH.test(envolventes),
+    inCrashHandler: /_crash_handler|format_exception/.test(funcao),
+    payloadIsControlChar: CONTROL_ONLY.test(chamada),
+    emitsStructuredToken: STRUCTURED_TOKEN.test(chamada),
+    channelPrefixed: CHANNEL_PREFIX.test(chamada),
+  }
 }
 
 /**
