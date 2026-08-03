@@ -1,9 +1,9 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { mkdtempSync, writeFileSync, mkdirSync, readFileSync, statSync } from "node:fs"
+import { mkdtempSync, writeFileSync, mkdirSync, readFileSync, statSync, readdirSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { pathToFileURL } from "node:url"
+import { pathToFileURL, fileURLToPath } from "node:url"
 import { cleanupTmp } from "./helpers/tmp.js"
 
 /**
@@ -26,8 +26,17 @@ import { cleanupTmp } from "./helpers/tmp.js"
  *  - **O gerador nao toca os overrides.** E o unico arquivo humano do par.
  */
 
-const repoRoot = path.resolve(import.meta.dirname, "..")
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const gen = () => import(`${pathToFileURL(path.join(repoRoot, "scripts", "i18n-registry.mjs"))}?t=${Date.now()}`)
+
+/** Travessia compativel com Node 18 — `fs.globSync` so existe do Node 22 em diante. */
+function varrerJs(dir) {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    const p = path.join(dir, e.name)
+    if (e.isDirectory()) return varrerJs(p)
+    return e.name.endsWith(".js") ? [p] : []
+  })
+}
 
 /** Mini-projeto com modulo canonico e os arquivos pedidos. */
 function projeto(files) {
@@ -133,6 +142,169 @@ test("arquivo NAO convertido nao aparece no registry, mesmo tendo saida", async 
     assert.deepEqual(r.convertedFiles, ["src/commands/dentro.js"])
     assert.ok(!("src/commands/fora.js" in r.files),
       "conversao e arquivo a arquivo — o resto segue no extrator legado")
+  } finally { cleanupTmp(root) }
+})
+
+// ── Fatia 2.1: entradas invalidas sao RECUSADAS ──────────────────────────────
+
+/**
+ * Cada rejeicao abaixo impede um registry que PARECE valido e nao e. Sem elas o
+ * gerador aceitaria descrever arquivo de fora do projeto, ou emitir chave que
+ * muda de maquina para maquina.
+ */
+
+test("NEGATIVO: caminho ABSOLUTO e recusado", async () => {
+  const { buildRegistry } = await gen()
+  const root = projeto({ "src/commands/x.js": `import { info } from "../cli/index.js"\ninfo("oi")\n` })
+  try {
+    assert.throws(
+      () => buildRegistry([path.join(root, "src/commands/x.js")], { root }),
+      /caminho absoluto/,
+      "chave absoluta gravaria o nome de usuario e mudaria por maquina",
+    )
+  } finally { cleanupTmp(root) }
+})
+
+test("NEGATIVO: caminho com `../` e recusado", async () => {
+  const { buildRegistry } = await gen()
+  const root = projeto({})
+  try {
+    assert.throws(() => buildRegistry(["../fora.js"], { root }), /fora do root/)
+  } finally { cleanupTmp(root) }
+})
+
+test("NEGATIVO: `../` DISFARCADO no meio do caminho tambem e recusado", async () => {
+  const { buildRegistry } = await gen()
+  const root = projeto({})
+  try {
+    // Normaliza para `../fora.js`: recusar so pelo prefixo textual deixaria passar.
+    assert.throws(() => buildRegistry(["src/../../fora.js"], { root }), /fora do root/)
+  } finally { cleanupTmp(root) }
+})
+
+test("NEGATIVO: duplicata e recusada", async () => {
+  const { buildRegistry } = await gen()
+  const root = projeto({ "src/commands/x.js": `import { info } from "../cli/index.js"\ninfo("oi")\n` })
+  try {
+    assert.throws(
+      () => buildRegistry(["src/commands/x.js", "src/commands/x.js"], { root }),
+      /duplicado/,
+      "a lista teria 2 itens e `files` teria 1 chave — a invariante quebraria",
+    )
+  } finally { cleanupTmp(root) }
+})
+
+test("NEGATIVO: duplicata DISFARCADA por `./` tambem e recusada", async () => {
+  const { buildRegistry } = await gen()
+  const root = projeto({ "src/commands/x.js": `import { info } from "../cli/index.js"\ninfo("oi")\n` })
+  try {
+    assert.throws(
+      () => buildRegistry(["src/commands/x.js", "./src/commands/x.js"], { root }),
+      /duplicado/,
+      "canonicalizar ANTES de comparar e o que pega este caso",
+    )
+  } finally { cleanupTmp(root) }
+})
+
+test("a mensagem de erro lista TODOS os problemas, nao so o primeiro", async () => {
+  const { buildRegistry } = await gen()
+  const root = projeto({})
+  try {
+    buildRegistry(["../a.js", "../b.js"], { root })
+    assert.fail("deveria ter lancado")
+  } catch (e) {
+    assert.match(e.message, /a\.js/)
+    assert.match(e.message, /b\.js/, "corrigir um por vez seria trabalho repetido")
+  }
+})
+
+test("INVARIANTE: convertedFiles === Object.keys(files).sort(), sempre", async () => {
+  const { buildRegistry } = await gen()
+  const root = projeto({
+    "src/commands/z.js": `import { info } from "../cli/index.js"\ninfo("z")\n`,
+    "src/commands/a.js": `import { info } from "../cli/index.js"\ninfo("a")\n`,
+    "src/util/puro.js": `export const x = 1\n`,
+  })
+  try {
+    for (const lista of [
+      ["src/commands/z.js", "src/commands/a.js", "src/util/puro.js"],
+      ["src/util/puro.js", "src/commands/z.js", "src/commands/a.js"],
+      ["./src/commands/a.js", "src/util/puro.js", "src/commands/z.js"],
+      [],
+    ]) {
+      const r = buildRegistry(lista, { root })
+      assert.deepEqual(r.convertedFiles, Object.keys(r.files).sort(),
+        `divergiu para a lista ${JSON.stringify(lista)}`)
+    }
+  } finally { cleanupTmp(root) }
+})
+
+// ── Fatia 2.1: bindingOrigin nunca absoluto ──────────────────────────────────
+
+test("bindingOrigin de origem EXTERNA nao vaza caminho absoluto", async () => {
+  const { origemDeBinding, ORIGEM_EXTERNA } = await gen()
+  const root = "C:/projeto"
+  assert.equal(origemDeBinding("C:/projeto/src/cli/index.js", root), "src/cli/index.js")
+  assert.equal(origemDeBinding("C:/Users/alguem/AppData/lib.d.ts", root), ORIGEM_EXTERNA,
+    "o comentario prometia null e o codigo devolvia o caminho absoluto")
+  assert.equal(origemDeBinding("C:/qualquer/node_modules/typescript/lib/lib.d.ts", root),
+    "node_modules/typescript/lib/lib.d.ts", "origem em node_modules e estavel e informativa")
+  assert.equal(origemDeBinding(null, root), null)
+})
+
+test("nenhum bindingOrigin do registry contem caminho absoluto, nem em arquivo real", async () => {
+  const { buildRegistry } = await gen()
+  const r = buildRegistry(["src/cli/index.js", "src/commands/monitor.js"], { root: repoRoot })
+  for (const f of Object.values(r.files)) {
+    for (const e of f.entries) {
+      if (e.bindingOrigin === null) continue
+      assert.ok(!/^[A-Za-z]:/.test(e.bindingOrigin), `absoluto: ${e.bindingOrigin}`)
+      assert.ok(!e.bindingOrigin.startsWith("/"), `absoluto POSIX: ${e.bindingOrigin}`)
+      assert.ok(!e.bindingOrigin.includes("Users"), `vazou caminho de usuario: ${e.bindingOrigin}`)
+    }
+  }
+})
+
+// ── Fatia 2.1: column identifica o callsite ──────────────────────────────────
+
+test("duas chamadas do MESMO helper na MESMA linha viram entradas distintas", async () => {
+  const { buildRegistry } = await gen()
+  const root = projeto({
+    "src/commands/x.js": `import { info } from "../cli/index.js"\ninfo("a"); info("b")\n`,
+  })
+  try {
+    const entries = buildRegistry(["src/commands/x.js"], { root }).files["src/commands/x.js"].entries
+    assert.equal(entries.length, 2)
+    assert.equal(entries[0].line, entries[1].line, "mesma linha")
+    assert.notEqual(entries[0].column, entries[1].column,
+      "so `line` faria um override atingir a chamada errada, em silencio")
+    assert.ok(entries[0].column < entries[1].column, "ordenadas por coluna")
+  } finally { cleanupTmp(root) }
+})
+
+test("column e 1-based e aponta para o inicio da chamada", async () => {
+  const { buildRegistry } = await gen()
+  const root = projeto({ "src/commands/x.js": `import { info } from "../cli/index.js"\n  info("x")\n` })
+  try {
+    const e = buildRegistry(["src/commands/x.js"], { root }).files["src/commands/x.js"].entries[0]
+    assert.equal(e.line, 2)
+    assert.equal(e.column, 3, "duas colunas de indentacao -> comeca na 3")
+  } finally { cleanupTmp(root) }
+})
+
+test("a ordenacao usa line, column e calleePath — total e estavel", async () => {
+  const { buildRegistry } = await gen()
+  const root = projeto({
+    "src/commands/x.js": `import { info, warn } from "../cli/index.js"
+warn("w"); info("i")
+info("depois")
+`,
+  })
+  try {
+    const entries = buildRegistry(["src/commands/x.js"], { root }).files["src/commands/x.js"].entries
+    const chaves = entries.map((e) => [e.line, e.column])
+    const ordenado = [...chaves].sort((a, b) => a[0] - b[0] || a[1] - b[1])
+    assert.deepEqual(chaves, ordenado)
   } finally { cleanupTmp(root) }
 })
 
@@ -271,9 +443,24 @@ test("o overrides commitado esta vazio e traz o contrato de cada override", asyn
   assert.equal(o.schema, OVERRIDES_SCHEMA)
   assert.deepEqual(o.overrides, [])
   const doc = o.$comment.join(" ")
-  for (const campo of ["reason", "owner", "evidence", "expectedFileHash"]) {
+  for (const campo of ["file", "line", "column", "reason", "owner", "evidence", "expectedFileHash"]) {
     assert.ok(doc.includes(campo), `o contrato precisa citar \`${campo}\``)
   }
+  assert.ok(/line.*NAO identifica|NAO identifica.*chamada/s.test(doc),
+    "o contrato precisa dizer POR QUE a coluna e obrigatoria")
+})
+
+test("a ancora do override existe de fato nas entradas do registry", async () => {
+  // O contrato dos overrides so vale se os campos que ele exige existirem no
+  // dado que ele sobrescreve. Sem este teste, o contrato podeira citar um campo
+  // que o gerador nunca emite.
+  const { buildRegistry } = await gen()
+  const r = buildRegistry(["src/cli/index.js"], { root: repoRoot })
+  const e = r.files["src/cli/index.js"].entries[0]
+  for (const campo of ["line", "column"]) {
+    assert.ok(Number.isInteger(e[campo]) && e[campo] > 0, `entrada precisa de \`${campo}\``)
+  }
+  assert.match(r.files["src/cli/index.js"].fileHash, /^sha256:[0-9a-f]{64}$/)
 })
 
 test("regenerar o artefato commitado nao produz diff", async () => {
@@ -331,22 +518,22 @@ test("FRONTEIRA: o inventario oficial ainda NAO consome o registry", async () =>
  * A prova de instalacao sem devDependencies e da Fatia 7; este guard e o que
  * impede a regressao chegar la.
  */
-test("GUARD ARQUITETURAL: nada em src/ importa TypeScript nem o engine AST", async () => {
-  const { globSync } = await import("node:fs")
-  const anterior = process.cwd()
-  process.chdir(repoRoot)
-  try {
-    const arquivos = globSync("src/**/*.js")
-    assert.ok(arquivos.length > 100, `varredura precisa cobrir src/, veio ${arquivos.length}`)
+test("GUARD ARQUITETURAL: nada em src/ importa TypeScript nem o engine AST", () => {
+  // Travessia manual, e nao `fs.globSync`: `globSync` so existe a partir do
+  // Node 22, o projeto declara `engines: node >=18` e o CI roda a suite em
+  // Node 18 e 20. Usar a API nova aqui faria a matriz inteira de Node 18
+  // reprovar por causa do TESTE, nao do codigo sob teste.
+  const arquivos = varrerJs(path.join(repoRoot, "src"))
+  assert.ok(arquivos.length > 100, `varredura precisa cobrir src/, veio ${arquivos.length}`)
 
-    const infratores = []
-    for (const f of arquivos) {
-      const src = readFileSync(path.join(repoRoot, f), "utf8")
-      if (/from\s+["']typescript["']|require\(\s*["']typescript["']\s*\)/.test(src)) {
-        infratores.push(`${f}: importa typescript`)
-      }
-      if (/i18n-js-ast/.test(src)) infratores.push(`${f}: importa o engine AST`)
+  const infratores = []
+  for (const abs of arquivos) {
+    const src = readFileSync(abs, "utf8")
+    const rel = path.relative(repoRoot, abs).replace(/\\/g, "/")
+    if (/from\s+["']typescript["']|require\(\s*["']typescript["']\s*\)/.test(src)) {
+      infratores.push(`${rel}: importa typescript`)
     }
-    assert.deepEqual(infratores, [], "runtime nao pode depender de devDependency")
-  } finally { process.chdir(anterior) }
+    if (/i18n-js-ast/.test(src)) infratores.push(`${rel}: importa o engine AST`)
+  }
+  assert.deepEqual(infratores, [], "runtime nao pode depender de devDependency")
 })
