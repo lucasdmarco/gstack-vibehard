@@ -352,7 +352,7 @@ const streamDeProcess = (n) => {
 /**
  * A chamada e `process.stdout.write(...)` ou `process.stderr.write(...)`?
  *
- * Existem 131 delas em 39 arquivos do projeto — inclusive `monitor.js` e
+ * Ha mais de cem ocorrencias distribuidas por dezenas de arquivos — inclusive `monitor.js` e
  * `create.js`. `write` nao esta em SINK_NAMES e o callee tem cadeia ANINHADA
  * (`process.stdout` nao e identificador simples), entao `calleeInfo` devolvia
  * `objeto: null` e o ponto era descartado. Consequencia se isso entrasse no
