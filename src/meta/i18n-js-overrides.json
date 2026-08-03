@@ -1,0 +1,17 @@
+{
+  "schema": "gstack.i18n-js-overrides.v1",
+  "$comment": [
+    "ARQUIVO 100% HUMANO. O gerador (scripts/i18n-registry.mjs) nunca o le nem o escreve.",
+    "Decisao manual escrita em i18n-js-registry.json seria apagada na proxima regeneracao;",
+    "por isso ela vive aqui.",
+    "",
+    "Cada override precisa de: file, line, audience, reason, owner, evidence, expectedFileHash.",
+    "expectedFileHash ancora a decisao ao conteudo que ela julgou. Se o arquivo mudar, o",
+    "override deixa de valer sozinho e precisa ser reexaminado — uma classificacao humana",
+    "nao pode migrar em silencio para um callsite que ninguem olhou.",
+    "",
+    "Vazio nesta fatia: nenhum arquivo foi convertido ainda, logo nao ha o que sobrescrever.",
+    "O consumo dos overrides pertence as Fatias 3 e 4."
+  ],
+  "overrides": []
+}
