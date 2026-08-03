@@ -17,7 +17,8 @@ import { cleanupTmp } from "./helpers/tmp.js"
  *
  *  2. **Sinks de stream sumiam.** `process.stdout.write` / `process.stderr.write`
  *     nao eram extraidos: `write` nao esta em SINK_NAMES e `process.stdout` nao e
- *     identificador simples. Sao 131 ocorrencias em 39 arquivos. Se o registry
+ *     identificador simples. Sao mais de cem ocorrencias distribuidas por dezenas
+ *     de arquivos. Se o registry
  *     fosse definido assim, cada arquivo migrado PERDERIA seus sinks.
  *
  * Extrair e obrigatorio; classificar sem evidencia, nao. Por isso a audiencia
