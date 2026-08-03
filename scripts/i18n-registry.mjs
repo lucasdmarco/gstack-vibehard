@@ -53,12 +53,27 @@ export function hashConteudo(texto) {
   return `sha256:${createHash("sha256").update(normalizado, "utf8").digest("hex")}`
 }
 
-/** Caminho relativo ao root, com barras normais. `null` quando fora do root. */
-function relativoAoRoot(alvo, root) {
+/** Marcador de origem fora do projeto — estavel entre maquinas. */
+export const ORIGEM_EXTERNA = "<external>"
+
+/**
+ * Caminho relativo ao root, com barras normais.
+ *
+ * Uma declaracao pode resolver FORA do root: um tipo de `node_modules`, ou um
+ * lib.d.ts do proprio TypeScript. A versao anterior prometia `null` no
+ * comentario e devolvia o caminho ABSOLUTO no codigo — o que gravaria
+ * `C:/Users/<nome>/...` no artefato commitado, quebrando determinismo entre
+ * maquinas e expondo o nome de usuario de quem gerou.
+ *
+ * Origem em `node_modules` vira caminho relativo a partir dele (estavel e
+ * informativo); qualquer outra origem externa vira `<external>`.
+ */
+export function origemDeBinding(alvo, root) {
   if (!alvo) return null
   const rel = path.relative(root, alvo)
-  if (rel.startsWith("..") || path.isAbsolute(rel)) return norm(alvo)
-  return norm(rel)
+  if (!rel.startsWith("..") && !path.isAbsolute(rel)) return norm(rel)
+  const dentroDeModules = norm(alvo).match(/(?:^|\/)(node_modules\/.+)$/)
+  return dentroDeModules ? dentroDeModules[1] : ORIGEM_EXTERNA
 }
 
 /** Entrada do registry a partir de um ponto do engine. */
@@ -67,10 +82,11 @@ function entrada(p, root) {
   return {
     audience: p.audience,
     bindingKind: p.binding.kind,
-    bindingOrigin: relativoAoRoot(p.binding.declaredIn, root),
+    bindingOrigin: origemDeBinding(p.binding.declaredIn, root),
     callee: p.callee,
     calleePath: p.calleePath,
     canonicalName: p.canonicalName,
+    column: p.column,
     line: p.line,
     provenance: { ids: prov.ids, kind: prov.kind, resolved: prov.resolved },
     rule: p.rule,
@@ -78,8 +94,16 @@ function entrada(p, root) {
   }
 }
 
-/** Ordem estavel: por linha, e por caminho do callee quando empatam. */
-const porPosicao = (a, b) => a.line - b.line || a.calleePath.localeCompare(b.calleePath)
+/**
+ * Ordem estavel e TOTAL: linha, coluna, caminho do callee.
+ *
+ * So `line` nao desempata duas chamadas na mesma linha, e ordem instavel entre
+ * empates faria o check byte a byte da Fatia 6 acusar diff sem que nada tenha
+ * mudado.
+ */
+const porPosicao = (a, b) => a.line - b.line
+  || a.column - b.column
+  || a.calleePath.localeCompare(b.calleePath)
 
 /**
  * Reconstroi objetos com chaves ORDENADAS, recursivamente.
@@ -102,25 +126,75 @@ export function ordenarChaves(v) {
  * isso o consumidor nao distingue "arquivo migrado que nao tem saida" de
  * "arquivo que o gerador esqueceu" — e trataria omissao como conversao.
  */
+/**
+ * Canonicaliza a lista de convertidos UMA VEZ e recusa o que nao pode entrar.
+ *
+ * Motivos de recusa, todos com o mesmo efeito se passassem: o registry deixaria
+ * de ser reproduzivel ou descreveria arquivo que nao e do projeto.
+ *
+ *   absoluto    — grava `C:/Users/<nome>/...` na chave; muda por maquina
+ *   com `../`   — aponta para fora do projeto
+ *   duplicado   — `convertedFiles` e `Object.keys(files)` divergiriam, porque a
+ *                 lista tem repeticao e o objeto colapsa a chave
+ *
+ * Falha ALTO E CEDO, com a lista completa de problemas: gerar um registry meio
+ * certo e pior que nao gerar, porque ele parece valido.
+ */
+/** Recusa o caminho, ou devolve `null` quando ele e aceitavel. */
+function motivoDeRecusa(original, rel, root) {
+  if (path.isAbsolute(original)) return `caminho absoluto: ${norm(original)}`
+  if (rel.startsWith("../") || rel === "..") return `fora do root: ${rel}`
+  const deVolta = path.relative(root, path.resolve(root, rel))
+  if (deVolta.startsWith("..") || path.isAbsolute(deVolta)) return `resolve fora do root: ${rel}`
+  return null
+}
+
+/** Forma canonica da chave: normalizada, com barras normais, sem `./` inicial. */
+const chaveDe = (original) => norm(path.normalize(original)).replace(/^\.\//, "")
+
+export function canonicalizarConvertidos(arquivos, root) {
+  const problemas = []
+  const vistos = new Map()
+
+  for (const bruto of arquivos) {
+    const original = String(bruto)
+    const rel = chaveDe(original)
+    const recusa = motivoDeRecusa(original, rel, root) ?? (vistos.has(rel) ? `duplicado: ${rel}` : null)
+    if (recusa) problemas.push(recusa)
+    else vistos.set(rel, path.resolve(root, rel))
+  }
+
+  if (problemas.length > 0) {
+    throw new Error(`i18n-registry: lista de convertidos invalida:\n  - ${problemas.join("\n  - ")}`)
+  }
+  return [...vistos.entries()]
+    .map(([rel, abs]) => ({ rel, abs }))
+    .sort((a, b) => a.rel.localeCompare(b.rel))
+}
+
 export function buildRegistry(arquivos, opcoes = {}) {
   const root = opcoes.root ?? process.cwd()
-  const absolutos = arquivos.map((f) => (path.isAbsolute(f) ? f : path.join(root, f)))
-  const analyzer = absolutos.length > 0 ? createAnalyzer(absolutos) : null
+  const alvos = canonicalizarConvertidos(arquivos, root)
+  const analyzer = alvos.length > 0 ? createAnalyzer(alvos.map((a) => a.abs)) : null
 
   const files = {}
-  for (const [i, abs] of absolutos.entries()) {
-    const rel = norm(arquivos[i]).replace(/^\.\//, "")
+  for (const { rel, abs } of alvos) {
     files[rel] = {
       entries: analyzeFile(abs, analyzer).map((p) => entrada(p, root)).sort(porPosicao),
       fileHash: hashConteudo(readFileSync(abs, "utf8")),
     }
   }
 
-  return ordenarChaves({
-    convertedFiles: [...arquivos].map((f) => norm(f).replace(/^\.\//, "")).sort(),
-    files,
-    schema: REGISTRY_SCHEMA,
-  })
+  // Invariante estrutural: a lista declarada e as chaves geradas sao a MESMA
+  // coisa vista de dois angulos. Divergir significaria anunciar conversao de um
+  // arquivo ausente do registry, ou o contrario.
+  const convertedFiles = alvos.map((a) => a.rel)
+  const chaves = Object.keys(files).sort()
+  if (convertedFiles.join("\u0000") !== chaves.join("\u0000")) {
+    throw new Error(`i18n-registry: convertedFiles divergiu das chaves de files:\n  lista: ${convertedFiles}\n  chaves: ${chaves}`)
+  }
+
+  return ordenarChaves({ convertedFiles, files, schema: REGISTRY_SCHEMA })
 }
 
 /** Serializacao canonica: 2 espacos e newline final. Deve ser byte-identica. */

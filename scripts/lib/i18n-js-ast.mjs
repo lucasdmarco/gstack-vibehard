@@ -409,9 +409,14 @@ export function analyzeFile(filePath, analyzer = null) {
   const registrar = (node, d) => {
     const arg0 = node.arguments[0]
     const caminho = d.alvo.objeto ? `${d.alvo.objeto}.${d.alvo.name}` : d.alvo.name
+    // `line` sozinha NAO identifica um callsite: duas chamadas cabem na mesma
+    // linha, inclusive do mesmo helper (`info("a"); info("b")`). Um override
+    // ancorado so em linha atingiria a chamada errada, em silencio.
+    const pos = sf.getLineAndCharacterOfPosition(node.getStart(sf))
     const base = {
       file: norm(filePath),
-      line: sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1,
+      line: pos.line + 1,
+      column: pos.character + 1,
       name: d.alvo.name,
       // Nome DECLARADO — e ele que decide o que a chamada e, nao o apelido local.
       canonicalName: d.canonicalName,

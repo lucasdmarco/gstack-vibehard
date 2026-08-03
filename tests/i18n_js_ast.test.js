@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { pathToFileURL } from "node:url"
+import { pathToFileURL, fileURLToPath } from "node:url"
 import { cleanupTmp } from "./helpers/tmp.js"
 
 /**
@@ -26,7 +26,7 @@ import { cleanupTmp } from "./helpers/tmp.js"
  * nem CI aqui. `src/cli/index.js` segue oficialmente com os unknown atuais.
  */
 
-const repoRoot = path.resolve(import.meta.dirname, "..")
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const eng = () => import(`${pathToFileURL(path.join(repoRoot, "scripts", "lib", "i18n-js-ast.mjs"))}?t=${Date.now()}`)
 
 /** Monta um mini-projeto com um `cli/index.js` canonico e o arquivo sob teste. */
