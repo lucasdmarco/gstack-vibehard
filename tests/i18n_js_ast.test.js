@@ -123,9 +123,19 @@ info("local")
   try {
     const a = createAnalyzer([f.alvos[0], f.canonical])
     const p = analyzeFile(f.alvos[0], a)
-    assert.equal(p[0].binding.kind, "local")
-    assert.ok(!p[0].binding.declaredIn.endsWith("src/cli/index.js"))
-    assert.equal(p[0].audience, "unknown")
+
+    // Desde a Fatia 1.2 este fixture rende DOIS pontos: a chamada `info(...)` e
+    // o `process.stdout.write` do corpo, que antes desaparecia do inventario.
+    assert.equal(p.length, 2, "o sink de stream do corpo tambem e extraido")
+
+    const chamada = p.find((x) => x.sink === null)
+    assert.equal(chamada.binding.kind, "local")
+    assert.ok(!chamada.binding.declaredIn.endsWith("src/cli/index.js"))
+    assert.equal(chamada.audience, "unknown")
+
+    const stream = p.find((x) => x.sink !== null)
+    assert.equal(stream.calleePath, "process.stdout.write")
+    assert.equal(stream.audience, "unknown")
   } finally { cleanupTmp(f.root) }
 })
 

@@ -84,8 +84,8 @@ const unalias = (checker, sym) => {
 
 const isImportDecl = (d) => ts.isImportSpecifier(d) || ts.isImportClause(d) || ts.isNamespaceImport(d)
 
-/** `console` nao tem declaracao no programa: e global do runtime. */
-const CONSOLE_BINDING = Object.freeze({ kind: "global", declaredIn: null })
+/** `console` e `process` nao tem declaracao no programa: sao globais do runtime. */
+const GLOBAL_BINDING = Object.freeze({ kind: "global", declaredIn: null })
 
 const bindingKindOf = (d, declaredIn, currentFile) => {
   if (ts.isParameter(d)) return "parameter"
@@ -153,14 +153,6 @@ export function ancestry(node) {
 /** Env vars que constituem ativacao explicita de depuracao. */
 const DEBUG_ENV_VARS = new Set(["GSTACK_DEBUG", "DEBUG", "VERBOSE"])
 
-/**
- * A expressao e ESTRUTURALMENTE `process.env.<VAR_APROVADA>`?
- *
- * A 1a versao fazia regex sobre o texto da condicao e aceitava qualquer coisa
- * contendo "DEBUG" — inclusive `options.DEBUG`, `isDebugMode`, ou uma string.
- * Isso e heuristica textual, exatamente o sinal que esta fase existe para nao
- * usar. Aqui a arvore precisa ser `process` → `.env` → `.VAR`.
- */
 /** O no e exatamente `process.env`? Nem `cfg.env`, nem `process.argv`. */
 const ehProcessEnv = (n) => ts.isPropertyAccessExpression(n)
   && ts.isIdentifier(n.name) && n.name.text === "env"
@@ -169,14 +161,38 @@ const ehProcessEnv = (n) => ts.isPropertyAccessExpression(n)
 /** O identificador da propriedade e uma das env vars aprovadas? */
 const ehVarDebug = (n) => ts.isIdentifier(n) && DEBUG_ENV_VARS.has(n.text)
 
-/** `!process.env.X` guarda a mesma decisao que `process.env.X`. */
-const semNegacao = (e) => (ts.isPrefixUnaryExpression(e) ? e.operand : e)
+/** Leitura crua de `process.env.<VAR_APROVADA>` — sem julgar polaridade. */
+const lePodeDebugEnv = (n) => ts.isPropertyAccessExpression(n)
+  && ehVarDebug(n.name) && ehProcessEnv(n.expression)
 
-export function isDebugEnvAccess(expr) {
-  const e = semNegacao(expr)
-  if (ts.isBinaryExpression(e)) return isDebugEnvAccess(e.left) || isDebugEnvAccess(e.right)
-  if (!ts.isPropertyAccessExpression(e)) return false
-  return ehVarDebug(e.name) && ehProcessEnv(e.expression)
+const semParenteses = (e) => (ts.isParenthesizedExpression(e) ? semParenteses(e.expression) : e)
+
+/**
+ * A condicao exige debug LIGADO para o ramo THEN executar?
+ *
+ * Nao basta a condicao MENCIONAR `process.env.DEBUG`: e preciso que o valor
+ * positivo seja NECESSARIO. A versao da Fatia 1.1 so perguntava "aparece?", e
+ * por isso repetia — com outra roupa — a mesma inversao ja corrigida no `else`:
+ *
+ *   `!process.env.GSTACK_DEBUG`      → o THEN roda com debug DESLIGADO;
+ *   `process.env.DEBUG || outra`     → o THEN roda sempre que `outra` for true,
+ *                                      mesmo com debug desligado.
+ *
+ * Em ambos, marcar `internal_debug` afirmaria que a saida esta fora do fluxo
+ * padrao quando ela esta exatamente dentro dele.
+ *
+ * Regra: `&&` propaga (basta um operando exigir), `||` nunca (nenhum operando e
+ * necessario), negacao inverte, comparacao e ambigua. Na duvida NAO e debug — o
+ * erro conservador deixa o ponto como saida normal, que e o pior caso seguro.
+ */
+export function requiresDebugEnv(expr) {
+  const e = semParenteses(expr)
+  if (ts.isPrefixUnaryExpression(e)) return false      // `!DEBUG` inverte
+  if (!ts.isBinaryExpression(e)) return lePodeDebugEnv(e)
+  if (e.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken) {
+    return requiresDebugEnv(e.left) || requiresDebugEnv(e.right)
+  }
+  return false                                          // `||` e comparacoes
 }
 
 /** `filho` esta contido em `alvo` por POSICAO na arvore? */
@@ -186,17 +202,18 @@ const contains = (alvo, filho) => Boolean(alvo)
 /**
  * O ponto esta sob guarda de ativacao explicita de debug?
  *
- * Tres exigencias, todas ausentes na 1a versao:
+ * Quatro exigencias:
  *   1. condicao ESTRUTURALMENTE `process.env.<VAR>` (nao regex de texto);
- *   2. o no precisa estar no ramo THEN — uma chamada no `else` roda quando o
+ *   2. debug positivo NECESSARIO — `!DEBUG` e `DEBUG || outra` recusados;
+ *   3. o no precisa estar no ramo THEN — uma chamada no `else` roda quando o
  *      debug esta DESLIGADO, e classifica-la como debug seria o oposto;
- *   3. ancestralidade real — guard em funcao vizinha nao alcanca.
+ *   4. ancestralidade real — guard em funcao vizinha nao alcanca.
  */
 export function underDebugGuard(node) {
   for (let p = node.parent; p; p = p.parent) {
     if (isFunctionLike(p)) break
     if (!ts.isIfStatement(p)) continue
-    if (!isDebugEnvAccess(p.expression)) continue
+    if (!requiresDebugEnv(p.expression)) continue
     if (contains(p.thenStatement, node)) return true
     // No ramo `else` (ou fora do then): NAO e caminho de debug.
   }
@@ -281,6 +298,12 @@ export const JS_RULES = Object.freeze([
 ])
 
 export function classifyPoint(p) {
+  // Escrita direta em stream e EXTRAIDA sempre e CLASSIFICADA nunca — por ora.
+  // Sem isso, `render-module-literal-output` daria `public_diagnostic` a todo
+  // `process.stdout.write` do modulo de render so pela identidade do arquivo,
+  // e um `write` de payload JSON viraria "texto que o usuario le". Extrair sem
+  // evidencia mantem o ponto visivel; classificar sem evidencia o falsifica.
+  if (p.sink) return { audience: "unknown", trigger: null, rule: null }
   const r = JS_RULES.find((x) => x.when(p))
   if (!r) return { audience: "unknown", trigger: null, rule: null }
   return { audience: r.audience, trigger: r.trigger, rule: r.id }
@@ -313,6 +336,37 @@ function calleeInfo(c) {
     idNode: c.name,
     objectNode: ehIdent ? c.expression : null,
   }
+}
+
+/** Streams de escrita direta do processo. */
+const PROCESS_STREAMS = new Set(["stdout", "stderr"])
+
+/** `process.stdout` / `process.stderr` — devolve o nome do stream, ou `null`. */
+const streamDeProcess = (n) => {
+  if (!ts.isPropertyAccessExpression(n)) return null
+  if (!ts.isIdentifier(n.expression) || n.expression.text !== "process") return null
+  if (!ts.isIdentifier(n.name) || !PROCESS_STREAMS.has(n.name.text)) return null
+  return n.name.text
+}
+
+/**
+ * A chamada e `process.stdout.write(...)` ou `process.stderr.write(...)`?
+ *
+ * Existem 131 delas em 39 arquivos do projeto — inclusive `monitor.js` e
+ * `create.js`. `write` nao esta em SINK_NAMES e o callee tem cadeia ANINHADA
+ * (`process.stdout` nao e identificador simples), entao `calleeInfo` devolvia
+ * `objeto: null` e o ponto era descartado. Consequencia se isso entrasse no
+ * registry: cada arquivo migrado do regex para o AST PERDERIA seus sinks de
+ * stream — o inventario ficaria menor sem que nada tivesse sido resolvido.
+ *
+ * Extrair e obrigatorio; classificar, nao. Ver `classifyPoint`.
+ */
+export function processStreamWrite(c) {
+  if (!ts.isPropertyAccessExpression(c)) return null
+  if (!ts.isIdentifier(c.name) || c.name.text !== "write") return null
+  const stream = streamDeProcess(c.expression)
+  if (!stream) return null
+  return { stream, calleePath: `process.${stream}.write` }
 }
 
 /**
@@ -352,16 +406,20 @@ export function analyzeFile(filePath, analyzer = null) {
   if (!sf) throw new Error(`arquivo nao esta no programa: ${filePath}`)
   const pontos = []
 
-  const registrar = (node, alvo, canonicalName, binding) => {
+  const registrar = (node, d) => {
     const arg0 = node.arguments[0]
+    const caminho = d.alvo.objeto ? `${d.alvo.objeto}.${d.alvo.name}` : d.alvo.name
     const base = {
       file: norm(filePath),
       line: sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1,
-      name: alvo.name,
+      name: d.alvo.name,
       // Nome DECLARADO — e ele que decide o que a chamada e, nao o apelido local.
-      canonicalName,
-      callee: alvo.objeto ? `${alvo.objeto}.${alvo.name}` : alvo.name,
-      binding,
+      canonicalName: d.canonicalName,
+      callee: caminho,
+      calleePath: d.calleePath ?? caminho,
+      // `stdout` | `stderr` para escrita direta no processo; `null` no resto.
+      sink: d.sink ?? null,
+      binding: d.binding,
       ...ancestry(node),
       underDebugGuard: underDebugGuard(node),
       templateIds: templateIdentifiers(arg0),
@@ -372,18 +430,29 @@ export function analyzeFile(filePath, analyzer = null) {
 
   /** `console` e global do runtime: nao ha simbolo de projeto a resolver. */
   const resolverAlvo = (alvo) => {
-    if (alvo.objeto === "console") return { binding: CONSOLE_BINDING, canonicalName: alvo.name }
+    if (alvo.objeto === "console") return { binding: GLOBAL_BINDING, canonicalName: alvo.name }
     return {
       binding: resolveBinding(a.checker, alvo.idNode, filePath),
       canonicalName: canonicalNameOf(a.checker, alvo.idNode) ?? alvo.name,
     }
   }
 
+  /** Escrita direta no stream: sempre extraida, nunca classificada por default. */
+  const descreverStream = (w) => ({
+    alvo: { name: "write", objeto: `process.${w.stream}` },
+    canonicalName: "write",
+    binding: GLOBAL_BINDING,
+    sink: w.stream,
+    calleePath: w.calleePath,
+  })
+
   /**
    * RESOLVE PRIMEIRO, filtra depois. A 1a versao filtrava por `SINK_NAMES` no
    * nome LOCAL e perdia todo alias arbitrario antes mesmo de resolver.
    */
   const descreverChamada = (node) => {
+    const w = processStreamWrite(node.expression)
+    if (w) return descreverStream(w)
     const alvo = calleeInfo(node.expression)
     if (!alvo) return null
     const r = resolverAlvo(alvo)
@@ -392,7 +461,7 @@ export function analyzeFile(filePath, analyzer = null) {
 
   const visit = (node) => {
     const ponto = ts.isCallExpression(node) ? descreverChamada(node) : null
-    if (ponto) registrar(node, ponto.alvo, ponto.canonicalName, ponto.binding)
+    if (ponto) registrar(node, ponto)
     ts.forEachChild(node, visit)
   }
   visit(sf)
