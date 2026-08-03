@@ -70,9 +70,13 @@ test("ALIAS: `import { info as log }` resolve ate a declaracao real", async () =
   try {
     const a = createAnalyzer([f.alvos[0], f.canonical])
     const p = analyzeFile(f.alvos[0], a)
-    // `log` nao esta em SINK_NAMES; o alias nao cria ponto novo por nome.
-    // O que importa e nao explodir e nao inventar classificacao.
-    assert.ok(Array.isArray(p))
+    // Este teste ERA vacuous (`assert.ok(Array.isArray(p))`, que passa com
+    // qualquer coisa) e eu o usei para afirmar suporte a alias que nao existia.
+    // O suporte real veio na Fatia 1.1; a bateria completa de alias, namespace e
+    // default import esta em `i18n_js_ast_binding.test.js`.
+    assert.equal(p.length, 1, "o alias E extraido")
+    assert.equal(p[0].canonicalName, "info", "resolveu ate a declaracao real")
+    assert.equal(p[0].audience, "public_diagnostic")
   } finally { cleanupTmp(f.root) }
 })
 

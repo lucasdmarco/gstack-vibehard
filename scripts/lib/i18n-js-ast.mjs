@@ -84,6 +84,9 @@ const unalias = (checker, sym) => {
 
 const isImportDecl = (d) => ts.isImportSpecifier(d) || ts.isImportClause(d) || ts.isNamespaceImport(d)
 
+/** `console` nao tem declaracao no programa: e global do runtime. */
+const CONSOLE_BINDING = Object.freeze({ kind: "global", declaredIn: null })
+
 const bindingKindOf = (d, declaredIn, currentFile) => {
   if (ts.isParameter(d)) return "parameter"
   if (isImportDecl(d)) return "import"
@@ -147,18 +150,55 @@ export function ancestry(node) {
   return { functions, inCatch, exportedFromModule }
 }
 
+/** Env vars que constituem ativacao explicita de depuracao. */
+const DEBUG_ENV_VARS = new Set(["GSTACK_DEBUG", "DEBUG", "VERBOSE"])
+
+/**
+ * A expressao e ESTRUTURALMENTE `process.env.<VAR_APROVADA>`?
+ *
+ * A 1a versao fazia regex sobre o texto da condicao e aceitava qualquer coisa
+ * contendo "DEBUG" — inclusive `options.DEBUG`, `isDebugMode`, ou uma string.
+ * Isso e heuristica textual, exatamente o sinal que esta fase existe para nao
+ * usar. Aqui a arvore precisa ser `process` → `.env` → `.VAR`.
+ */
+/** O no e exatamente `process.env`? Nem `cfg.env`, nem `process.argv`. */
+const ehProcessEnv = (n) => ts.isPropertyAccessExpression(n)
+  && ts.isIdentifier(n.name) && n.name.text === "env"
+  && ts.isIdentifier(n.expression) && n.expression.text === "process"
+
+/** O identificador da propriedade e uma das env vars aprovadas? */
+const ehVarDebug = (n) => ts.isIdentifier(n) && DEBUG_ENV_VARS.has(n.text)
+
+/** `!process.env.X` guarda a mesma decisao que `process.env.X`. */
+const semNegacao = (e) => (ts.isPrefixUnaryExpression(e) ? e.operand : e)
+
+export function isDebugEnvAccess(expr) {
+  const e = semNegacao(expr)
+  if (ts.isBinaryExpression(e)) return isDebugEnvAccess(e.left) || isDebugEnvAccess(e.right)
+  if (!ts.isPropertyAccessExpression(e)) return false
+  return ehVarDebug(e.name) && ehProcessEnv(e.expression)
+}
+
+/** `filho` esta contido em `alvo` por POSICAO na arvore? */
+const contains = (alvo, filho) => Boolean(alvo)
+  && filho.getStart() >= alvo.getStart() && filho.getEnd() <= alvo.getEnd()
+
 /**
  * O ponto esta sob guarda de ativacao explicita de debug?
  *
- * Sobe pela arvore procurando um `if` cuja condicao mencione a env var de
- * debug. E ancestralidade real: um `if (process.env.GSTACK_DEBUG)` numa funcao
- * vizinha nao conta.
+ * Tres exigencias, todas ausentes na 1a versao:
+ *   1. condicao ESTRUTURALMENTE `process.env.<VAR>` (nao regex de texto);
+ *   2. o no precisa estar no ramo THEN — uma chamada no `else` roda quando o
+ *      debug esta DESLIGADO, e classifica-la como debug seria o oposto;
+ *   3. ancestralidade real — guard em funcao vizinha nao alcanca.
  */
 export function underDebugGuard(node) {
   for (let p = node.parent; p; p = p.parent) {
     if (isFunctionLike(p)) break
     if (!ts.isIfStatement(p)) continue
-    if (/GSTACK_DEBUG|\bDEBUG\b|\bVERBOSE\b/.test(p.expression.getText())) return true
+    if (!isDebugEnvAccess(p.expression)) continue
+    if (contains(p.thenStatement, node)) return true
+    // No ramo `else` (ou fora do then): NAO e caminho de debug.
   }
   return false
 }
@@ -209,20 +249,27 @@ export const JS_RULES = Object.freeze([
     reason: "console.* dentro da primitiva exportada que implementa o canal: o texto vem do chamador, a funcao so decora. Classificar como publico duplicaria a contagem",
   },
   {
+    // RESTRITA ao modulo canonico. A 1a versao classificava QUALQUER funcao
+    // chamada `select`/`prompt`/`confirm` em QUALQUER modulo como interface
+    // publica — um `select` de query SQL noutro arquivo viraria prompt.
     id: "interactive-prompt",
-    when: (p) => p.binding.kind === "global" && p.functions.some((f) => PROMPT_FUNCTIONS.has(f)),
+    when: (p) => isCanonicalRenderFile(p.file)
+      && p.binding.kind === "global"
+      && p.functions.some((f) => PROMPT_FUNCTIONS.has(f)),
     audience: "public_interactive",
     trigger: "user_prompt",
-    reason: "saida em qualquer nivel dentro de funcao de prompt: o usuario le e responde",
+    reason: "saida em qualquer nivel dentro de funcao de prompt DO MODULO CANONICO: o usuario le e responde",
   },
   {
+    // Usa `canonicalName` (nome DECLARADO), nao o apelido local: `info as say`
+    // continua sendo a primitiva `info`.
     id: "render-via-canonical-helper",
     when: (p) => (p.binding.kind === "import" || p.binding.kind === "local")
-      && RENDER_PRIMITIVES.has(p.name)
+      && RENDER_PRIMITIVES.has(p.canonicalName)
       && isCanonicalRenderFile(p.binding.declaredIn || ""),
     audience: "public_diagnostic",
     trigger: "sanctioned_channel",
-    reason: "helper de render cuja DECLARACAO resolve no modulo canonico — nome e origem conferidos pelo checker",
+    reason: "helper de render cuja DECLARACAO resolve no modulo canonico — nome canonico e origem conferidos pelo checker",
   },
   {
     id: "render-module-literal-output",
@@ -260,8 +307,43 @@ function calleeInfo(c) {
   return {
     name: c.name.text,
     objeto: ehIdent ? c.expression.text : null,
-    idNode: ehIdent ? c.expression : c.name,
+    // Para `ns.info()` o simbolo a resolver e o MEMBRO (`info`), nao o objeto
+    // namespace. A 1a versao resolvia `c.expression` e por isso um
+    // `import * as cli` devolvia o namespace, nunca a primitiva.
+    idNode: c.name,
+    objectNode: ehIdent ? c.expression : null,
   }
+}
+
+/**
+ * Nome CANONICO do alvo: o nome com que a funcao foi DECLARADA, nao o nome
+ * local do callsite.
+ *
+ * Existe porque a 1a versao filtrava por `SINK_NAMES` usando o nome local — e
+ * `import { info as say }` nunca chegava a ser extraido, ja que `say` nao esta
+ * na lista. Alias arbitrario precisa funcionar: o que define um ponto de saida
+ * e a funcao que ele CHAMA, nao como o arquivo decidiu apelida-la.
+ */
+const nomeSeIdentifier = (n) => (n && ts.isIdentifier(n) ? n.text : null)
+
+/**
+ * Nome ESCRITO na primeira declaracao do simbolo.
+ *
+ * Em `import { info as say }`, `propertyName` e `info` (o nome de origem) e
+ * `name` e `say` (o apelido local) — e o de origem que decide.
+ */
+function nomeDaDeclaracao(sym) {
+  const d = sym.getDeclarations()?.[0]
+  if (!d) return null
+  if (ts.isImportSpecifier(d)) return (d.propertyName ?? d.name).text
+  return nomeSeIdentifier(d.name)
+}
+
+export function canonicalNameOf(checker, idNode) {
+  const raw = checker.getSymbolAtLocation(idNode)
+  if (!raw) return null
+  const sym = unalias(checker, raw)
+  return nomeDaDeclaracao(sym) ?? sym.getName() ?? null
 }
 
 export function analyzeFile(filePath, analyzer = null) {
@@ -270,15 +352,14 @@ export function analyzeFile(filePath, analyzer = null) {
   if (!sf) throw new Error(`arquivo nao esta no programa: ${filePath}`)
   const pontos = []
 
-  const registrar = (node, alvo) => {
-    const binding = alvo.objeto === "console"
-      ? { kind: "global", declaredIn: null }
-      : resolveBinding(a.checker, alvo.idNode, filePath)
+  const registrar = (node, alvo, canonicalName, binding) => {
     const arg0 = node.arguments[0]
     const base = {
       file: norm(filePath),
       line: sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1,
       name: alvo.name,
+      // Nome DECLARADO — e ele que decide o que a chamada e, nao o apelido local.
+      canonicalName,
       callee: alvo.objeto ? `${alvo.objeto}.${alvo.name}` : alvo.name,
       binding,
       ...ancestry(node),
@@ -289,11 +370,29 @@ export function analyzeFile(filePath, analyzer = null) {
     pontos.push({ ...base, ...classifyPoint(base) })
   }
 
-  const visit = (node) => {
-    if (ts.isCallExpression(node)) {
-      const alvo = calleeInfo(node.expression)
-      if (alvo && SINK_NAMES.has(alvo.name)) registrar(node, alvo)
+  /** `console` e global do runtime: nao ha simbolo de projeto a resolver. */
+  const resolverAlvo = (alvo) => {
+    if (alvo.objeto === "console") return { binding: CONSOLE_BINDING, canonicalName: alvo.name }
+    return {
+      binding: resolveBinding(a.checker, alvo.idNode, filePath),
+      canonicalName: canonicalNameOf(a.checker, alvo.idNode) ?? alvo.name,
     }
+  }
+
+  /**
+   * RESOLVE PRIMEIRO, filtra depois. A 1a versao filtrava por `SINK_NAMES` no
+   * nome LOCAL e perdia todo alias arbitrario antes mesmo de resolver.
+   */
+  const descreverChamada = (node) => {
+    const alvo = calleeInfo(node.expression)
+    if (!alvo) return null
+    const r = resolverAlvo(alvo)
+    return SINK_NAMES.has(r.canonicalName) ? { alvo, ...r } : null
+  }
+
+  const visit = (node) => {
+    const ponto = ts.isCallExpression(node) ? descreverChamada(node) : null
+    if (ponto) registrar(node, ponto.alvo, ponto.canonicalName, ponto.binding)
     ts.forEachChild(node, visit)
   }
   visit(sf)
