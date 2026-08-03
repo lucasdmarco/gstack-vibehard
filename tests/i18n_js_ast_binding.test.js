@@ -211,8 +211,8 @@ test("NEGATIVO: funcao `select` HOMONIMA noutro modulo NAO e prompt", async () =
   } finally { cleanupTmp(f.root) }
 })
 
-test("isDebugEnvAccess: reconhece estruturalmente e recusa impostores", async () => {
-  const { isDebugEnvAccess } = await eng()
+test("requiresDebugEnv: exige forma estrutural E polaridade positiva necessaria", async () => {
+  const { requiresDebugEnv } = await eng()
   const ts = (await import("typescript")).default
 
   /** Parseia `if (<cond>) {}` e devolve a expressao da condicao. */
@@ -221,18 +221,31 @@ test("isDebugEnvAccess: reconhece estruturalmente e recusa impostores", async ()
     return sf.statements[0].expression
   }
 
-  const aceitos = ["process.env.GSTACK_DEBUG", "process.env.DEBUG", "process.env.VERBOSE",
-    "!process.env.GSTACK_DEBUG", "process.env.DEBUG || outra"]
-  for (const t of aceitos) assert.equal(isDebugEnvAccess(cond(t)), true, `deveria aceitar: ${t}`)
+  const aceitos = [
+    "process.env.GSTACK_DEBUG",
+    "process.env.DEBUG",
+    "process.env.VERBOSE",
+    "(process.env.GSTACK_DEBUG)",
+    "process.env.GSTACK_DEBUG && outra",       // debug continua NECESSARIO
+    "outra && process.env.GSTACK_DEBUG",
+  ]
+  for (const t of aceitos) assert.equal(requiresDebugEnv(cond(t)), true, `deveria aceitar: ${t}`)
 
   const recusados = [
-    "options.DEBUG",              // propriedade de objeto qualquer
-    "cfg.env.DEBUG",              // `env` que nao vem de `process`
-    "process.argv.DEBUG",         // `process`, mas nao `env`
-    "process.env.OUTRA",          // env var fora da lista aprovada
-    "DEBUG",                      // identificador solto
-    "\"DEBUG\"",                  // string com o texto
-    "isDebugMode",                // nome parecido — o caso que o regex aceitava
+    // Polaridade — a Fatia 1.1 aceitava estes dois, e ambos rodam com debug OFF
+    "!process.env.GSTACK_DEBUG",
+    "process.env.DEBUG || outra",
+    "outra || process.env.DEBUG",
+    "process.env.DEBUG !== \"1\"",  // comparacao negativa
+    "process.env.DEBUG === \"1\"",  // comparacao: nao inferimos semantica do valor
+    // Forma — ja recusados desde a 1.1
+    "options.DEBUG",                 // propriedade de objeto qualquer
+    "cfg.env.DEBUG",                 // `env` que nao vem de `process`
+    "process.argv.DEBUG",            // `process`, mas nao `env`
+    "process.env.OUTRA",             // env var fora da lista aprovada
+    "DEBUG",                         // identificador solto
+    "\"DEBUG\"",                     // string com o texto
+    "isDebugMode",                   // nome parecido — o caso que o regex aceitava
   ]
-  for (const t of recusados) assert.equal(isDebugEnvAccess(cond(t)), false, `deveria recusar: ${t}`)
+  for (const t of recusados) assert.equal(requiresDebugEnv(cond(t)), false, `deveria recusar: ${t}`)
 })
