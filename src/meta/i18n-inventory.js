@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync, statSync, existsSync } from "fs"
 import { join, relative, sep } from "path"
-import { loadJsRegistry } from "./i18n-js-registry-loader.js"
+import { loadJsRegistry, isValidatedRegistry } from "./i18n-js-registry-loader.js"
 import { AUDIENCES, isInScope } from "./i18n-audiences.js"
 
 /**
@@ -467,13 +467,30 @@ function pythonContext(text, line) {
  * contra os entry points reais — um registro que aponta para arquivo inexistente ou
  * para script que deixou de ser runtime é ERRO, não decoração.
  */
-const collectJsPoints = (repoRoot, runtimeScripts, registry = null) => [
+/** Os arquivos JS que o inventário efetivamente varre. */
+const arquivosJsColetados = (repoRoot, runtimeScripts) => [
   ...walkFiles(join(repoRoot, "src"), [".js", ".mjs", ".cjs"]),
   ...walkFiles(join(repoRoot, "templates"), [".js", ".mjs", ".cjs", ".ts", ".tsx"]),
   // mantenedor/CI fica fora da claim — por derivação do grafo, não por lista
   ...walkFiles(join(repoRoot, "scripts"), [".mjs", ".js", ".cjs"])
     .filter((f) => runtimeScripts.has(relative(repoRoot, f).split(sep).pop())),
-].flatMap((f) => classifyJsFile(f, repoRoot, registry))
+]
+
+/**
+ * Devolve os pontos E o conjunto de arquivos VISITADOS.
+ *
+ * O conjunto é registrado explicitamente porque "produziu zero pontos" e "nunca
+ * entrou na coleta" são estados diferentes e indistinguíveis pelo resultado.
+ * Inferir visita a partir dos pontos deixaria passar um `convertedFiles` que o
+ * coletor jamais varre.
+ */
+const collectJsPoints = (repoRoot, runtimeScripts, registry = null) => {
+  const arquivos = arquivosJsColetados(repoRoot, runtimeScripts)
+  return {
+    visitados: new Set(arquivos.map((f) => relative(repoRoot, f).split(sep).join("/"))),
+    pontos: arquivos.flatMap((f) => classifyJsFile(f, repoRoot, registry)),
+  }
+}
 
 const collectPyPoints = (repoRoot) => walkFiles(join(repoRoot, "hooks"), [".py"]).flatMap((f) => {
   const text = readSafe(f)
@@ -504,9 +521,50 @@ const jaClassificado = (p) => Boolean(p.audience) && p.audience !== "unknown"
  */
 export const anchorOf = (p) => `${p.file}|${p.line}|${p.column}`
 
-const overridesPorAncora = (overrides) => new Map(
-  (overrides || []).map((o) => [`${o.file}|${o.line}|${o.column}`, o]),
+const porAncora = (lista) => new Map(
+  (lista || []).map((o) => [`${o.file}|${o.line}|${o.column}`, o]),
 )
+
+const overridesPorAncora = porAncora
+
+/**
+ * Marca de decisão aplicada a partir de veredito com PROCEDÊNCIA.
+ *
+ * A procedência é verificada UMA VEZ, no veredito inteiro
+ * (`isValidatedRegistry`), antes de qualquer aplicação — o que cobre `byFile`,
+ * `overrides` e `provenanceDecisions` de uma vez só. Duas versões anteriores
+ * erraram aqui: a primeira aceitava qualquer objeto na propriedade; a segunda
+ * marcava só as decisões de provenance e deixava os OVERRIDES passarem pela
+ * mesma porta.
+ *
+ * Este símbolo sobrevive apenas para `unresolvedProvenance`, que é exportada e
+ * pode receber pontos montados fora do pipeline — nesse caminho não há veredito
+ * a inspecionar, e a marca no ponto é o que resta.
+ */
+const DECISAO_VALIDADA = Symbol("i18n.provenanceDecision.validated")
+
+export const decisaoValidada = (p) => Boolean(p?.provenanceDecision?.[DECISAO_VALIDADA])
+
+/**
+ * Anexa a decisão ao ponto, PRESERVANDO a provenance original.
+ *
+ * Sobrescrever `provenance.resolved` para `true` apagaria a evidência de que o
+ * argumento é interpolado — e a decisão passaria a parecer análise automática.
+ * O dado bruto continua dizendo "não resolvido"; a decisão fica ao lado, com
+ * quem decidiu, por quê e com qual estratégia.
+ */
+const comDecisaoProvenance = (p, d) => {
+  if (!d) return p
+  const decisao = {
+    strategy: d.strategy,
+    interpolations: Array.isArray(d.interpolations) ? [...d.interpolations] : d.interpolations,
+    reason: d.reason,
+    owner: d.owner,
+    evidence: d.evidence,
+  }
+  Object.defineProperty(decisao, DECISAO_VALIDADA, { value: true, enumerable: false })
+  return { ...p, provenanceDecision: decisao }
+}
 
 /**
  * Override humano tem a última palavra — mas SÓ no callsite exato que ele
@@ -526,9 +584,11 @@ const semOverride = (p, registry) => {
   return finalize(p, audienceBySink(p.sink) ?? "unknown", p.trigger ?? null)
 }
 
-function enrichPoint(p, registry, overrides = null) {
-  const ov = overrides?.get(anchorOf(p))
-  return ov ? aplicarOverride(p, ov) : semOverride(p, registry)
+function enrichPoint(p, registry, overrides = null, decisoes = null) {
+  const ancora = anchorOf(p)
+  const ov = overrides?.get(ancora)
+  const base = ov ? aplicarOverride(p, ov) : semOverride(p, registry)
+  return comDecisaoProvenance(base, decisoes?.get(ancora))
 }
 
 /**
@@ -559,11 +619,26 @@ const provenanceValida = (v) => Boolean(v) && typeof v === "object" && typeof v.
  * bloquearia todo arquivo ainda não convertido, que é o oposto da convivência
  * arquivo a arquivo.
  */
+/**
+ * Decisão humana VALIDADA resolve a pendência — e só ela. Checar a PRESENÇA da
+ * propriedade aceitava qualquer objeto forjado; a marca interna prova que ela
+ * veio do loader, que conferiu âncora, hash e identificadores.
+ */
+const pendenciaPorDecisao = (p) => {
+  if (decisaoValidada(p)) return { resolvido: true }
+  return p.provenanceDecision ? { motivo: "unvalidated_decision" } : null
+}
+
+const pendenciaPorProvenance = (p) => {
+  if (provenanceValida(p.provenance)) return p.provenance.resolved ? null : "interpolated"
+  return p.source === "ast_registry" ? "missing_provenance" : null
+}
+
 const pendenciaDe = (p) => {
   if (p.classification !== "in_scope") return null
-  if (provenanceValida(p.provenance)) return p.provenance.resolved ? null : "interpolated"
-  if (p.source === "ast_registry") return "missing_provenance"
-  return null
+  const daDecisao = pendenciaPorDecisao(p)
+  if (daDecisao) return daDecisao.motivo ?? null
+  return pendenciaPorProvenance(p)
 }
 
 export function unresolvedProvenance(inventory) {
@@ -605,6 +680,53 @@ export function unresolvedProvenance(inventory) {
  *    houve medição. `unknown: 0` seria lido como "nada a classificar", que é a
  *    leitura oposta à verdade.
  */
+/**
+ * O que foi DECLARADO precisa ter sido CONSUMIDO.
+ *
+ * Dois vazamentos silenciosos que isto fecha:
+ *
+ *  - **Arquivo convertido que o coletor não varre.** `convertedFiles` pode listar
+ *    um caminho fora de `src/`, `templates/` e dos scripts alcançáveis. Ele passa
+ *    em todas as validações do loader — existe, hash confere — e simplesmente
+ *    nunca é lido. O registry anuncia cobertura que não acontece.
+ *
+ *  - **Decisão de provenance que nunca casa.** Se o arquivo dela não é
+ *    coletado, a decisão é válida, declarada... e inerte. O gate via
+ *    `provenance.ok: true` porque a pendência também não foi coletada — verde
+ *    por ausência dos dois lados.
+ *
+ * Bloqueia como `corrupt`: é incoerência entre artefato e pipeline, não
+ * defasagem de conteúdo.
+ */
+const incoerencia = (reason, details) => ({ ok: false, status: "corrupt", reason, details })
+
+/** Declarado × aplicado, para cada tipo de decisão humana. */
+const divergenciaAplicacao = (rotulo, declaradas, aplicadas) => (declaradas === aplicadas
+  ? null
+  : incoerencia(
+    `${rotulo} declarad${rotulo.startsWith("overrides") ? "os" : "as"} (${declaradas}) divergem d${rotulo.startsWith("overrides") ? "os" : "as"} aplicad${rotulo.startsWith("overrides") ? "os" : "as"} (${aplicadas}) — decisão válida que nunca casa é inerte`,
+    { declared: declaradas, applied: aplicadas },
+  ))
+
+function auditarConsumo(veredito, pontos, visitados) {
+  // VISITA, não inferência a partir dos pontos: um arquivo com zero entradas
+  // pode ter sido varrido e não ter saída, ou nunca ter entrado na coleta. Os
+  // dois produzem "zero pontos" e só o conjunto de visitados os separa.
+  const naoVisitados = veredito.convertedFiles.filter((f) => !visitados.has(f))
+  if (naoVisitados.length > 0) {
+    return incoerencia(
+      `${naoVisitados.length} arquivo(s) em convertedFiles não são varridos pelo inventário — o registry anuncia cobertura que não acontece`,
+      { files: naoVisitados },
+    )
+  }
+
+  return divergenciaAplicacao("decisões de provenance", veredito.provenanceDecisions.length,
+    pontos.filter((p) => decisaoValidada(p)).length)
+    ?? divergenciaAplicacao("overrides", veredito.overrides.length,
+      pontos.filter((p) => p.override != null).length)
+    ?? { ok: true }
+}
+
 const inventarioBloqueado = (veredito, runtimeScripts) => ({
   schemaVersion: I18N_INVENTORY_SCHEMA,
   jsRegistry: { ok: false, status: veredito.status, reason: veredito.reason, details: veredito.details },
@@ -621,14 +743,42 @@ const inventarioBloqueado = (veredito, runtimeScripts) => ({
   points: [],
 })
 
+/**
+ * Sem procedência do loader, nada é aplicado.
+ *
+ * `jsRegistry` existe para injetar vereditos em teste, e era o buraco: um objeto
+ * `{ok:true}` fabricado, com override ancorado num callsite real, reclassificava
+ * a mensagem e liberava o gate sem passar por validação alguma. Agora a
+ * procedência é exigida ANTES de olhar qualquer conteúdo — quem quiser exercitar
+ * caminho hostil precisa escrever os arquivos e passar pelo loader de verdade.
+ */
+const semProcedencia = {
+  ok: false, status: "corrupt",
+  reason: "veredito de registry sem procedência de `loadJsRegistry` — overrides e decisões de provenance só se aplicam a partir do loader validado",
+  details: {},
+}
+
+/** Veredito utilizável, ou a razão para bloquear. */
+const vereditoDeEntrada = (repoRoot, jsRegistry) => {
+  const v = jsRegistry ?? loadJsRegistry({ repoRoot })
+  if (!v.ok) return { bloqueio: v }
+  return isValidatedRegistry(v) ? { veredito: v } : { bloqueio: semProcedencia }
+}
+
 export function buildInventory({ repoRoot = process.cwd(), registry = {}, jsRegistry = null } = {}) {
   const runtimeScripts = new Set(runtimeReachableScripts(repoRoot))
-  const veredito = jsRegistry ?? loadJsRegistry({ repoRoot })
-  if (!veredito.ok) return inventarioBloqueado(veredito, runtimeScripts)
+  const entrada = vereditoDeEntrada(repoRoot, jsRegistry)
+  if (entrada.bloqueio) return inventarioBloqueado(entrada.bloqueio, runtimeScripts)
+  const veredito = entrada.veredito
 
-  const pontos = [...collectJsPoints(repoRoot, runtimeScripts, veredito), ...collectPyPoints(repoRoot)]
+  const js = collectJsPoints(repoRoot, runtimeScripts, veredito)
+  const pontos = [...js.pontos, ...collectPyPoints(repoRoot)]
   const overrides = overridesPorAncora(veredito.overrides)
-  const enriquecidos = pontos.map((p) => enrichPoint(p, registry, overrides))
+  const decisoes = porAncora(veredito.provenanceDecisions)
+  const enriquecidos = pontos.map((p) => enrichPoint(p, registry, overrides, decisoes))
+
+  const consumo = auditarConsumo(veredito, enriquecidos, js.visitados)
+  if (!consumo.ok) return inventarioBloqueado(consumo, runtimeScripts)
 
   const porAudiencia = {}
   for (const p of enriquecidos) porAudiencia[p.audience] = (porAudiencia[p.audience] || 0) + 1
@@ -643,6 +793,7 @@ export function buildInventory({ repoRoot = process.cwd(), registry = {}, jsRegi
       // Conta pela PROPRIEDADE, não pelo texto do trigger: uma regra AST que um
       // dia se chamasse "override" inflaria a contagem em silêncio.
       overridesApplied: enriquecidos.filter((p) => p.override != null).length,
+      provenanceDecisionsApplied: enriquecidos.filter((p) => p.provenanceDecision != null).length,
     },
     blocked: false,
     provenance: unresolvedProvenance({ points: enriquecidos }),
