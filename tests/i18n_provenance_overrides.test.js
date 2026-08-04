@@ -241,6 +241,162 @@ test("override reclassifica o `classification` junto com a audiência", async ()
   } finally { cleanupTmp(root) }
 })
 
+// ── Fatia 4.1: o gate PRECISA consumir o veredito ────────────────────────────
+
+/**
+ * A Fatia 4 criou `unresolvedProvenance`, expôs em `inventory.provenance` e NÃO
+ * ligou ao gate: veredito anunciado e inerte, o mesmo defeito que este programa
+ * já corrigiu noutros lugares. Com `unknown: 0` o gate aprovava, mesmo com
+ * provenance pendente.
+ */
+test("P0: `unknown:0` com provenance PENDENTE reprova o gate", async () => {
+  const { phase1Gate } = await imp()
+  const g = phase1Gate({
+    unknown: 0,
+    jsRegistry: { ok: true, status: "fresh" },
+    provenance: { ok: false, count: 3, reason: "3 ponto(s) in_scope com origem não resolvida" },
+  })
+  assert.equal(g.ok, false, "zerar unknown não basta para liberar a Fase 1")
+  assert.equal(g.provenanceOk, false)
+  assert.equal(g.unresolvedProvenance, 3)
+  assert.match(g.reason, /origem/, "o motivo precisa citar a provenance, não só unknown")
+})
+
+test("CONTROLE POSITIVO: `unknown:0` com provenance RESOLVIDA libera o gate", async () => {
+  const { phase1Gate } = await imp()
+  const g = phase1Gate({
+    unknown: 0, jsRegistry: { ok: true, status: "fresh" }, provenance: { ok: true, count: 0 },
+  })
+  assert.equal(g.ok, true, "o caminho para liberar existe — não é inalcançável por construção")
+  assert.equal(g.provenanceOk, true)
+  assert.equal(g.reason, null)
+})
+
+test("as DUAS razões aparecem juntas quando unknown E provenance falham", async () => {
+  const { phase1Gate } = await imp()
+  const g = phase1Gate({
+    unknown: 7, jsRegistry: { ok: true, status: "fresh" },
+    provenance: { ok: false, count: 2, reason: "2 ponto(s) sem origem" },
+  })
+  assert.equal(g.ok, false)
+  assert.match(g.reason, /7 ponto/, "corrigir uma sem saber da outra seria trabalho repetido")
+  assert.match(g.reason, /2 ponto/)
+})
+
+test("gate sem campo `provenance` (inventário legado) não quebra", async () => {
+  const { phase1Gate } = await imp()
+  const g = phase1Gate({ unknown: 0, jsRegistry: { ok: true, status: "fresh" } })
+  assert.equal(g.ok, true)
+  assert.equal(g.provenanceOk, true)
+})
+
+// ── Fatia 4.1: provenance AST ausente falha FECHADA ──────────────────────────
+
+test("P1: ponto AST in_scope SEM provenance reprova (fail-closed)", async () => {
+  const { unresolvedProvenance } = await imp()
+  const r = unresolvedProvenance({
+    points: [{ file: "a.js", line: 1, column: 1, classification: "in_scope", source: "ast_registry", provenance: null }],
+  })
+  assert.equal(r.ok, false, "o gerador emite provenance para toda entrada — ausência é perda de dado")
+  assert.equal(r.missingProvenance, 1)
+  assert.equal(r.points[0].reason, "missing_provenance")
+  assert.match(r.reason, /regenerar/)
+})
+
+test("P1: provenance MALFORMADA em ponto AST reprova", async () => {
+  const { unresolvedProvenance } = await imp()
+  const malformadas = [
+    { resolved: "sim" },   // não é booleano
+    {},                    // sem `resolved`
+    "resolvida",           // não é objeto
+    42,
+  ]
+  for (const prov of malformadas) {
+    const r = unresolvedProvenance({
+      points: [{ file: "a.js", line: 1, column: 1, classification: "in_scope", source: "ast_registry", provenance: prov }],
+    })
+    assert.equal(r.ok, false, `provenance ${JSON.stringify(prov)} não pode passar como resolvida`)
+    assert.equal(r.points[0].reason, "missing_provenance")
+  }
+})
+
+test("ponto LEGADO sem provenance continua permitido (convivência arquivo a arquivo)", async () => {
+  const { unresolvedProvenance } = await imp()
+  const r = unresolvedProvenance({
+    points: [
+      { file: "b.js", line: 1, classification: "in_scope" },
+      { file: "c.js", line: 2, classification: "in_scope", provenance: null },
+    ],
+  })
+  assert.equal(r.ok, true, "exigir do legado bloquearia todo arquivo ainda não convertido")
+  assert.equal(r.missingProvenance, 0)
+})
+
+test("ponto out_of_scope NÃO bloqueia, nem sendo AST sem provenance", async () => {
+  const { unresolvedProvenance } = await imp()
+  const r = unresolvedProvenance({
+    points: [
+      { file: "a.js", line: 1, column: 1, classification: "out_of_scope", source: "ast_registry", provenance: null },
+      { file: "a.js", line: 2, column: 1, classification: "out_of_scope", source: "ast_registry", provenance: { resolved: false, ids: ["x"] } },
+    ],
+  })
+  assert.equal(r.ok, true, "fora da claim, a origem do argumento não é usada por ninguém")
+  assert.equal(r.count, 0)
+})
+
+// ── Fatia 4.1: phaseStatus relata a pendência ────────────────────────────────
+
+test("phaseStatus relata a pendência de provenance, não só `unknown`", async () => {
+  const { phaseStatus } = await imp()
+  const s = phaseStatus({
+    unknown: 0, jsRegistry: { ok: true, status: "fresh" },
+    provenance: { ok: false, count: 4, reason: "4 ponto(s) in_scope com origem não resolvida" },
+  })
+  assert.equal(s.phaseStatus, "partial", "gate vermelho não pode virar `complete`")
+  assert.equal(s.provenanceOk, false)
+  assert.equal(s.unresolvedProvenance, 4)
+  assert.match(s.reason, /origem/,
+    "dizer só '0 pontos sem audiência' ao lado de gate vermelho seria contradição sem causa visível")
+})
+
+test("phaseStatus fica `complete` só com unknown zerado E provenance resolvida", async () => {
+  const { phaseStatus } = await imp()
+  const s = phaseStatus({
+    unknown: 0, jsRegistry: { ok: true, status: "fresh" }, provenance: { ok: true, count: 0 },
+  })
+  assert.equal(s.phaseStatus, "complete")
+  assert.equal(s.nextPhase, "2")
+  assert.match(s.reason, /provenance resolvida/)
+})
+
+// ── Fatia 4.1: contagem por propriedade, não por texto ───────────────────────
+
+test("P2: `overridesApplied` conta pela PROPRIEDADE `override`, não pelo texto do trigger", async () => {
+  const { buildInventory } = await imp()
+  const fonte = `export function info(m) { console.log(m) }\n`
+  const { root, hash, reg } = await projetoConvertido(fonte)
+  try {
+    const alvo = reg.files["src/cli/index.js"].entries[0]
+    const { root: root2 } = await projetoConvertido(fonte, [
+      overrideBase(hash, { line: alvo.line, column: alvo.column }),
+    ])
+    try {
+      const inv = buildInventory({ repoRoot: root2 })
+      const comPropriedade = inv.points.filter((p) => p.override != null).length
+      assert.equal(inv.jsRegistry.overridesApplied, comPropriedade)
+      assert.equal(comPropriedade, 1)
+
+      // Uma regra AST que um dia se chamasse "override" inflaria a contagem
+      // textual sem que nenhuma decisão humana existisse.
+      const impostor = [...inv.points, { file: "x.js", line: 1, column: 1, trigger: "override" }]
+      assert.equal(impostor.filter((p) => p.override != null).length, 1,
+        "contar por propriedade ignora o homônimo")
+      assert.equal(impostor.filter((p) => p.trigger === "override").length, 2,
+        "contar por texto o incluiria — é exatamente a colisão a evitar")
+    } finally { cleanupTmp(root2) }
+  } finally { cleanupTmp(root) }
+})
+
 // ── Estado oficial ───────────────────────────────────────────────────────────
 
 test("INVENTÁRIO OFICIAL: 125 unknown, 1924 total, convertedFiles vazio", async () => {
