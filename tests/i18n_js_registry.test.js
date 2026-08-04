@@ -499,12 +499,23 @@ test("determinismo e forma valem tambem sobre arquivos REAIS do repositorio", as
 
 // ── Fronteira com a Fatia 3 ──────────────────────────────────────────────────
 
-test("FRONTEIRA: o inventario oficial ainda NAO consome o registry", async () => {
-  // A Fatia 2 gera; quem consome e a Fatia 3. Se este teste comecar a falhar
-  // sem que a Fatia 3 tenha sido feita, alguem ligou o registry adiantado.
+/**
+ * Este teste NASCEU invertido na Fatia 2: exigia que o inventário NÃO consumisse
+ * o registry, para impedir que alguém ligasse o consumo antes da hora. Ele
+ * cumpriu a função e falhou exatamente quando devia — na Fatia 3, que é o
+ * consumo AUTORIZADO. Agora guarda o outro lado: o consumo existe e é
+ * fail-closed, sem arrastar TypeScript para o runtime.
+ */
+test("FRONTEIRA: o inventario oficial CONSOME o registry (Fatia 3), sem TypeScript", async () => {
   const inventario = readFileSync(path.join(repoRoot, "src", "meta", "i18n-inventory.js"), "utf8")
-  assert.ok(!inventario.includes("i18n-js-registry"),
-    "consumo do registry pertence a Fatia 3")
+  assert.ok(inventario.includes("i18n-js-registry-loader"),
+    "a Fatia 3 ligou o consumo — se sumir, o inventario voltou ao regex sem aviso")
+  assert.ok(!/from\s+["']typescript["']/.test(inventario),
+    "o runtime nunca pode depender do compilador TypeScript")
+
+  const loader = readFileSync(path.join(repoRoot, "src", "meta", "i18n-js-registry-loader.js"), "utf8")
+  assert.ok(!/from\s+["']typescript["']/.test(loader))
+  assert.ok(!loader.includes("i18n-js-ast"), "o engine e build-time")
 })
 
 /**

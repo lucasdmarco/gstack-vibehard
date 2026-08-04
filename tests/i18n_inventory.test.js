@@ -99,7 +99,26 @@ test("o gate da Fase 1 BLOQUEIA enquanto houver unknown", async () => {
 
 test("CONTROLE POSITIVO: inventário sem unknown libera o gate (o caminho existe)", async () => {
   const { phase1Gate } = await imp()
-  assert.deepEqual(phase1Gate({ unknown: 0 }), { ok: true, unknown: 0, reason: null })
+  // Contrato COMPLETO, não subconjunto: a Fatia 3 acrescentou `blocked` e
+  // `registryStatus`, e o gate agora reprova por registry inválido ANTES de
+  // olhar contagem. Afrouxar para `assert.partialDeepStrictEqual` deixaria o
+  // caminho bloqueado passar despercebido aqui.
+  assert.deepEqual(phase1Gate({ unknown: 0, jsRegistry: { ok: true, status: "fresh" } }), {
+    ok: true, blocked: false, registryStatus: "fresh", unknown: 0, reason: null,
+  })
+})
+
+test("CONTROLE NEGATIVO: gate BLOQUEIA por registry inválido, sem olhar contagem", async () => {
+  const { phase1Gate } = await imp()
+  const g = phase1Gate({
+    blocked: true,
+    jsRegistry: { ok: false, status: "stale", reason: "hash divergente", details: { files: [] } },
+    unknown: 0,
+  })
+  assert.equal(g.ok, false, "`unknown: 0` não pode aprovar inventário não medido")
+  assert.equal(g.blocked, true)
+  assert.equal(g.registryStatus, "stale")
+  assert.equal(g.unknown, null, "`null` distingue NÃO MEDIDO de ZERO")
 })
 
 test("todo ponto carrega file/line/sink/audience/owner/classification (registro auditável)", async () => {

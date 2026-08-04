@@ -1,5 +1,7 @@
 import { readFileSync, readdirSync, statSync, existsSync } from "fs"
 import { join, relative, sep } from "path"
+import { loadJsRegistry } from "./i18n-js-registry-loader.js"
+import { AUDIENCES, isInScope } from "./i18n-audiences.js"
 
 /**
  * Inventário de superfície de mensagem (PRD48 P2.1, Fase 1 da migração English-first).
@@ -28,27 +30,10 @@ import { join, relative, sep } from "path"
  */
 export const I18N_INVENTORY_SCHEMA = "gstack.i18n-inventory.v1"
 
-/** Audiências possíveis. `unknown` bloqueia; ausência de classificação não existe. */
-export const AUDIENCES = Object.freeze([
-  "public_diagnostic",       // aparece normalmente ou após falha — entra, deve ser inglês
-  "public_security_decision", // bloqueio/approval/alerta — entra, deve ser inglês
-  // `machine_protocol` EXIGE consumidor/parser real, contrato e teste. Sem os três, a
-  // categoria vira depósito de "casos sem idioma" e some com o problema em vez de
-  // resolvê-lo — por isso duas classes foram extraídas dela:
-  "machine_protocol",        // contrato consumido por parser real — inglês estável
-  "terminal_control",        // byte de controle do terminal (BEL, ANSI) — não há idioma
-  "test_observability",      // marcador consumido por teste, sob ativação explícita
-  "internal_debug",          // diagnóstico interno explicitamente ativado — fora da claim
-  "external_passthrough",    // bytes de subprocesso externo, encaminhados sem transformação
-  "generated_app_copy",      // texto do app do usuário — segue o idioma do projeto
-  "generated_dev_surface",   // mensagem técnica no projeto gerado — entra, inglês
-  "user_content",            // conteúdo do usuário — nunca traduzir
-  "unknown",                 // audiência indeterminada — BLOQUEIA a Fase 1
-])
-
-const IN_SCOPE_AUDIENCES = new Set(["public_diagnostic", "public_security_decision", "generated_dev_surface"])
-
-export const isInScope = (audience) => IN_SCOPE_AUDIENCES.has(audience)
+// O vocabulário mudou para `i18n-audiences.js` porque o loader do registry
+// também precisa dele, e importá-lo daqui fecharia um ciclo ESM. Re-exportado
+// para não quebrar nenhum consumidor existente.
+export { AUDIENCES, isInScope }
 
 // ── Grafo de execução ────────────────────────────────────────────────────────────
 // Um script é RUNTIME quando o código publicado o alcança. Fonte: referências a
@@ -200,13 +185,35 @@ function scanFile(absPath, repoRoot, sinks) {
 }
 
 /** Aplica a classificação por canal aos pontos JS, com `emitsJson` medido na linha. */
-function classifyJsFile(absPath, repoRoot) {
+function classifyJsFile(absPath, repoRoot, registry = null) {
+  const rel = relative(repoRoot, absPath).split(sep).join("/")
+  const doRegistry = registry?.byFile?.get(rel)
+  if (doRegistry) return pontosDoRegistry(rel, doRegistry)
+
   const text = readSafe(absPath)
   return scanFile(absPath, repoRoot, SINKS_JS).map((p) => ({
     ...p,
     ...classifyJsPoint({ sink: p.sink, emitsJson: emitsJsonAt(text, p.line) }),
   }))
 }
+
+/**
+ * Converte entradas do registry AST em pontos do inventário.
+ *
+ * Convivência ARQUIVO A ARQUIVO: só quem está em `convertedFiles` chega aqui. O
+ * resto continua no extrator legado por DECLARAÇÃO — um arquivo ausente do
+ * registry não é erro, é "ainda não migrado". O que é erro (e bloqueia) é o
+ * registry inteiro estar ausente, corrompido ou defasado.
+ */
+const pontosDoRegistry = (rel, entries) => entries.map((e) => ({
+  file: rel,
+  line: e.line,
+  column: e.column,
+  sink: e.sink ? `process.${e.sink}.write` : e.calleePath || e.callee,
+  audience: e.audience,
+  trigger: e.rule || null,
+  source: "ast_registry",
+}))
 
 // ── Classificação por canal (NUNCA por conteúdo da frase) ────────────────────────
 /**
@@ -446,13 +453,13 @@ function pythonContext(text, line) {
  * contra os entry points reais — um registro que aponta para arquivo inexistente ou
  * para script que deixou de ser runtime é ERRO, não decoração.
  */
-const collectJsPoints = (repoRoot, runtimeScripts) => [
+const collectJsPoints = (repoRoot, runtimeScripts, registry = null) => [
   ...walkFiles(join(repoRoot, "src"), [".js", ".mjs", ".cjs"]),
   ...walkFiles(join(repoRoot, "templates"), [".js", ".mjs", ".cjs", ".ts", ".tsx"]),
   // mantenedor/CI fica fora da claim — por derivação do grafo, não por lista
   ...walkFiles(join(repoRoot, "scripts"), [".mjs", ".js", ".cjs"])
     .filter((f) => runtimeScripts.has(relative(repoRoot, f).split(sep).pop())),
-].flatMap((f) => classifyJsFile(f, repoRoot))
+].flatMap((f) => classifyJsFile(f, repoRoot, registry))
 
 const collectPyPoints = (repoRoot) => walkFiles(join(repoRoot, "hooks"), [".py"]).flatMap((f) => {
   const text = readSafe(f)
@@ -479,9 +486,43 @@ function enrichPoint(p, registry) {
   return finalize(p, audienceBySink(p.sink) || "unknown", p.trigger || null)
 }
 
-export function buildInventory({ repoRoot = process.cwd(), registry = {} } = {}) {
+/**
+ * Inventário BLOQUEADO por registry inválido.
+ *
+ * Devolve a MESMA forma, com `points: []` e contagens `null`, mais
+ * `jsRegistry.ok:false`. Três decisões deliberadas:
+ *
+ *  - **Não lança.** Exceção com stack seria indistinguível de bug e perderia a
+ *    razão estruturada. O consumidor recebe o motivo e decide.
+ *  - **Não devolve pontos do regex.** Entregar o inventário legado seria o
+ *    fallback silencioso que esta fatia existe para impedir: a classificação
+ *    antiga voltaria a valer sobre código novo, e o número pareceria saudável.
+ *  - **Contagens `null`, nunca `0`.** Zero é resultado de medição; aqui não
+ *    houve medição. `unknown: 0` seria lido como "nada a classificar", que é a
+ *    leitura oposta à verdade.
+ */
+const inventarioBloqueado = (veredito, runtimeScripts) => ({
+  schemaVersion: I18N_INVENTORY_SCHEMA,
+  jsRegistry: { ok: false, status: veredito.status, reason: veredito.reason, details: veredito.details },
+  blocked: true,
+  // `null`, NUNCA `0`. Zero é um resultado de medição; aqui não houve medição, e
+  // `unknown: 0` num inventário bloqueado seria lido como "nada a classificar" —
+  // exatamente a leitura oposta à verdade. Consumidor que somar ou comparar
+  // recebe `null` e quebra alto, em vez de propagar um número inventado.
+  total: null,
+  inScope: null,
+  unknown: null,
+  byAudience: null,
+  runtimeScripts: [...runtimeScripts],
+  points: [],
+})
+
+export function buildInventory({ repoRoot = process.cwd(), registry = {}, jsRegistry = null } = {}) {
   const runtimeScripts = new Set(runtimeReachableScripts(repoRoot))
-  const pontos = [...collectJsPoints(repoRoot, runtimeScripts), ...collectPyPoints(repoRoot)]
+  const veredito = jsRegistry ?? loadJsRegistry({ repoRoot })
+  if (!veredito.ok) return inventarioBloqueado(veredito, runtimeScripts)
+
+  const pontos = [...collectJsPoints(repoRoot, runtimeScripts, veredito), ...collectPyPoints(repoRoot)]
   const enriquecidos = pontos.map((p) => enrichPoint(p, registry))
 
   const porAudiencia = {}
@@ -489,6 +530,13 @@ export function buildInventory({ repoRoot = process.cwd(), registry = {} } = {})
 
   return {
     schemaVersion: I18N_INVENTORY_SCHEMA,
+    jsRegistry: {
+      ok: true,
+      status: veredito.status,
+      convertedFiles: veredito.convertedFiles,
+      overrides: veredito.overrides.length,
+    },
+    blocked: false,
     total: enriquecidos.length,
     inScope: enriquecidos.filter((p) => p.classification === "in_scope").length,
     unknown: enriquecidos.filter((p) => p.audience === "unknown").length,
@@ -513,10 +561,31 @@ export function buildInventory({ repoRoot = process.cwd(), registry = {} } = {})
  */
 export function phaseStatus(inventory) {
   const gate = phase1Gate(inventory)
+
+  // Registry inválido NÃO é "Fase 1A com N pendências": é ausência de medição.
+  // A versão anterior lia `inventory.unknown` direto e anunciava "0 ponto(s) sem
+  // audiência" para um inventário que nunca foi computado.
+  if (gate.blocked) {
+    return {
+      schemaVersion: I18N_INVENTORY_SCHEMA,
+      phase: "1B",
+      phaseStatus: "blocked",
+      blocked: true,
+      registryStatus: gate.registryStatus,
+      unknown: null,
+      rcBlocked: true,
+      englishFirstClaimAllowed: false,
+      nextPhase: "1B",
+      reason: gate.reason,
+    }
+  }
+
   return {
     schemaVersion: I18N_INVENTORY_SCHEMA,
     phase: gate.ok ? "1" : "1A",
     phaseStatus: gate.ok ? "complete" : "partial",
+    blocked: false,
+    registryStatus: gate.registryStatus,
     unknown: inventory.unknown,
     rcBlocked: true,
     englishFirstClaimAllowed: false,
@@ -527,14 +596,35 @@ export function phaseStatus(inventory) {
   }
 }
 
+const estaBloqueado = (inv) => inv.blocked === true || inv.jsRegistry?.ok === false
+
+const gateBloqueado = (r) => ({
+  ok: false,
+  blocked: true,
+  registryStatus: r.status ?? "unknown",
+  unknown: null,
+  reason: `registry de saída JS ${r.status ?? "inválido"}: ${r.reason ?? "sem motivo declarado"}`,
+  details: r.details ?? {},
+})
+
+const gateMedido = (inv) => ({
+  ok: inv.unknown === 0,
+  blocked: false,
+  registryStatus: inv.jsRegistry?.status ?? "fresh",
+  unknown: inv.unknown,
+  reason: inv.unknown === 0
+    ? null
+    : `${inv.unknown} ponto(s) de saída sem audiência determinada — classificar antes de migrar`,
+})
+
+/**
+ * ORDEM IMPORTA. Num inventário bloqueado `unknown` é `null` — não medido. A
+ * checagem de bloqueio vem PRIMEIRO para que o gate nunca dependa de contagem
+ * nesse caminho: se um dia alguém trocar `null` por `0`, o gate continua
+ * reprovando em vez de aprovar um inventário que nunca foi computado.
+ */
 export function phase1Gate(inventory) {
-  return {
-    ok: inventory.unknown === 0,
-    unknown: inventory.unknown,
-    reason: inventory.unknown === 0
-      ? null
-      : `${inventory.unknown} ponto(s) de saída sem audiência determinada — classificar antes de migrar`,
-  }
+  return estaBloqueado(inventory) ? gateBloqueado(inventory.jsRegistry ?? {}) : gateMedido(inventory)
 }
 
 /**
