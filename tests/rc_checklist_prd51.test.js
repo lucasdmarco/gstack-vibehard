@@ -152,11 +152,46 @@ test("P0.NODE-SUPPORT-GATE-INVALID está registrado com classificação e opçõ
   })
 
   const ids = item.decisionOptions.map((o) => o.id)
-  assert.deepEqual(ids, ["A", "B"])
-  assert.equal(item.decisionOptions.find((o) => o.id === "A").recommended, true)
+  assert.deepEqual(ids, ["C", "A", "B"], "C encabeça: é a recomendada")
   for (const o of item.decisionOptions) {
     assert.ok(o.summary && o.requires, `opção ${o.id} declara o que exige`)
   }
+
+  // Exatamente UMA recomendada, e é a que exige evidência antes de decidir.
+  const recomendadas = item.decisionOptions.filter((o) => o.recommended === true)
+  assert.deepEqual(recomendadas.map((o) => o.id), ["C"])
+
+  const c = item.decisionOptions.find((o) => o.id === "C")
+  assert.equal(c.decision_status, "evidence_required")
+  assert.equal(c.current_engines, "unchanged")
+  assert.equal(c.node22_status, "recommended_runtime")
+  assert.equal(c.node18_20_status, "compatibility_unproven")
+
+  // A continua DISPONÍVEL — rebaixar não é remover.
+  assert.equal(item.decisionOptions.find((o) => o.id === "A").recommended, false)
+})
+
+/**
+ * O erro que produziu a primeira versão deste registro: medi a SUÍTE e
+ * recomendei elevar `engines`, que é afirmação sobre o RUNTIME. As três claims
+ * existem para que essa confusão não caiba mais no dado.
+ */
+test("as três claims do bloqueante são registradas SEPARADAMENTE", async () => {
+  const { PRD51_RC_ITEMS } = await imp()
+  const item = PRD51_RC_ITEMS.find((i) => i.id === "P0.NODE-SUPPORT-GATE-INVALID")
+
+  assert.deepEqual(item.claims, {
+    runtime_compatibility: "unproven",
+    suite_compatibility: "failing",
+    safe_support: "undecided",
+  })
+
+  // A única claim MEDIDA é a da suíte; a do runtime não pode se declarar provada
+  // por varredura estática.
+  assert.notEqual(item.claims.runtime_compatibility, "proved")
+  assert.match(item.evidence, /varredura est[áa]tica n[ãa]o [ée] execu[çc][ãa]o/i,
+    "a evidência precisa declarar o próprio limite")
+  assert.match(item.impact, /N[ÃA]O sustenta conclus[ãa]o sobre o runtime/i)
 
   // A evidência precisa carregar os números medidos, não uma impressão.
   for (const numero of ["208", "352", "351", "74"]) {
