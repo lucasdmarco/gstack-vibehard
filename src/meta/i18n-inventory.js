@@ -205,15 +205,29 @@ function classifyJsFile(absPath, repoRoot, registry = null) {
  * registry não é erro, é "ainda não migrado". O que é erro (e bloqueia) é o
  * registry inteiro estar ausente, corrompido ou defasado.
  */
-const pontosDoRegistry = (rel, entries) => entries.map((e) => ({
+/** Rótulo do sink: escrita direta em stream, ou o caminho do callee. */
+const sinkDaEntrada = (e) => (e.sink ? `process.${e.sink}.write` : (e.calleePath ?? e.callee ?? null))
+
+/**
+ * A âncora é `file+line+column` — só `line` não identifica um callsite, porque
+ * duas chamadas cabem na mesma linha. `calleePath`, `bindingOrigin` e
+ * `provenance` são preservados porque são a EVIDÊNCIA da classificação: sem
+ * eles, auditar um ponto exigiria regerar o registry inteiro.
+ */
+const pontoDoRegistry = (rel, e) => ({
   file: rel,
   line: e.line,
   column: e.column,
-  sink: e.sink ? `process.${e.sink}.write` : e.calleePath || e.callee,
+  sink: sinkDaEntrada(e),
+  calleePath: e.calleePath ?? e.callee ?? null,
+  bindingOrigin: e.bindingOrigin ?? null,
+  provenance: e.provenance ?? null,
   audience: e.audience,
-  trigger: e.rule || null,
+  trigger: e.rule ?? null,
   source: "ast_registry",
-}))
+})
+
+const pontosDoRegistry = (rel, entries) => entries.map((e) => pontoDoRegistry(rel, e))
 
 // ── Classificação por canal (NUNCA por conteúdo da frase) ────────────────────────
 /**
@@ -479,11 +493,69 @@ const finalize = (p, audience, trigger) => ({
 
 const jaClassificado = (p) => Boolean(p.audience) && p.audience !== "unknown"
 
-function enrichPoint(p, registry) {
-  if (jaClassificado(p)) return finalize(p, p.audience, p.trigger || null)
+/**
+ * Chave de um callsite. `file+line+column` — nunca só `file`, nunca prefixo.
+ *
+ * O registry LEGADO (`declaredFor`) aceita `arquivo`, `arquivo:linha` e prefixo
+ * de diretório, o que é aceitável para refinar `unknown` em massa. Os overrides
+ * do AST são outra coisa: cada um carrega `reason`, `owner`, `evidence` e
+ * `expectedFileHash` porque descreve UMA decisão sobre UM callsite. Casá-los por
+ * arquivo espalharia silenciosamente uma decisão para pontos que ninguém olhou.
+ */
+export const anchorOf = (p) => `${p.file}|${p.line}|${p.column}`
+
+const overridesPorAncora = (overrides) => new Map(
+  (overrides || []).map((o) => [`${o.file}|${o.line}|${o.column}`, o]),
+)
+
+/**
+ * Override humano tem a última palavra — mas SÓ no callsite exato que ele
+ * ancora, e o loader já garantiu que a âncora existe e que o `expectedFileHash`
+ * confere. Aqui é aplicação, não validação.
+ */
+const aplicarOverride = (p, ov) => ({
+  ...finalize(p, ov.audience, "override"),
+  override: { reason: ov.reason, owner: ov.owner, evidence: ov.evidence },
+})
+
+/** Classificação quando não há override: derivada > declarada > por sink. */
+const semOverride = (p, registry) => {
+  if (jaClassificado(p)) return finalize(p, p.audience, p.trigger ?? null)
   const declarado = declaredFor(registry, p)
   if (declarado) return finalize(p, declarado, "registry")
-  return finalize(p, audienceBySink(p.sink) || "unknown", p.trigger || null)
+  return finalize(p, audienceBySink(p.sink) ?? "unknown", p.trigger ?? null)
+}
+
+function enrichPoint(p, registry, overrides = null) {
+  const ov = overrides?.get(anchorOf(p))
+  return ov ? aplicarOverride(p, ov) : semOverride(p, registry)
+}
+
+/**
+ * Provenance não resolvida bloqueia — mas SÓ para audiência `in_scope`.
+ *
+ * `argumentProvenance` marca `unresolved` quando o argumento é template com
+ * interpolação: `${plan.id}` é do projeto, `${objective}` é do usuário,
+ * `${count}` é derivado, e sem análise de fluxo não dá para saber qual. Isso
+ * importa para o que vai ser TRADUZIDO — se metade da string vem de fora, o
+ * tradutor precisa saber.
+ *
+ * Fora do escopo da claim, não importa: `render_primitive` recebe o texto do
+ * chamador (que já foi contado) e `machine_protocol` não é traduzido. Bloquear
+ * neles travaria a migração por um dado que ninguém vai usar.
+ */
+export function unresolvedProvenance(inventory) {
+  const pendentes = (inventory.points || []).filter((p) =>
+    p.classification === "in_scope" && p.provenance && p.provenance.resolved === false)
+
+  return {
+    ok: pendentes.length === 0,
+    count: pendentes.length,
+    points: pendentes.map((p) => ({ file: p.file, line: p.line, column: p.column, ids: p.provenance.ids || [] })),
+    reason: pendentes.length === 0
+      ? null
+      : `${pendentes.length} ponto(s) in_scope com origem de argumento não resolvida — interpolação não prova de onde vem o dado`,
+  }
 }
 
 /**
@@ -523,7 +595,8 @@ export function buildInventory({ repoRoot = process.cwd(), registry = {}, jsRegi
   if (!veredito.ok) return inventarioBloqueado(veredito, runtimeScripts)
 
   const pontos = [...collectJsPoints(repoRoot, runtimeScripts, veredito), ...collectPyPoints(repoRoot)]
-  const enriquecidos = pontos.map((p) => enrichPoint(p, registry))
+  const overrides = overridesPorAncora(veredito.overrides)
+  const enriquecidos = pontos.map((p) => enrichPoint(p, registry, overrides))
 
   const porAudiencia = {}
   for (const p of enriquecidos) porAudiencia[p.audience] = (porAudiencia[p.audience] || 0) + 1
@@ -535,8 +608,10 @@ export function buildInventory({ repoRoot = process.cwd(), registry = {}, jsRegi
       status: veredito.status,
       convertedFiles: veredito.convertedFiles,
       overrides: veredito.overrides.length,
+      overridesApplied: enriquecidos.filter((p) => p.trigger === "override").length,
     },
     blocked: false,
+    provenance: unresolvedProvenance({ points: enriquecidos }),
     total: enriquecidos.length,
     inScope: enriquecidos.filter((p) => p.classification === "in_scope").length,
     unknown: enriquecidos.filter((p) => p.audience === "unknown").length,
