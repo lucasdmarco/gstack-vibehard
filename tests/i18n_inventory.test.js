@@ -104,7 +104,8 @@ test("CONTROLE POSITIVO: inventário sem unknown libera o gate (o caminho existe
   // olhar contagem. Afrouxar para `assert.partialDeepStrictEqual` deixaria o
   // caminho bloqueado passar despercebido aqui.
   assert.deepEqual(phase1Gate({ unknown: 0, jsRegistry: { ok: true, status: "fresh" } }), {
-    ok: true, blocked: false, registryStatus: "fresh", unknown: 0, reason: null,
+    ok: true, blocked: false, registryStatus: "fresh", unknown: 0,
+    provenanceOk: true, unresolvedProvenance: 0, reason: null,
   })
 })
 

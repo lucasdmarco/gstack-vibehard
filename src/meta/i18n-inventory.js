@@ -544,17 +544,49 @@ function enrichPoint(p, registry, overrides = null) {
  * chamador (que já foi contado) e `machine_protocol` não é traduzido. Bloquear
  * neles travaria a migração por um dado que ninguém vai usar.
  */
+/** Provenance bem formada: objeto com `resolved` booleano. */
+const provenanceValida = (v) => Boolean(v) && typeof v === "object" && typeof v.resolved === "boolean"
+
+/**
+ * Motivo de pendência de um ponto, ou `null` se ele está resolvido.
+ *
+ * FAIL-CLOSED PARA PONTO AST. Um ponto vindo do registry SEMPRE deveria trazer
+ * provenance — o gerador a emite para toda entrada. Se ela veio ausente ou
+ * malformada, algo se perdeu entre gerar e consumir, e tratar isso como
+ * "resolvido" seria presumir a resposta justamente onde o dado sumiu.
+ *
+ * Ponto LEGADO (extrator regex) não tem provenance por construção: exigir dele
+ * bloquearia todo arquivo ainda não convertido, que é o oposto da convivência
+ * arquivo a arquivo.
+ */
+const pendenciaDe = (p) => {
+  if (p.classification !== "in_scope") return null
+  if (provenanceValida(p.provenance)) return p.provenance.resolved ? null : "interpolated"
+  if (p.source === "ast_registry") return "missing_provenance"
+  return null
+}
+
 export function unresolvedProvenance(inventory) {
-  const pendentes = (inventory.points || []).filter((p) =>
-    p.classification === "in_scope" && p.provenance && p.provenance.resolved === false)
+  const pendentes = []
+  for (const p of inventory.points || []) {
+    const motivo = pendenciaDe(p)
+    if (motivo) pendentes.push({ p, motivo })
+  }
+
+  const faltando = pendentes.filter((x) => x.motivo === "missing_provenance").length
+  const detalhe = faltando > 0 ? ` (${faltando} sem provenance no registry — regenerar)` : ""
 
   return {
     ok: pendentes.length === 0,
     count: pendentes.length,
-    points: pendentes.map((p) => ({ file: p.file, line: p.line, column: p.column, ids: p.provenance.ids || [] })),
+    missingProvenance: faltando,
+    points: pendentes.map(({ p, motivo }) => ({
+      file: p.file, line: p.line, column: p.column,
+      reason: motivo, ids: p.provenance?.ids ?? [],
+    })),
     reason: pendentes.length === 0
       ? null
-      : `${pendentes.length} ponto(s) in_scope com origem de argumento não resolvida — interpolação não prova de onde vem o dado`,
+      : `${pendentes.length} ponto(s) in_scope com origem de argumento não resolvida — interpolação não prova de onde vem o dado${detalhe}`,
   }
 }
 
@@ -608,7 +640,9 @@ export function buildInventory({ repoRoot = process.cwd(), registry = {}, jsRegi
       status: veredito.status,
       convertedFiles: veredito.convertedFiles,
       overrides: veredito.overrides.length,
-      overridesApplied: enriquecidos.filter((p) => p.trigger === "override").length,
+      // Conta pela PROPRIEDADE, não pelo texto do trigger: uma regra AST que um
+      // dia se chamasse "override" inflaria a contagem em silêncio.
+      overridesApplied: enriquecidos.filter((p) => p.override != null).length,
     },
     blocked: false,
     provenance: unresolvedProvenance({ points: enriquecidos }),
@@ -655,21 +689,31 @@ export function phaseStatus(inventory) {
     }
   }
 
-  return {
-    schemaVersion: I18N_INVENTORY_SCHEMA,
-    phase: gate.ok ? "1" : "1A",
-    phaseStatus: gate.ok ? "complete" : "partial",
-    blocked: false,
-    registryStatus: gate.registryStatus,
-    unknown: inventory.unknown,
-    rcBlocked: true,
-    englishFirstClaimAllowed: false,
-    nextPhase: gate.ok ? "2" : "1B",
-    reason: gate.ok
-      ? "inventário sem unknown — Fase 1 encerrada; migração pode começar"
-      : `Fase 1A: extractor e gate fail-closed entregues; ${inventory.unknown} ponto(s) sem audiência. Fase 1B classifica e zera.`,
-  }
+  return faseMedida(gate, inventory)
 }
+
+/**
+ * A pendência de provenance vira campo próprio porque pode ser a ÚNICA razão de
+ * o gate reprovar (com `unknown` já zerado). Um relatório que só falasse de
+ * `unknown` diria "0 pontos sem audiência" ao lado de um gate vermelho —
+ * contradição aparente, sem causa visível.
+ */
+const faseMedida = (gate, inventory) => ({
+  schemaVersion: I18N_INVENTORY_SCHEMA,
+  phase: gate.ok ? "1" : "1A",
+  phaseStatus: gate.ok ? "complete" : "partial",
+  blocked: false,
+  registryStatus: gate.registryStatus,
+  unknown: inventory.unknown,
+  provenanceOk: gate.provenanceOk !== false,
+  unresolvedProvenance: gate.unresolvedProvenance ?? 0,
+  rcBlocked: true,
+  englishFirstClaimAllowed: false,
+  nextPhase: gate.ok ? "2" : "1B",
+  reason: gate.ok
+    ? "inventário sem unknown e com provenance resolvida — Fase 1 encerrada; migração pode começar"
+    : `Fase 1A: extractor e gate fail-closed entregues. ${gate.reason} Fase 1B classifica e zera.`,
+})
 
 const estaBloqueado = (inv) => inv.blocked === true || inv.jsRegistry?.ok === false
 
@@ -682,15 +726,38 @@ const gateBloqueado = (r) => ({
   details: r.details ?? {},
 })
 
-const gateMedido = (inv) => ({
-  ok: inv.unknown === 0,
-  blocked: false,
-  registryStatus: inv.jsRegistry?.status ?? "fresh",
-  unknown: inv.unknown,
-  reason: inv.unknown === 0
-    ? null
-    : `${inv.unknown} ponto(s) de saída sem audiência determinada — classificar antes de migrar`,
-})
+const razaoUnknown = (n) => (n === 0
+  ? null
+  : `${n} ponto(s) de saída sem audiência determinada — classificar antes de migrar`)
+
+/**
+ * Zerar `unknown` NÃO basta para liberar a Fase 1.
+ *
+ * A Fatia 4 criou `unresolvedProvenance` e o expôs no inventário, mas o gate
+ * continuou olhando só a contagem — ou seja, o veredito era anunciado e inerte,
+ * exatamente o defeito que este programa já corrigiu noutros lugares. Um ponto
+ * `in_scope` cuja origem de argumento é indeterminada não está pronto para
+ * migrar: quem traduz não sabe o que é literal e o que veio de fora.
+ */
+const PROVENANCE_NEUTRA = Object.freeze({ ok: true, count: 0, reason: null })
+
+/** As duas razões saem juntas: corrigir uma sem saber da outra é trabalho repetido. */
+const razaoDoGate = (nUnknown, prov) =>
+  [razaoUnknown(nUnknown), prov.ok === false ? prov.reason : null].filter(Boolean).join(" | ") || null
+
+const gateMedido = (inv) => {
+  const prov = inv.provenance ?? PROVENANCE_NEUTRA
+  const provOk = prov.ok !== false
+  return {
+    ok: inv.unknown === 0 && provOk,
+    blocked: false,
+    registryStatus: inv.jsRegistry?.status ?? "fresh",
+    unknown: inv.unknown,
+    provenanceOk: provOk,
+    unresolvedProvenance: prov.count ?? 0,
+    reason: razaoDoGate(inv.unknown, prov),
+  }
+}
 
 /**
  * ORDEM IMPORTA. Num inventário bloqueado `unknown` é `null` — não medido. A
