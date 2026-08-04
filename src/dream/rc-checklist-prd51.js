@@ -101,6 +101,54 @@ export const PRD51_RC_ITEMS = Object.freeze([
   { id: "S51.9.3", tier: "P1", sprint: "S51.9.3", version: "5.98.0", status: "delivered", title: "`logs --follow` deixa de ser flag anunciada e inerte", proof: "tests/logs_follow.test.js" },
   { id: "S51.9.4", tier: "P1", sprint: "S51.9.4", version: "5.99.0", status: "delivered", title: "TGZ validado em ambiente limpo + detector de teste invisível", proof: "tests/tgz_clean_env.test.js" },
   { id: "S51.10.1", tier: "P1", sprint: "S51.10.1", version: "5.101.0", status: "delivered", title: "Checklist canônico do próprio PRD51 + DoD do §9 como objeto verificável; PRD47 reconciliado (3 P0 delivered, P0.2 non-goal)", proof: "tests/rc_checklist_prd51.test.js" },
+
+  // BLOQUEANTE DE SUPORTE DO RC — achado da certificação (2026-08-03), durante a
+  // Fase 1B. Registrado como item SEPARADO porque não é dívida da Fase 1B: os 4
+  // arquivos daquela fase passam 74/74 em Node 18.20.8 REAL.
+  //
+  // O QUE ACONTECEU. Uma revisão apontou que um teste da Fase 1B usava
+  // `fs.globSync` (Node >= 22) enquanto o projeto declara `engines: node >=18`.
+  // Corrigido. Ao VALIDAR num Node 18 real — em vez de raciocinar sobre
+  // compatibilidade — apareceu o problema maior: `import.meta.dirname`
+  // (Node >= 20.11) é usado em 351 arquivos de teste do repositório.
+  //
+  // O gate nunca foi válido. O job `test-node-matrix` foi criado no S51.10.2
+  // exatamente para impedir que "uma regressão exclusiva do Node 18 passasse
+  // batido". Passou batido o fato de que a suíte inteira não roda lá. Um gate
+  // que reprova por incompatibilidade estrutural não testa regressão alguma:
+  // ele é ruído constante, e ruído constante é indistinguível de gate ausente.
+  //
+  // PROIBIÇÕES EXPLÍCITAS (decisão humana, 2026-08-03): não aceitar as 352
+  // falhas como baseline, não desabilitar o job, não marcar Node 18 como
+  // suportado, e não alterar `engines` antes da decisão.
+  {
+    id: "P0.NODE-SUPPORT-GATE-INVALID", tier: "P0", sprint: "certificação RC", version: "5.107.0",
+    status: "pending",
+    blocking: true,
+    blockingReason: "release_support_decision",
+    needsDecision: true,
+    fixAuthorized: false,
+    // Nomes preservados verbatim da classificação humana: o registro é a decisão,
+    // não uma paráfrase dela.
+    classification: Object.freeze({
+      declared_support: "node >=18",
+      phase1b_compatibility: "proved_on_node18",
+      repository_suite_on_node18: "failing",
+      node18_support_claim: "unproven",
+      ci_gate_status: "structurally_invalid",
+      cause: "import.meta.dirname em 351 arquivos de teste",
+      blocker: "release_support_decision",
+    }),
+    evidence: "Medição direta em Node 18.20.8 (win-x64, portátil) no commit 5ede986: `node --test tests/` = 561 testes, 208 pass, 352 fail, 1 skip. Causa única: `import.meta.dirname` (Node >= 20.11) em 351 arquivos de tests/. ZERO falhas atribuíveis à Fase 1B — seus 4 arquivos (i18n_js_ast, _binding, _sinks, _registry) dão 74/74 pass no MESMO Node 18. `package.json` declara `engines.node >= 18`; `.github/workflows/test.yml:48` roda `npm test` completo na matriz [18, 20].",
+    impact: "O suporte a Node 18 é ANUNCIADO e NÃO PROVADO. O job que deveria prová-lo reprova por incompatibilidade estrutural da suíte, não por regressão do produto — então nunca poderia ter dado sinal útil. Node 18 e Node 20 estão fora de suporte upstream desde antes desta data, o que torna a decisão de suporte, e não a correção dos 351 arquivos, o caminho crítico.",
+    affectedScope: "contrato público de versões do Node: package.json engines, doctor, instalador, documentação, matriz de capacidades e o job test-node-matrix",
+    decisionOptions: Object.freeze([
+      { id: "A", recommended: true, summary: "Elevar o mínimo para Node 22 e testar a matriz 22/24", requires: "atualizar package.json, doctor, instalador, documentação e matriz de capacidades; remover toda claim pública de Node 18/20; provar instalação limpa em Node 22" },
+      { id: "B", recommended: false, summary: "Manter Node 18 como suportado", requires: "frente SEPARADA para migrar 351 arquivos de teste de `import.meta.dirname` para `fileURLToPath(import.meta.url)`, com a suíte verde em Node 18 antes de qualquer claim" },
+    ]),
+    title: "Suporte a Node 18 anunciado sem prova: a suíte não roda no Node 18 (352/561 falham por `import.meta.dirname`) e o gate `test-node-matrix` é estruturalmente inválido desde o S51.10.2",
+    proof: null,
+  },
 ])
 
 /**

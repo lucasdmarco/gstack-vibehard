@@ -18,22 +18,52 @@ const repoRoot = path.resolve(import.meta.dirname, "..")
 const mod = path.join(repoRoot, "src", "dream", "rc-checklist-prd51.js")
 const imp = () => import(`${pathToFileURL(mod)}?t=${Date.now()}`)
 
+/**
+ * Item de SPRINT registra o que um sprint entregou; item de CERTIFICAÇÃO registra
+ * o que a certificação do RC ACHOU e ainda não tem dono. O segundo não tem sprint
+ * nem prova — se tivesse prova, não seria pendência.
+ *
+ * A regra que importa (mesma do PRD48) é a inversa e vale para os dois: nada se
+ * declara fechado sem prova em disco, e nada pendente exibe prova.
+ */
+const ehDeSprint = (i) => i.sprint !== "certificação RC"
+
 test("cada item aponta uma prova que EXISTE em disco (a regra que o S51.3 aprendeu quebrando)", async () => {
   const { PRD51_RC_ITEMS } = await imp()
   for (const i of PRD51_RC_ITEMS) {
+    if (i.status === "pending") {
+      assert.equal(i.proof, null, `${i.id} está pendente ⇒ não pode exibir prova`)
+      continue
+    }
     assert.ok(i.proof, `${i.id} declara prova`)
     assert.ok(existsSync(path.join(repoRoot, i.proof)), `prova de ${i.id} existe: ${i.proof}`)
   }
 })
 
-test("cada item mapeia sprint + versão + tier válido (rastreabilidade achado→sprint→release)", async () => {
+test("todo item de SPRINT mapeia sprint + versão + tier (rastreabilidade achado→sprint→release)", async () => {
   const { PRD51_RC_ITEMS } = await imp()
   const tiers = new Set(["P0", "P1", "P2"])
-  for (const i of PRD51_RC_ITEMS) {
+  const deSprint = PRD51_RC_ITEMS.filter(ehDeSprint)
+  assert.ok(deSprint.length > 40, "a maioria esmagadora dos itens é de sprint")
+  for (const i of deSprint) {
     assert.match(i.sprint, /^S51\./, `${i.id} tem sprint do PRD51`)
     assert.match(i.version, /^5\.\d+\.\d+$/, `${i.id} tem versão`)
     assert.ok(tiers.has(i.tier), `${i.id} tem tier válido`)
     assert.ok(i.title && i.title.length > 10, `${i.id} tem título descritivo`)
+  }
+})
+
+test("item de CERTIFICAÇÃO carrega o que um achado sem dono precisa carregar", async () => {
+  const { PRD51_RC_ITEMS } = await imp()
+  const tiers = new Set(["P0", "P1", "P2"])
+  const deCertificacao = PRD51_RC_ITEMS.filter((i) => !ehDeSprint(i))
+  assert.ok(deCertificacao.length > 0, "a certificação do RC produziu achado registrado")
+  for (const i of deCertificacao) {
+    assert.ok(tiers.has(i.tier), `${i.id} tem tier válido`)
+    assert.ok(i.title && i.title.length > 10, `${i.id} tem título descritivo`)
+    assert.ok(i.evidence && i.evidence.length > 50, `${i.id} carrega evidência medida, não impressão`)
+    assert.ok(i.impact, `${i.id} declara o impacto`)
+    assert.equal(i.status, "pending", `${i.id} é pendência — não se auto-resolve`)
   }
 })
 
@@ -74,13 +104,79 @@ test("nenhuma caixa `runtime` é dada como satisfeita — execução não se pre
   assert.deepEqual(runtimeSatisfeitas, [], "suíte fria, proof no HEAD e matriz cross-OS só fecham executando")
 })
 
-test("prd51Readiness: sprints fecharam (ready:true) mas o DoD NÃO (programComplete:false) — a separação é o ponto", async () => {
+/**
+ * Este teste afirmava `ready:true` — "todo P0 dos sprints está fechado", que
+ * continua verdade. O que mudou é que a CERTIFICAÇÃO abriu um P0 que os sprints
+ * não tinham: `P0.NODE-SUPPORT-GATE-INVALID`. `ready` responde "não há P0
+ * aberto", e agora há um, então `false` é a resposta correta.
+ *
+ * Não relaxar isto é o ponto: um bloqueante registrado que não derruba `ready`
+ * seria decoração.
+ */
+test("prd51Readiness: ready:false — os P0 dos sprints fecharam, mas a certificação abriu um", async () => {
   const { prd51Readiness } = await imp()
   const r = prd51Readiness()
-  assert.equal(r.ready, true, "todo P0 dos sprints está fechado")
+  assert.equal(r.ready, false, "existe P0 aberto — o bloqueante de suporte do Node")
+  assert.deepEqual(r.p0Pending, ["P0.NODE-SUPPORT-GATE-INVALID"],
+    "e é SÓ ele: nenhum P0 de sprint regrediu")
   assert.equal(r.programComplete, false, "o §9 ainda tem caixas abertas — ready nunca autoriza 'concluído'")
   assert.ok(r.counts.dodOpen > 0)
   assert.equal(r.counts.dodSatisfied + r.counts.dodOpen, r.counts.dod)
+})
+
+/**
+ * O bloqueante existe para ser DECIDIDO, não para ser contornado. As proibições
+ * são explícitas: não virar baseline, não desabilitar o job, não declarar Node 18
+ * suportado. Este teste guarda a forma do registro; a decisão é humana.
+ */
+test("P0.NODE-SUPPORT-GATE-INVALID está registrado com classificação e opções de decisão", async () => {
+  const { PRD51_RC_ITEMS } = await imp()
+  const item = PRD51_RC_ITEMS.find((i) => i.id === "P0.NODE-SUPPORT-GATE-INVALID")
+  assert.ok(item, "o achado precisa estar no ledger, não só no relatório")
+
+  assert.equal(item.tier, "P0")
+  assert.equal(item.status, "pending")
+  assert.equal(item.blocking, true)
+  assert.equal(item.needsDecision, true)
+  assert.equal(item.fixAuthorized, false, "correção dos 351 arquivos NÃO foi autorizada")
+  assert.equal(item.proof, null, "sem prova: é exatamente o que falta")
+
+  assert.deepEqual(item.classification, {
+    declared_support: "node >=18",
+    phase1b_compatibility: "proved_on_node18",
+    repository_suite_on_node18: "failing",
+    node18_support_claim: "unproven",
+    ci_gate_status: "structurally_invalid",
+    cause: "import.meta.dirname em 351 arquivos de teste",
+    blocker: "release_support_decision",
+  })
+
+  const ids = item.decisionOptions.map((o) => o.id)
+  assert.deepEqual(ids, ["A", "B"])
+  assert.equal(item.decisionOptions.find((o) => o.id === "A").recommended, true)
+  for (const o of item.decisionOptions) {
+    assert.ok(o.summary && o.requires, `opção ${o.id} declara o que exige`)
+  }
+
+  // A evidência precisa carregar os números medidos, não uma impressão.
+  for (const numero of ["208", "352", "351", "74"]) {
+    assert.ok(item.evidence.includes(numero), `evidência precisa citar ${numero}`)
+  }
+})
+
+test("a Fase 1B NÃO é responsabilizada pelo bloqueante do Node", async () => {
+  const { PRD51_RC_ITEMS } = await imp()
+  const item = PRD51_RC_ITEMS.find((i) => i.id === "P0.NODE-SUPPORT-GATE-INVALID")
+  assert.equal(item.classification.phase1b_compatibility, "proved_on_node18")
+  assert.match(item.evidence, /ZERO falhas atribu/i,
+    "a separação de culpa é parte do registro: misturar as duas coisas esconderia as duas")
+})
+
+test("o contrato de engines NÃO foi alterado antes da decisão", async () => {
+  const { readFileSync } = await import("node:fs")
+  const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"))
+  assert.match(pkg.engines.node, />=\s*18/,
+    "mexer em engines antes da decisão humana seria decidir sozinho qual runtime o produto suporta")
 })
 
 // S51.10.4: a versão anterior fixava `DOD.22` como pendência aberta — e quebrou no
@@ -97,9 +193,16 @@ test("openDoD expõe cada pendência com o que falta (o RC precisa saber, não d
   }
 })
 
+/** Fecha sinteticamente todo P0 aberto — usado só pelos controles positivos. */
+const comP0Fechados = (itens) => itens.map((i) =>
+  (i.tier === "P0" && i.status !== "delivered" ? { ...i, status: "delivered" } : i))
+
 test("CONTROLE NEGATIVO: um P0 que regredir derruba ready E programComplete", async () => {
   const { prd51Readiness, PRD51_RC_ITEMS, PRD51_DOD_ITEMS } = await imp()
-  const regredido = PRD51_RC_ITEMS.map((i) => (i.id === "S51.2.7" ? { ...i, status: "partial" } : i))
+  // Parte da base com os P0 abertos REAIS já fechados, para isolar a regressão
+  // que este controle injeta — senão ele mediria o bloqueante do Node, não o S51.2.7.
+  const base = comP0Fechados(PRD51_RC_ITEMS)
+  const regredido = base.map((i) => (i.id === "S51.2.7" ? { ...i, status: "partial" } : i))
   const r = prd51Readiness(regredido, PRD51_DOD_ITEMS)
   assert.equal(r.ready, false)
   assert.deepEqual(r.p0Pending, ["S51.2.7"])
@@ -109,9 +212,17 @@ test("CONTROLE NEGATIVO: um P0 que regredir derruba ready E programComplete", as
 test("CONTROLE POSITIVO: com todo o DoD satisfeito E os P0 fechados, programComplete vira true", async () => {
   const { prd51Readiness, PRD51_RC_ITEMS, PRD51_DOD_ITEMS } = await imp()
   const tudoOk = PRD51_DOD_ITEMS.map((d) => ({ ...d, status: "satisfied", evidence: d.evidence || "sintético" }))
-  const r = prd51Readiness(PRD51_RC_ITEMS, tudoOk)
+  const r = prd51Readiness(comP0Fechados(PRD51_RC_ITEMS), tudoOk)
   assert.equal(r.programComplete, true, "o caminho para 'concluído' existe — não é inalcançável por construção")
   assert.equal(r.counts.dodOpen, 0)
+})
+
+test("CONTROLE: o bloqueante do Node, sozinho, impede programComplete mesmo com o DoD inteiro satisfeito", async () => {
+  const { prd51Readiness, PRD51_RC_ITEMS, PRD51_DOD_ITEMS } = await imp()
+  const tudoOk = PRD51_DOD_ITEMS.map((d) => ({ ...d, status: "satisfied", evidence: d.evidence || "sintético" }))
+  const r = prd51Readiness(PRD51_RC_ITEMS, tudoOk)
+  assert.equal(r.programComplete, false, "um P0 aberto basta — o DoD satisfeito não o compensa")
+  assert.deepEqual(r.p0Pending, ["P0.NODE-SUPPORT-GATE-INVALID"])
 })
 
 test("CONTROLE NEGATIVO: uma única caixa `partial` do DoD já impede programComplete", async () => {
