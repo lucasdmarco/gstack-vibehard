@@ -399,11 +399,12 @@ test("P2: `overridesApplied` conta pela PROPRIEDADE `override`, não pelo texto 
 
 // ── Estado oficial ───────────────────────────────────────────────────────────
 
-test("INVENTÁRIO OFICIAL: 125 unknown, 1924 total, convertedFiles vazio", async () => {
+test("INVENTÁRIO OFICIAL após a Fatia 5: 98 unknown, 1918 total, 1 arquivo convertido", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
-  assert.equal(inv.unknown, 125, "a Fatia 4 não classifica nada")
-  assert.equal(inv.total, 1924)
-  assert.deepEqual(inv.jsRegistry.convertedFiles, [])
-  assert.equal(inv.jsRegistry.overridesApplied, 0, "não há override no repositório")
+  assert.equal(inv.unknown, 98)
+  assert.equal(inv.total, 1918)
+  assert.deepEqual(inv.jsRegistry.convertedFiles, ["src/cli/index.js"])
+  assert.equal(inv.jsRegistry.overridesApplied, 0,
+    "nenhum override foi necessário — o AST classificou os 29 pontos sem ajuda humana")
 })

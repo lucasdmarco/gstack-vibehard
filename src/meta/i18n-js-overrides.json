@@ -42,5 +42,17 @@
     "a decisao humana parecer analise automatica."
   ],
   "overrides": [],
-  "provenanceDecisions": []
+  "provenanceDecisions": [
+    {
+      "file": "src/cli/index.js",
+      "line": 304,
+      "column": 5,
+      "expectedFileHash": "sha256:c9d4f9a265489024b05bc3873363f3610c525211533142b31cd157f19f162041",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": ["command", "e", "message"],
+      "reason": "A moldura literal 'Falha ao executar' e o separador sao texto publico e devem ser traduzidos. Os dois valores interpolados sao dados de runtime e NAO sao traduziveis: `command` e o nome do subcomando que o usuario digitou, e `e.message` vem da excecao original, frequentemente de biblioteca ou do sistema operacional. Traduzir qualquer um dos dois quebraria a correspondencia com o que o usuario escreveu ou com o que a origem reportou.",
+      "owner": "lucas",
+      "evidence": "src/cli/index.js:304 — tests/i18n_provenance_decision.test.js cobre o caso real; tests/i18n_cli_index_migration.test.js prova a aplicacao unica apos a conversao"
+    }
+  ]
 }

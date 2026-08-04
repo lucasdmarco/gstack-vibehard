@@ -1,5 +1,515 @@
 {
-  "convertedFiles": [],
-  "files": {},
+  "convertedFiles": [
+    "src/cli/index.js"
+  ],
+  "files": {
+    "src/cli/index.js": {
+      "entries": [
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 134,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-module-literal-output",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 135,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-module-literal-output",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 136,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-module-literal-output",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 137,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-module-literal-output",
+          "sink": null
+        },
+        {
+          "audience": "public_interactive",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 158,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "interactive-prompt",
+          "sink": null
+        },
+        {
+          "audience": "public_interactive",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 5,
+          "line": 160,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "interactive-prompt",
+          "sink": null
+        },
+        {
+          "audience": "public_interactive",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 165,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "interactive-prompt",
+          "sink": null
+        },
+        {
+          "audience": "public_interactive",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 170,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "interactive-prompt",
+          "sink": null
+        },
+        {
+          "audience": "public_interactive",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 5,
+          "line": 172,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "interactive-prompt",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 239,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-module-literal-output",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 58,
+          "line": 240,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-module-literal-output",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 241,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-module-literal-output",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 244,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-module-literal-output",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 245,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-module-literal-output",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 25,
+          "line": 247,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-module-literal-output",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 262,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-module-literal-output",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 263,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-module-literal-output",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 264,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-module-literal-output",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 30,
+          "line": 265,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-module-literal-output",
+          "sink": null
+        },
+        {
+          "audience": "render_primitive",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 271,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-primitive-impl",
+          "sink": null
+        },
+        {
+          "audience": "render_primitive",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 275,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-primitive-impl",
+          "sink": null
+        },
+        {
+          "audience": "render_primitive",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 279,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-primitive-impl",
+          "sink": null
+        },
+        {
+          "audience": "render_primitive",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 283,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-primitive-impl",
+          "sink": null
+        },
+        {
+          "audience": "render_primitive",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 287,
+          "provenance": {
+            "ids": [
+              "color",
+              "title",
+              "COLORS",
+              "bold"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "render-primitive-impl",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 32,
+          "line": 299,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-module-literal-output",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "local",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 49,
+          "line": 299,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "local",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "error",
+          "calleePath": "error",
+          "canonicalName": "error",
+          "column": 5,
+          "line": 304,
+          "provenance": {
+            "ids": [
+              "command",
+              "e",
+              "message"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "internal_debug",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.error",
+          "calleePath": "console.error",
+          "canonicalName": "error",
+          "column": 35,
+          "line": 305,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "debug-guarded",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 5,
+          "line": 392,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-module-literal-output",
+          "sink": null
+        }
+      ],
+      "fileHash": "sha256:c9d4f9a265489024b05bc3873363f3610c525211533142b31cd157f19f162041"
+    }
+  },
   "schema": "gstack.i18n-js-registry.v1"
 }

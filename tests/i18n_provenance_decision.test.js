@@ -785,11 +785,16 @@ test("CASO REAL: src/cli/index.js tem exatamente 1 pendência, e a decisão a re
 
 // ── Estado oficial ───────────────────────────────────────────────────────────
 
-test("INVENTÁRIO OFICIAL inalterado: 125 unknown, 1924 total, 0 decisões", async () => {
+/**
+ * Este teste guardava o estado PRÉ-migração (125/1924/0 decisões) para provar
+ * que a Fatia 4.2 só criava o mecanismo. A Fatia 5 o exercitou de verdade, e o
+ * número aqui passa a ser o estado real do repositório.
+ */
+test("INVENTÁRIO OFICIAL após a Fatia 5: 98 unknown, 1918 total, 1 decisão aplicada", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
-  assert.equal(inv.unknown, 125)
-  assert.equal(inv.total, 1924)
-  assert.deepEqual(inv.jsRegistry.convertedFiles, [])
-  assert.equal(inv.jsRegistry.provenanceDecisionsApplied, 0, "nenhuma decisão no repositório ainda")
+  assert.equal(inv.unknown, 98)
+  assert.equal(inv.total, 1918)
+  assert.deepEqual(inv.jsRegistry.convertedFiles, ["src/cli/index.js"])
+  assert.equal(inv.jsRegistry.provenanceDecisionsApplied, 1, "a decisão da linha 304, aplicada uma vez")
 })
