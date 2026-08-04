@@ -70,15 +70,35 @@ dedutível por leitura; a dos 351 arquivos só apareceu executando.
 - **Não** alterar `engines` antes da decisão.
 - **Não** corrigir os 351 arquivos dentro da Fase 1B.
 
+## Três claims separadas
+
+O primeiro registro deste achado recomendava elevar `engines` — e isso era um
+erro de inferência: a medição é sobre a **suíte**, e `engines` é afirmação sobre
+o **runtime**. Infraestrutura de teste não é requisito de produto.
+
+| Claim | Estado | Base |
+|---|---|---|
+| `suite_compatibility` | **failing** | medido: 208 pass / 352 fail |
+| `runtime_compatibility` | **unproven** | nunca executado em 18/20 |
+| `safe_support` | **undecided** | decisão humana; depende das duas acima |
+
+O que existe sobre o runtime é **leitura estática**: varredura de 15 APIs
+sensíveis a versão em `src/`, sem incompatibilidade encontrada — `node:sqlite`
+com guarda e fallback JSONL declarado (`src/state/store.js:25-30`), `Map.groupBy`
+evitado citando o floor (`src/skills/gate-matrix.js:228`), 1 dependência de
+produção, sem `postinstall`. **Varredura estática não é execução.**
+
 ## Decisão pendente
 
 | Opção | Descrição | Exige |
 |---|---|---|
-| **A** (recomendada) | Mínimo Node 22; matriz 22/24 | package.json, doctor, instalador, documentação, matriz de capacidades; remover claim de Node 18/20; provar instalação limpa em Node 22 |
-| **B** | Manter Node 18 | frente separada migrando 351 arquivos para `fileURLToPath(import.meta.url)`, com suíte verde em Node 18 antes de qualquer claim |
+| **C** (recomendada) | Auditar o runtime **empacotado** antes de elevar o mínimo | matriz clean-machine em Node 18/20/22/24 com oráculo semântico por comando; `engines` inalterado até lá |
+| **A** (disponível) | Mínimo Node 22; matriz 22/24 | package.json, doctor, instalador, documentação, matriz de capacidades; remover claim de Node 18/20; instalação limpa em Node 22. **Não recomendada agora**: decidiria o contrato do produto a partir de evidência sobre os testes |
+| **B** (disponível) | Manter Node 18 | frente separada migrando 351 arquivos para `fileURLToPath(import.meta.url)`, com suíte verde em Node 18 antes de qualquer claim |
 
-Contexto que pesa em favor de A: em agosto de 2026, Node 18 e Node 20 já estão
-fora de suporte upstream.
+Node 22 segue **recomendado por segurança** em qualquer cenário — em agosto de
+2026, Node 18 e Node 20 estão fora de suporte upstream. Isso não é o mesmo que
+provar que o produto quebra neles.
 
 ## Reprodução
 

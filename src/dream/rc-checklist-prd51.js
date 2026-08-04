@@ -139,11 +139,31 @@ export const PRD51_RC_ITEMS = Object.freeze([
       cause: "import.meta.dirname em 351 arquivos de teste",
       blocker: "release_support_decision",
     }),
-    evidence: "Medição direta em Node 18.20.8 (win-x64, portátil) no commit 5ede986: `node --test tests/` = 561 testes, 208 pass, 352 fail, 1 skip. Causa única: `import.meta.dirname` (Node >= 20.11) em 351 arquivos de tests/. ZERO falhas atribuíveis à Fase 1B — seus 4 arquivos (i18n_js_ast, _binding, _sinks, _registry) dão 74/74 pass no MESMO Node 18. `package.json` declara `engines.node >= 18`; `.github/workflows/test.yml:48` roda `npm test` completo na matriz [18, 20].",
-    impact: "O suporte a Node 18 é ANUNCIADO e NÃO PROVADO. O job que deveria prová-lo reprova por incompatibilidade estrutural da suíte, não por regressão do produto — então nunca poderia ter dado sinal útil. Node 18 e Node 20 estão fora de suporte upstream desde antes desta data, o que torna a decisão de suporte, e não a correção dos 351 arquivos, o caminho crítico.",
+    /**
+     * TRÊS CLAIMS SEPARADAS. Confundi-las foi o erro que produziu a primeira
+     * versão deste registro: medi a SUÍTE e recomendei elevar `engines`, que é
+     * uma afirmação sobre o RUNTIME. Infraestrutura de teste não é requisito de
+     * produto, e nenhuma das duas decide sozinha o que é seguro suportar.
+     */
+    claims: Object.freeze({
+      runtime_compatibility: "unproven",  // nunca medida — matriz clean-machine pendente
+      suite_compatibility: "failing",     // 208 pass / 352 fail, medido
+      safe_support: "undecided",          // decisão humana; depende das duas acima
+    }),
+    evidence: "Medição direta em Node 18.20.8 (win-x64, portátil) no commit 5ede986: `node --test tests/` = 561 testes, 208 pass, 352 fail, 1 skip. Causa única: `import.meta.dirname` (Node >= 20.11) em 351 arquivos de tests/. ZERO falhas atribuíveis à Fase 1B — seus 4 arquivos (i18n_js_ast, _binding, _sinks, _registry) dão 74/74 pass no MESMO Node 18. `package.json` declara `engines.node >= 18`; `.github/workflows/test.yml:48` roda `npm test` completo na matriz [18, 20]. ESCOPO DESTA EVIDÊNCIA: ela mede a SUÍTE. Sobre o runtime, a única leitura feita foi ESTÁTICA — varredura de 15 APIs sensíveis a versão em `src/` sem incompatibilidade encontrada (`node:sqlite` tem guarda e fallback JSONL declarado em src/state/store.js:25-30; `Map.groupBy` foi evitado citando o floor em src/skills/gate-matrix.js:228; 1 dependência de produção; sem postinstall). Varredura estática não é execução: `runtime_compatibility` segue `unproven`.",
+    impact: "O suporte a Node 18 é ANUNCIADO e NÃO PROVADO. O job que deveria prová-lo reprova por incompatibilidade estrutural da suíte, não por regressão do produto — então nunca poderia ter dado sinal útil. ATENÇÃO AO LIMITE: esta evidência NÃO sustenta conclusão sobre o runtime empacotado, que nunca foi executado em Node 18/20. Elevar `engines` porque os TESTES usam `import.meta.dirname` confundiria infraestrutura de teste com requisito de produto.",
     affectedScope: "contrato público de versões do Node: package.json engines, doctor, instalador, documentação, matriz de capacidades e o job test-node-matrix",
     decisionOptions: Object.freeze([
-      { id: "A", recommended: true, summary: "Elevar o mínimo para Node 22 e testar a matriz 22/24", requires: "atualizar package.json, doctor, instalador, documentação e matriz de capacidades; remover toda claim pública de Node 18/20; provar instalação limpa em Node 22" },
+      {
+        id: "C", recommended: true,
+        summary: "Auditar a compatibilidade do runtime EMPACOTADO antes de elevar o mínimo",
+        decision_status: "evidence_required",
+        current_engines: "unchanged",
+        node22_status: "recommended_runtime",
+        node18_20_status: "compatibility_unproven",
+        requires: "matriz clean-machine do pacote REAL em Node 18/20/22/24, com oráculo semântico por comando (instalação, doctor, audit-only, contexto, criação, verify, proof) — nunca comparação entre versões, que aprovaria uma falha idêntica em todas. Registrar runtime e suíte como claims separadas; `safe_support` só depois das duas.",
+      },
+      { id: "A", recommended: false, summary: "Elevar o mínimo para Node 22 e testar a matriz 22/24", requires: "atualizar package.json, doctor, instalador, documentação e matriz de capacidades; remover toda claim pública de Node 18/20; provar instalação limpa em Node 22. NÃO recomendada AGORA: decidiria o contrato do produto a partir de evidência sobre os testes." },
       { id: "B", recommended: false, summary: "Manter Node 18 como suportado", requires: "frente SEPARADA para migrar 351 arquivos de teste de `import.meta.dirname` para `fileURLToPath(import.meta.url)`, com a suíte verde em Node 18 antes de qualquer claim" },
     ]),
     title: "Suporte a Node 18 anunciado sem prova: a suíte não roda no Node 18 (352/561 falham por `import.meta.dirname`) e o gate `test-node-matrix` é estruturalmente inválido desde o S51.10.2",
