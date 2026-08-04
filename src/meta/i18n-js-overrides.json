@@ -17,7 +17,30 @@
     "nao pode migrar em silencio para um callsite que ninguem olhou.",
     "",
     "Vazio nesta fatia: nenhum arquivo foi convertido ainda, logo nao ha o que sobrescrever.",
-    "O consumo dos overrides pertence as Fatias 3 e 4."
+    "O consumo dos overrides pertence as Fatias 3 e 4.",
+    "",
+    "--- provenanceDecisions (Fatia 4.2) ---",
+    "",
+    "DECISAO DE PROVENANCE E SEPARADA DE AUDIENCIA. Um override muda O QUE a mensagem e;",
+    "uma decisao de provenance resolve DE ONDE VEM o argumento dela. Confundir as duas",
+    "levaria ao unico atalho desonesto disponivel: reclassificar uma mensagem publica como",
+    "out_of_scope so para o gate ficar verde.",
+    "",
+    "Cada decisao precisa de: file, line, column, expectedFileHash, strategy,",
+    "interpolations, reason, owner, evidence.",
+    "",
+    "strategy hoje aceita apenas translate_literal_frame_preserve_interpolations: a MOLDURA",
+    "literal e traduzivel e os valores interpolados permanecem dinamicos, sem traducao.",
+    "",
+    "interpolations precisa coincidir EXATAMENTE com os identificadores que o gerador",
+    "extraiu. Se o codigo ganhar uma interpolacao nova, a decisao deixa de cobrir a string",
+    "inteira — aceitar isso em silencio faria uma mensagem parcialmente nao analisada passar",
+    "como decidida.",
+    "",
+    "A provenance ORIGINAL e preservada no ponto. A decisao fica ao lado, nunca por cima:",
+    "sobrescrever `resolved` apagaria a evidencia de que o argumento e interpolado e faria",
+    "a decisao humana parecer analise automatica."
   ],
-  "overrides": []
+  "overrides": [],
+  "provenanceDecisions": []
 }

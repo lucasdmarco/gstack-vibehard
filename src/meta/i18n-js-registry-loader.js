@@ -190,6 +190,47 @@ const problemaArquivo = (file, dados) => {
   return null
 }
 
+/** Formas de provenance que o gerador emite. */
+const PROVENANCE_KINDS = Object.freeze(["literal_only", "interpolated"])
+
+/**
+ * Provenance COMPLETA — validada aqui, e não só onde é consumida.
+ *
+ * `ids: 42` passava por esta camada e explodia lá adiante, em `[...ids]` dentro
+ * da comparação com a decisão humana: crash em vez de veredito, violando o
+ * contrato "erro estruturado, nunca crash". A validação pertence à fronteira,
+ * onde o dado entra, não ao consumidor de plantão.
+ */
+const idsValidos = (v) => Array.isArray(v) && v.every((x) => naoVazio(x))
+
+/**
+ * As duas formas são semanticamente fechadas, e a incoerência entre elas é
+ * silenciosa: `{kind:"literal_only", resolved:false}` faria um literal puro
+ * bloquear para sempre, e `{kind:"interpolated", ids:[]}` faria uma decisão
+ * humana passar sem identificador nenhum para conferir.
+ */
+const REGRAS_PROVENANCE = Object.freeze([
+  { falha: (p) => !ehObjeto(p), motivo: () => "`provenance` não é objeto" },
+  { falha: (p) => typeof p.resolved !== "boolean", motivo: () => "`provenance.resolved` não é booleano" },
+  { falha: (p) => !PROVENANCE_KINDS.includes(p.kind), motivo: (p) => `\`provenance.kind\` inválido: ${JSON.stringify(p.kind)}` },
+  { falha: (p) => !idsValidos(p.ids), motivo: () => "`provenance.ids` não é lista de strings não vazias" },
+  {
+    falha: (p) => p.kind === "literal_only" && (p.resolved !== true || p.ids.length > 0),
+    motivo: () => "`literal_only` exige `resolved:true` e `ids` vazio",
+  },
+  {
+    falha: (p) => p.kind === "interpolated" && (p.resolved !== false || p.ids.length === 0),
+    motivo: () => "`interpolated` exige `resolved:false` e ao menos um id",
+  },
+])
+
+const problemaProvenance = (file, e) => {
+  const p = e.provenance
+  if (p === undefined) return null                      // ausência é tratada no inventário
+  const r = REGRAS_PROVENANCE.find((x) => x.falha(p))
+  return r ? `${file}:${e.line} ${r.motivo(p)}` : null
+}
+
 /** `entries: [null]` chegava aqui e explodia em `e.line`. */
 const problemaEntrada = (file, e, i) => {
   if (!ehObjeto(e)) return `${file}: entrada #${i} não é objeto (${JSON.stringify(e)})`
@@ -197,7 +238,7 @@ const problemaEntrada = (file, e, i) => {
   if (!inteiroPositivo(e.column)) return `${file}: linha ${e.line} sem \`column\` válida`
   if (!naoVazio(e.audience)) return `${file}:${e.line} sem \`audience\``
   if (!AUDIENCES.includes(e.audience)) return `${file}:${e.line} audiência inválida: ${e.audience}`
-  return null
+  return problemaProvenance(file, e)
 }
 
 function validarEntradas(r) {
@@ -215,6 +256,135 @@ function validarEntradas(r) {
 // ── Overrides: validação REFERENCIAL ─────────────────────────────────────────
 
 const CAMPOS_OVERRIDE = ["file", "line", "column", "audience", "reason", "owner", "evidence", "expectedFileHash"]
+
+// ── Decisões de PROVENANCE (Fatia 4.2) ───────────────────────────────────────
+
+/**
+ * Estratégias de resolução de provenance.
+ *
+ * `translate_literal_frame_preserve_interpolations`: a MOLDURA literal é
+ * traduzível; os valores interpolados permanecem dinâmicos e NÃO são traduzidos.
+ *
+ * Caso real em `src/cli/index.js:304` — o helper de render recebe o template
+ * "Falha ao executar '<command>': <e.message>". A moldura vira inglês; `command`
+ * e `e.message` são dados de runtime.
+ *
+ * NOTA DE ESCRITA: o exemplo acima evita de propósito a sintaxe literal de
+ * chamada. A primeira versão deste comentário a continha e o extrator REGEX do
+ * inventário a contou como ponto de saída real — o total foi de 1924 para 1925
+ * por causa de um COMENTÁRIO. É o mesmo falso positivo estrutural que motivou
+ * esta fase inteira, e `src/meta/` ainda não está convertido para o AST.
+ */
+export const PROVENANCE_STRATEGIES = Object.freeze(["translate_literal_frame_preserve_interpolations"])
+
+/**
+ * Procedência do VEREDITO INTEIRO produzido por `loadJsRegistry`.
+ *
+ * Uma prova só, cobrindo `byFile`, `overrides` e `provenanceDecisions` — a
+ * versão anterior marcava apenas as decisões de provenance e deixava a mesma
+ * porta aberta para os OVERRIDES: um veredito fabricado com override ancorado
+ * num callsite real reclassificava a mensagem, mudava `in_scope` para
+ * `out_of_scope` e liberava o gate, sem passar por validação nenhuma.
+ *
+ * `WeakSet` e não `Symbol` no objeto: não há propriedade a copiar. A associação
+ * vive fora do veredito, e só esta função insere — uma cópia campo a campo,
+ * por mais idêntica que seja, não é reconhecida.
+ */
+const VEREDITOS_VALIDADOS = new WeakSet()
+
+/** O veredito foi produzido e validado por `loadJsRegistry`? */
+export const isValidatedRegistry = (v) => Boolean(v) && VEREDITOS_VALIDADOS.has(v)
+
+const CAMPOS_DECISAO = ["file", "line", "column", "expectedFileHash", "strategy", "interpolations", "reason", "owner", "evidence"]
+
+const mesmosIds = (a, b) => {
+  const x = [...a].sort()
+  const y = [...b].sort()
+  return x.length === y.length && x.every((v, i) => v === y[i])
+}
+
+const problemaCamposDecisao = (d, i) => {
+  for (const campo of CAMPOS_DECISAO) {
+    if (d[campo] === undefined) return `decisão de provenance #${i} sem \`${campo}\``
+  }
+  for (const campo of ["reason", "owner", "evidence"]) {
+    if (!naoVazio(d[campo])) return `decisão de provenance #${i}: \`${campo}\` vazio`
+  }
+  return null
+}
+
+const problemaFormaDecisao = (d, i) => {
+  const daPath = pathProblem(d.file)
+  if (daPath) return `decisão de provenance #${i}: ${daPath}`
+  if (!inteiroPositivo(d.line)) return `decisão de provenance #${i}: \`line\` inválida`
+  if (!inteiroPositivo(d.column)) return `decisão de provenance #${i}: \`column\` inválida`
+  if (!PROVENANCE_STRATEGIES.includes(d.strategy)) {
+    return `decisão de provenance #${i}: estratégia desconhecida: ${JSON.stringify(d.strategy)}`
+  }
+  if (!Array.isArray(d.interpolations)) return `decisão de provenance #${i}: \`interpolations\` não é lista`
+  return null
+}
+
+/**
+ * A decisão precisa descrever o callsite REAL, com o conteúdo que ela julgou e
+ * exatamente os identificadores que o gerador extraiu.
+ *
+ * Divergência de identificadores é o controle mais importante: se o código ganhar
+ * uma interpolação nova, a decisão humana deixa de cobrir a string inteira — e
+ * aceitar isso em silêncio faria uma mensagem parcialmente não analisada passar
+ * como decidida.
+ */
+const problemaArquivoDecisao = (d, i, alvo) => {
+  if (!alvo) return `decisão de provenance #${i}: \`${d.file}\` não está em convertedFiles`
+  if (!HASH_RE.test(d.expectedFileHash)) return `decisão de provenance #${i}: \`expectedFileHash\` malformado`
+  if (d.expectedFileHash !== alvo.fileHash) {
+    return `decisão de provenance #${i}: \`expectedFileHash\` não confere — o arquivo mudou desde a decisão`
+  }
+  return null
+}
+
+const problemaCallsiteDecisao = (d, i, entrada) => {
+  if (!entrada) return `decisão de provenance #${i}: nenhum callsite em ${d.file}:${d.line}:${d.column}`
+  if (entrada.provenance?.resolved !== false) {
+    return `decisão de provenance #${i}: o callsite ${d.file}:${d.line}:${d.column} já tem provenance resolvida — decisão desnecessária`
+  }
+  const gerado = entrada.provenance.ids ?? []
+  if (!mesmosIds(d.interpolations, gerado)) {
+    return `decisão de provenance #${i}: interpolações divergem do gerado (decidido=${JSON.stringify([...d.interpolations].sort())}, gerado=${JSON.stringify([...gerado].sort())})`
+  }
+  return null
+}
+
+const problemaReferenciaDecisao = (d, i, registry) => {
+  const alvo = registry.files[d.file]
+  const doArquivo = problemaArquivoDecisao(d, i, alvo)
+  if (doArquivo) return doArquivo
+  return problemaCallsiteDecisao(d, i, alvo.entries.find((e) => e.line === d.line && e.column === d.column))
+}
+
+const problemaDecisao = (d, i, registry) => {
+  if (!ehObjeto(d)) return `decisão de provenance #${i} não é objeto (${JSON.stringify(d)})`
+  return problemaCamposDecisao(d, i)
+    || problemaFormaDecisao(d, i)
+    || problemaReferenciaDecisao(d, i, registry)
+}
+
+function validarDecisoesProvenance(o, registry) {
+  const lista = o.provenanceDecisions
+  if (lista === undefined) return null           // campo opcional
+  if (!Array.isArray(lista)) return "provenanceDecisions ausente ou não é lista"
+
+  const ancoras = new Set()
+  for (const [i, d] of lista.entries()) {
+    const problema = problemaDecisao(d, i, registry)
+    if (problema) return problema
+
+    const ancora = `${d.file}|${d.line}|${d.column}`
+    if (ancoras.has(ancora)) return `decisão de provenance #${i}: âncora duplicada (${ancora})`
+    ancoras.add(ancora)
+  }
+  return null
+}
 
 /**
  * Um override precisa apontar para algo que EXISTE.
@@ -319,20 +489,28 @@ function validarFrescor(r, repoRoot) {
  * fora de `convertedFiles` simplesmente não aparece: o inventário mantém o
  * extrator legado para ele POR DECLARAÇÃO, não por omissão.
  */
-/** Lê e valida o par de arquivos. Devolve `{ ok, reg, ovr }` ou o veredito de falha. */
-function carregarPar(repoRoot) {
+/** Lê e valida o arquivo GERADO. */
+function carregarRegistry(repoRoot) {
   const reg = lerJson(join(repoRoot, REGISTRY_FILE), REGISTRY_FILE)
   if (!reg.ok) return reg
+  const problema = validarForma(reg.data) || validarEntradas(reg.data)
+  return problema ? falha("corrupt", problema, { file: REGISTRY_FILE }) : reg
+}
 
-  const daForma = validarForma(reg.data) || validarEntradas(reg.data)
-  if (daForma) return falha("corrupt", daForma, { file: REGISTRY_FILE })
-
+/** Lê e valida o arquivo HUMANO, contra o registry já validado. */
+function carregarOverrides(repoRoot, registry) {
   const ovr = lerJson(join(repoRoot, OVERRIDES_FILE), OVERRIDES_FILE)
   if (!ovr.ok) return ovr
+  const problema = validarOverrides(ovr.data, registry) || validarDecisoesProvenance(ovr.data, registry)
+  return problema ? falha("corrupt", problema, { file: OVERRIDES_FILE }) : ovr
+}
 
-  const dosOverrides = validarOverrides(ovr.data, reg.data)
-  if (dosOverrides) return falha("corrupt", dosOverrides, { file: OVERRIDES_FILE })
-
+/** Devolve `{ ok, reg, ovr }` ou o veredito de falha. */
+function carregarPar(repoRoot) {
+  const reg = carregarRegistry(repoRoot)
+  if (!reg.ok) return reg
+  const ovr = carregarOverrides(repoRoot, reg.data)
+  if (!ovr.ok) return ovr
   return { ok: true, reg: reg.data, ovr: ovr.data }
 }
 
@@ -347,11 +525,17 @@ export function loadJsRegistry({ repoRoot = process.cwd() } = {}) {
       { files: divergentes })
   }
 
-  return {
+  // Tudo abaixo já foi validado: forma, referências, hash e frescor. O inventário
+  // APLICA; não revalida. A marca de procedência é aposta AQUI, depois da
+  // validação — nunca por quem consome.
+  const veredito = {
     ok: true,
     status: "fresh",
     convertedFiles: [...par.reg.convertedFiles],
     byFile: new Map(Object.entries(par.reg.files).map(([f, d]) => [f, d.entries])),
     overrides: [...par.ovr.overrides],
+    provenanceDecisions: [...(par.ovr.provenanceDecisions ?? [])],
   }
+  VEREDITOS_VALIDADOS.add(veredito)
+  return veredito
 }
