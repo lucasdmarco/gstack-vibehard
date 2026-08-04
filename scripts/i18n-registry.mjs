@@ -32,11 +32,18 @@ export const OVERRIDES_SCHEMA = "gstack.i18n-js-overrides.v1"
 /**
  * Arquivos cujo inventario passa a vir do AST.
  *
- * VAZIO nesta fatia, e isso e o estado honesto: nenhum arquivo foi reconciliado
- * ainda. A Fatia 5 adiciona `src/cli/index.js` depois de confrontar os 35 pontos
- * do regex com os 29 reais e os 6 falsos positivos estruturais.
+ * `src/cli/index.js` entrou na Fatia 5, depois da reconciliacao linha a linha
+ * entre o extrator regex e o AST. Os seis pontos de diferenca sao TODOS falsos
+ * positivos do regex, e todos do mesmo padrao `\b(info|warn|error|...)\s*\(`:
+ *
+ *   270, 274, 278, 282, 286 — a DECLARACAO `export function success(msg) {`
+ *                             casa o padrao e vira "chamada"
+ *   305                     — o `error(` DENTRO de `console.error(` casa de novo,
+ *                             duplicando um ponto ja contado como `console`
+ *
+ * Nenhum ponto real foi perdido: 35 do regex = 29 reais + 6 falsos.
  */
-export const CONVERTED_FILES = Object.freeze([])
+export const CONVERTED_FILES = Object.freeze(["src/cli/index.js"])
 
 const norm = (p) => String(p).replace(/\\/g, "/")
 

@@ -429,12 +429,19 @@ test("o codigo do gerador nao menciona o caminho de overrides fora da constante"
 
 // ── Artefatos commitados ─────────────────────────────────────────────────────
 
-test("o registry commitado esta VAZIO e declara isso explicitamente", async () => {
+/**
+ * Este teste nasceu exigindo `convertedFiles` VAZIO, para impedir que alguém
+ * convertesse um arquivo antes da reconciliação. Falhou na Fatia 5, que é a
+ * conversão autorizada — e agora guarda o outro lado: o que está declarado
+ * precisa ter entradas de verdade.
+ */
+test("o registry commitado declara o que foi reconciliado, com entradas reais", async () => {
   const { REGISTRY_PATH, REGISTRY_SCHEMA } = await gen()
   const r = JSON.parse(readFileSync(path.join(repoRoot, REGISTRY_PATH), "utf8"))
   assert.equal(r.schema, REGISTRY_SCHEMA)
-  assert.deepEqual(r.convertedFiles, [], "nenhum arquivo foi reconciliado ainda — Fatia 5")
-  assert.deepEqual(r.files, {})
+  assert.deepEqual(r.convertedFiles, ["src/cli/index.js"], "só o arquivo da Fatia 5")
+  assert.deepEqual(Object.keys(r.files).sort(), r.convertedFiles)
+  assert.ok(r.files["src/cli/index.js"].entries.length > 0, "declarado sem entradas seria anúncio vazio")
 })
 
 test("o overrides commitado esta vazio e traz o contrato de cada override", async () => {
