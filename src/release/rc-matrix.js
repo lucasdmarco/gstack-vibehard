@@ -36,7 +36,7 @@ export const RC_MATRIX = Object.freeze([
     status: "partial",
     ci: ["test.yml:doctor", "test.yml:test", "test.yml:test-node-matrix"],
     provedBy: [],
-    gap: "As três versões (18/20/22) só rodavam no job `doctor`, que executa UM comando (`node src/index.js doctor`) — uma regressão exclusiva do Node 18 passaria batido. O S51.10.2 criou `test-node-matrix`, que roda a suíte INTEIRA no mínimo (18) e no LTS (20), somando-se ao `test` que já cobre a versão de release (22) nos três SOs. Segue `partial` porque a matriz completa 3 SOs × 3 Node ficou fora por custo de CI: cobriria uma combinação improvável (incompatibilidade de Node que só se manifesta num SO). Recorte declarado, não inferido.",
+    gap: "ATUALIZADO NA CERTIFICAÇÃO (2026-08-03) — o gate é ESTRUTURALMENTE INVÁLIDO, ver `P0.NODE-SUPPORT-GATE-INVALID` em rc-checklist-prd51.js. O S51.10.2 criou `test-node-matrix` para rodar a suíte inteira no mínimo (18) e no LTS (20), justamente porque 'uma regressão exclusiva do Node 18 passaria batido'. Medição direta em Node 18.20.8 real: 208 pass / 352 fail de 561, causa única `import.meta.dirname` (Node >= 20.11) em 351 arquivos de teste. Um gate que reprova por incompatibilidade estrutural da suíte não sinaliza regressão alguma — é ruído constante, indistinguível de gate ausente. Logo: suporte a Node 18 é ANUNCIADO (`engines.node >=18`) e NÃO PROVADO. O recorte 3 SOs × 3 Node segue fora por custo, mas essa já não é a lacuna principal: a decisão de qual runtime o produto suporta é. Aguarda decisão humana (A: mínimo Node 22, matriz 22/24 — recomendada; B: manter 18 mediante migração separada dos 351 arquivos).",
   },
   {
     id: "lite-full",
