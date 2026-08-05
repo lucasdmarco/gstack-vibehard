@@ -146,22 +146,48 @@ export const PRD51_RC_ITEMS = Object.freeze([
      * produto, e nenhuma das duas decide sozinha o que é seguro suportar.
      */
     claims: Object.freeze({
-      runtime_compatibility: "unproven",  // nunca medida — matriz clean-machine pendente
+      // MEDIDO em 2026-08-05 (Trilha B2): pacote real em Node 18/20/22/24,
+      // Windows, instalação offline, tarball de árvore limpa. As quatro linhas
+      // deram `runtime_compatible`. A hipótese que originou este P0 — de que o
+      // produto poderia não rodar em Node 18 — foi REFUTADA.
+      runtime_compatibility: "proved_windows_local",
       suite_compatibility: "failing",     // 208 pass / 352 fail, medido
       safe_support: "undecided",          // decisão humana; depende das duas acima
     }),
+    /** Evidência da matriz, com o escopo exato do que foi medido. */
+    runtimeMatrix: Object.freeze({
+      date: "2026-08-05",
+      commit: "e5b832dde05687ee54afe871ea5c819ded534620",
+      tarballSha256: "sha256:3dfd4fdfc804ab9f865f683c23b88345d0632ca2ffef92439c55dc41b84989ca",
+      install: "offline",
+      os_coverage: "windows_local",
+      cross_os: "unproven — workflow runtime-compat.yml nunca executado no GitHub",
+      versions: Object.freeze([
+        { node: "v18.20.8", verdict: "runtime_compatible", sqlite_available: false, backend: "jsonl_fallback" },
+        { node: "v20.19.5", verdict: "runtime_compatible", sqlite_available: false, backend: "jsonl_fallback" },
+        { node: "v22.21.1", verdict: "runtime_compatible", sqlite_available: true, backend: "sqlite" },
+        { node: "v24.14.0", verdict: "runtime_compatible", sqlite_available: true, backend: "sqlite" },
+      ]),
+      readings: Object.freeze({
+        strict: "fail — backend difere entre versoes (jsonl_fallback x sqlite)",
+        declared_degradation: "pass — degradacao autorizada pela CAPACIDADE ausente, nao pela versao",
+      }),
+      evidence: ".docs/RESEARCH/prd51-runtime-matrix-20260805.md",
+    }),
     evidence: "Medição direta em Node 18.20.8 (win-x64, portátil) no commit 5ede986: `node --test tests/` = 561 testes, 208 pass, 352 fail, 1 skip. Causa única: `import.meta.dirname` (Node >= 20.11) em 351 arquivos de tests/. ZERO falhas atribuíveis à Fase 1B — seus 4 arquivos (i18n_js_ast, _binding, _sinks, _registry) dão 74/74 pass no MESMO Node 18. `package.json` declara `engines.node >= 18`; `.github/workflows/test.yml:48` roda `npm test` completo na matriz [18, 20]. ESCOPO DESTA EVIDÊNCIA: ela mede a SUÍTE. Sobre o runtime, a única leitura feita foi ESTÁTICA — varredura de 15 APIs sensíveis a versão em `src/` sem incompatibilidade encontrada (`node:sqlite` tem guarda e fallback JSONL declarado em src/state/store.js:25-30; `Map.groupBy` foi evitado citando o floor em src/skills/gate-matrix.js:228; 1 dependência de produção; sem postinstall). Varredura estática não é execução: `runtime_compatibility` segue `unproven`.",
-    impact: "O suporte a Node 18 é ANUNCIADO e NÃO PROVADO. O job que deveria prová-lo reprova por incompatibilidade estrutural da suíte, não por regressão do produto — então nunca poderia ter dado sinal útil. ATENÇÃO AO LIMITE: esta evidência NÃO sustenta conclusão sobre o runtime empacotado, que nunca foi executado em Node 18/20. Elevar `engines` porque os TESTES usam `import.meta.dirname` confundiria infraestrutura de teste com requisito de produto.",
+    impact: "O gate `test-node-matrix` reprova por incompatibilidade estrutural da SUÍTE, não por regressão do produto — nunca poderia ter dado sinal útil sobre o runtime. ATUALIZADO EM 2026-08-05: a matriz da Trilha B2 mediu o RUNTIME e ele é compatível em Node 18/20/22/24 no Windows, o que REFUTA a hipótese original. Restam duas coisas, e nenhuma é compatibilidade: (a) a suíte segue quebrada em 18/20, então esses runtimes só poderiam ser `best_effort`, jamais suporte oficial — a regra de decisão acordada é explícita nisso; (b) Node 18 e 20 estão fora de suporte upstream, o que torna Node 22 recomendado por SEGURANÇA. Elevar `engines` continua sendo decisão de política, e não pode ser justificada por incompatibilidade que não existe.",
     affectedScope: "contrato público de versões do Node: package.json engines, doctor, instalador, documentação, matriz de capacidades e o job test-node-matrix",
     decisionOptions: Object.freeze([
       {
         id: "C", recommended: true,
         summary: "Auditar a compatibilidade do runtime EMPACOTADO antes de elevar o mínimo",
-        decision_status: "evidence_required",
+        decision_status: "evidence_partial",
         current_engines: "unchanged",
         node22_status: "recommended_runtime",
-        node18_20_status: "compatibility_unproven",
-        requires: "matriz clean-machine do pacote REAL em Node 18/20/22/24, com oráculo semântico por comando (instalação, doctor, audit-only, contexto, criação, verify, proof) — nunca comparação entre versões, que aprovaria uma falha idêntica em todas. Registrar runtime e suíte como claims separadas; `safe_support` só depois das duas.",
+        // MEDIDO: as quatro versões deram `runtime_compatible` no Windows.
+        node18_20_status: "runtime_compatible_windows_local",
+        obtained: "Matriz autoritativa de 2026-08-05 (ver `runtimeMatrix`): pacote real, instalação offline, 10 oráculos semânticos por versão, completude verificada. O produto FUNCIONA em Node 18/20/22/24 no Windows — a hipótese de incompatibilidade foi refutada.",
+        requires: "Falta apenas a cobertura cross-OS: o workflow `runtime-compat.yml` existe mas NUNCA rodou no GitHub, então Linux/macOS seguem `unproven`. `safe_support` continua `undecided` — é decisão de política, não de compatibilidade.",
       },
       { id: "A", recommended: false, summary: "Elevar o mínimo para Node 22 e testar a matriz 22/24", requires: "atualizar package.json, doctor, instalador, documentação e matriz de capacidades; remover toda claim pública de Node 18/20; provar instalação limpa em Node 22. NÃO recomendada AGORA: decidiria o contrato do produto a partir de evidência sobre os testes." },
       { id: "B", recommended: false, summary: "Manter Node 18 como suportado", requires: "frente SEPARADA para migrar 351 arquivos de teste de `import.meta.dirname` para `fileURLToPath(import.meta.url)`, com a suíte verde em Node 18 antes de qualquer claim" },

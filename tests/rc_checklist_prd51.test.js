@@ -162,10 +162,14 @@ test("P0.NODE-SUPPORT-GATE-INVALID está registrado com classificação e opçõ
   assert.deepEqual(recomendadas.map((o) => o.id), ["C"])
 
   const c = item.decisionOptions.find((o) => o.id === "C")
-  assert.equal(c.decision_status, "evidence_required")
-  assert.equal(c.current_engines, "unchanged")
+  // `evidence_required` -> `evidence_partial`: a matriz Windows foi obtida; falta
+  // cross-OS. O status acompanha a evidência, e não o contrário.
+  assert.equal(c.decision_status, "evidence_partial")
+  assert.equal(c.current_engines, "unchanged", "engines segue intocado até a decisão")
   assert.equal(c.node22_status, "recommended_runtime")
-  assert.equal(c.node18_20_status, "compatibility_unproven")
+  assert.equal(c.node18_20_status, "runtime_compatible_windows_local",
+    "18/20 rodam o produto — o que falta é decisão de suporte, não compatibilidade")
+  assert.ok(c.obtained && c.requires, "o que já foi provado e o que falta, separados")
 
   // A continua DISPONÍVEL — rebaixar não é remover.
   assert.equal(item.decisionOptions.find((o) => o.id === "A").recommended, false)
@@ -181,22 +185,62 @@ test("as três claims do bloqueante são registradas SEPARADAMENTE", async () =>
   const item = PRD51_RC_ITEMS.find((i) => i.id === "P0.NODE-SUPPORT-GATE-INVALID")
 
   assert.deepEqual(item.claims, {
-    runtime_compatibility: "unproven",
+    runtime_compatibility: "proved_windows_local",
     suite_compatibility: "failing",
     safe_support: "undecided",
   })
 
-  // A única claim MEDIDA é a da suíte; a do runtime não pode se declarar provada
-  // por varredura estática.
+  // O escopo viaja na própria claim: `proved_windows_local`, nunca `proved`.
+  // Um SO medido não autoriza afirmação cross-OS.
   assert.notEqual(item.claims.runtime_compatibility, "proved")
-  assert.match(item.evidence, /varredura est[áa]tica n[ãa]o [ée] execu[çc][ãa]o/i,
-    "a evidência precisa declarar o próprio limite")
-  assert.match(item.impact, /N[ÃA]O sustenta conclus[ãa]o sobre o runtime/i)
+  assert.match(item.claims.runtime_compatibility, /windows_local/)
+  assert.equal(item.claims.safe_support, "undecided",
+    "medir compatibilidade NÃO decide o contrato de suporte")
 
   // A evidência precisa carregar os números medidos, não uma impressão.
   for (const numero of ["208", "352", "351", "74"]) {
     assert.ok(item.evidence.includes(numero), `evidência precisa citar ${numero}`)
   }
+})
+
+/**
+ * A matriz REFUTOU a hipótese que originou o P0 — mas refutar a hipótese não
+ * fecha o bloqueante. O que resta não é compatibilidade: é decisão de política
+ * (suíte quebrada em 18/20 e runtimes fora de suporte upstream) e cobertura
+ * cross-OS. Fechar aqui seria trocar "o produto funciona" por "o suporte está
+ * decidido", que são coisas diferentes.
+ */
+test("a matriz REFUTA a hipótese, mas o P0 permanece ABERTO", async () => {
+  const { PRD51_RC_ITEMS, prd51Readiness } = await imp()
+  const item = PRD51_RC_ITEMS.find((i) => i.id === "P0.NODE-SUPPORT-GATE-INVALID")
+
+  assert.equal(item.status, "pending", "medir compatibilidade não fecha o bloqueante")
+  assert.equal(item.blocking, true)
+  assert.equal(item.needsDecision, true)
+  assert.deepEqual(prd51Readiness().p0Pending, ["P0.NODE-SUPPORT-GATE-INVALID"])
+})
+
+test("a evidência da matriz registra as QUATRO versões com escopo e procedência", async () => {
+  const { PRD51_RC_ITEMS } = await imp()
+  const m = PRD51_RC_ITEMS.find((i) => i.id === "P0.NODE-SUPPORT-GATE-INVALID").runtimeMatrix
+
+  assert.equal(m.os_coverage, "windows_local", "um SO — nunca anunciar mais do que foi medido")
+  assert.match(m.cross_os, /unproven/, "Linux/macOS dependem do workflow, que nunca rodou")
+  assert.equal(m.install, "offline", "rede proibida, não apenas evitada")
+  assert.match(m.tarballSha256, /^sha256:[0-9a-f]{64}$/)
+  assert.match(m.commit, /^[0-9a-f]{40}$/)
+
+  assert.equal(m.versions.length, 4)
+  assert.deepEqual(m.versions.map((v) => v.node), ["v18.20.8", "v20.19.5", "v22.21.1", "v24.14.0"])
+  assert.ok(m.versions.every((v) => v.verdict === "runtime_compatible"))
+
+  // A degradação em 18/20 é observada, e a leitura estrita continua reprovando —
+  // as duas saem juntas, e nenhuma é escondida.
+  assert.deepEqual(m.versions.filter((v) => !v.sqlite_available).map((v) => v.backend),
+    ["jsonl_fallback", "jsonl_fallback"])
+  assert.match(m.readings.strict, /^fail/)
+  assert.match(m.readings.declared_degradation, /^pass/)
+  assert.match(m.readings.declared_degradation, /CAPACIDADE ausente, nao pela versao/)
 })
 
 test("a Fase 1B NÃO é responsabilizada pelo bloqueante do Node", async () => {
