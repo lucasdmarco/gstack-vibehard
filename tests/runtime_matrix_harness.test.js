@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { readFileSync, writeFileSync, mkdtempSync } from "node:fs"
+import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, readdirSync, existsSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -221,12 +221,21 @@ test("exit 1 para incompatibilidade do PRODUTO, mesmo com linhas de ambiente jun
   }), EXIT.INCOMPATIVEL)
 })
 
-test("exit 0 SÓ com medição válida e produto passando", async () => {
+/**
+ * A versão anterior deste teste afirmava que "uma linha medida basta" — e era
+ * justamente a regra frouxa que deixava evidência parcial passar como completa.
+ * Agora exit 0 exige que TODAS as linhas tenham sido medidas.
+ */
+test("exit 0 SÓ quando TODAS as linhas foram medidas e o produto passou", async () => {
   const { exitCodeDe, EXIT } = await imp()
   assert.equal(exitCodeDe({ resultados: [{ verdict: "runtime_compatible" }] }), EXIT.MEDICAO_VALIDA)
   assert.equal(exitCodeDe({
+    resultados: [{ verdict: "runtime_compatible" }, { verdict: "runtime_compatible" }],
+  }), EXIT.MEDICAO_VALIDA)
+
+  assert.equal(exitCodeDe({
     resultados: [{ verdict: "runtime_compatible" }, { verdict: "test_environment_unsupported" }],
-  }), EXIT.MEDICAO_VALIDA, "uma linha medida basta para o resultado ser sobre o produto")
+  }), EXIT.SEM_MEDICAO, "uma linha sem medição já torna a rodada incompleta")
 })
 
 test("os três códigos são DISTINTOS — significados não intercambiáveis", async () => {
@@ -267,6 +276,190 @@ test("AGREGAÇÃO recusa relatórios de TARBALLS diferentes", async () => {
   ])
   assert.match(agg.erro, /tarballs diferentes/, "agregar artefatos distintos compararia coisas diferentes")
   assert.deepEqual(agg.resultados, [])
+})
+
+/**
+ * Um único relatório produzia `erro:null`, uma medição e exit 0 — anunciando
+ * cobertura de quatro versões a partir de uma. Job ausente virava evidência
+ * "agregada" verde.
+ */
+test("NEGATIVO: AGREGAÇÃO com conjunto INCOMPLETO é recusada", async () => {
+  const { agregar, exitCodeDe, EXIT } = await imp()
+  const tarball = { sha256: "sha256:abc" }
+  const um = { tarball, os: "linux/x64", resultados: [linha("v24.14.0", "runtime_compatible", "sqlite", true)] }
+
+  const agg = agregar([um])
+  assert.match(agg.erro, /conjunto incompleto: faltam Node 18, 20, 22/)
+  assert.deepEqual(agg.resultados, [], "nada é agregado a partir de conjunto incompleto")
+  assert.equal(exitCodeDe(agg), EXIT.SEM_MEDICAO)
+})
+
+test("NEGATIVO: AGREGAÇÃO com versão DUPLICADA é recusada", async () => {
+  const { agregar } = await imp()
+  const tarball = { sha256: "sha256:abc" }
+  const rel = (v, b, s) => ({ tarball, os: "linux/x64", resultados: [linha(v, "runtime_compatible", b, s)] })
+  const agg = agregar([
+    rel("v18.20.8", "jsonl_fallback", false),
+    rel("v18.20.8", "jsonl_fallback", false),
+    rel("v22.21.1", "sqlite", true),
+    rel("v24.14.0", "sqlite", true),
+  ])
+  assert.match(agg.erro, /versao duplicada no conjunto: 18/, "duplicata mascararia a versão faltante")
+})
+
+test("NEGATIVO: AGREGAÇÃO com SOs DIFERENTES é recusada — a agregação é POR SO", async () => {
+  const { agregar } = await imp()
+  const tarball = { sha256: "sha256:abc" }
+  const rel = (v, b, s, os) => ({ tarball, os, resultados: [linha(v, "runtime_compatible", b, s)] })
+  const agg = agregar([
+    rel("v18.20.8", "jsonl_fallback", false, "linux/x64"),
+    rel("v20.19.5", "jsonl_fallback", false, "win32/x64"),
+    rel("v22.21.1", "sqlite", true, "linux/x64"),
+    rel("v24.14.0", "sqlite", true, "linux/x64"),
+  ])
+  assert.match(agg.erro, /SOs diferentes/)
+})
+
+test("POSITIVO: conjunto COMPLETO das quatro versões, mesmo SO e tarball, agrega", async () => {
+  const { agregar, exitCodeDe, EXIT } = await imp()
+  const tarball = { sha256: "sha256:abc" }
+  const rel = (v, b, s) => ({ tarball, os: "linux/x64", resultados: [linha(v, "runtime_compatible", b, s)] })
+  const agg = agregar([
+    rel("v18.20.8", "jsonl_fallback", false),
+    rel("v20.19.5", "jsonl_fallback", false),
+    rel("v22.21.1", "sqlite", true),
+    rel("v24.14.0", "sqlite", true),
+  ])
+  assert.equal(agg.erro, undefined, "o caminho legítimo continua funcionando")
+  assert.equal(agg.resultados.length, 4)
+  assert.equal(agg.completude.ok, true)
+  assert.equal(exitCodeDe(agg), EXIT.MEDICAO_VALIDA)
+})
+
+// ── Completude: medição parcial não é sucesso ────────────────────────────────
+
+/**
+ * Reprodução do achado: `runtime_compatible` no 24 junto de
+ * `test_environment_unsupported` no 18 devolvia exit 0. Para uma matriz de
+ * quatro versões, uma linha útil é evidência PARCIAL vendida como completa.
+ */
+test("P0: QUALQUER versão sem medição torna a rodada incompleta (exit 2)", async () => {
+  const { exitCodeDe, EXIT } = await imp()
+  assert.equal(exitCodeDe({
+    resultados: [
+      { node: "v24.14.0", verdict: "runtime_compatible" },
+      { node: "v18.20.8", verdict: "test_environment_unsupported" },
+    ],
+  }), EXIT.SEM_MEDICAO, "3 de 4 medidas não é sucesso")
+
+  assert.equal(exitCodeDe({
+    resultados: [
+      { node: "v24.14.0", verdict: "runtime_compatible" },
+      { node: "v18.20.8", verdict: "test_environment_invalid" },
+    ],
+  }), EXIT.SEM_MEDICAO)
+})
+
+test("`avaliarCompletude` nomeia exatamente quais versões ficaram sem medição", async () => {
+  const { avaliarCompletude } = await imp()
+  const r = avaliarCompletude([
+    { node: "v18.20.8", verdict: "test_environment_invalid" },
+    { node: "v20.19.5", verdict: "runtime_compatible" },
+    { node: "v22.21.1", verdict: "runtime_compatible" },
+    { node: "v24.14.0", verdict: "test_environment_unsupported" },
+  ], ["v18.20.8", "v20.19.5", "v22.21.1", "v24.14.0"])
+
+  assert.equal(r.ok, false)
+  assert.deepEqual(r.faltando, ["v18.20.8", "v24.14.0"])
+  assert.deepEqual(r.medidas, ["v20.19.5", "v22.21.1"])
+  assert.match(r.motivo, /sem medicao valida: v18\.20\.8, v24\.14\.0/)
+})
+
+test("completude reprovada derruba o exit code mesmo sem linha de ambiente", async () => {
+  const { exitCodeDe, EXIT } = await imp()
+  assert.equal(exitCodeDe({
+    resultados: [{ node: "v24.14.0", verdict: "runtime_compatible" }],
+    completude: { ok: false, faltando: ["v18.20.8"], motivo: "faltou 18" },
+  }), EXIT.SEM_MEDICAO)
+})
+
+// ── Cache seed: instalação offline de verdade ────────────────────────────────
+
+test("NEGATIVO: sem `--cache-seed` a sandbox usa cache PRÓPRIO e vazio", async () => {
+  const { ambienteIsolado } = await imp()
+  const sandbox = mkdtempSync(path.join(tmpdir(), "gstack-semseed-"))
+  try {
+    const env = ambienteIsolado(sandbox, process.execPath)
+    assert.ok(env.NPM_CONFIG_CACHE.startsWith(sandbox), "o cache vive DENTRO da sandbox")
+    assert.equal(readdirSync(env.NPM_CONFIG_CACHE).length, 0, "e nasce vazio")
+  } finally { cleanupTmp(sandbox) }
+})
+
+/**
+ * O workflow definia `NPM_CONFIG_CACHE` apontando ao cache comum, e
+ * `ambienteIsolado` o SOBRESCREVIA com um vazio: o cache verificado nunca
+ * chegava ao `npm install`, e cada linha resolvia pela rede.
+ */
+test("POSITIVO: `--cache-seed` COPIA o cache verificado para dentro da sandbox", async () => {
+  const { ambienteIsolado } = await imp()
+  const seed = mkdtempSync(path.join(tmpdir(), "gstack-seed-"))
+  const sandbox = mkdtempSync(path.join(tmpdir(), "gstack-comseed-"))
+  try {
+    mkdirSync(path.join(seed, "_cacache"), { recursive: true })
+    writeFileSync(path.join(seed, "_cacache", "marcador.txt"), "entrada verificada")
+
+    const env = ambienteIsolado(sandbox, process.execPath, seed)
+    assert.ok(env.NPM_CONFIG_CACHE.startsWith(sandbox), "o isolamento é preservado — é CÓPIA, não referência")
+    assert.ok(existsSync(path.join(env.NPM_CONFIG_CACHE, "_cacache", "marcador.txt")),
+      "o conteúdo do seed chegou ao cache que o npm vai usar")
+  } finally { cleanupTmp(seed); cleanupTmp(sandbox) }
+})
+
+test("`--cache-seed` liga a instalação OFFLINE, registrada no relatório", async () => {
+  const src = codigoDoRunner()
+  assert.match(src, /const rede = offline \? \["--offline"\] : \[\]/,
+    "`--prefer-offline` ainda permite rede; `--offline` proíbe")
+  assert.match(src, /install: \{ offline: Boolean\(opcoes\.cacheSeed\), cacheSeed/,
+    "o relatório declara se a instalação foi offline")
+})
+
+test("`--cache-seed` é reconhecido pelo parser", async () => {
+  const { parseArgs } = await imp()
+  const a = parseArgs(["--node", "n", "--cache-seed", "/tmp/c", "--tarball", "t.tgz"])
+  assert.equal(a.cacheSeed, "/tmp/c")
+  assert.deepEqual(a.nodes, ["n"])
+})
+
+/**
+ * GUARD DE PROPAGAÇÃO. O `cacheSeed` atravessa quatro funções até chegar ao
+ * `npm install`, e uma delas ficou sem o parâmetro — `medirNaSandbox` não o
+ * declarava e o runner morria com `ReferenceError: opcoes is not defined`.
+ * Testes de unidade das pontas não pegam isso: o parser aceitava a flag e
+ * `ambienteIsolado` sabia usá-la, mas o meio da cadeia estava roto.
+ */
+test("a cadeia inteira propaga `cacheSeed` — nenhum elo perde o parâmetro", () => {
+  const src = codigoDoRunner()
+  const elos = [
+    [/function ambienteIsolado\(sandbox, nodeBin, cacheSeed = null\)/, "ambienteIsolado recebe"],
+    [/function prepararProjeto\(nodeBin, sandbox, tarball, env, offline\)/, "prepararProjeto recebe `offline`"],
+    [/function medirNaSandbox\([^)]*opcoes = \{\}\)/, "medirNaSandbox recebe `opcoes`"],
+    [/function medirVersao\(nodeBin, tarball, opcoes = \{\}\)/, "medirVersao recebe `opcoes`"],
+    [/function montarRelatorio\(nodes, tarball, opcoes = \{\}\)/, "montarRelatorio recebe `opcoes`"],
+    [/ambienteIsolado\(sandbox, nodeBin, opcoes\.cacheSeed\)/, "medirNaSandbox REPASSA ao ambiente"],
+    [/medirNaSandbox\([^)]*impressaoGlobal\(\), opcoes\)/, "medirVersao REPASSA"],
+    [/medirVersao\(n, tarball, opcoes\)/, "montarRelatorio REPASSA"],
+    [/montarRelatorio\(nodes, tarballArg \?\? empacotar\(\), \{ cacheSeed \}\)/, "main REPASSA"],
+  ]
+  for (const [re, oque] of elos) assert.match(src, re, `elo quebrado: ${oque}`)
+})
+
+test("o runner carrega e executa com `--cache-seed` sem ReferenceError", async () => {
+  const { medirVersao } = await imp()
+  // Binário inexistente: para antes de instalar, mas ATRAVESSA a assinatura com
+  // `opcoes` — que era exatamente onde o elo estava roto.
+  const r = medirVersao(path.join(tmpdir(), "node-que-nao-existe"), "x.tgz", { cacheSeed: "/tmp/seed" })
+  assert.equal(r.verdict, "test_environment_unsupported")
+  assert.match(r.motivo, /binario Node nao executa/)
 })
 
 test("AGREGAÇÃO sem relatórios devolve erro, não aprovação", async () => {
