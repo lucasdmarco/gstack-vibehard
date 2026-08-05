@@ -89,6 +89,34 @@
       "role": "epistemic_protocol_reference",
       "addedOn": "2026-07-23",
       "note": "PRD50 S50.0: origem metodologica do protocolo gerador/verificador/revisao/reinicio. O repo publica PROMPTS E OUTPUTS, nao a implementacao do agente — o GStack mapeia a metodologia ao Loop Engine que JA existe (src/workflow-graph/runner.js), nunca cria um segundo motor, e NUNCA declara replica do Aletheia (PRD50 §17.2). Nunca vendorizado, nunca dependencia runtime. As outras 7 fontes do PRD50 (blogs/preprints/docs Gemini) estao em .docs/RESEARCH/prd50-source-manifest.json com maturidade por fonte."
+    },
+    {
+      "url": "https://github.com/mattpocock/skills",
+      "status": "active_reference",
+      "role": "agent_engineering_methodology",
+      "addedOn": "2026-08-05",
+      "note": "Auditado no commit 07999e06b58541362f2f3d6de9e2b108ac28dc52 (MIT). Referencia para autoridade de invocacao, review em dois eixos, tracer bullets, wayfinding, prototipos e documentacao para agentes. Nunca instalado, copiado ou usado como dependencia runtime. Disposition em .docs/RESEARCH/prd52-54-external-agent-methods-20260805.md; ancora obrigatoria batch-6-aidd-methodology."
+    },
+    {
+      "url": "https://www.aihero.dev/",
+      "status": "active_reference",
+      "role": "public_agent_methodology_corpus",
+      "addedOn": "2026-08-05",
+      "note": "Snapshot de paginas publicas em 2026-08-05. Usado apenas para comparar taxonomia de prova, AX, discovery agent-readable, wayfinding e fidelidade de fontes. Licenca de conteudo nao presumida: sem copia, vendoring ou dependencia. Disposition em .docs/RESEARCH/prd52-54-external-agent-methods-20260805.md."
+    },
+    {
+      "url": "https://github.com/happyrobot-ai/livekit-agents",
+      "status": "archived_reference",
+      "role": "historical_livekit_agents_snapshot",
+      "addedOn": "2026-08-05",
+      "note": "Snapshot v0.11.3 no commit 70b4e87f592d34785ebc7b4cc6badefce5291197 (Apache-2.0), identico ao commit upstream; nao ha inovacao exclusiva do fork no HEAD auditado. Contexto historico apenas, nunca fonte atual ou dependencia."
+    },
+    {
+      "url": "https://github.com/livekit/agents",
+      "status": "active_reference",
+      "role": "agent_runtime_lifecycle_testing_reference",
+      "addedOn": "2026-08-05",
+      "note": "Referencia viva auditada no commit 62d527d4603c9b0eaafdce272a80d42de4efae9e (Apache-2.0). Adaptar somente contratos de admission/drain/kill, efeito parcial, failure scope, resultado tipado e sequencia de eventos. Sem runtime Python, WebRTC, voz, pool/prewarm ou dependencia LiveKit."
     }
   ]
 }
