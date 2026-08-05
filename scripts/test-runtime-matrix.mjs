@@ -28,7 +28,7 @@
  * jobs empacotaria 12 vezes — o Node deixaria de ser a unica variavel.
  */
 import { execFileSync, spawnSync } from "node:child_process"
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, rmSync, statSync } from "node:fs"
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, rmSync, statSync, cpSync } from "node:fs"
 import { createHash } from "node:crypto"
 import { tmpdir } from "node:os"
 import path from "node:path"
@@ -39,18 +39,19 @@ const isWin = process.platform === "win32"
 
 // ── Argumentos ───────────────────────────────────────────────────────────────
 
+/** Flags que ACUMULAM valores, e as que guardam um valor unico. */
+const LISTAS = { "--node": "nodes", "--aggregate": "agregarDe" }
+const UNICOS = { "--tarball": "tarball", "--cache-seed": "cacheSeed" }
+
 function parseArgs(argv) {
-  const nodes = []
-  const agregarDe = []
-  let tarball = null
-  let json = false
+  const r = { nodes: [], agregarDe: [], tarball: null, cacheSeed: null, json: false }
   for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === "--node") nodes.push(argv[++i])
-    else if (argv[i] === "--tarball") tarball = argv[++i]
-    else if (argv[i] === "--aggregate") agregarDe.push(argv[++i])
-    else if (argv[i] === "--json") json = true
+    const flag = argv[i]
+    if (LISTAS[flag]) r[LISTAS[flag]].push(argv[++i])
+    else if (UNICOS[flag]) r[UNICOS[flag]] = argv[++i]
+    else if (flag === "--json") r.json = true
   }
-  return { nodes, tarball, json, agregarDe }
+  return r
 }
 
 // ── Sandbox: nenhum subprocesso herda diretorio gravavel real ────────────────
@@ -62,7 +63,7 @@ function parseArgs(argv) {
  * proprio produto escreverem no HOME real, e a matriz passaria a medir um
  * ambiente contaminado.
  */
-function ambienteIsolado(sandbox, nodeBin) {
+function ambienteIsolado(sandbox, nodeBin, cacheSeed = null) {
   const sub = (nome) => {
     const p = path.join(sandbox, nome)
     mkdirSync(p, { recursive: true })
@@ -72,6 +73,13 @@ function ambienteIsolado(sandbox, nodeBin) {
   const temp = sub("temp")
   const cache = sub("npm-cache")
   const prefix = sub("npm-prefix")
+
+  // O cache da sandbox nasce VAZIO por design — isolamento. Mas isso descartava
+  // o cache comum que o CI prepara: `NPM_CONFIG_CACHE` era sobrescrito e cada
+  // linha da matriz resolvia a arvore pela REDE, podendo baixar entradas
+  // diferentes ou falhar. Com `--cache-seed`, o conteudo verificado e COPIADO
+  // para dentro da sandbox: a instalacao fica offline e o isolamento continua.
+  if (cacheSeed && existsSync(cacheSeed)) cpSync(cacheSeed, cache, { recursive: true })
 
   return {
     ...process.env,
@@ -383,11 +391,17 @@ function versaoDoBinario(nodeBin) {
   return r.status === 0 ? (r.stdout || "").trim() : null
 }
 
-function prepararProjeto(nodeBin, sandbox, tarball, env) {
+function prepararProjeto(nodeBin, sandbox, tarball, env, offline) {
   const proj = path.join(sandbox, "proj")
   mkdirSync(proj, { recursive: true })
   writeFileSync(path.join(proj, "package.json"), JSON.stringify({ name: "matrix-host", private: true, version: "1.0.0" }))
-  const inst = npm(nodeBin, ["install", "--no-audit", "--no-fund", "--silent", tarball], {
+
+  // `--offline` PROIBE rede; `--prefer-offline` apenas a evita quando pode. Com
+  // cache seed, a instalacao precisa ser reproduzivel: se falta entrada, o certo
+  // e falhar como ambiente, nao completar silenciosamente pela rede — senao a
+  // matriz volta a medir disponibilidade de rede junto com o Node.
+  const rede = offline ? ["--offline"] : []
+  const inst = npm(nodeBin, ["install", "--no-audit", "--no-fund", "--silent", ...rede, tarball], {
     cwd: proj, env, timeout: TIMEOUT_INSTALL,
   })
   if (inst.status !== 0) {
@@ -445,8 +459,8 @@ function resultadoMedido({ versao, nodeBin, env, prep, checks, amb, sqlite, back
 }
 
 /** Executa a medicao dentro da sandbox ja criada. */
-function medirNaSandbox(nodeBin, tarball, sandbox, versao, antes) {
-  const env = ambienteIsolado(sandbox, nodeBin)
+function medirNaSandbox(nodeBin, tarball, sandbox, versao, antes, opcoes = {}) {
+  const env = ambienteIsolado(sandbox, nodeBin, opcoes.cacheSeed)
 
   // ANTES de qualquer oraculo do produto: o ambiente resolve para o alvo? Se
   // nao, a rodada nao mede o produto — e dizer `runtime_incompatible` aqui seria
@@ -461,7 +475,7 @@ function medirNaSandbox(nodeBin, tarball, sandbox, versao, antes) {
     }
   }
 
-  const prep = prepararProjeto(nodeBin, sandbox, tarball, env)
+  const prep = prepararProjeto(nodeBin, sandbox, tarball, env, Boolean(opcoes.cacheSeed))
   if (prep.erro) return { node: versao, verdict: "test_environment_unsupported", motivo: prep.erro }
 
   const checks = rodarOraculos(nodeBin, env, prep, sandbox, versao, tarball)
@@ -476,14 +490,14 @@ function medirNaSandbox(nodeBin, tarball, sandbox, versao, antes) {
   return resultadoMedido({ versao, nodeBin, env, prep, checks, amb, sqlite, backend })
 }
 
-function medirVersao(nodeBin, tarball) {
+function medirVersao(nodeBin, tarball, opcoes = {}) {
   const versao = versaoDoBinario(nodeBin)
   if (!versao) {
     return { node: nodeBin, verdict: "test_environment_unsupported", motivo: "binario Node nao executa" }
   }
   const sandbox = mkdtempSync(path.join(tmpdir(), "gstack-rt-"))
   try {
-    return medirNaSandbox(nodeBin, tarball, sandbox, versao, impressaoGlobal())
+    return medirNaSandbox(nodeBin, tarball, sandbox, versao, impressaoGlobal(), opcoes)
   } finally {
     try { rmSync(sandbox, { recursive: true, force: true }) } catch { /* sandbox some no reboot */ }
   }
@@ -576,16 +590,21 @@ function imprimirTexto(relatorio) {
   process.stdout.write(`${linhas.join("\n")}\n`)
 }
 
-function montarRelatorio(nodes, tarball) {
+function montarRelatorio(nodes, tarball, opcoes = {}) {
+  const resultados = nodes.map((n) => medirVersao(n, tarball, opcoes))
   const relatorio = {
     schemaVersion: "gstack.runtime-matrix.v1",
     os: `${process.platform}/${process.arch}`,
     os_coverage: process.platform === "win32" ? "windows_local" : `${process.platform}_local`,
     tarball: { path: path.basename(tarball), sha256: sha256(tarball) },
+    install: { offline: Boolean(opcoes.cacheSeed), cacheSeed: opcoes.cacheSeed ?? null },
     generatedAt: new Date().toISOString(),
-    resultados: nodes.map((n) => medirVersao(n, tarball)),
+    resultados,
+    // O conjunto PEDIDO viaja no relatorio: sem ele, ninguem consegue saber
+    // depois se a rodada cobriu tudo o que devia.
+    completude: avaliarCompletude(resultados, resultados.map((r) => r.node)),
   }
-  relatorio.leituras = leituras(relatorio.resultados)
+  relatorio.leituras = leituras(resultados)
   return relatorio
 }
 
@@ -609,12 +628,42 @@ export const EXIT = Object.freeze({
  *   1  mediu e o produto falhou            -> defeito do PRODUTO
  *   2  nao mediu (ambiente invalido/indisponivel, ou rodada vazia) -> defeito do ARRANJO
  */
+/**
+ * COMPLETUDE, nao "pelo menos uma". A versao anterior devolvia 0 quando UMA
+ * linha media e as outras caiam em ambiente — para uma matriz de quatro versoes,
+ * isso e evidencia PARCIAL vendida como completa.
+ */
+const rodadaIncompleta = (relatorio) => {
+  const resultados = relatorio.resultados ?? []
+  return resultados.length === 0
+    || resultados.some((r) => VEREDITOS_DE_AMBIENTE.has(r.verdict))
+    || relatorio.completude?.ok === false
+}
+
 export function exitCodeDe(relatorio) {
   const resultados = relatorio.resultados ?? []
-  if (resultados.length === 0) return EXIT.SEM_MEDICAO
   if (resultados.some((r) => r.verdict === "runtime_incompatible")) return EXIT.INCOMPATIVEL
-  const uteis = resultados.filter((r) => !VEREDITOS_DE_AMBIENTE.has(r.verdict))
-  return uteis.length === 0 ? EXIT.SEM_MEDICAO : EXIT.MEDICAO_VALIDA
+  return rodadaIncompleta(relatorio) ? EXIT.SEM_MEDICAO : EXIT.MEDICAO_VALIDA
+}
+
+/**
+ * A rodada cobriu TODAS as versoes pedidas?
+ *
+ * `versoesEsperadas` vem da linha de comando (os binarios apontados). Sem essa
+ * comparacao, uma matriz que silenciosamente mediu tres de quatro pareceria
+ * completa — e o relatorio nao teria como saber o que faltou.
+ */
+export function avaliarCompletude(resultados, versoesEsperadas) {
+  if (!versoesEsperadas || versoesEsperadas.length === 0) return null
+  const medidas = new Set(resultados.filter((r) => !VEREDITOS_DE_AMBIENTE.has(r.verdict)).map((r) => r.node))
+  const faltando = versoesEsperadas.filter((v) => !medidas.has(v))
+  return {
+    ok: faltando.length === 0,
+    esperadas: [...versoesEsperadas],
+    medidas: [...medidas],
+    faltando,
+    motivo: faltando.length === 0 ? null : `versoes solicitadas sem medicao valida: ${faltando.join(", ")}`,
+  }
 }
 
 /**
@@ -629,24 +678,51 @@ export function exitCodeDe(relatorio) {
  * Exige o MESMO tarball em todos: agregar medicoes de artefatos diferentes
  * compararia coisas distintas.
  */
-export function agregar(relatorios) {
-  if (relatorios.length === 0) {
-    return { schemaVersion: "gstack.runtime-matrix-agg.v1", erro: "nenhum relatorio para agregar", resultados: [] }
-  }
+/** Linhas MAIORES do Node que a matriz exige por SO. */
+export const VERSOES_EXIGIDAS = Object.freeze(["18", "20", "22", "24"])
+
+const linhaMaiorDe = (v) => String(v ?? "").replace(/^v/, "").split(".")[0]
+
+const erroAgg = (erro) => ({ schemaVersion: "gstack.runtime-matrix-agg.v1", erro, resultados: [] })
+
+/**
+ * Toda condicao que torna o conjunto NAO agregavel.
+ *
+ * Sem elas, um job ausente ou duplicado viraria evidencia "agregada" verde: a
+ * reproducao com UM unico relatorio devolvia `erro:null` e exit 0, anunciando
+ * cobertura de quatro versoes a partir de uma.
+ */
+function problemaDoConjunto(relatorios) {
   const tarballs = new Set(relatorios.map((r) => r.tarball?.sha256))
-  if (tarballs.size > 1) {
-    return {
-      schemaVersion: "gstack.runtime-matrix-agg.v1",
-      erro: `relatorios de tarballs diferentes: ${[...tarballs].join(", ")}`,
-      resultados: [],
-    }
+  if (tarballs.size > 1) return `relatorios de tarballs diferentes: ${[...tarballs].join(", ")}`
+
+  const sos = new Set(relatorios.map((r) => r.os))
+  if (sos.size > 1) return `relatorios de SOs diferentes: ${[...sos].join(", ")} — agregacao e POR SO`
+
+  const linhas = relatorios.flatMap((r) => r.resultados ?? []).map((r) => linhaMaiorDe(r.node))
+  const duplicadas = linhas.filter((v, i) => linhas.indexOf(v) !== i)
+  if (duplicadas.length > 0) return `versao duplicada no conjunto: ${[...new Set(duplicadas)].join(", ")}`
+
+  const faltando = VERSOES_EXIGIDAS.filter((v) => !linhas.includes(v))
+  if (faltando.length > 0) {
+    return `conjunto incompleto: faltam Node ${faltando.join(", ")} (exigidas ${VERSOES_EXIGIDAS.join("/")})`
   }
+  return null
+}
+
+export function agregar(relatorios) {
+  if (relatorios.length === 0) return erroAgg("nenhum relatorio para agregar")
+
+  const problema = problemaDoConjunto(relatorios)
+  if (problema) return erroAgg(problema)
+
   const resultados = relatorios.flatMap((r) => r.resultados ?? [])
   return {
     schemaVersion: "gstack.runtime-matrix-agg.v1",
     tarball: relatorios[0].tarball,
-    os: [...new Set(relatorios.map((r) => r.os))],
+    os: relatorios[0].os,
     resultados,
+    completude: avaliarCompletude(resultados, resultados.map((r) => r.node)),
     leituras: leituras(resultados),
   }
 }
@@ -669,7 +745,7 @@ function modoAgregacao(arquivos, json) {
 }
 
 function main() {
-  const { nodes, tarball: tarballArg, json, agregarDe } = parseArgs(process.argv.slice(2))
+  const { nodes, tarball: tarballArg, json, agregarDe, cacheSeed } = parseArgs(process.argv.slice(2))
   if (agregarDe.length > 0) return modoAgregacao(agregarDe, json)
   if (nodes.length === 0) {
     process.stderr.write("uso: node scripts/test-runtime-matrix.mjs --node <path> [--node <path>...] [--tarball <tgz>] [--json]\n")
@@ -679,7 +755,7 @@ function main() {
 
   // `--tarball` fornecido: NUNCA reempacota. Em CI, os 12 jobs consomem o mesmo
   // artefato do job `pack`, senao o Node deixa de ser a unica variavel.
-  const relatorio = montarRelatorio(nodes, tarballArg ?? empacotar())
+  const relatorio = montarRelatorio(nodes, tarballArg ?? empacotar(), { cacheSeed })
 
   if (json) process.stdout.write(`${JSON.stringify(relatorio, null, 2)}\n`)
   else imprimirTexto(relatorio)

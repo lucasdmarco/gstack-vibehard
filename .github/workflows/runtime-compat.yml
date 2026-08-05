@@ -127,20 +127,21 @@ jobs:
             || { echo "manifest de outro commit — abortando"; exit 1; }
 
       # `--tarball` obrigatório: o job consumidor NUNCA reempacota.
-      # `NPM_CONFIG_CACHE` + `--prefer-offline` fazem a instalação usar o cache
-      # comum do job `pack`, para que rede lenta ou indisponível não vire
-      # veredito sobre o Node.
+      #
+      # `--cache-seed` e NÃO `NPM_CONFIG_CACHE`: a sandbox redireciona o cache
+      # para dentro de si (isolamento), então definir a variável aqui era inútil —
+      # ela era sobrescrita e cada linha resolvia a árvore pela REDE. O seed é
+      # COPIADO para dentro da sandbox e a instalação roda com `--offline`, que
+      # PROÍBE rede em vez de apenas evitá-la.
       - name: "Matriz de runtime (Node ${{ matrix.node }})"
         shell: bash
-        env:
-          NPM_CONFIG_CACHE: dist-matrix/npm-cache
-          NPM_CONFIG_PREFER_OFFLINE: "true"
         run: |
           set -euo pipefail
           NAME=$(node -p "require('./dist-matrix/manifest.json').tarball")
           node scripts/test-runtime-matrix.mjs \
             --node "$(node -p "process.execPath")" \
             --tarball "dist-matrix/$NAME" \
+            --cache-seed "dist-matrix/npm-cache" \
             --json | tee "runtime-matrix-${{ matrix.os }}-node${{ matrix.node }}.json"
 
       - uses: actions/upload-artifact@v4
