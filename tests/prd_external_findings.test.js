@@ -41,8 +41,12 @@ const corrido = (texto) => texto.replace(/^\s*>\s?/gm, " ").replace(/\s+/g, " ")
 
 // ── Documentos versionados ───────────────────────────────────────────────────
 
-test("os quatro documentos dos achados estão versionados", () => {
-  for (const rel of [RELATORIO, REGISTRY, ...Object.values(PRD)]) {
+test("os CINCO artefatos dos achados estão versionados", () => {
+  // Três PRDs + relatório comparativo + registry. Chamá-los de "quatro
+  // documentos" era erro de contagem no próprio nome do teste.
+  const artefatos = [RELATORIO, REGISTRY, ...Object.values(PRD)]
+  assert.equal(artefatos.length, 5)
+  for (const rel of artefatos) {
     assert.ok(existsSync(path.join(repoRoot, rel)), `${rel} precisa existir no repositório`)
     assert.ok(ler(rel).length > 500, `${rel} não pode ser um stub`)
   }
@@ -57,61 +61,106 @@ test("o relatório declara o gate do registry e o batch obrigatório", () => {
     "referência metodológica não pode virar dependência do produto")
 })
 
-// ── OWNERSHIP: cada conceito no PRD dono ─────────────────────────────────────
+// ── OWNERSHIP por SEÇÃO ──────────────────────────────────────────────────────
 
 /**
- * A tabela abaixo veio da CONTAGEM real nos três documentos, não de suposição.
- * `min` é quanto o dono precisa ter; `maxOutros` é o teto nos demais — margem
- * pequena existe porque uma referência cruzada é legítima, mas concentração é o
- * que define propriedade.
+ * Divide o markdown em seções por heading, preservando o corpo de cada uma.
+ *
+ * Contar no arquivo inteiro é insuficiente: mover `reference_pack` de
+ * §8.3.1 para uma seção qualquer do MESMO PRD53 manteria a contagem e passaria
+ * verde. A definição precisa estar onde o documento diz que ela está.
+ */
+function secoes(texto) {
+  const out = new Map()
+  let atual = "(preambulo)"
+  let buffer = []
+  for (const linha of texto.split("\n")) {
+    const h = linha.match(/^#{1,3}\s+(.+)/)
+    if (h) {
+      out.set(atual, (out.get(atual) ?? "") + buffer.join("\n"))
+      atual = h[1].trim()
+      buffer = [linha]
+      continue
+    }
+    buffer.push(linha)
+  }
+  out.set(atual, (out.get(atual) ?? "") + buffer.join("\n"))
+  return out
+}
+
+/** Corpo da seção cujo título começa com o prefixo dado. */
+const secao = (mapa, prefixo) => {
+  for (const [titulo, corpo] of mapa) if (titulo.startsWith(prefixo)) return { titulo, corpo }
+  return null
+}
+
+/**
+ * SEÇÃO DONA de cada conceito — onde ele é DEFINIDO, não apenas citado.
+ * Extraída do mapeamento real dos três documentos.
  */
 const OWNERSHIP = [
-  // PRD52 — prova e certificação
-  { termo: "Claim Contract", dono: 52, min: 3, maxOutros: 2 },
-  // PRD53 — governança de referências, autoridade de skills, avaliação
-  { termo: "SkillBinding", dono: 53, min: 2, maxOutros: 0 },
-  { termo: "Scenario Lab", dono: 53, min: 10, maxOutros: 0 },
-  { termo: "reference_pack", dono: 53, min: 2, maxOutros: 0 },
-  // PRD54 — Task Graph, lifecycle, handoff, PendingRequirement
-  { termo: "Task Graph", dono: 54, min: 10, maxOutros: 1 },
-  { termo: "PendingRequirement", dono: 54, min: 5, maxOutros: 1 },
-  { termo: "failureScope", dono: 54, min: 2, maxOutros: 0 },
-  { termo: "drain", dono: 54, min: 3, maxOutros: 0 },
+  { termo: "Claim Contract", dono: 52, secao: "22.2", maxOutros: 2 },
+  { termo: "reference_pack", dono: 53, secao: "8.3.1", maxOutros: 0 },
+  { termo: "SkillBinding", dono: 53, secao: "8.6", maxOutros: 0 },
+  { termo: "Scenario Lab", dono: 53, secao: "12. Scenario Lab", maxOutros: 0 },
+  { termo: "Task Graph", dono: 54, secao: "7.2", maxOutros: 1 },
+  { termo: "PendingRequirement", dono: 54, secao: "23.2", maxOutros: 1 },
+  { termo: "drain", dono: 54, secao: "22.3", maxOutros: 0 },
+  { termo: "failureScope", dono: 54, secao: "22.3", maxOutros: 0 },
 ]
 
-test("cada conceito vive no PRD DONO — presença em outro não é propriedade", () => {
+test("cada conceito está na SEÇÃO dona — não apenas em algum lugar do PRD", () => {
+  const mapas = { 52: secoes(ler(PRD[52])), 53: secoes(ler(PRD[53])), 54: secoes(ler(PRD[54])) }
+
+  for (const { termo, dono, secao: prefixo } of OWNERSHIP) {
+    const s = secao(mapas[dono], prefixo)
+    assert.ok(s, `PRD${dono}: seção \`${prefixo}\` não existe — a estrutura mudou`)
+    assert.ok(conta(s.corpo, termo) >= 1,
+      `\`${termo}\` precisa ser definido em "${s.titulo}" do PRD${dono}; movê-lo para outra seção do MESMO documento manteria a contagem total e passaria despercebido`)
+  }
+})
+
+test("nenhum conceito vaza para o PRD errado — presença não é propriedade", () => {
   const textos = { 52: ler(PRD[52]), 53: ler(PRD[53]), 54: ler(PRD[54]) }
 
-  for (const { termo, dono, min, maxOutros } of OWNERSHIP) {
-    const noDono = conta(textos[dono], termo)
-    assert.ok(noDono >= min,
-      `\`${termo}\` deveria ser desenvolvido no PRD${dono} (${noDono} ocorrência(s), mínimo ${min})`)
-
+  for (const { termo, dono, maxOutros } of OWNERSHIP) {
     for (const outro of [52, 53, 54].filter((p) => p !== dono)) {
       const n = conta(textos[outro], termo)
       assert.ok(n <= maxOutros,
-        `\`${termo}\` pertence ao PRD${dono}, mas aparece ${n}x no PRD${outro} (teto ${maxOutros}) — o dono estaria decidindo sobre território alheio`)
+        `\`${termo}\` pertence ao PRD${dono}, mas aparece ${n}x no PRD${outro} (teto ${maxOutros}) — o outro estaria decidindo sobre território alheio`)
     }
   }
 })
 
-test("os três territórios são distintos — nenhum PRD acumula os conceitos dos outros", () => {
+test("o dono CONCENTRA o conceito — e cada PRD é dono de ao menos um", () => {
   const textos = { 52: ler(PRD[52]), 53: ler(PRD[53]), 54: ler(PRD[54]) }
   const donos = {}
   for (const { termo, dono } of OWNERSHIP) (donos[dono] ??= []).push(termo)
 
-  // Cada PRD precisa ser dono de pelo menos um conceito: se um deles ficasse sem
-  // nenhum, a divisão de responsabilidade teria colapsado.
   for (const p of [52, 53, 54]) {
     assert.ok((donos[p] ?? []).length > 0, `PRD${p} precisa ser dono de ao menos um conceito`)
   }
-
-  // E o dono precisa concentrar mais que qualquer outro.
   for (const { termo, dono } of OWNERSHIP) {
-    const contagens = [52, 53, 54].map((p) => ({ p, n: conta(textos[p], termo) }))
-    const lider = contagens.reduce((a, b) => (b.n > a.n ? b : a))
+    const lider = [52, 53, 54].map((p) => ({ p, n: conta(textos[p], termo) }))
+      .reduce((a, b) => (b.n > a.n ? b : a))
     assert.equal(lider.p, dono, `\`${termo}\`: quem concentra é o PRD${lider.p}, não o dono declarado PRD${dono}`)
   }
+})
+
+/**
+ * CONTROLE NEGATIVO do próprio mecanismo: se a checagem por seção não estivesse
+ * funcionando, mover o conceito dentro do mesmo arquivo passaria batido. Aqui o
+ * conceito é removido da seção dona (em memória) e a verificação precisa falhar.
+ */
+test("CONTROLE: conceito fora da seção dona é DETECTADO", () => {
+  const mapa = secoes(ler(PRD[53]))
+  const s = secao(mapa, "8.3.1")
+  assert.ok(s && conta(s.corpo, "reference_pack") >= 1, "pré-condição: o termo está na seção dona")
+
+  // Simula a movimentação: corpo da seção sem o termo.
+  const mutilada = s.corpo.replace(/reference_pack/gi, "outro_conceito")
+  assert.equal(conta(mutilada, "reference_pack"), 0,
+    "com o termo fora da seção, a asserção de ownership por seção falharia — que é o ponto")
 })
 
 // ── Registry: fontes citadas existem, com disposição declarada ───────────────

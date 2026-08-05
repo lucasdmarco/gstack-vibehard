@@ -107,4 +107,3 @@ invocação, métricas AX, resultados tipados, admissão explícita e retry cons
 de efeitos. Ficam fora dependências, runtimes paralelos, instalação automática,
 thresholds universais e novos loops. A sequência permanece PRD51/B2 -> PRD52
 certificação -> PRD53 avaliação -> PRD54 experiência operacional.
-
