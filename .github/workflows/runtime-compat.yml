@@ -1,0 +1,193 @@
+name: Runtime compat
+
+# MATRIZ DE COMPATIBILIDADE DO RUNTIME — Trilha B2 do PRD51.
+#
+# Workflow DEDICADO, e não um job dentro de `test.yml`. O `test-node-matrix` de lá
+# roda a suíte inteira em Node 18, onde ela falha estruturalmente por
+# `import.meta.dirname` em 351 arquivos de TESTE — jobs verdes dentro de uma run
+# global vermelha não são evidência de nada. Ver `P0.NODE-SUPPORT-GATE-INVALID`
+# em `src/dream/rc-checklist-prd51.js`.
+#
+# O que esta matriz prova: o PACOTE REAL funciona no Node X.
+# O que ela NÃO prova: que a suíte roda no Node X. São claims separadas.
+#
+# COBERTURA: runners do GitHub Actions provam `ci_runner_cross_os` — máquinas
+# provisionadas, não desktops limpos. O rótulo no ledger é esse.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths:
+      - "scripts/test-runtime-matrix.mjs"
+      - ".github/workflows/runtime-compat.yml"
+      - "package.json"
+      - "src/**"
+  pull_request:
+    branches: [main, master]
+    paths:
+      - "scripts/test-runtime-matrix.mjs"
+      - ".github/workflows/runtime-compat.yml"
+      - "package.json"
+      - "src/**"
+
+jobs:
+  # UM tarball para toda a matriz. Sem isto, 12 jobs empacotariam 12 vezes e o
+  # Node deixaria de ser a única variável sob teste.
+  pack:
+    runs-on: ubuntu-latest
+    outputs:
+      sha256: ${{ steps.manifest.outputs.sha256 }}
+      name: ${{ steps.manifest.outputs.name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+        name: "Install dependencies"
+
+      - name: "Empacota UMA vez e gera o manifest"
+        id: manifest
+        run: |
+          set -euo pipefail
+          mkdir -p dist-matrix
+          NAME=$(npm pack --pack-destination dist-matrix | tail -1 | tr -d '\r')
+          SHA=$(sha256sum "dist-matrix/$NAME" | cut -d' ' -f1)
+          cat > dist-matrix/manifest.json <<EOF
+          {
+            "gitSha": "${GITHUB_SHA}",
+            "packageVersion": "$(node -p "require('./package.json').version")",
+            "tarball": "${NAME}",
+            "sha256": "${SHA}"
+          }
+          EOF
+          cat dist-matrix/manifest.json
+          echo "sha256=${SHA}" >> "$GITHUB_OUTPUT"
+          echo "name=${NAME}" >> "$GITHUB_OUTPUT"
+
+      # O pacote tem dependência de PRODUÇÃO (`smol-toml`). Sem um cache comum,
+      # cada uma das 12 linhas resolveria a árvore pela rede — podendo baixar
+      # entradas diferentes ou falhar por indisponibilidade, e transformando
+      # variação de rede em veredito sobre o Node.
+      - name: "Cache npm comum, para os consumidores instalarem OFFLINE"
+        run: |
+          set -euo pipefail
+          mkdir -p dist-matrix/npm-cache
+          npm cache add "dist-matrix/${{ steps.manifest.outputs.name }}" --cache dist-matrix/npm-cache
+          node -e "
+            const p=require('./package.json');
+            const deps=Object.entries(p.dependencies||{});
+            if(deps.length===0){console.log('sem dependencias de producao');process.exit(0)}
+            console.log('pre-carregando:', deps.map(([n,v])=>n+'@'+v).join(', '));
+          "
+          for SPEC in $(node -p "Object.entries(require('./package.json').dependencies||{}).map(([n,v])=>n+'@'+v).join(' ')"); do
+            npm cache add "$SPEC" --cache dist-matrix/npm-cache
+          done
+          du -sh dist-matrix/npm-cache | cut -f1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gstack-tarball
+          path: dist-matrix/
+          retention-days: 7
+
+  matrix:
+    needs: pack
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node: [18, 20, 22, 24]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: gstack-tarball
+          path: dist-matrix
+
+      # O manifest é verificado ANTES de executar qualquer coisa: um tarball
+      # divergente faria a matriz medir outro artefato sem ninguém notar.
+      - name: "Verifica o manifest (git SHA, versão, SHA-256)"
+        shell: bash
+        run: |
+          set -euo pipefail
+          NAME=$(node -p "require('./dist-matrix/manifest.json').tarball")
+          WANT=$(node -p "require('./dist-matrix/manifest.json').sha256")
+          GOT=$(node -e "const c=require('crypto'),f=require('fs');process.stdout.write(c.createHash('sha256').update(f.readFileSync('dist-matrix/'+process.argv[1])).digest('hex'))" "$NAME")
+          echo "manifest: $WANT"
+          echo "artefato: $GOT"
+          test "$WANT" = "$GOT" || { echo "SHA-256 divergente — abortando"; exit 1; }
+          test "$(node -p "require('./dist-matrix/manifest.json').gitSha")" = "$GITHUB_SHA" \
+            || { echo "manifest de outro commit — abortando"; exit 1; }
+
+      # `--tarball` obrigatório: o job consumidor NUNCA reempacota.
+      # `NPM_CONFIG_CACHE` + `--prefer-offline` fazem a instalação usar o cache
+      # comum do job `pack`, para que rede lenta ou indisponível não vire
+      # veredito sobre o Node.
+      - name: "Matriz de runtime (Node ${{ matrix.node }})"
+        shell: bash
+        env:
+          NPM_CONFIG_CACHE: dist-matrix/npm-cache
+          NPM_CONFIG_PREFER_OFFLINE: "true"
+        run: |
+          set -euo pipefail
+          NAME=$(node -p "require('./dist-matrix/manifest.json').tarball")
+          node scripts/test-runtime-matrix.mjs \
+            --node "$(node -p "process.execPath")" \
+            --tarball "dist-matrix/$NAME" \
+            --json | tee "runtime-matrix-${{ matrix.os }}-node${{ matrix.node }}.json"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: runtime-matrix-${{ matrix.os }}-node${{ matrix.node }}
+          path: runtime-matrix-*.json
+          retention-days: 30
+
+  # AGREGAÇÃO POR SO. Cada job acima roda UM Node, então `strict` nunca enxerga,
+  # sozinho, `jsonl_fallback` em 18/20 e `sqlite` em 22/24 — a divergência de
+  # backend só existe quando as quatro linhas são vistas juntas. Sem este job, a
+  # leitura `strict` de cada linha passaria por vacuidade.
+  aggregate:
+    needs: matrix
+    if: always()
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: runtime-matrix-${{ matrix.os }}-node*
+          path: relatorios
+          merge-multiple: true
+
+      - name: "Agrega os quatro Nodes de ${{ matrix.os }} e calcula as leituras"
+        shell: bash
+        run: |
+          set -euo pipefail
+          ARQS=$(find relatorios -name 'runtime-matrix-${{ matrix.os }}-node*.json' | sort)
+          test -n "$ARQS" || { echo "nenhum relatório para ${{ matrix.os }} — sem medição"; exit 2; }
+          echo "$ARQS"
+          # shellcheck disable=SC2046
+          node scripts/test-runtime-matrix.mjs $(for f in $ARQS; do printf -- '--aggregate %s ' "$f"; done) \
+            --json | tee "agregado-${{ matrix.os }}.json"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: runtime-matrix-agregado-${{ matrix.os }}
+          path: agregado-*.json
+          retention-days: 30
