@@ -3,6 +3,9 @@ import assert from "node:assert/strict"
 import { readFileSync, existsSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
+import {
+  verificarOwnership, secoesDe, secaoPorPrefixo, contar, MATRIZ_CONTRATOS,
+} from "./helpers/prd-ownership.js"
 
 /**
  * Achados externos dos PRDs 52–54 — governança do registro.
@@ -63,104 +66,159 @@ test("o relatório declara o gate do registry e o batch obrigatório", () => {
 
 // ── OWNERSHIP por SEÇÃO ──────────────────────────────────────────────────────
 
-/**
- * Divide o markdown em seções por heading, preservando o corpo de cada uma.
- *
- * Contar no arquivo inteiro é insuficiente: mover `reference_pack` de
- * §8.3.1 para uma seção qualquer do MESMO PRD53 manteria a contagem e passaria
- * verde. A definição precisa estar onde o documento diz que ela está.
- */
-function secoes(texto) {
-  const out = new Map()
-  let atual = "(preambulo)"
-  let buffer = []
-  for (const linha of texto.split("\n")) {
-    const h = linha.match(/^#{1,3}\s+(.+)/)
-    if (h) {
-      out.set(atual, (out.get(atual) ?? "") + buffer.join("\n"))
-      atual = h[1].trim()
-      buffer = [linha]
-      continue
-    }
-    buffer.push(linha)
-  }
-  out.set(atual, (out.get(atual) ?? "") + buffer.join("\n"))
-  return out
-}
+const documentos = () => ({ 52: ler(PRD[52]), 53: ler(PRD[53]), 54: ler(PRD[54]) })
 
-/** Corpo da seção cujo título começa com o prefixo dado. */
-const secao = (mapa, prefixo) => {
-  for (const [titulo, corpo] of mapa) if (titulo.startsWith(prefixo)) return { titulo, corpo }
-  return null
-}
-
-/**
- * SEÇÃO DONA de cada conceito — onde ele é DEFINIDO, não apenas citado.
- * Extraída do mapeamento real dos três documentos.
- */
-const OWNERSHIP = [
-  { termo: "Claim Contract", dono: 52, secao: "22.2", maxOutros: 2 },
-  { termo: "reference_pack", dono: 53, secao: "8.3.1", maxOutros: 0 },
-  { termo: "SkillBinding", dono: 53, secao: "8.6", maxOutros: 0 },
-  { termo: "Scenario Lab", dono: 53, secao: "12. Scenario Lab", maxOutros: 0 },
-  { termo: "Task Graph", dono: 54, secao: "7.2", maxOutros: 1 },
-  { termo: "PendingRequirement", dono: 54, secao: "23.2", maxOutros: 1 },
-  { termo: "drain", dono: 54, secao: "22.3", maxOutros: 0 },
-  { termo: "failureScope", dono: 54, secao: "22.3", maxOutros: 0 },
-]
-
-test("cada conceito está na SEÇÃO dona — não apenas em algum lugar do PRD", () => {
-  const mapas = { 52: secoes(ler(PRD[52])), 53: secoes(ler(PRD[53])), 54: secoes(ler(PRD[54])) }
-
-  for (const { termo, dono, secao: prefixo } of OWNERSHIP) {
-    const s = secao(mapas[dono], prefixo)
-    assert.ok(s, `PRD${dono}: seção \`${prefixo}\` não existe — a estrutura mudou`)
-    assert.ok(conta(s.corpo, termo) >= 1,
-      `\`${termo}\` precisa ser definido em "${s.titulo}" do PRD${dono}; movê-lo para outra seção do MESMO documento manteria a contagem total e passaria despercebido`)
-  }
-})
-
-test("nenhum conceito vaza para o PRD errado — presença não é propriedade", () => {
-  const textos = { 52: ler(PRD[52]), 53: ler(PRD[53]), 54: ler(PRD[54]) }
-
-  for (const { termo, dono, maxOutros } of OWNERSHIP) {
-    for (const outro of [52, 53, 54].filter((p) => p !== dono)) {
-      const n = conta(textos[outro], termo)
-      assert.ok(n <= maxOutros,
-        `\`${termo}\` pertence ao PRD${dono}, mas aparece ${n}x no PRD${outro} (teto ${maxOutros}) — o outro estaria decidindo sobre território alheio`)
-    }
-  }
-})
-
-test("o dono CONCENTRA o conceito — e cada PRD é dono de ao menos um", () => {
-  const textos = { 52: ler(PRD[52]), 53: ler(PRD[53]), 54: ler(PRD[54]) }
-  const donos = {}
-  for (const { termo, dono } of OWNERSHIP) (donos[dono] ??= []).push(termo)
-
+test("a matriz de contratos cobre os três PRDs e todos os contratos aprovados", () => {
+  const porDono = {}
+  for (const c of MATRIZ_CONTRATOS) (porDono[c.dono] ??= []).push(c.termo)
   for (const p of [52, 53, 54]) {
-    assert.ok((donos[p] ?? []).length > 0, `PRD${p} precisa ser dono de ao menos um conceito`)
+    assert.ok((porDono[p] ?? []).length >= 4, `PRD${p} precisa ter ao menos 4 contratos cobertos`)
   }
-  for (const { termo, dono } of OWNERSHIP) {
-    const lider = [52, 53, 54].map((p) => ({ p, n: conta(textos[p], termo) }))
-      .reduce((a, b) => (b.n > a.n ? b : a))
-    assert.equal(lider.p, dono, `\`${termo}\`: quem concentra é o PRD${lider.p}, não o dono declarado PRD${dono}`)
+
+  // Contratos aprovados no relatório comparativo que a primeira versão omitia.
+  const cobertos = new Set(MATRIZ_CONTRATOS.map((c) => c.termo))
+  for (const obrigatorio of [
+    "sourceClass", "evidenceKind", "invocationAuthority", "Agent Experience (AX)",
+    "protótipo", "contextPressure", "effectState", "operatorRunbookRef",
+    "multiplicidade", "uninstall",
+  ]) {
+    assert.ok(cobertos.has(obrigatorio), `contrato aprovado sem cobertura: \`${obrigatorio}\``)
   }
 })
 
-/**
- * CONTROLE NEGATIVO do próprio mecanismo: se a checagem por seção não estivesse
- * funcionando, mover o conceito dentro do mesmo arquivo passaria batido. Aqui o
- * conceito é removido da seção dona (em memória) e a verificação precisa falhar.
- */
-test("CONTROLE: conceito fora da seção dona é DETECTADO", () => {
-  const mapa = secoes(ler(PRD[53]))
-  const s = secao(mapa, "8.3.1")
-  assert.ok(s && conta(s.corpo, "reference_pack") >= 1, "pré-condição: o termo está na seção dona")
+test("TODOS os contratos estão na seção dona, sem vazamento e com concentração", () => {
+  const problemas = verificarOwnership(documentos(), MATRIZ_CONTRATOS)
+  assert.deepEqual(problemas, [],
+    `ownership violado:\n${problemas.map((p) => `  ${p.tipo}: ${p.termo} (PRD${p.dono})`).join("\n")}`)
+})
 
-  // Simula a movimentação: corpo da seção sem o termo.
-  const mutilada = s.corpo.replace(/reference_pack/gi, "outro_conceito")
-  assert.equal(conta(mutilada, "reference_pack"), 0,
-    "com o termo fora da seção, a asserção de ownership por seção falharia — que é o ponto")
+/**
+ * CONTROLE NEGATIVO REAL — o anterior era vazio.
+ *
+ * A versão anterior removia o termo e apenas confirmava que a remoção ocorrera;
+ * NUNCA executava a validação. Se o verificador parasse de reprovar, o controle
+ * seguiria verde — um teste que testava a si mesmo. Aqui o documento mutilado é
+ * passado ao MESMO `verificarOwnership` do teste principal, e ele precisa
+ * devolver o problema.
+ */
+test("CONTROLE: mover contrato para outra seção do MESMO PRD é reprovado", () => {
+  const docs = documentos()
+  const mapa = secoesDe(docs[53])
+  const s = secaoPorPrefixo(mapa, "8.3.1")
+  assert.ok(s && contar(s.corpo, "reference_pack") >= 1, "pré-condição: o termo está na seção dona")
+
+  // Move o termo para FORA da seção dona mantendo-o no documento: a contagem
+  // TOTAL do arquivo não muda, e só a checagem por seção pega a diferença.
+  const antes = contar(docs[53], "reference_pack")
+  const removidos = contar(s.corpo, "reference_pack")
+  const corpoSemTermo = s.corpo.replace(/reference_pack/gi, "termo_deslocado")
+  const mutilado = `${docs[53].replace(s.corpo, corpoSemTermo)}\n\n## 99. Apêndice\n\n${"reference_pack ".repeat(removidos)}\n`
+
+  assert.equal(contar(mutilado, "reference_pack"), antes,
+    "a contagem total precisa ficar IDÊNTICA — é isso que torna a checagem por arquivo cega ao deslocamento")
+
+  const problemas = verificarOwnership({ ...docs, 53: mutilado }, MATRIZ_CONTRATOS)
+  const achado = problemas.find((p) => p.termo === "reference_pack" && p.tipo === "secao_ausente")
+  assert.ok(achado, `o verificador precisa reprovar; devolveu: ${JSON.stringify(problemas)}`)
+  assert.equal(achado.dono, 53)
+  assert.equal(achado.secao, "8.3.1")
+})
+
+test("CONTROLE: contrato vazando para outro PRD é reprovado", () => {
+  const docs = documentos()
+  // Injeta `SkillBinding` (do PRD53) dez vezes no PRD54.
+  const mutilado = `${docs[54]}\n\n## 98. Invasão\n\n${"SkillBinding ".repeat(10)}\n`
+
+  const problemas = verificarOwnership({ ...docs, 54: mutilado }, MATRIZ_CONTRATOS)
+  const vazou = problemas.find((p) => p.termo === "SkillBinding" && p.tipo === "vazamento")
+  assert.ok(vazou, "o verificador precisa detectar o vazamento")
+  assert.equal(vazou.outro, "54")
+  assert.ok(vazou.n > vazou.teto)
+})
+
+/**
+ * O regime `compartilhadoCom` é a saída óbvia para fazer qualquer contrato
+ * inconveniente passar. Estes três testes fecham a porta: ele é minoritário,
+ * exige a seção âncora como o exclusivo, e IMPÕE obrigações que o exclusivo não
+ * tem — quem compartilha precisa usar, e quem não foi declarado não pode usar.
+ */
+test("compartilhamento é exceção medida, não regime padrão", () => {
+  const compartilhados = MATRIZ_CONTRATOS.filter((c) => c.compartilhadoCom)
+  assert.ok(compartilhados.length >= 1, "há ao menos um — senão os controles abaixo não valem")
+  assert.ok(compartilhados.length * 4 <= MATRIZ_CONTRATOS.length,
+    `${compartilhados.length}/${MATRIZ_CONTRATOS.length} compartilhados: virou escape hatch, não exceção`)
+  for (const c of compartilhados) {
+    assert.ok(c.secao, `\`${c.termo}\` compartilhado ainda precisa declarar a seção âncora do dono`)
+    assert.equal(c.maxOutros, undefined, "`maxOutros` não se aplica ao regime compartilhado — deixá-lo confunde os dois")
+  }
+})
+
+test("CONTROLE: compartilhador declarado que ABANDONA o termo é reprovado", () => {
+  const docs = documentos()
+  const semTermo = docs[54].replace(/sourceClass/gi, "campo_removido")
+  const problemas = verificarOwnership({ ...docs, 54: semTermo }, MATRIZ_CONTRATOS)
+  const achado = problemas.find((p) => p.termo === "sourceClass" && p.tipo === "compartilhador_ausente")
+  assert.ok(achado, "vocabulário transversal que some de um dos documentos deixou de ser transversal")
+  assert.equal(achado.outro, "54")
+})
+
+test("CONTROLE: uso por PRD fora da lista declarada é reprovado", () => {
+  const docs = documentos()
+  const restrito = MATRIZ_CONTRATOS.map((c) =>
+    c.termo === "sourceClass" ? { ...c, compartilhadoCom: [54] } : c)
+  const problemas = verificarOwnership(docs, restrito)
+  const achado = problemas.find((p) => p.termo === "sourceClass" && p.tipo === "compartilhamento_nao_declarado")
+  assert.ok(achado, "PRD52 usa o termo sem estar declarado — precisa reprovar")
+  assert.equal(achado.outro, "52")
+})
+
+/**
+ * CONCENTRAÇÃO — a regra que sobreviveu ao primeiro round de mutação.
+ *
+ * Desligar `sem_concentracao` no verificador não fazia teste algum falhar: os
+ * controles existentes eram todos casos em que `vazamento` disparava junto e
+ * mascarava a ausência. Documentos SINTÉTICOS resolvem isso — com teto folgado,
+ * `vazamento` não dispara e só a concentração pode pegar o problema.
+ */
+const SINTETICO = (n52, n53, n54) => ({
+  52: `## 9.9 Âncora\n\n${"conceito ".repeat(n52)}`,
+  53: `## 9.9 Âncora\n\n${"conceito ".repeat(n53)}`,
+  54: `## 9.9 Âncora\n\n${"conceito ".repeat(n54)}`,
+})
+const CONTRATO_SINTETICO = [{ termo: "conceito", dono: 53, secao: "9.9", maxOutros: 99 }]
+
+test("CONTROLE: dono que perde a concentração é reprovado — mesmo sem vazamento", () => {
+  // PRD52 concentra 9× contra 1× do dono; teto 99 impede que `vazamento` dispare.
+  const problemas = verificarOwnership(SINTETICO(9, 1, 1), CONTRATO_SINTETICO)
+  assert.deepEqual(problemas.map((p) => p.tipo), ["sem_concentracao"],
+    "só a concentração pode acusar aqui; se vier vazamento junto, o caso deixou de isolar a regra")
+  assert.equal(problemas[0].lider, "52")
+  assert.equal(problemas[0].n, 9)
+})
+
+test("CONTROLE: empate NÃO conta como concentração do dono", () => {
+  // Empate 5-5-5: ninguém concentra, e o dono não pode herdar a dúvida.
+  const problemas = verificarOwnership(SINTETICO(5, 5, 5), CONTRATO_SINTETICO)
+  assert.equal(problemas.length, 1, "empate precisa reprovar — ownership por maioria simples não existe")
+  assert.equal(problemas[0].tipo, "sem_concentracao")
+})
+
+test("CONTROLE: dono que concentra é aprovado — a regra não reprova sempre", () => {
+  assert.deepEqual(verificarOwnership(SINTETICO(1, 9, 1), CONTRATO_SINTETICO), [])
+})
+
+test("CONTROLE: seção dona inexistente é reprovada, não ignorada", () => {
+  const docs = documentos()
+  const problemas = verificarOwnership(docs, [
+    { termo: "reference_pack", dono: 53, secao: "99.9 Seção que não existe", maxOutros: 0 },
+  ])
+  assert.ok(problemas.some((p) => p.tipo === "secao_inexistente"),
+    "seção ausente precisa reprovar — silenciar seria aprovar por omissão")
+})
+
+test("CONTROLE: verificador aprova documentos íntegros — não reprova por construção", () => {
+  assert.deepEqual(verificarOwnership(documentos(), MATRIZ_CONTRATOS), [],
+    "se reprovasse sempre, os controles negativos não provariam nada")
 })
 
 // ── Registry: fontes citadas existem, com disposição declarada ───────────────
