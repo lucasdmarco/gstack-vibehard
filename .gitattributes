@@ -1,0 +1,13 @@
+# Artefatos de EVIDÊNCIA são identificados por hash do arquivo, então precisam
+# atravessar clone e checkout byte a byte.
+#
+# `core.autocrlf=true` normaliza LF no blob e reexpande para CRLF no checkout
+# Windows. Para código isso é inofensivo; para uma âncora de procedência é fatal:
+# o recibo da Trilha B2 tem sha256 `cc148ce3…` neste Windows e `fcf627de…` no
+# blob, de modo que a mesma cadeia de evidência daria "adulterada" num clone
+# Linux — sem que nada tivesse sido adulterado.
+#
+# `-text` desliga toda conversão nesses caminhos. Os bytes versionados são os que
+# saíram da medição (descontado apenas o BOM de transporte).
+.docs/RESEARCH/*.receipt.json -text
+.docs/RESEARCH/*.anchor.json  -text

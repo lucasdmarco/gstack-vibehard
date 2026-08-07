@@ -61,6 +61,28 @@ test("CONTROLE: `escreverRecibo` recusa emitir BOM", () => {
   assert.deepEqual(JSON.parse(bytes.toString("utf-8")), { schemaVersion: "teste", n: 1 })
 })
 
+/**
+ * O hash da âncora identifica o ARQUIVO, então ele precisa sobreviver a clone e
+ * checkout em qualquer plataforma.
+ *
+ * `core.autocrlf=true` normaliza LF no blob e reexpande CRLF no checkout Windows.
+ * Para código isso é inofensivo; aqui era fatal: o recibo tinha `cc148ce3…` neste
+ * Windows e `fcf627de…` no blob, de modo que a MESMA evidência intacta acusaria
+ * adulteração num clone Linux. `.gitattributes` desliga a conversão nesses
+ * caminhos, e este teste guarda a igualdade que torna a âncora portátil.
+ */
+test("os artefatos de evidência atravessam o Git byte a byte", () => {
+  const atributos = readFileSync(path.join(repoRoot, ".gitattributes"), "utf8")
+  for (const rel of [RECIBO, ANCORA]) {
+    const noIndice = execFileSync("git", ["hash-object", rel], { cwd: repoRoot, encoding: "utf-8" }).trim()
+    const semFiltro = execFileSync("git", ["hash-object", "--no-filters", rel], { cwd: repoRoot, encoding: "utf-8" }).trim()
+    assert.equal(noIndice, semFiltro,
+      `${rel}: o Git aplicaria conversão de EOL, e o hash da âncora deixaria de bater fora do Windows`)
+  }
+  assert.match(atributos, /\.receipt\.json\s+-text/, "a regra precisa estar declarada, não depender de sorte de configuração")
+  assert.match(atributos, /\.anchor\.json\s+-text/)
+})
+
 // ── Ancoragem por hash: recibo ↔ tarball ↔ commit ───────────────────────────
 
 test("a âncora referencia o recibo pelo hash do arquivo versionado", () => {
