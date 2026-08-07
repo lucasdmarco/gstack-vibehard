@@ -195,6 +195,38 @@ export function requiresDebugEnv(expr) {
   return false                                          // `||` e comparacoes
 }
 
+/**
+ * Nomes que, como condicao, denotam MODO MAQUINA.
+ *
+ * Curto e literal: `json`, `--json`, `asJson`. Nao ha inferencia semantica — um
+ * `if (config)` nao vira modo maquina por ser uma flag qualquer.
+ */
+const MACHINE_FLAG = /^(?:--)?(?:json|as_?json|machine)$/i
+
+/**
+ * Despacho por FORMA do no, em tabela.
+ *
+ * A versao em cascata de `if`s tinha complexidade ciclomatica 11 e crescia a
+ * cada forma nova. A tabela mantem cada caso legivel isoladamente e o
+ * caminhamento em um lugar so.
+ */
+const FLAG_POR_FORMA = [
+  [ts.isIdentifier, (e) => MACHINE_FLAG.test(e.text)],
+  [ts.isStringLiteral, (e) => MACHINE_FLAG.test(e.text)],
+  [ts.isPropertyAccessExpression, (e) => ts.isIdentifier(e.name) && MACHINE_FLAG.test(e.name.text)],
+  [ts.isPrefixUnaryExpression, (e, rec) => rec(e.operand)],
+  [ts.isParenthesizedExpression, (e, rec) => rec(e.expression)],
+  [ts.isBinaryExpression, (e, rec) => rec(e.left) || rec(e.right)],
+  [ts.isCallExpression, (e, rec) => e.arguments.some(rec)],
+]
+
+/** A condicao menciona explicitamente a flag de saida de maquina? */
+function mencionaFlagDeMaquina(expr) {
+  if (!expr) return false
+  const caso = FLAG_POR_FORMA.find(([ehForma]) => ehForma(expr))
+  return caso ? Boolean(caso[1](expr, mencionaFlagDeMaquina)) : false
+}
+
 /** `filho` esta contido em `alvo` por POSICAO na arvore? */
 const contains = (alvo, filho) => Boolean(alvo)
   && filho.getStart() >= alvo.getStart() && filho.getEnd() <= alvo.getEnd()
@@ -220,6 +252,23 @@ export function underDebugGuard(node) {
   return false
 }
 
+/**
+ * O ponto esta no ramo de MODO MAQUINA (`if (json) …`)?
+ *
+ * Mesma disciplina de `underDebugGuard`: para na fronteira da funcao, porque uma
+ * condicao fora dela nao controla este ponto, e olha SO o ramo `then` — no `else`
+ * de `if (json)` estamos justamente no caminho humano.
+ */
+export function underMachineGuard(node) {
+  for (let p = node.parent; p; p = p.parent) {
+    if (isFunctionLike(p)) break
+    if (!ts.isIfStatement(p)) continue
+    if (!mencionaFlagDeMaquina(p.expression)) continue
+    if (contains(p.thenStatement, node)) return true
+  }
+  return false
+}
+
 /** Identificadores interpolados num template literal (sem resolver origem). */
 function templateIdentifiers(arg) {
   if (!arg || !ts.isTemplateExpression(arg)) return null
@@ -235,6 +284,142 @@ function templateIdentifiers(arg) {
 }
 
 // ── Regras ───────────────────────────────────────────────────────────────────
+
+// ── Evidencia ESTRUTURAL do argumento ────────────────────────────────────────
+
+/**
+ * Serializadores que constituem prova de payload de maquina.
+ *
+ * A lista e curta de proposito e olha a CHAMADA, nao o nome da variavel: um
+ * `const json = "texto humano"` nao vira protocolo por se chamar json.
+ */
+const SERIALIZADORES = new Set(["JSON.stringify"])
+
+/** Nome pontuado do callee, quando ele e `obj.metodo` ou `f`. Senao `null`. */
+function calleeDotted(node) {
+  if (!ts.isCallExpression(node)) return null
+  const c = node.expression
+  if (ts.isIdentifier(c)) return c.text
+  if (!ts.isPropertyAccessExpression(c) || !ts.isIdentifier(c.name)) return null
+  return ts.isIdentifier(c.expression) ? `${c.expression.text}.${c.name.text}` : null
+}
+
+/**
+ * A string e composta SO de bytes de controle do terminal?
+ *
+ * Sequencias CSI (`\x1b[...`), BEL, CR e backspace nao tem idioma: nao ha o que
+ * traduzir num apagar-linha. Uma unica letra fora de sequencia derruba a
+ * classificacao — `\x1b[2KAborted` e texto que o usuario le, com enfeite.
+ */
+const SO_CONTROLE = /^(?:\[[0-9;?]*[ -/]*[@-~]|[@-Z\\-_]|[\r\b\n\t ])+$/
+
+/** Partes literais que servem apenas de separador entre payloads. */
+const SO_SEPARADOR = (s) => /^[\r\n\t ]*$/.test(s)
+
+/**
+ * Decompoe a expressao de saida em PARTES, atravessando concatenacao e template.
+ *
+ * `process.stdout.write(JSON.stringify(x) + "\n")` e a forma dominante no
+ * repositorio: sem atravessar o `+`, o serializador ficaria escondido atras de
+ * uma BinaryExpression e o ponto seria opaco.
+ */
+const ehConcatenacao = (n) => ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.PlusToken
+const ehLiteralDeTexto = (n) => ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)
+
+const espalharTemplate = (node, acc, rec) => {
+  acc.push({ tipo: "literal", texto: node.head.text })
+  for (const s of node.templateSpans) {
+    rec(s.expression, acc)
+    acc.push({ tipo: "literal", texto: s.literal.text })
+  }
+}
+
+/** Uma forma por linha; o caminhamento fica em `partesDaExpressao`. */
+const PARTE_POR_FORMA = [
+  [ts.isParenthesizedExpression, (n, acc, rec) => rec(n.expression, acc)],
+  [ehConcatenacao, (n, acc, rec) => { rec(n.left, acc); rec(n.right, acc) }],
+  [ts.isTemplateExpression, espalharTemplate],
+  [ehLiteralDeTexto, (n, acc) => acc.push({ tipo: "literal", texto: n.text })],
+]
+
+const empurrarChamada = (node, acc) => {
+  const dotted = calleeDotted(node)
+  if (dotted && SERIALIZADORES.has(dotted)) acc.push({ tipo: "serializador", nome: dotted })
+  else acc.push({ tipo: "opaco" })
+}
+
+function partesDaExpressao(node, acc = []) {
+  if (!node) return acc
+  const caso = PARTE_POR_FORMA.find(([ehForma]) => ehForma(node))
+  if (caso) caso[1](node, acc, partesDaExpressao)
+  else empurrarChamada(node, acc)
+  return acc
+}
+
+/**
+ * Forma do argumento — evidencia ESTRUTURAL, nunca leitura de conteudo.
+ *
+ *   `serializer`    toda parte e serializador ou separador em branco;
+ *   `control_only`  literais compostos so de bytes de controle;
+ *   `text`          ha literal com texto legivel;
+ *   `opaque`        identificador ou chamada arbitraria — nao se sabe.
+ *
+ * `opaque` NAO e um resultado ruim: e a recusa em adivinhar. Um `write(buffer)`
+ * pode ser qualquer coisa, e classificar por otimismo foi o erro que a fatia
+ * Python ja cometeu uma vez.
+ */
+/** Resumo das partes — computado uma vez, lido pelas regras de forma. */
+const resumoDasPartes = (partes) => {
+  const literais = partes.filter((p) => p.tipo === "literal")
+  return {
+    literais,
+    serializador: partes.find((p) => p.tipo === "serializador")?.nome ?? null,
+    temOpaco: partes.some((p) => p.tipo === "opaco"),
+    soSeparadores: literais.every((l) => SO_SEPARADOR(l.texto)),
+    soControle: literais.length > 0 && literais.every((l) => SO_CONTROLE.test(l.texto)),
+    temTexto: literais.some((l) => l.texto.trim().length > 0),
+  }
+}
+
+/**
+ * Uma linha por forma, da evidencia mais forte para a mais fraca.
+ *
+ * `text_literal` e `text` sao formas SEPARADAS porque provam coisas diferentes.
+ * Uma frase inteiramente literal e mensagem redigida para alguem ler. Assim que
+ * entra parte opaca (`"SELECT * FROM " + tabela`), a expressao pode formar
+ * qualquer coisa — inclusive uma query logada num modulo de banco, que foi
+ * exatamente o caso em que a primeira versao de `command-human-branch`
+ * classificou como canal humano do CLI algo que nao e canal do CLI.
+ */
+const FORMAS_DO_ARGUMENTO = [
+  [(r) => r.serializador && !r.temOpaco && r.soSeparadores, (r) => ({ forma: "serializer", serializador: r.serializador })],
+  [(r) => !r.serializador && !r.temOpaco && r.soControle, () => ({ forma: "control_only" })],
+  [(r) => r.temTexto && !r.temOpaco, () => ({ forma: "text_literal" })],
+  [(r) => r.temTexto, () => ({ forma: "text" })],
+]
+
+export function formaDoArgumento(arg) {
+  const partes = partesDaExpressao(arg)
+  if (partes.length === 0) return { forma: "none", partes }
+  const r = resumoDasPartes(partes)
+  const caso = FORMAS_DO_ARGUMENTO.find(([quando]) => quando(r))
+  return { ...(caso ? caso[1](r) : { forma: "opaque" }), partes }
+}
+
+/**
+ * CONSUMIDORES DECLARADOS de protocolo de maquina.
+ *
+ * `machine_protocol` exige serializador estrutural E consumidor provado — as
+ * duas coisas, sempre. Sem esta lista, todo `write(JSON.stringify(x))` viraria
+ * protocolo por parecer um, e a categoria vira o deposito de "casos sem idioma"
+ * contra o qual `i18n-audiences.js` avisa explicitamente.
+ *
+ * Cada entrada nomeia o teste que CONSOME a saida. Nasce vazia de proposito: a
+ * Task 3 instala a regra, e cada arquivo migrado a preenche com a prova dele
+ * (ver `tests/i18n_js_ast_command_surfaces.test.js`, que exercita a regra com
+ * consumidor injetado, e a Fatia 4, que migra `monitor.js` e `create.js`).
+ */
+export const MACHINE_PROTOCOL_CONSUMERS = Object.freeze({})
 
 /**
  * Ordem: da evidencia mais especifica para a menos. `unknown` e o ultimo
@@ -295,18 +480,81 @@ export const JS_RULES = Object.freeze([
     trigger: "render_module_surface",
     reason: "console.* no modulo de render que nao e primitiva/prompt/debug: por identidade do modulo, e texto que o usuario le",
   },
+  {
+    /**
+     * Ramo HUMANO de comando exportado — a regra mais arriscada desta leva, e
+     * por isso a mais restrita das cinco.
+     *
+     * Ela NAO aprova `console.*` em massa. Exige, de uma vez: chamada a
+     * `console` (global do runtime, nao um homonimo de projeto), dentro de
+     * funcao EXPORTADA, com argumento de forma `text` — literal legivel, nunca
+     * `opaque` nem serializador — e FORA de qualquer ramo `if (json)`. Um
+     * comando que imprime JSON no ramo maquina e texto no ramo humano tem os
+     * dois pontos classificados de forma diferente, que e o comportamento certo:
+     * a audiencia e do PONTO, nao do arquivo.
+     */
+    id: "command-human-branch",
+    when: (p) => !isCanonicalRenderFile(p.file)
+      && p.binding.kind === "global"
+      && String(p.callee).startsWith("console.")
+      && p.exportedFromModule
+      && p.argForm === "text_literal"
+      && p.underMachineGuard !== true,
+    audience: "public_diagnostic",
+    trigger: "command_human_branch",
+    reason: "console.* com argumento INTEIRAMENTE literal, em funcao exportada, fora do ramo de maquina: frase redigida para alguem ler. Parte opaca derruba a regra: concatenar identificador desconhecido forma qualquer coisa, inclusive uma query logada num modulo de banco, que nao e canal do CLI",
+  },
 ])
 
-export function classifyPoint(p) {
-  // Escrita direta em stream e EXTRAIDA sempre e CLASSIFICADA nunca — por ora.
-  // Sem isso, `render-module-literal-output` daria `public_diagnostic` a todo
-  // `process.stdout.write` do modulo de render so pela identidade do arquivo,
-  // e um `write` de payload JSON viraria "texto que o usuario le". Extrair sem
-  // evidencia mantem o ponto visivel; classificar sem evidencia o falsifica.
-  if (p.sink) return { audience: "unknown", trigger: null, rule: null }
-  const r = JS_RULES.find((x) => x.when(p))
+/**
+ * Regras de ESCRITA DIRETA em stream — separadas das demais de proposito.
+ *
+ * Um `process.stdout.write` nao pode ser classificado pela identidade do arquivo:
+ * `render-module-literal-output` daria `public_diagnostic` a todo write do modulo
+ * de render, e um payload JSON viraria "texto que o usuario le". Aqui a decisao
+ * vem SO da forma da expressao (`formaDoArgumento`) e da guarda que envolve o
+ * ponto. O que nao casar nenhuma destas tres continua `unknown`: extrair sem
+ * evidencia mantem o ponto visivel, classificar sem evidencia o falsifica.
+ */
+export const SINK_RULES = Object.freeze([
+  {
+    // Guarda POSITIVA. `requiresDebugEnv` ja garante que `!DEBUG` e
+    // `DEBUG || outra` nao contam: no ramo THEN dessas duas o debug esta
+    // DESLIGADO, e chamar aquilo de `internal_debug` afirmaria que a saida esta
+    // fora do fluxo padrao justamente quando ela esta dentro dele.
+    id: "stream-debug-guarded",
+    when: (p) => p.underDebugGuard === true,
+    audience: "internal_debug",
+    trigger: "debug_flag",
+    reason: "escrita em stream sob ativacao explicita de debug",
+    risk: "raw_stack_paths_and_secrets",
+  },
+  {
+    id: "stream-json-protocol",
+    when: (p, ctx) => p.argForm === "serializer" && Boolean(ctx.consumers[p.file]),
+    audience: "machine_protocol",
+    trigger: "structural_serializer",
+    reason: "payload de serializador estrutural com consumidor DECLARADO — as duas coisas; serializador sozinho nao prova que alguem consome",
+  },
+  {
+    id: "stream-terminal-control",
+    when: (p) => p.argForm === "control_only",
+    audience: "terminal_control",
+    trigger: "control_bytes",
+    reason: "literal composto so de bytes de controle (CSI/BEL/CR): nao ha idioma num apagar-linha",
+  },
+])
+
+const aplicar = (regras, p, ctx) => {
+  const r = regras.find((x) => x.when(p, ctx))
   if (!r) return { audience: "unknown", trigger: null, rule: null }
   return { audience: r.audience, trigger: r.trigger, rule: r.id }
+}
+
+export function classifyPoint(p, ctx = {}) {
+  const consumers = ctx.consumers ?? MACHINE_PROTOCOL_CONSUMERS
+  if (p.sink) return aplicar(SINK_RULES, p, { consumers })
+  return aplicar(JS_RULES, p, { consumers })
 }
 
 export const rules = () => JS_RULES.map(({ id, audience, trigger, reason, risk }) =>
@@ -400,7 +648,7 @@ export function canonicalNameOf(checker, idNode) {
   return nomeDaDeclaracao(sym) ?? sym.getName() ?? null
 }
 
-export function analyzeFile(filePath, analyzer = null) {
+export function analyzeFile(filePath, analyzer = null, ctx = {}) {
   const a = analyzer || createAnalyzer([filePath])
   const sf = a.program.getSourceFile(filePath)
   if (!sf) throw new Error(`arquivo nao esta no programa: ${filePath}`)
@@ -427,10 +675,14 @@ export function analyzeFile(filePath, analyzer = null) {
       binding: d.binding,
       ...ancestry(node),
       underDebugGuard: underDebugGuard(node),
+      underMachineGuard: underMachineGuard(node),
       templateIds: templateIdentifiers(arg0),
       argKind: arg0 ? ts.SyntaxKind[arg0.kind] : "none",
+      // Forma ESTRUTURAL do argumento — o que permite decidir sobre um
+      // `process.*.write` sem apelar para a identidade do arquivo.
+      argForm: formaDoArgumento(arg0).forma,
     }
-    pontos.push({ ...base, ...classifyPoint(base) })
+    pontos.push({ ...base, ...classifyPoint(base, ctx) })
   }
 
   /** `console` e global do runtime: nao ha simbolo de projeto a resolver. */
