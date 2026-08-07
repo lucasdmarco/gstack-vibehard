@@ -173,6 +173,80 @@ test("as três claims permanecem no escopo medido — nenhuma inflada", () => {
   assert.deepEqual({ ...ancora().claims }, esperado, "a âncora não pode prometer mais que o ledger")
 })
 
+/**
+ * A prosa do ledger é pública e é lida por humanos que decidem. Ela não pode
+ * dizer o contrário do campo estruturado ao lado.
+ *
+ * O item afirmava, no fim de `evidence`, que "`runtime_compatibility` segue
+ * `unproven`" — texto correto ANTES da matriz e congelado depois dela, enquanto
+ * `claims.runtime_compatibility` já valia `proved_windows_local`. Quem lesse o
+ * parágrafo tiraria a conclusão oposta à do campo.
+ */
+const AFIRMA_UNPROVEN = /runtime_compatibility[^.]{0,60}(segue|permanece|continua|é|e)\s+`?unproven/i
+
+test("o ledger não afirma `unproven` para uma claim que já foi provada", () => {
+  const item = PRD51_RC_ITEMS.find((i) => i.id === "P0.NODE-SUPPORT-GATE-INVALID")
+  const prosa = [item.evidence, item.impact, item.title, item.affectedScope].filter(Boolean).join("\n")
+  assert.equal(item.claims.runtime_compatibility, "proved_windows_local", "pré-condição do caso")
+  assert.doesNotMatch(prosa, AFIRMA_UNPROVEN,
+    "a prosa contradiz `claims.runtime_compatibility` — um leitor humano decidiria pelo texto")
+})
+
+test("CONTROLE: o detector de contradição REALMENTE pega a frase antiga", () => {
+  // Sem isto, a asserção acima passaria por a regex nunca casar nada.
+  const textoAntigo = "Varredura estática não é execução: `runtime_compatibility` segue `unproven`."
+  assert.match(textoAntigo, AFIRMA_UNPROVEN, "a regex precisa reprovar a redação que existia")
+})
+
+test("o que PERMANECE não-provado segue escrito, sem promoção por tabela", () => {
+  const item = PRD51_RC_ITEMS.find((i) => i.id === "P0.NODE-SUPPORT-GATE-INVALID")
+  assert.match(MATRIZ.cross_os, /unproven/, "cross-OS não pode ser promovido junto com o runtime")
+  assert.equal(item.claims.suite_compatibility, "failing")
+  assert.equal(item.claims.safe_support, "undecided")
+  assert.notEqual(item.status, "delivered")
+  assert.match(item.impact, /decis[ãa]o de pol[íi]tica/i,
+    "a parte que depende de decisão humana precisa continuar declarada como tal")
+})
+
+/**
+ * O `-text` preserva os bytes e, com isso, cada linha do recibo termina em CR —
+ * o que faz `git diff --check` reprovar as 423 linhas como trailing whitespace.
+ * Um gate de higiene reprovando por inteiro o arquivo que deveria proteger acaba
+ * sendo desligado por alguém, e a preservação de bytes vai junto.
+ */
+test("os artefatos declaram `whitespace=cr-at-eol` junto do `-text`", () => {
+  const atributos = readFileSync(path.join(repoRoot, ".gitattributes"), "utf8")
+  for (const padrao of ["receipt", "anchor"]) {
+    const linha = atributos.split("\n").find((l) => l.includes(`.${padrao}.json`) && !l.startsWith("#"))
+    assert.ok(linha, `sem regra para *.${padrao}.json`)
+    assert.match(linha, /-text/, "preservação de bytes é o requisito primário")
+    assert.match(linha, /whitespace=cr-at-eol/,
+      "sem isto, `git diff --check` reprova o arquivo inteiro e o CR preservado vira 'sujeira'")
+  }
+})
+
+test("`git diff --check` aprova os artefatos preservados", () => {
+  const saida = execFileSync("git", ["diff", "--check", "6d06008..HEAD"], { cwd: repoRoot, encoding: "utf-8" })
+  assert.equal(saida.trim(), "", `diff --check reprovou:\n${saida.slice(0, 400)}`)
+})
+
+/**
+ * O achado sobre procedência não foi corrigido nesta leva — foi DEFERIDO por
+ * decisão humana. Um deferimento sem registro é indistinguível de esquecimento.
+ */
+test("o achado de procedência do artefato está registrado como P1 deferido", () => {
+  const item = PRD51_RC_ITEMS.find((i) => i.id === "P1.ARTIFACT-SOURCE-INFERRED")
+  assert.ok(item, "achado deferido precisa existir no ledger, não só no histórico da revisão")
+  assert.equal(item.tier, "P1")
+  assert.notEqual(item.status, "delivered")
+  assert.ok(item.deferredTo, "deferimento sem destino é esquecimento com outro nome")
+  assert.match(item.requires, /executorCheckout/, "o desenho da correção precisa ficar escrito")
+  assert.match(item.requires, /artifactSource/)
+  assert.match(item.requires, /manifest/i)
+  assert.match(item.impact, /1039\/1039|reconcilia/i,
+    "o impacto precisa dizer por que a rodada de 2026-08-05 NÃO é afetada")
+})
+
 test("a âncora declara por escrito o que NÃO prova", () => {
   const a = ancora()
   assert.ok(a.naoProva.length >= 3)

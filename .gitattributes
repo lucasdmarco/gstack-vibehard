@@ -9,5 +9,13 @@
 #
 # `-text` desliga toda conversão nesses caminhos. Os bytes versionados são os que
 # saíram da medição (descontado apenas o BOM de transporte).
-.docs/RESEARCH/*.receipt.json -text
-.docs/RESEARCH/*.anchor.json  -text
+#
+# `whitespace=cr-at-eol` acompanha o `-text` e NÃO é cosmético. Preservados os
+# bytes, cada linha do recibo termina em CR, e `git diff --check` acusa as 423
+# como "trailing whitespace" — um gate de higiene que reprova por completo o
+# arquivo que ele deveria proteger. O atributo declara que o CR ali é o conteúdo,
+# não sujeira, e o gate volta a distinguir uma coisa da outra. A alternativa
+# seria reescrever o recibo com LF, o que alteraria a evidência para agradar o
+# linter.
+.docs/RESEARCH/*.receipt.json -text whitespace=cr-at-eol
+.docs/RESEARCH/*.anchor.json  -text whitespace=cr-at-eol

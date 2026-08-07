@@ -191,7 +191,7 @@ export const PRD51_RC_ITEMS = Object.freeze([
       anchor: ".docs/RESEARCH/prd51-runtime-matrix-20260805.anchor.json",
       tarballReconciledWithCommit: "1039/1039 arquivos idênticos por hash de blob; 0 divergentes, 0 ausentes",
     }),
-    evidence: "Medição direta em Node 18.20.8 (win-x64, portátil) no commit 5ede986: `node --test tests/` = 561 testes, 208 pass, 352 fail, 1 skip. Causa única: `import.meta.dirname` (Node >= 20.11) em 351 arquivos de tests/. ZERO falhas atribuíveis à Fase 1B — seus 4 arquivos (i18n_js_ast, _binding, _sinks, _registry) dão 74/74 pass no MESMO Node 18. `package.json` declara `engines.node >= 18`; `.github/workflows/test.yml:48` roda `npm test` completo na matriz [18, 20]. ESCOPO DESTA EVIDÊNCIA: ela mede a SUÍTE. Sobre o runtime, a única leitura feita foi ESTÁTICA — varredura de 15 APIs sensíveis a versão em `src/` sem incompatibilidade encontrada (`node:sqlite` tem guarda e fallback JSONL declarado em src/state/store.js:25-30; `Map.groupBy` foi evitado citando o floor em src/skills/gate-matrix.js:228; 1 dependência de produção; sem postinstall). Varredura estática não é execução: `runtime_compatibility` segue `unproven`.",
+    evidence: "Medição direta em Node 18.20.8 (win-x64, portátil) no commit 5ede986: `node --test tests/` = 561 testes, 208 pass, 352 fail, 1 skip. Causa única: `import.meta.dirname` (Node >= 20.11) em 351 arquivos de tests/. ZERO falhas atribuíveis à Fase 1B — seus 4 arquivos (i18n_js_ast, _binding, _sinks, _registry) dão 74/74 pass no MESMO Node 18. `package.json` declara `engines.node >= 18`; `.github/workflows/test.yml:48` roda `npm test` completo na matriz [18, 20]. ESCOPO DESTA EVIDÊNCIA: ela mede a SUÍTE. Sobre o runtime, a única leitura feita foi ESTÁTICA — varredura de 15 APIs sensíveis a versão em `src/` sem incompatibilidade encontrada (`node:sqlite` tem guarda e fallback JSONL declarado em src/state/store.js:25-30; `Map.groupBy` foi evitado citando o floor em src/skills/gate-matrix.js:228; 1 dependência de produção; sem postinstall). Varredura estática não é execução — e por isso `runtime_compatibility` ficou `unproven` ATÉ 2026-08-05. SUPERADO NAQUELA DATA pela matriz da Trilha B2 (`runtimeMatrix` acima): o runtime foi EXECUTADO em Node 18/20/22/24 sobre o pacote real, e `runtime_compatibility` passou a `proved_windows_local`. O parágrafo anterior descreve a leitura estática que existia antes da medição; ele é registro histórico do raciocínio, não o estado atual da claim. O que esta evidência da SUÍTE continua sustentando, sem alteração, é `suite_compatibility: failing`.",
     impact: "O gate `test-node-matrix` reprova por incompatibilidade estrutural da SUÍTE, não por regressão do produto — nunca poderia ter dado sinal útil sobre o runtime. ATUALIZADO EM 2026-08-05: a matriz da Trilha B2 mediu o RUNTIME e ele é compatível em Node 18/20/22/24 no Windows, o que REFUTA a hipótese original. Restam duas coisas, e nenhuma é compatibilidade: (a) a suíte segue quebrada em 18/20, então esses runtimes só poderiam ser `best_effort`, jamais suporte oficial — a regra de decisão acordada é explícita nisso; (b) Node 18 e 20 estão fora de suporte upstream, o que torna Node 22 recomendado por SEGURANÇA. Elevar `engines` continua sendo decisão de política, e não pode ser justificada por incompatibilidade que não existe.",
     affectedScope: "contrato público de versões do Node: package.json engines, doctor, instalador, documentação, matriz de capacidades e o job test-node-matrix",
     decisionOptions: Object.freeze([
@@ -210,6 +210,20 @@ export const PRD51_RC_ITEMS = Object.freeze([
       { id: "B", recommended: false, summary: "Manter Node 18 como suportado", requires: "frente SEPARADA para migrar 351 arquivos de teste de `import.meta.dirname` para `fileURLToPath(import.meta.url)`, com a suíte verde em Node 18 antes de qualquer claim" },
     ]),
     title: "Suporte a Node 18 anunciado sem prova: a suíte não roda no Node 18 (352/561 falham por `import.meta.dirname`) e o gate `test-node-matrix` é estruturalmente inválido desde o S51.10.2",
+    proof: null,
+  },
+
+  // Achado da revisão da Task 2 (2026-08-07). DEFERIDO para a Fatia 7/CI por
+  // decisão humana: a correção redesenha a procedência do runner, e o closeout
+  // não é lugar para isso.
+  {
+    id: "P1.ARTIFACT-SOURCE-INFERRED", tier: "P1", sprint: "certificação RC", version: "5.107.0",
+    status: "pending", deferredTo: "Fatia 7 / CI", blocking: false,
+    title: "`origem.commit` do runner descreve o checkout que EXECUTA a medição, não a procedência do tarball medido",
+    evidence: "`scripts/test-runtime-matrix.mjs` preenche `origem` com `git rev-parse HEAD` do diretório onde o runner roda. Com `--tarball <qualquer.tgz>`, o artefato pode ser antigo, de outra branch ou de outra máquina, e o relatório ainda o carimba com o commit do momento. O `runtime-compat.yml` não tem esse furo — o job `pack` emite `manifest.json` com `gitSha` + `sha256`, e o consumidor aborta se divergir —, mas essa verificação vive no shell do workflow e NÃO chega ao relatório nem protege execução local.",
+    impact: "Nenhum na rodada autoritativa de 2026-08-05: lá a procedência foi provada por reconciliação de conteúdo (1039/1039 arquivos idênticos ao commit `e5b832d`), registrada em `.docs/RESEARCH/prd51-runtime-matrix-20260805.anchor.json`. O risco é de rodadas FUTURAS emitirem procedência inferida com aparência de provada.",
+    requires: "Separar `executorCheckout` (commit + árvore do runner) de `artifactSource` (commit vindo de manifest verificado contra o SHA-256 do tarball). Sem manifest, `artifactSource.commit` é `null`/`unproven` — nunca inferido do checkout. Manifest com SHA-256 divergente deve ABORTAR, não degradar.",
+    affectedScope: "procedência declarada em recibos de matriz de runtime gerados daqui em diante",
     proof: null,
   },
 ])
