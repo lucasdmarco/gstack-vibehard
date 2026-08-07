@@ -150,6 +150,122 @@ export function ancestry(node) {
   return { functions, inCatch, exportedFromModule }
 }
 
+// ── Alcancabilidade intra-modulo (Task 3.1a) ─────────────────────────────────
+
+/**
+ * Quais funcoes do arquivo sao alcancaveis a partir de um export?
+ *
+ * POR QUE EXISTE. `monitor.js` tem 27 pontos de saida e UM unico export: as
+ * chamadas vivem em funcoes internas, e `exportedFromModule` e `false` em todas.
+ * Sem alcancabilidade, 24 pontos ficam `unknown` nao por ambiguidade real, mas
+ * porque a regra so olhava a funcao imediata.
+ *
+ * FAIL-CLOSED, e a direcao importa. Uma aresta so nasce de chamada ESTATICA cujo
+ * callee e identificador simples que o checker resolve para uma declaracao DESTE
+ * arquivo. Tudo o mais — `obj[nome]()`, funcao passada como callback, import de
+ * outro modulo, simbolo nao resolvido — nao cria aresta. O efeito e sempre o
+ * mesmo: menos alcancavel, nunca mais. Ambiguidade reduz o que se afirma.
+ */
+const ehFuncaoNomeada = (st) => ts.isFunctionDeclaration(st) && Boolean(st.name)
+const ehConstDeFuncao = (d) => ts.isIdentifier(d.name) && d.initializer && isFunctionLike(d.initializer)
+
+const declaracoesDeVariavel = (st) =>
+  (ts.isVariableStatement(st) ? st.declarationList.declarations.filter(ehConstDeFuncao) : [])
+
+function declaracoesDeFuncao(sf) {
+  const mapa = new Map()
+  for (const st of sf.statements) {
+    if (ehFuncaoNomeada(st)) mapa.set(st.name.text, st)
+    for (const d of declaracoesDeVariavel(st)) mapa.set(d.name.text, d.initializer)
+  }
+  return mapa
+}
+
+/** A declaracao resolvida e uma das funcoes top-level DESTE arquivo? */
+/**
+ * IDENTIDADE do no, nao coincidencia de nome.
+ *
+ * Comparar so `decls.has(nome)` criava aresta em
+ * `export function run(render) { render() }`: o parametro `render` sombreia a
+ * funcao local homonima, esta declarado no mesmo arquivo e o nome batia — o
+ * grafo passava a afirmar que a funcao local roda, quando quem decide o que
+ * `render` e e o chamador de `run`.
+ */
+const ehMesmaDeclaracao = (d, declarada) =>
+  d === declarada || (ts.isVariableDeclaration(d) && d.initializer === declarada)
+
+const declaracaoResolvida = (checker, id, sf) => {
+  const sym = checker.getSymbolAtLocation(id)
+  if (!sym) return null
+  const d = unalias(checker, sym).getDeclarations()?.[0]
+  return d && d.getSourceFile() === sf ? d : null
+}
+
+const nomeLocalResolvido = (checker, id, sf, decls) => {
+  const d = declaracaoResolvida(checker, id, sf)
+  const declarada = decls.get(id.text)
+  if (!d || !declarada) return null
+  return ehMesmaDeclaracao(d, declarada) ? id.text : null
+}
+
+/** Arestas `chamadora -> chamada`, apenas de chamadas estaticas resolvidas. */
+function arestasDeChamada(checker, sf, decls) {
+  const arestas = new Map([...decls.keys()].map((k) => [k, new Set()]))
+  for (const [nome, corpo] of decls) {
+    const visitar = (n) => {
+      // `f()` — identificador simples. `obj.f()` e `obj[k]()` NAO criam aresta:
+      // resolver o receptor e o problema da 3.1b, e presumi-lo aqui inventaria
+      // alcance que nao foi provado.
+      if (ts.isCallExpression(n) && ts.isIdentifier(n.expression)) {
+        const alvo = nomeLocalResolvido(checker, n.expression, sf, decls)
+        if (alvo) arestas.get(nome).add(alvo)
+      }
+      ts.forEachChild(n, visitar)
+    }
+    visitar(corpo)
+  }
+  return arestas
+}
+
+/**
+ * Conjunto de funcoes alcancaveis a partir dos exports. BFS com marcacao de
+ * visitados — um ciclo `a -> b -> a` termina, e ambas seguem alcancaveis se a
+ * raiz alcanca qualquer uma delas.
+ */
+export function alcancaveisDeExport(checker, sf) {
+  const decls = declaracoesDeFuncao(sf)
+  const arestas = arestasDeChamada(checker, sf, decls)
+  const raizes = [...decls].filter(([, node]) => ehExportada(node)).map(([nome]) => nome)
+
+  const alcancadas = new Set()
+  const fila = [...raizes]
+  while (fila.length > 0) {
+    const atual = fila.shift()
+    if (alcancadas.has(atual)) continue
+    alcancadas.add(atual)
+    for (const proximo of arestas.get(atual) ?? []) fila.push(proximo)
+  }
+  return { alcancadas, raizes: new Set(raizes), declaradas: new Set(decls.keys()) }
+}
+
+/**
+ * O ponto esta dentro de funcao alcancavel a partir de um export?
+ *
+ * A cadeia de `ancestry` vem de dentro para fora, entao a ultima entrada e a
+ * funcao top-level. `<anon>` — callback, IIFE, arrow solto — nao tem nome que
+ * case com o grafo e por isso NAO e alcancavel: quem passou o callback e quem
+ * decide se ele roda, e isso nao esta provado aqui.
+ */
+export function alcancavelDaqui(cadeiaDeFuncoes, alcance) {
+  if (cadeiaDeFuncoes.length === 0) return false
+  // `<anon>` em QUALQUER posicao da cadeia derruba, nao so no topo. Um arrow
+  // inline dentro de um export — `lista.forEach(() => …)` — depende de quem
+  // recebeu o callback para rodar. Na pratica ele quase sempre roda; "quase
+  // sempre" nao e o criterio, e olhar so o topo da cadeia o aprovaria.
+  if (cadeiaDeFuncoes.includes("<anon>")) return false
+  return alcance.alcancadas.has(cadeiaDeFuncoes[cadeiaDeFuncoes.length - 1])
+}
+
 /** Env vars que constituem ativacao explicita de depuracao. */
 const DEBUG_ENV_VARS = new Set(["GSTACK_DEBUG", "DEBUG", "VERBOSE"])
 
@@ -422,6 +538,24 @@ export function formaDoArgumento(arg) {
 export const MACHINE_PROTOCOL_CONSUMERS = Object.freeze({})
 
 /**
+ * As tres condicoes de `command-human-branch`, nomeadas separadamente.
+ *
+ *   canal    — e `console` do runtime, fora do modulo canonico de render;
+ *   alcance  — a funcao e exportada OU alcancavel a partir de um export (3.1a);
+ *   frase    — argumento INTEIRAMENTE literal e fora do ramo `if (json)`.
+ *
+ * Separa-las nao e so higiene: cada uma responde a uma pergunta diferente, e
+ * confundi-las foi o que produziu o falso positivo do `select` SQL.
+ */
+const ehConsoleDeProjeto = (p) => !isCanonicalRenderFile(p.file)
+  && p.binding.kind === "global"
+  && String(p.callee).startsWith("console.")
+
+const ehSuperficieDeComando = (p) => p.exportedFromModule || p.reachableFromExport === true
+
+const ehFraseHumana = (p) => p.argForm === "text_literal" && p.underMachineGuard !== true
+
+/**
  * Ordem: da evidencia mais especifica para a menos. `unknown` e o ultimo
  * recurso — estado de INVESTIGACAO, jamais "interno" por default.
  *
@@ -494,12 +628,7 @@ export const JS_RULES = Object.freeze([
      * a audiencia e do PONTO, nao do arquivo.
      */
     id: "command-human-branch",
-    when: (p) => !isCanonicalRenderFile(p.file)
-      && p.binding.kind === "global"
-      && String(p.callee).startsWith("console.")
-      && p.exportedFromModule
-      && p.argForm === "text_literal"
-      && p.underMachineGuard !== true,
+    when: (p) => ehConsoleDeProjeto(p) && ehSuperficieDeComando(p) && ehFraseHumana(p),
     audience: "public_diagnostic",
     trigger: "command_human_branch",
     reason: "console.* com argumento INTEIRAMENTE literal, em funcao exportada, fora do ramo de maquina: frase redigida para alguem ler. Parte opaca derruba a regra: concatenar identificador desconhecido forma qualquer coisa, inclusive uma query logada num modulo de banco, que nao e canal do CLI",
@@ -653,6 +782,8 @@ export function analyzeFile(filePath, analyzer = null, ctx = {}) {
   const sf = a.program.getSourceFile(filePath)
   if (!sf) throw new Error(`arquivo nao esta no programa: ${filePath}`)
   const pontos = []
+  // Calculado UMA vez por arquivo: o grafo e do modulo, nao do ponto.
+  const alcance = alcancaveisDeExport(a.checker, sf)
 
   const registrar = (node, d) => {
     const arg0 = node.arguments[0]
@@ -676,6 +807,8 @@ export function analyzeFile(filePath, analyzer = null, ctx = {}) {
       ...ancestry(node),
       underDebugGuard: underDebugGuard(node),
       underMachineGuard: underMachineGuard(node),
+      // Funcao top-level que contem o ponto (ultima da cadeia de ancestralidade).
+      reachableFromExport: alcancavelDaqui(ancestry(node).functions, alcance),
       templateIds: templateIdentifiers(arg0),
       argKind: arg0 ? ts.SyntaxKind[arg0.kind] : "none",
       // Forma ESTRUTURAL do argumento — o que permite decidir sobre um
