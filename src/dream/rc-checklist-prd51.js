@@ -173,6 +173,23 @@ export const PRD51_RC_ITEMS = Object.freeze([
         declared_degradation: "pass — degradacao autorizada pela CAPACIDADE ausente, nao pela versao",
       }),
       evidence: ".docs/RESEARCH/prd51-runtime-matrix-20260805.md",
+      /**
+       * Cadeia de evidência legível por máquina, reparada em 2026-08-06.
+       *
+       * O recibo da rodada existia apenas fora do repositório e com BOM
+       * (`EF BB BF`), herdado do redirecionamento do PowerShell — `JSON.parse`
+       * lançava, então a evidência parecia presente e não era consumível. Ele
+       * está versionado, sem BOM e sem uma vírgula de alteração no conteúdo.
+       *
+       * O recibo v1 tampouco carregava o commit: a ligação vivia só na prosa do
+       * Markdown. Foi RECONSTRUÍDA comparando, arquivo a arquivo, o conteúdo do
+       * tarball com os blobs do commit (1039/1039 idênticos), e o runner passou
+       * a emitir `origem.commit` para que nenhuma rodada futura dependa disso.
+       */
+      receipt: ".docs/RESEARCH/prd51-runtime-matrix-20260805.receipt.json",
+      receiptSha256: "sha256:cc148ce3ed34d8fbb5a91dbf2e4a4925a2a5f9386b85a997184ffaf52fa934d0",
+      anchor: ".docs/RESEARCH/prd51-runtime-matrix-20260805.anchor.json",
+      tarballReconciledWithCommit: "1039/1039 arquivos idênticos por hash de blob; 0 divergentes, 0 ausentes",
     }),
     evidence: "Medição direta em Node 18.20.8 (win-x64, portátil) no commit 5ede986: `node --test tests/` = 561 testes, 208 pass, 352 fail, 1 skip. Causa única: `import.meta.dirname` (Node >= 20.11) em 351 arquivos de tests/. ZERO falhas atribuíveis à Fase 1B — seus 4 arquivos (i18n_js_ast, _binding, _sinks, _registry) dão 74/74 pass no MESMO Node 18. `package.json` declara `engines.node >= 18`; `.github/workflows/test.yml:48` roda `npm test` completo na matriz [18, 20]. ESCOPO DESTA EVIDÊNCIA: ela mede a SUÍTE. Sobre o runtime, a única leitura feita foi ESTÁTICA — varredura de 15 APIs sensíveis a versão em `src/` sem incompatibilidade encontrada (`node:sqlite` tem guarda e fallback JSONL declarado em src/state/store.js:25-30; `Map.groupBy` foi evitado citando o floor em src/skills/gate-matrix.js:228; 1 dependência de produção; sem postinstall). Varredura estática não é execução: `runtime_compatibility` segue `unproven`.",
     impact: "O gate `test-node-matrix` reprova por incompatibilidade estrutural da SUÍTE, não por regressão do produto — nunca poderia ter dado sinal útil sobre o runtime. ATUALIZADO EM 2026-08-05: a matriz da Trilha B2 mediu o RUNTIME e ele é compatível em Node 18/20/22/24 no Windows, o que REFUTA a hipótese original. Restam duas coisas, e nenhuma é compatibilidade: (a) a suíte segue quebrada em 18/20, então esses runtimes só poderiam ser `best_effort`, jamais suporte oficial — a regra de decisão acordada é explícita nisso; (b) Node 18 e 20 estão fora de suporte upstream, o que torna Node 22 recomendado por SEGURANÇA. Elevar `engines` continua sendo decisão de política, e não pode ser justificada por incompatibilidade que não existe.",

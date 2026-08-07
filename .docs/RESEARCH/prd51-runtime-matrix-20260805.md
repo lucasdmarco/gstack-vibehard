@@ -8,6 +8,19 @@
 
 ## Âncora
 
+> **Cadeia legível por máquina** (reparada em 2026-08-06):
+> [`…20260805.receipt.json`](prd51-runtime-matrix-20260805.receipt.json) é o recibo
+> da rodada, versionado **sem BOM** e sem alteração de conteúdo;
+> [`…20260805.anchor.json`](prd51-runtime-matrix-20260805.anchor.json) liga recibo,
+> tarball e commit por hash, e declara o que a evidência **não** prova.
+> `tests/prd51_b2_evidence_chain.test.js` guarda a cadeia.
+>
+> O recibo chegou ao disco por redirecionamento do PowerShell e ganhou um BOM
+> (`EF BB BF`) que fazia `JSON.parse` lançar — a evidência existia, estava certa e
+> era **inconsumível**. Ele também não carregava o commit, que vivia só na prosa
+> abaixo. Ambos os buracos estão fechados, e o runner passou a emitir
+> `origem.commit` para que a reconstrução não precise se repetir.
+
 | Campo | Valor |
 |---|---|
 | Data | 2026-08-05 |
@@ -15,6 +28,7 @@
 | Árvore no empacotamento | **limpa** |
 | Tarball | `gstack-vibehard-installer-5.107.0.tgz` |
 | SHA-256 do tarball | `3dfd4fdfc804ab9f865f683c23b88345d0632ca2ffef92439c55dc41b84989ca` |
+| Tarball ↔ commit | **1039/1039 arquivos idênticos** por hash de blob; 0 divergentes, 0 ausentes |
 | Gerado em | `C:\gs-auth2` — **fora** do repositório |
 | Instalação | `--offline` (rede **proibida**), a partir de cache seed verificado |
 | Cobertura de SO | `windows_local` — **um** SO |
@@ -95,6 +109,21 @@ como prova. Elas existem no registro porque o que encontraram tem valor:
 
 Sete defeitos do harness foram corrigidos antes desta medição valer. Todos eram
 do instrumento; nenhum do produto.
+
+Um oitavo apareceu **depois** da medição, no transporte da evidência: o recibo
+saiu correto do runner e foi corrompido a caminho do disco (BOM do
+redirecionamento), além de não carregar o próprio commit. Também do instrumento —
+mas com uma diferença que vale registrar: os sete primeiros produziriam medição
+errada, e este produziria medição certa e **incitável**, que é o defeito mais
+fácil de deixar passar porque o arquivo está lá.
+
+A reconciliação foi por **conteúdo**, não por reempacotamento: `npm pack` não é
+byte-reprodutível — o gzip carrega `mtime` —, então divergência de SHA-256 do
+`.tgz` não distinguiria conteúdo diferente de horário diferente. Comparou-se o
+hash de blob de cada arquivo (`git hash-object --path`, que aplica os mesmos
+filtros do commit) contra `git rev-parse <commit>:<caminho>`. 585 dos 1039 só
+coincidem após normalização de EOL, porque o tarball saiu de working tree com
+CRLF: comparar bytes crus acusaria 585 falsos positivos.
 
 ## Limites declarados
 

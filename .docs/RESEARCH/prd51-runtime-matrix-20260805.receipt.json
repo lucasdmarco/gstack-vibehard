@@ -1,0 +1,423 @@
+{
+  "schemaVersion": "gstack.runtime-matrix.v1",
+  "os": "win32/x64",
+  "os_coverage": "windows_local",
+  "tarball": {
+    "path": "gstack-vibehard-installer-5.107.0.tgz",
+    "sha256": "sha256:3dfd4fdfc804ab9f865f683c23b88345d0632ca2ffef92439c55dc41b84989ca"
+  },
+  "install": {
+    "offline": true,
+    "cacheSeed": "C:\\gs-seed2"
+  },
+  "generatedAt": "2026-08-05T18:20:11.603Z",
+  "resultados": [
+    {
+      "node": "v18.20.8",
+      "npm": "10.8.2",
+      "os": "win32/x64",
+      "ambiente": {
+        "processVersion": "v18.20.8",
+        "nodeNoPath": "C:\\nodes\\node-v18.20.8-win-x64\\node.exe",
+        "pathApontaAlvo": true,
+        "doctorVersion": "v18.20.8"
+      },
+      "sqlite_available": false,
+      "backend_observado": "jsonl_fallback",
+      "degradacao_autorizada": true,
+      "verdict": "runtime_compatible",
+      "checks": [
+        {
+          "nome": "install",
+          "ok": true,
+          "detalhe": {
+            "tarball": "gstack-vibehard-installer-5.107.0.tgz"
+          }
+        },
+        {
+          "nome": "doctor",
+          "ok": true,
+          "detalhe": {
+            "node": "v18.20.8",
+            "os": "Windows"
+          }
+        },
+        {
+          "nome": "dream-audit",
+          "ok": true,
+          "detalhe": {
+            "REAL": 24,
+            "PARTIAL": 1,
+            "PLACEBO": 0
+          }
+        },
+        {
+          "nome": "create",
+          "ok": true,
+          "detalhe": {
+            "mode": "lite"
+          }
+        },
+        {
+          "nome": "context",
+          "ok": true,
+          "detalhe": {
+            "indexado": true
+          }
+        },
+        {
+          "nome": "verify",
+          "ok": true,
+          "detalhe": {
+            "status": "ready_with_warnings",
+            "archetype": "unknown"
+          }
+        },
+        {
+          "nome": "proof-negativo",
+          "ok": true,
+          "detalhe": {
+            "blockers": 1
+          }
+        },
+        {
+          "nome": "proof-parcial",
+          "ok": true,
+          "detalhe": {
+            "cenario": "partial_structured_execution",
+            "dreamAuditOk": true,
+            "ready": false
+          }
+        },
+        {
+          "nome": "state",
+          "ok": true,
+          "detalhe": {
+            "backend": "jsonl_fallback",
+            "file": "state.jsonl"
+          }
+        },
+        {
+          "nome": "isolamento",
+          "ok": true,
+          "detalhe": {
+            "escopo": 8
+          }
+        }
+      ],
+      "falhas": []
+    },
+    {
+      "node": "v20.19.5",
+      "npm": "10.8.2",
+      "os": "win32/x64",
+      "ambiente": {
+        "processVersion": "v20.19.5",
+        "nodeNoPath": "C:\\nodes\\node-v20.19.5-win-x64\\node.exe",
+        "pathApontaAlvo": true,
+        "doctorVersion": "v20.19.5"
+      },
+      "sqlite_available": false,
+      "backend_observado": "jsonl_fallback",
+      "degradacao_autorizada": true,
+      "verdict": "runtime_compatible",
+      "checks": [
+        {
+          "nome": "install",
+          "ok": true,
+          "detalhe": {
+            "tarball": "gstack-vibehard-installer-5.107.0.tgz"
+          }
+        },
+        {
+          "nome": "doctor",
+          "ok": true,
+          "detalhe": {
+            "node": "v20.19.5",
+            "os": "Windows"
+          }
+        },
+        {
+          "nome": "dream-audit",
+          "ok": true,
+          "detalhe": {
+            "REAL": 24,
+            "PARTIAL": 1,
+            "PLACEBO": 0
+          }
+        },
+        {
+          "nome": "create",
+          "ok": true,
+          "detalhe": {
+            "mode": "lite"
+          }
+        },
+        {
+          "nome": "context",
+          "ok": true,
+          "detalhe": {
+            "indexado": true
+          }
+        },
+        {
+          "nome": "verify",
+          "ok": true,
+          "detalhe": {
+            "status": "ready_with_warnings",
+            "archetype": "unknown"
+          }
+        },
+        {
+          "nome": "proof-negativo",
+          "ok": true,
+          "detalhe": {
+            "blockers": 1
+          }
+        },
+        {
+          "nome": "proof-parcial",
+          "ok": true,
+          "detalhe": {
+            "cenario": "partial_structured_execution",
+            "dreamAuditOk": true,
+            "ready": false
+          }
+        },
+        {
+          "nome": "state",
+          "ok": true,
+          "detalhe": {
+            "backend": "jsonl_fallback",
+            "file": "state.jsonl"
+          }
+        },
+        {
+          "nome": "isolamento",
+          "ok": true,
+          "detalhe": {
+            "escopo": 8
+          }
+        }
+      ],
+      "falhas": []
+    },
+    {
+      "node": "v22.21.1",
+      "npm": "10.9.4",
+      "os": "win32/x64",
+      "ambiente": {
+        "processVersion": "v22.21.1",
+        "nodeNoPath": "C:\\nodes\\node-v22.21.1-win-x64\\node.exe",
+        "pathApontaAlvo": true,
+        "doctorVersion": "v22.21.1"
+      },
+      "sqlite_available": true,
+      "backend_observado": "sqlite",
+      "degradacao_autorizada": false,
+      "verdict": "runtime_compatible",
+      "checks": [
+        {
+          "nome": "install",
+          "ok": true,
+          "detalhe": {
+            "tarball": "gstack-vibehard-installer-5.107.0.tgz"
+          }
+        },
+        {
+          "nome": "doctor",
+          "ok": true,
+          "detalhe": {
+            "node": "v22.21.1",
+            "os": "Windows"
+          }
+        },
+        {
+          "nome": "dream-audit",
+          "ok": true,
+          "detalhe": {
+            "REAL": 24,
+            "PARTIAL": 1,
+            "PLACEBO": 0
+          }
+        },
+        {
+          "nome": "create",
+          "ok": true,
+          "detalhe": {
+            "mode": "lite"
+          }
+        },
+        {
+          "nome": "context",
+          "ok": true,
+          "detalhe": {
+            "indexado": true
+          }
+        },
+        {
+          "nome": "verify",
+          "ok": true,
+          "detalhe": {
+            "status": "ready_with_warnings",
+            "archetype": "unknown"
+          }
+        },
+        {
+          "nome": "proof-negativo",
+          "ok": true,
+          "detalhe": {
+            "blockers": 1
+          }
+        },
+        {
+          "nome": "proof-parcial",
+          "ok": true,
+          "detalhe": {
+            "cenario": "partial_structured_execution",
+            "dreamAuditOk": true,
+            "ready": false
+          }
+        },
+        {
+          "nome": "state",
+          "ok": true,
+          "detalhe": {
+            "backend": "sqlite",
+            "file": "state.db"
+          }
+        },
+        {
+          "nome": "isolamento",
+          "ok": true,
+          "detalhe": {
+            "escopo": 8
+          }
+        }
+      ],
+      "falhas": []
+    },
+    {
+      "node": "v24.14.0",
+      "npm": "11.9.0",
+      "os": "win32/x64",
+      "ambiente": {
+        "processVersion": "v24.14.0",
+        "nodeNoPath": "C:\\nodes\\node-v24.14.0-win-x64\\node.exe",
+        "pathApontaAlvo": true,
+        "doctorVersion": "v24.14.0"
+      },
+      "sqlite_available": true,
+      "backend_observado": "sqlite",
+      "degradacao_autorizada": false,
+      "verdict": "runtime_compatible",
+      "checks": [
+        {
+          "nome": "install",
+          "ok": true,
+          "detalhe": {
+            "tarball": "gstack-vibehard-installer-5.107.0.tgz"
+          }
+        },
+        {
+          "nome": "doctor",
+          "ok": true,
+          "detalhe": {
+            "node": "v24.14.0",
+            "os": "Windows"
+          }
+        },
+        {
+          "nome": "dream-audit",
+          "ok": true,
+          "detalhe": {
+            "REAL": 24,
+            "PARTIAL": 1,
+            "PLACEBO": 0
+          }
+        },
+        {
+          "nome": "create",
+          "ok": true,
+          "detalhe": {
+            "mode": "lite"
+          }
+        },
+        {
+          "nome": "context",
+          "ok": true,
+          "detalhe": {
+            "indexado": true
+          }
+        },
+        {
+          "nome": "verify",
+          "ok": true,
+          "detalhe": {
+            "status": "ready_with_warnings",
+            "archetype": "unknown"
+          }
+        },
+        {
+          "nome": "proof-negativo",
+          "ok": true,
+          "detalhe": {
+            "blockers": 1
+          }
+        },
+        {
+          "nome": "proof-parcial",
+          "ok": true,
+          "detalhe": {
+            "cenario": "partial_structured_execution",
+            "dreamAuditOk": true,
+            "ready": false
+          }
+        },
+        {
+          "nome": "state",
+          "ok": true,
+          "detalhe": {
+            "backend": "sqlite",
+            "file": "state.db"
+          }
+        },
+        {
+          "nome": "isolamento",
+          "ok": true,
+          "detalhe": {
+            "escopo": 8
+          }
+        }
+      ],
+      "falhas": []
+    }
+  ],
+  "completude": {
+    "ok": true,
+    "esperadas": [
+      "v18.20.8",
+      "v20.19.5",
+      "v22.21.1",
+      "v24.14.0"
+    ],
+    "medidas": [
+      "v18.20.8",
+      "v20.19.5",
+      "v22.21.1",
+      "v24.14.0"
+    ],
+    "faltando": [],
+    "motivo": null
+  },
+  "leituras": {
+    "strict": {
+      "ok": false,
+      "motivo": "backend difere entre versoes: jsonl_fallback, sqlite"
+    },
+    "declared_degradation": {
+      "ok": true,
+      "motivo": null
+    }
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "gstack.evidence-anchor.v1",
+  "assunto": "PRD51 Trilha B2 — matriz de compatibilidade de runtime",
+  "ancoradoEm": "2026-08-06",
+  "recibo": {
+    "caminho": ".docs/RESEARCH/prd51-runtime-matrix-20260805.receipt.json",
+    "sha256": "sha256:cc148ce3ed34d8fbb5a91dbf2e4a4925a2a5f9386b85a997184ffaf52fa934d0",
+    "schemaVersion": "gstack.runtime-matrix.v1",
+    "bom": false,
+    "transporte": {
+      "origem": "C:\\gs-auth2\\matriz-autoritativa.json",
+      "sha256ComBom": "sha256:bddbf038cb58bd7e156c42f2b39453e69e5dacb678a526ee4b84c186607302c3",
+      "nota": "O original chegou ao disco por redirecionamento do PowerShell e ganhou BOM (EF BB BF), o que fazia JSON.parse lancar. A versao versionada difere do original SOMENTE nesses 3 bytes iniciais; o conteudo nao foi tocado."
+    }
+  },
+  "tarball": {
+    "nome": "gstack-vibehard-installer-5.107.0.tgz",
+    "sha256": "sha256:3dfd4fdfc804ab9f865f683c23b88345d0632ca2ffef92439c55dc41b84989ca",
+    "sha256NoRecibo": "sha256:3dfd4fdfc804ab9f865f683c23b88345d0632ca2ffef92439c55dc41b84989ca",
+    "versionado": false,
+    "nota": "2,4 MB de artefato binario ficam fora do repositorio; o que prova a ligacao e o hash, nao a copia."
+  },
+  "commit": {
+    "sha": "e5b832dde05687ee54afe871ea5c819ded534620",
+    "resumo": "merge: PRD51 B2 -- completude obrigatoria (medicao parcial nao e sucesso), cache seed offline e agregacao exigindo conjunto integro",
+    "data": "2026-08-05T15:03:49-03:00",
+    "presenteNoRecibo": false
+  },
+  "reconciliacao": {
+    "metodo": "git hash-object --path <rel> --stdin de cada arquivo do tarball, comparado a git rev-parse <commit>:<rel>",
+    "porQueNaoReempacotar": "npm pack nao e byte-reprodutivel (o gzip carrega mtime); divergencia de SHA-256 do .tgz nao distinguiria conteudo diferente de horario diferente.",
+    "arquivos": 1039,
+    "identicos": 1039,
+    "divergentes": 0,
+    "ausentes": 0,
+    "normalizadosEol": 585,
+    "ok": true,
+    "nota": "585 arquivos so coincidem apos normalizacao de EOL: o tarball saiu de working tree com CRLF (core.autocrlf no Windows) e o blob do commit guarda LF. Comparar bytes crus acusaria 585 falsos positivos."
+  },
+  "claims": {
+    "runtime_compatibility": "proved_windows_local",
+    "suite_compatibility": "failing",
+    "safe_support": "undecided"
+  },
+  "naoProva": [
+    "que a suite de testes roda em Node 18/20 (208 pass / 352 fail; import.meta.dirname em 351 arquivos)",
+    "que o produto funciona em Linux ou macOS (runtime-compat.yml nunca rodou no GitHub)",
+    "que Node 18 e suportado oficialmente — decisao humana sobre o contrato publico, ainda pendente"
+  ],
+  "p0": {
+    "id": "P0.NODE-SUPPORT-GATE-INVALID",
+    "estado": "aberto",
+    "fechaCom": "decisao humana sobre engines, nunca por esta medicao"
+  },
+  "releaseReady": false
+}

@@ -41,10 +41,10 @@ const isWin = process.platform === "win32"
 
 /** Flags que ACUMULAM valores, e as que guardam um valor unico. */
 const LISTAS = { "--node": "nodes", "--aggregate": "agregarDe" }
-const UNICOS = { "--tarball": "tarball", "--cache-seed": "cacheSeed" }
+const UNICOS = { "--tarball": "tarball", "--cache-seed": "cacheSeed", "--out": "out" }
 
 function parseArgs(argv) {
-  const r = { nodes: [], agregarDe: [], tarball: null, cacheSeed: null, json: false }
+  const r = { nodes: [], agregarDe: [], tarball: null, cacheSeed: null, out: null, json: false }
   for (let i = 0; i < argv.length; i++) {
     const flag = argv[i]
     if (LISTAS[flag]) r[LISTAS[flag]].push(argv[++i])
@@ -590,6 +590,29 @@ function imprimirTexto(relatorio) {
   process.stdout.write(`${linhas.join("\n")}\n`)
 }
 
+/**
+ * Commit da árvore que produziu o tarball, lido do repositório no momento da
+ * medição.
+ *
+ * A rodada autoritativa de 2026-08-05 saiu SEM este campo: o commit existia
+ * apenas na prosa do relatório em Markdown, o que obrigou a reconciliar tarball
+ * e commit à mão depois. Uma evidência que não carrega a própria âncora deixa a
+ * ligação por conta de quem lê — e é aí que ela se perde.
+ *
+ * `sujo: true` não invalida a medição; declara que o tarball pode conter
+ * alteração não versionada, e portanto não é reconciliável com commit algum.
+ */
+function ancoraDeCommit(repo) {
+  try {
+    const git = (args) => execFileSync("git", args, { cwd: repo, encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] }).trim()
+    return { commit: git(["rev-parse", "HEAD"]), sujo: git(["status", "--porcelain"]).length > 0 }
+  } catch {
+    // Fora de repositório (sandbox, tarball baixado em CI): declarar a ausência é
+    // honesto; inventar `null` silencioso faria o campo parecer preenchível.
+    return { commit: null, sujo: null, motivo: "git indisponivel ou fora de repositorio" }
+  }
+}
+
 function montarRelatorio(nodes, tarball, opcoes = {}) {
   const resultados = nodes.map((n) => medirVersao(n, tarball, opcoes))
   const relatorio = {
@@ -597,6 +620,7 @@ function montarRelatorio(nodes, tarball, opcoes = {}) {
     os: `${process.platform}/${process.arch}`,
     os_coverage: process.platform === "win32" ? "windows_local" : `${process.platform}_local`,
     tarball: { path: path.basename(tarball), sha256: sha256(tarball) },
+    origem: ancoraDeCommit(opcoes.repo ?? process.cwd()),
     install: { offline: Boolean(opcoes.cacheSeed), cacheSeed: opcoes.cacheSeed ?? null },
     generatedAt: new Date().toISOString(),
     resultados,
@@ -737,18 +761,41 @@ function imprimirAgregado(agg) {
   process.stdout.write(`${linhas.join("\n")}\n`)
 }
 
-function modoAgregacao(arquivos, json) {
-  const agg = agregar(arquivos.map((f) => JSON.parse(readFileSync(f, "utf-8"))))
-  if (json) process.stdout.write(`${JSON.stringify(agg, null, 2)}\n`)
-  else imprimirAgregado(agg)
+/**
+ * Escreve o recibo em UTF-8 SEM BOM.
+ *
+ * O recibo da rodada autoritativa chegou ao disco por redirecionamento do
+ * PowerShell e ganhou um BOM (`EF BB BF`), que faz `JSON.parse` lancar. A
+ * evidencia existia e estava correta, mas era ILEGIVEL por maquina — pior que
+ * ausente, porque parecia presente. `writeFileSync` com "utf-8" nao emite BOM;
+ * tirar o redirecionamento do caminho da evidencia elimina a causa, em vez de
+ * remendar o arquivo depois.
+ */
+function escreverRecibo(destino, obj) {
+  const texto = `${JSON.stringify(obj, null, 2)}\n`
+  writeFileSync(destino, texto, "utf-8")
+  if (readFileSync(destino)[0] === 0xef) throw new Error(`BOM escrito em ${destino} — recibo ilegivel por maquina`)
+  process.stderr.write(`recibo: ${destino}\n`)
+}
+
+function emitir({ out, json }, relatorio, imprimir) {
+  if (out) escreverRecibo(out, relatorio)
+  if (json) process.stdout.write(`${JSON.stringify(relatorio, null, 2)}\n`)
+  else if (!out) imprimir(relatorio)
+}
+
+function modoAgregacao(arquivos, opcoes) {
+  const agg = agregar(arquivos.map((f) => JSON.parse(readFileSync(f, "utf-8").replace(/^﻿/, ""))))
+  emitir(opcoes, agg, imprimirAgregado)
   process.exit(agg.erro ? EXIT.SEM_MEDICAO : exitCodeDe(agg))
 }
 
 function main() {
-  const { nodes, tarball: tarballArg, json, agregarDe, cacheSeed } = parseArgs(process.argv.slice(2))
-  if (agregarDe.length > 0) return modoAgregacao(agregarDe, json)
+  const opcoes = parseArgs(process.argv.slice(2))
+  const { nodes, tarball: tarballArg, agregarDe, cacheSeed } = opcoes
+  if (agregarDe.length > 0) return modoAgregacao(agregarDe, opcoes)
   if (nodes.length === 0) {
-    process.stderr.write("uso: node scripts/test-runtime-matrix.mjs --node <path> [--node <path>...] [--tarball <tgz>] [--json]\n")
+    process.stderr.write("uso: node scripts/test-runtime-matrix.mjs --node <path> [--node <path>...] [--tarball <tgz>] [--out <recibo.json>] [--json]\n")
     process.stderr.write("     node scripts/test-runtime-matrix.mjs --aggregate <a.json> --aggregate <b.json> [--json]\n")
     process.exit(EXIT.SEM_MEDICAO)
   }
@@ -756,13 +803,10 @@ function main() {
   // `--tarball` fornecido: NUNCA reempacota. Em CI, os 12 jobs consomem o mesmo
   // artefato do job `pack`, senao o Node deixa de ser a unica variavel.
   const relatorio = montarRelatorio(nodes, tarballArg ?? empacotar(), { cacheSeed })
-
-  if (json) process.stdout.write(`${JSON.stringify(relatorio, null, 2)}\n`)
-  else imprimirTexto(relatorio)
-
+  emitir(opcoes, relatorio, imprimirTexto)
   process.exit(exitCodeDe(relatorio))
 }
 
 if (executadoDiretamente) main()
 
-export { parseArgs, ambienteIsolado, verificarAmbienteNode, leituras, medirVersao, VEREDITOS_DE_AMBIENTE }
+export { parseArgs, ambienteIsolado, verificarAmbienteNode, leituras, medirVersao, VEREDITOS_DE_AMBIENTE, escreverRecibo, ancoraDeCommit }
