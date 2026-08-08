@@ -169,13 +169,8 @@ test("interpolado classificado continua com provenance NÃO resolvida", async (t
 
 // ── Censo ───────────────────────────────────────────────────────────────────
 
-test("CENSO: monitor.js cai a 1 unknown, e ele é o opaco", async () => {
-  const { analyzeFile, createAnalyzer } = await eng()
-  const a = createAnalyzer(["src/commands/monitor.js", "src/cli/index.js"])
-  const unk = analyzeFile("src/commands/monitor.js", a).filter((p) => p.audience === "unknown")
-  assert.equal(unk.length, 1, "24 -> 13 pelos wrappers -> 1 pelos entrypoints canônicos")
-  assert.equal(unk[0].argForm, "opaque", "o que resta não tem forma textual analisável")
-})
+// O censo definitivo de monitor.js vive no fim deste arquivo: o último ponto
+// deixou de ser `opaque` quando `interpolation_only` passou a descrevê-lo.
 
 test("CENSO: create.js melhora para 86 e segue não convertido", async () => {
   const { analyzeFile, createAnalyzer } = await eng()
@@ -185,4 +180,82 @@ test("CENSO: create.js melhora para 86 e segue não convertido", async () => {
 
   const { CONVERTED_FILES } = await import(pathToFileURL(path.join(repoRoot, "scripts", "i18n-registry.mjs")).href)
   assert.deepEqual([...CONVERTED_FILES], ["src/cli/index.js"], "nenhuma conversão nesta entrega")
+})
+
+// ── `interpolation_only`: moldura sem texto (forma, não audiência nova) ─────
+
+/**
+ * `console.log(`  ${icon} ${id}`)` tem moldura — os literais existem — mas ela é
+ * só espaçamento. O ponto NÃO é ambiguidade: sabe-se o que sai (a composição de
+ * dois dados), e sabe-se que não há palavra a traduzir. Um `console.log(payload)`
+ * é outra coisa: investigação pendente. Tratá-los igual esconderia um ponto que
+ * jamais terá string dentro da fila do que ainda precisa ser investigado.
+ */
+test("moldura só de espaçamento vira `interpolation_only`, não `opaque`", async (t) => {
+  const f = fixture("  x: (a) => cmd(a),", `
+export function cmd(icon, id) {
+  console.log(\`  \${icon} \${id}\`)
+}
+`)
+  t.after(() => cleanupTmp(f.root))
+  const p = (await analisar(f))[0]
+  assert.equal(p.argForm, "interpolation_only")
+  assert.deepEqual(p.templateIds, ["icon", "id"], "os ids são PRESERVADOS — há dado dinâmico a decidir")
+})
+
+test("`interpolation_only` recebe audiência pelo MESMO canal canônico", async (t) => {
+  const f = fixture("  x: (a) => cmd(a),", `
+export function cmd(icon, id) { console.log(\`  \${icon} \${id}\`) }
+`)
+  t.after(() => cleanupTmp(f.root))
+  assert.equal((await analisar(f))[0].audience, "public_diagnostic",
+    "não há audiência nova: a pergunta do canal é a mesma, e a resposta exige o mesmo entrypoint")
+})
+
+test("HOSTIL: sem entrypoint canônico, `interpolation_only` segue `unknown`", async (t) => {
+  const f = fixture("  outro: (a) => cmd(a),", `
+export function cmd() { return 1 }
+export function avulsa(icon, id) { console.log(\`  \${icon} \${id}\`) }
+`)
+  t.after(() => cleanupTmp(f.root))
+  const p = (await analisar(f)).find((x) => x.argForm === "interpolation_only")
+  assert.equal(p.audience, "unknown", "ausência de moldura não afrouxa a exigência de canal")
+})
+
+test("HOSTIL: argumento sem moldura alguma continua `opaque`", async (t) => {
+  const f = fixture("  x: (a) => cmd(a),", `
+export function cmd(payload) { console.log(payload) }
+`)
+  t.after(() => cleanupTmp(f.root))
+  const p = (await analisar(f))[0]
+  assert.equal(p.argForm, "opaque", "sem literais não há moldura — é investigação pendente, não ausência de texto")
+  assert.equal(p.audience, "unknown")
+})
+
+test("provenance distingue AUSÊNCIA DE MOLDURA de ausência de prova", async (t) => {
+  const f = fixture("  x: (a) => cmd(a),", `
+export function cmd(icon, id) { console.log(\`  \${icon} \${id}\`) }
+`)
+  t.after(() => cleanupTmp(f.root))
+  const { argumentProvenance } = await eng()
+  const prov = argumentProvenance((await analisar(f))[0])
+
+  assert.equal(prov.kind, "no_local_frame", "não há frame literal — `translate_literal_frame_…` não se aplica aqui")
+  assert.equal(prov.resolved, false,
+    "e ainda assim NÃO está resolvido: dado dinâmico exige prova estrutural ou decisão ancorada")
+  assert.deepEqual(prov.ids, ["icon", "id"])
+})
+
+test("CENSO: monitor.js chega a 27/27 classificados, zero unknown", async () => {
+  const { analyzeFile, createAnalyzer, argumentProvenance } = await eng()
+  const a = createAnalyzer(["src/commands/monitor.js", "src/cli/index.js"])
+  const pts = analyzeFile("src/commands/monitor.js", a)
+
+  assert.equal(pts.length, 27)
+  assert.equal(pts.filter((p) => p.audience === "unknown").length, 0, "24 -> 13 -> 1 -> 0")
+
+  // A audiência está completa; a PROVENANCE não — e são decisões distintas.
+  const pendentes = pts.filter((p) => !argumentProvenance(p).resolved)
+  assert.equal(pendentes.length, 9, "8 molduras interpoladas + 1 sem moldura local")
+  assert.equal(pendentes.filter((p) => argumentProvenance(p).kind === "no_local_frame").length, 1)
 })

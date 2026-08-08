@@ -704,6 +704,18 @@ const FORMAS_DO_ARGUMENTO = [
   [(r) => !r.serializador && !r.temOpaco && r.soControle, () => ({ forma: "control_only" })],
   [(r) => r.temTexto && !r.temOpaco, () => ({ forma: "text_literal" })],
   [(r) => r.temTexto, () => ({ forma: "text" })],
+  /**
+   * MOLDURA SEM TEXTO — `console.log(`  ${icon} ${h.id}`)`.
+   *
+   * Há moldura (os literais existem) mas ela é só espaçamento: nenhum literal
+   * tem texto legível. O ponto NAO e ambiguidade — e a diferenca importa. Um
+   * `console.log(payload)` e investigacao pendente: nao se sabe o que sai. Este
+   * aqui se sabe: sai a composicao de dois dados, sem uma palavra a traduzir.
+   *
+   * Trata-los como a mesma coisa esconderia um ponto que jamais tera string,
+   * dentro da fila do que ainda precisa ser investigado.
+   */
+  [(r) => !r.temTexto && r.temOpaco && r.literais.length > 0, () => ({ forma: "interpolation_only" })],
 ]
 
 export function formaDoArgumento(arg, ctx = null) {
@@ -750,7 +762,9 @@ const ehFraseHumana = (p) => p.underMachineGuard !== true && (
   // Moldura INTERPOLADA so vira canal humano com entrypoint canonico provado.
   // Com "export qualquer" bastaria, e o `select` de SQL — literal + parametro,
   // exatamente esta forma — voltaria a ser classificado como saida do CLI.
-  || (p.argForm === "text" && p.reachableFromEntrypoint === true))
+  // `interpolation_only` acompanha `text`: sem moldura a traduzir, mas o CANAL
+  // e a mesma pergunta, e a resposta exige o mesmo entrypoint canonico.
+  || (["text", "interpolation_only"].includes(p.argForm) && p.reachableFromEntrypoint === true))
 
 /**
  * Ordem: da evidencia mais especifica para a menos. `unknown` e o ultimo
@@ -1071,5 +1085,12 @@ export function analyzeFile(filePath, analyzer = null, ctx = {}) {
  */
 export function argumentProvenance(p) {
   if (!p.templateIds || p.templateIds.length === 0) return { resolved: true, kind: "literal_only", ids: [] }
+  // AUSENCIA DE MOLDURA LOCAL nao e ausencia de provenance. Aqui nao ha frase a
+  // traduzir — so espacamento entre dados —, e por isso a estrategia
+  // `translate_literal_frame_preserve_interpolations` nao se aplica: nao existe
+  // frame literal. Os `ids` seguem preservados porque dado dinamico continua
+  // exigindo prova estrutural ou decisao ancorada; o que muda e a RAZAO de
+  // `resolved: false`, nunca o fato de haver algo a decidir.
+  if (p.argForm === "interpolation_only") return { resolved: false, kind: "no_local_frame", ids: p.templateIds }
   return { resolved: false, kind: "interpolated", ids: p.templateIds }
 }

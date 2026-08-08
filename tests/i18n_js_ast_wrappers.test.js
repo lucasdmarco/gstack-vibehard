@@ -155,15 +155,15 @@ export function run() { console.log(color("Este texto some.")) }
 
 // ── Censo, ainda sem converter ──────────────────────────────────────────────
 
-test("CENSO: wrappers derrubam os `opaque` de monitor.js de 16 para 1", async () => {
+test("CENSO: wrappers derrubam os `opaque` de monitor.js", async () => {
   const { analyzeFile, createAnalyzer } = await eng()
   const a = createAnalyzer(["src/commands/monitor.js", "src/cli/index.js"])
   const pts = analyzeFile("src/commands/monitor.js", a)
   const unk = pts.filter((p) => p.audience === "unknown")
   const opacos = unk.filter((p) => p.argForm === "opaque")
 
-  assert.equal(unk.length, 1, "24 -> 13 pelos wrappers, 13 -> 1 pelos entrypoints canônicos")
-  assert.equal(opacos.length, 1)
+  assert.equal(unk.length, 0, "24 -> 13 (wrappers) -> 1 (entrypoints) -> 0 (interpolation_only)")
+  assert.equal(opacos.length, 0)
   assert.equal(unk.filter((p) => p.argForm === "text").length, 0,
     "as 12 molduras interpoladas receberam AUDIÊNCIA na parte 2; a provenance delas segue pendente e é outra decisão")
 })
