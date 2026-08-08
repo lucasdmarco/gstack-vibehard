@@ -206,9 +206,14 @@ test("CENSO: a capacidade melhora `create.js` e não move `monitor.js`", async (
     return { total: pts.length, unknown: pts.filter((p) => p.audience === "unknown").length }
   }
 
+  // HISTÓRICO DO NÚMERO, porque ele mudou por uma causa nomeável:
+  //   95 -> 90 (create.js)   pela alcançabilidade desta task;
+  //   24 -> 13 (monitor.js)  pelos wrappers transparentes da 3.1c, NÃO por esta.
+  // A afirmação original da 3.1a segue de pé: alcançar a função é condição
+  // necessária e não suficiente, e sozinha ela não moveu `monitor.js`.
   const mon = contar("src/commands/monitor.js")
   assert.equal(mon.total, 27)
-  assert.equal(mon.unknown, 24, "monitor.js NÃO é destravado por alcançabilidade — o bloqueio é a forma do argumento")
+  assert.equal(mon.unknown, 13, "12 interpolados + 1 opaco; a alcançabilidade sozinha não movia nenhum deles")
 
   const cre = contar("src/cli/create.js")
   assert.equal(cre.total, 96)

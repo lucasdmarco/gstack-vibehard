@@ -439,6 +439,79 @@ const SO_SEPARADOR = (s) => /^[\r\n\t ]*$/.test(s)
  * repositorio: sem atravessar o `+`, o serializador ficaria escondido atras de
  * uma BinaryExpression e o ponto seria opaco.
  */
+// ── Wrappers de apresentacao (Task 3.1c) ─────────────────────────────────────
+
+/**
+ * A funcao e um wrapper TRANSPARENTE de apresentacao?
+ *
+ * Wrapper transparente e aquele que recebe um texto, o decora e devolve — o
+ * conteudo traduzivel atravessa intacto. `monitor.js` tem o caso canonico:
+ *
+ *   function color(text, code) { return code + text + "\x1b[0m" }
+ *
+ * Sem resolve-lo, `console.log(color("── Harnesses ──", C.bold))` fica `opaque`
+ * e nao ha o que classificar — sao 16 dos 24 pontos daquele arquivo.
+ *
+ * O RECONHECIMENTO E ESTRUTURAL, NUNCA POR NOME. Qualquer funcao chamada `color`
+ * noutro modulo, ou uma que faca I/O, ou uma que componha dois textos, nao passa
+ * daqui. Exige-se: corpo de um unico `return`, e a expressao retornada composta
+ * apenas de parametros e literais — nada de chamada, nada de acesso a
+ * propriedade. Um wrapper que consulta estado nao devolve o que recebeu.
+ */
+function corpoDeReturnUnico(fn) {
+  if (!fn.body) return null
+  if (!ts.isBlock(fn.body)) return fn.body
+  const stmts = fn.body.statements
+  if (stmts.length !== 1 || !ts.isReturnStatement(stmts[0])) return null
+  return stmts[0].expression ?? null
+}
+
+/** Uma forma por linha; o caminhamento fica em `foliasDaExpressao`. */
+const FOLHA_POR_FORMA = [
+  [ts.isParenthesizedExpression, (n, acc, rec) => rec(n.expression, acc)],
+  [(n) => ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.PlusToken,
+    (n, acc, rec) => { rec(n.left, acc); rec(n.right, acc) }],
+  [ts.isTemplateExpression, (n, acc, rec) => {
+    acc.push({ tipo: "literal" })
+    for (const s of n.templateSpans) { rec(s.expression, acc); acc.push({ tipo: "literal" }) }
+  }],
+  [(n) => ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n), (n, acc) => acc.push({ tipo: "literal" })],
+  [ts.isIdentifier, (n, acc) => acc.push({ tipo: "ident", nome: n.text })],
+]
+
+/** Identificadores e literais que compoem a expressao, sem atravessar chamadas. */
+function foliasDaExpressao(node, acc = []) {
+  if (!node) return acc
+  const caso = FOLHA_POR_FORMA.find(([ehForma]) => ehForma(node))
+  // `outro` — chamada, acesso a propriedade, qualquer coisa que possa consultar
+  // estado. Uma unica folha dessas derruba a transparencia do wrapper.
+  if (caso) caso[1](node, acc, foliasDaExpressao)
+  else acc.push({ tipo: "outro" })
+  return acc
+}
+
+const folhasAceitaveis = (folhas) => folhas.length > 0 && !folhas.some((f) => f.tipo === "outro")
+
+const identsSaoParametros = (usados, nomes) => usados.length > 0 && usados.every((n) => nomes.includes(n))
+
+const ehCandidataAWrapper = (fn) => Boolean(fn) && isFunctionLike(fn) && fn.parameters.length > 0
+
+export function ehWrapperTransparente(fn) {
+  if (!ehCandidataAWrapper(fn)) return null
+  const ret = corpoDeReturnUnico(fn)
+  const folhas = ret ? foliasDaExpressao(ret) : []
+  if (!folhasAceitaveis(folhas)) return null
+
+  const nomesDeParametro = fn.parameters.filter((p) => ts.isIdentifier(p.name)).map((p) => p.name.text)
+  const usados = folhas.filter((f) => f.tipo === "ident").map((f) => f.nome)
+  if (!identsSaoParametros(usados, nomesDeParametro)) return null
+
+  // Indices dos parametros que ATRAVESSAM para a saida. Quem decide qual deles
+  // carrega o texto e o CALLSITE, nao esta funcao: `color(texto, cor)` e
+  // `color(cor, texto)` tem a mesma forma aqui.
+  return { indicesDePassagem: nomesDeParametro.map((n, i) => (usados.includes(n) ? i : -1)).filter((i) => i >= 0) }
+}
+
 const ehConcatenacao = (n) => ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.PlusToken
 const ehLiteralDeTexto = (n) => ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)
 
@@ -458,17 +531,45 @@ const PARTE_POR_FORMA = [
   [ehLiteralDeTexto, (n, acc) => acc.push({ tipo: "literal", texto: n.text })],
 ]
 
-const empurrarChamada = (node, acc) => {
+/**
+ * A chamada e a um wrapper transparente DESTE modulo, resolvido por identidade?
+ * Devolve o argumento que carrega o texto, ou `null`.
+ *
+ * A carga tem de ser UNICA: se dois argumentos de passagem sao textuais, o
+ * wrapper compoe duas mensagens e nao ha um "o texto" para analisar. Melhor
+ * `opaque` do que escolher um deles.
+ */
+const ehChamadaSimples = (node, ctx) =>
+  Boolean(ctx?.checker) && ts.isCallExpression(node) && ts.isIdentifier(node.expression)
+
+const ehTextual = (arg, ctx) => Boolean(arg) && ["text_literal", "text"].includes(formaDoArgumento(arg, ctx).forma)
+
+function cargaDeWrapper(node, ctx) {
+  if (!ehChamadaSimples(node, ctx)) return null
+  const nome = nomeLocalResolvido(ctx.checker, node.expression, ctx.sf, ctx.decls)
+  const forma = nome ? ehWrapperTransparente(ctx.decls.get(nome)) : null
+  if (!forma) return null
+
+  const candidatos = forma.indicesDePassagem
+    .map((i) => node.arguments[i])
+    .filter((arg) => ehTextual(arg, ctx))
+  return candidatos.length === 1 ? candidatos[0] : null
+}
+
+const empurrarChamada = (node, acc, ctx) => {
+  const carga = cargaDeWrapper(node, ctx)
+  if (carga) return partesDaExpressao(carga, acc, ctx)
   const dotted = calleeDotted(node)
   if (dotted && SERIALIZADORES.has(dotted)) acc.push({ tipo: "serializador", nome: dotted })
   else acc.push({ tipo: "opaco" })
+  return acc
 }
 
-function partesDaExpressao(node, acc = []) {
+function partesDaExpressao(node, acc = [], ctx = null) {
   if (!node) return acc
   const caso = PARTE_POR_FORMA.find(([ehForma]) => ehForma(node))
-  if (caso) caso[1](node, acc, partesDaExpressao)
-  else empurrarChamada(node, acc)
+  if (caso) caso[1](node, acc, (n, a) => partesDaExpressao(n, a, ctx))
+  else empurrarChamada(node, acc, ctx)
   return acc
 }
 
@@ -514,8 +615,8 @@ const FORMAS_DO_ARGUMENTO = [
   [(r) => r.temTexto, () => ({ forma: "text" })],
 ]
 
-export function formaDoArgumento(arg) {
-  const partes = partesDaExpressao(arg)
+export function formaDoArgumento(arg, ctx = null) {
+  const partes = partesDaExpressao(arg, [], ctx)
   if (partes.length === 0) return { forma: "none", partes }
   const r = resumoDasPartes(partes)
   const caso = FORMAS_DO_ARGUMENTO.find(([quando]) => quando(r))
@@ -784,6 +885,9 @@ export function analyzeFile(filePath, analyzer = null, ctx = {}) {
   const pontos = []
   // Calculado UMA vez por arquivo: o grafo e do modulo, nao do ponto.
   const alcance = alcancaveisDeExport(a.checker, sf)
+  // Contexto de resolucao para wrappers transparentes (3.1c): mesmo grafo de
+  // declaracoes locais da 3.1a, entao a identidade de no ja esta conferida.
+  const ctxAst = { checker: a.checker, sf, decls: declaracoesDeFuncao(sf) }
 
   const registrar = (node, d) => {
     const arg0 = node.arguments[0]
@@ -813,7 +917,7 @@ export function analyzeFile(filePath, analyzer = null, ctx = {}) {
       argKind: arg0 ? ts.SyntaxKind[arg0.kind] : "none",
       // Forma ESTRUTURAL do argumento — o que permite decidir sobre um
       // `process.*.write` sem apelar para a identidade do arquivo.
-      argForm: formaDoArgumento(arg0).forma,
+      argForm: formaDoArgumento(arg0, ctxAst).forma,
     }
     pontos.push({ ...base, ...classifyPoint(base, ctx) })
   }
