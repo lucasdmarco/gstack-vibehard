@@ -162,10 +162,10 @@ test("CENSO: wrappers derrubam os `opaque` de monitor.js de 16 para 1", async ()
   const unk = pts.filter((p) => p.audience === "unknown")
   const opacos = unk.filter((p) => p.argForm === "opaque")
 
-  assert.equal(unk.length, 13, "24 -> 13: os 16 opacos eram chamadas a `color`")
+  assert.equal(unk.length, 1, "24 -> 13 pelos wrappers, 13 -> 1 pelos entrypoints canônicos")
   assert.equal(opacos.length, 1)
-  assert.equal(unk.filter((p) => p.argForm === "text").length, 12,
-    "o que resta são molduras interpoladas — audiência e provenance são decisões distintas, e esta é a segunda")
+  assert.equal(unk.filter((p) => p.argForm === "text").length, 0,
+    "as 12 molduras interpoladas receberam AUDIÊNCIA na parte 2; a provenance delas segue pendente e é outra decisão")
 })
 
 test("CENSO: nenhum arquivo convertido — provenance segue pendente", async () => {

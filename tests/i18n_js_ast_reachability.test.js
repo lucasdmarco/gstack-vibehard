@@ -208,16 +208,17 @@ test("CENSO: a capacidade melhora `create.js` e não move `monitor.js`", async (
 
   // HISTÓRICO DO NÚMERO, porque ele mudou por uma causa nomeável:
   //   95 -> 90 (create.js)   pela alcançabilidade desta task;
-  //   24 -> 13 (monitor.js)  pelos wrappers transparentes da 3.1c, NÃO por esta.
+  //   24 -> 13 (monitor.js)  pelos wrappers transparentes da 3.1c, NÃO por esta;
+  //   13 ->  1 (monitor.js)  pelos entrypoints canônicos da 3.1c parte 2.
   // A afirmação original da 3.1a segue de pé: alcançar a função é condição
   // necessária e não suficiente, e sozinha ela não moveu `monitor.js`.
   const mon = contar("src/commands/monitor.js")
   assert.equal(mon.total, 27)
-  assert.equal(mon.unknown, 13, "12 interpolados + 1 opaco; a alcançabilidade sozinha não movia nenhum deles")
+  assert.equal(mon.unknown, 1, "restou o opaco; a alcançabilidade por export sozinha não movia nenhum dos 24")
 
   const cre = contar("src/cli/create.js")
   assert.equal(cre.total, 96)
-  assert.equal(cre.unknown, 90, "create.js melhora de 95 para 90; os 78 pontos de `logger.*` seguem pendentes da 3.1b")
+  assert.equal(cre.unknown, 86, "create.js: 95 -> 90 por esta task, 90 -> 86 pelos entrypoints; os `logger.*` seguem pendentes da 3.1b")
 })
 
 test("CENSO: nenhum arquivo foi convertido nesta capacidade", async () => {

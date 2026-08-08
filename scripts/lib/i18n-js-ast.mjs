@@ -232,10 +232,15 @@ function arestasDeChamada(checker, sf, decls) {
  * visitados — um ciclo `a -> b -> a` termina, e ambas seguem alcancaveis se a
  * raiz alcanca qualquer uma delas.
  */
-export function alcancaveisDeExport(checker, sf) {
+export function alcancaveisDeExport(checker, sf, raizesExtras = null) {
   const decls = declaracoesDeFuncao(sf)
   const arestas = arestasDeChamada(checker, sf, decls)
-  const raizes = [...decls].filter(([, node]) => ehExportada(node)).map(([nome]) => nome)
+  //  RESTRINGE em vez de somar quando fornecido: sao os handlers
+  // do DISPATCH que vivem neste arquivo, e o criterio estrito nao aceita export
+  // qualquer como origem.
+  const raizes = raizesExtras
+    ? [...raizesExtras].filter((n) => decls.has(n))
+    : [...decls].filter(([, node]) => ehExportada(node)).map(([nome]) => nome)
 
   const alcancadas = new Set()
   const fila = [...raizes]
@@ -264,6 +269,92 @@ export function alcancavelDaqui(cadeiaDeFuncoes, alcance) {
   // sempre" nao e o criterio, e olhar so o topo da cadeia o aprovaria.
   if (cadeiaDeFuncoes.includes("<anon>")) return false
   return alcance.alcancadas.has(cadeiaDeFuncoes[cadeiaDeFuncoes.length - 1])
+}
+
+// ── Entrypoints canonicos (Task 3.1c parte 2) ────────────────────────────────
+
+/**
+ * Handlers de comando derivados do objeto `DISPATCH` REAL de `src/cli/index.js`.
+ *
+ * POR QUE SO O DISPATCH. `COMMANDS` e `command-layers.js` descrevem o catalogo e
+ * a camada de cada comando; nenhum dos dois EXECUTA nada. Autoridade de execucao
+ * e o mapa que o CLI consulta para chamar o handler, e so ele prova que uma
+ * funcao e alcancada por invocacao real do usuario.
+ *
+ * POR QUE IMPORTA. "Alcancavel a partir de um export qualquer" e frouxo demais:
+ * `export function select(t) { console.log("SELECT * FROM " + t) }` num modulo
+ * de banco satisfaz isso e NAO e canal do CLI. Com moldura interpolada em jogo,
+ * esse criterio reintroduziria o falso positivo do SQL — por isso `text` so
+ * recebe audiencia com entrypoint canonico provado, nunca com export.
+ *
+ * FAIL-CLOSED. So conta `nome: (a) => handler(a)` ou `nome: handler`, com o
+ * identificador resolvido pelo checker ate a declaracao. Chave computada,
+ * spread, corpo com mais de uma expressao, handler que nao e chamada direta —
+ * nada disso vira raiz. Forma nao comprovada permanece fora.
+ */
+/** Expressao do arrow, quando o corpo e uma unica expressao (ou um unico return). */
+const corpoDeExpressaoUnica = (fn) => {
+  if (!ts.isBlock(fn.body)) return fn.body
+  const [st] = fn.body.statements
+  return fn.body.statements.length === 1 && st && ts.isReturnStatement(st) ? st.expression : null
+}
+
+const chamadaDiretaDe = (expr) => {
+  if (ts.isIdentifier(expr)) return expr
+  if (!isFunctionLike(expr)) return null
+  const corpo = corpoDeExpressaoUnica(expr)
+  const ehDelegacao = corpo && ts.isCallExpression(corpo) && ts.isIdentifier(corpo.expression)
+  return ehDelegacao ? corpo.expression : null
+}
+
+const ehDeclaracaoDeDispatch = (d) => ts.isIdentifier(d.name) && d.name.text === "DISPATCH"
+  && d.initializer && ts.isObjectLiteralExpression(d.initializer)
+
+const objetoDispatch = (sf) => {
+  for (const st of sf.statements) {
+    const achada = ts.isVariableStatement(st)
+      ? st.declarationList.declarations.find(ehDeclaracaoDeDispatch) : null
+    if (achada) return achada.initializer
+  }
+  return null
+}
+
+/**
+ * Uma entrada do `DISPATCH` -> `{ arquivo, nome }` da declaracao do handler.
+ * `null` sempre que a forma nao prova qual funcao roda: chave computada, spread,
+ * corpo com mais de uma expressao, simbolo que o checker nao resolve.
+ */
+const ehEntradaNomeada = (prop) => ts.isPropertyAssignment(prop) && !ts.isComputedPropertyName(prop.name)
+
+const declaracaoDoHandler = (id, checker) => {
+  const bruto = id ? checker.getSymbolAtLocation(id) : null
+  return bruto ? (unalias(checker, bruto).getDeclarations()?.[0] ?? null) : null
+}
+
+function raizDaPropriedade(prop, checker) {
+  if (!ehEntradaNomeada(prop)) return null
+  const decl = declaracaoDoHandler(chamadaDiretaDe(prop.initializer), checker)
+  const nome = decl ? (nomeSeIdentifier(decl.name) ?? nomeDeVariavel(decl.parent)) : null
+  return nome ? { arquivo: norm(decl.getSourceFile().fileName), nome } : null
+}
+
+/**
+ * Declaracoes-raiz por arquivo: `{ "<arquivo>": Set<nomeDaFuncao> }`.
+ * Vazio quando o `DISPATCH` nao e encontrado — ausencia de prova, nao permissao.
+ */
+export function entrypointsCanonicos(program, checker) {
+  const porArquivo = new Map()
+  const index = program.getSourceFiles().find((s) => isCanonicalRenderFile(s.fileName))
+  const obj = index ? objetoDispatch(index) : null
+  if (!obj) return porArquivo
+
+  for (const prop of obj.properties) {
+    const raiz = raizDaPropriedade(prop, checker)
+    if (!raiz) continue
+    if (!porArquivo.has(raiz.arquivo)) porArquivo.set(raiz.arquivo, new Set())
+    porArquivo.get(raiz.arquivo).add(raiz.nome)
+  }
+  return porArquivo
 }
 
 /** Env vars que constituem ativacao explicita de depuracao. */
@@ -654,7 +745,12 @@ const ehConsoleDeProjeto = (p) => !isCanonicalRenderFile(p.file)
 
 const ehSuperficieDeComando = (p) => p.exportedFromModule || p.reachableFromExport === true
 
-const ehFraseHumana = (p) => p.argForm === "text_literal" && p.underMachineGuard !== true
+const ehFraseHumana = (p) => p.underMachineGuard !== true && (
+  p.argForm === "text_literal"
+  // Moldura INTERPOLADA so vira canal humano com entrypoint canonico provado.
+  // Com "export qualquer" bastaria, e o `select` de SQL — literal + parametro,
+  // exatamente esta forma — voltaria a ser classificado como saida do CLI.
+  || (p.argForm === "text" && p.reachableFromEntrypoint === true))
 
 /**
  * Ordem: da evidencia mais especifica para a menos. `unknown` e o ultimo
@@ -885,6 +981,9 @@ export function analyzeFile(filePath, analyzer = null, ctx = {}) {
   const pontos = []
   // Calculado UMA vez por arquivo: o grafo e do modulo, nao do ponto.
   const alcance = alcancaveisDeExport(a.checker, sf)
+  // Raizes DERIVADAS do DISPATCH real; vazio quando nao provado.
+  const canonicas = entrypointsCanonicos(a.program, a.checker).get(norm(filePath)) ?? null
+  const alcanceCanonico = canonicas ? alcancaveisDeExport(a.checker, sf, canonicas) : { alcancadas: new Set() }
   // Contexto de resolucao para wrappers transparentes (3.1c): mesmo grafo de
   // declaracoes locais da 3.1a, entao a identidade de no ja esta conferida.
   const ctxAst = { checker: a.checker, sf, decls: declaracoesDeFuncao(sf) }
@@ -913,6 +1012,8 @@ export function analyzeFile(filePath, analyzer = null, ctx = {}) {
       underMachineGuard: underMachineGuard(node),
       // Funcao top-level que contem o ponto (ultima da cadeia de ancestralidade).
       reachableFromExport: alcancavelDaqui(ancestry(node).functions, alcance),
+      // Criterio ESTRITO: so handler do DISPATCH conta como origem.
+      reachableFromEntrypoint: alcancavelDaqui(ancestry(node).functions, alcanceCanonico),
       templateIds: templateIdentifiers(arg0),
       argKind: arg0 ? ts.SyntaxKind[arg0.kind] : "none",
       // Forma ESTRUTURAL do argumento — o que permite decidir sobre um
