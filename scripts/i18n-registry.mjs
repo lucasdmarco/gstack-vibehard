@@ -43,7 +43,7 @@ export const OVERRIDES_SCHEMA = "gstack.i18n-js-overrides.v1"
  *
  * Nenhum ponto real foi perdido: 35 do regex = 29 reais + 6 falsos.
  */
-export const CONVERTED_FILES = Object.freeze(["src/cli/index.js"])
+export const CONVERTED_FILES = Object.freeze(["src/cli/index.js", "src/commands/monitor.js"])
 
 const norm = (p) => String(p).replace(/\\/g, "/")
 

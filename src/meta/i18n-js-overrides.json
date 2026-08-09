@@ -49,10 +49,164 @@
       "column": 5,
       "expectedFileHash": "sha256:c9d4f9a265489024b05bc3873363f3610c525211533142b31cd157f19f162041",
       "strategy": "translate_literal_frame_preserve_interpolations",
-      "interpolations": ["command", "e", "message"],
+      "interpolations": [
+        "command",
+        "e",
+        "message"
+      ],
       "reason": "A moldura literal 'Falha ao executar' e o separador sao texto publico e devem ser traduzidos. Os dois valores interpolados sao dados de runtime e NAO sao traduziveis: `command` e o nome do subcomando que o usuario digitou, e `e.message` vem da excecao original, frequentemente de biblioteca ou do sistema operacional. Traduzir qualquer um dos dois quebraria a correspondencia com o que o usuario escreveu ou com o que a origem reportou.",
       "owner": "lucas",
       "evidence": "src/cli/index.js:304 — tests/i18n_provenance_decision.test.js cobre o caso real; tests/i18n_cli_index_migration.test.js prova a aplicacao unica apos a conversao"
+    },
+    {
+      "file": "src/commands/monitor.js",
+      "line": 74,
+      "column": 5,
+      "expectedFileHash": "sha256:f41470b598abe8a6569e96a2a9e350654297d0b0725ce2f15f5de2056b9202d6",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "e",
+        "message",
+        "e"
+      ],
+      "reason": "Moldura literal `monitor: erro ao ler chronicle QG: ` é frase do produto e deve ser traduzida; `e.message || e` é texto do runtime, de origem externa, e preservá-lo intacto é a única leitura honesta — traduzir mensagem de erro alheia inventaria conteúdo.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/monitor.js:74, dentro de `getQGBlockedCount`, em bloco catch; o identificador vem do parâmetro do catch, sem passar por nenhum literal do projeto."
+    },
+    {
+      "file": "src/commands/monitor.js",
+      "line": 139,
+      "column": 5,
+      "expectedFileHash": "sha256:f41470b598abe8a6569e96a2a9e350654297d0b0725ce2f15f5de2056b9202d6",
+      "strategy": "preserve_nonlinguistic_dynamic_values",
+      "interpolations": [
+        "icon",
+        "h",
+        "id"
+      ],
+      "reason": "Não há moldura literal: o template é `  ${icon} ${h.id}`, cujos literais são só espaçamento. Ambos os valores foram provados não-linguísticos, então nada aqui é traduzível e não existe frame a preservar.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "`icon` é atribuído em monitor.js:138 como `h.active ? color('●', C.green) : color('○', C.dim)` — glifo mais sequência ANSI, sem idioma. `h.id` vem do array fechado de `getHarnessStatus()` (monitor.js:89-96): claude|gstack|codex|opencode|cursor|windsurf, identificadores de ferramenta que não se traduzem.",
+      "values": {
+        "icon": {
+          "category": "glyph",
+          "origin": "src/commands/monitor.js:138 — `h.active ? color(\"●\", C.green) : color(\"○\", C.dim)`: glifo Unicode envolvido em sequencia ANSI, sem idioma."
+        },
+        "h": {
+          "category": "identifier",
+          "origin": "src/commands/monitor.js:137 — iterador sobre `getHarnessStatus()`; o objeto em si nao e impresso, so sua propriedade `id`."
+        },
+        "id": {
+          "category": "identifier",
+          "origin": "src/commands/monitor.js:89-96 — array fechado de `getHarnessStatus()`: claude|gstack|codex|opencode|cursor|windsurf, nomes de ferramenta que nao se traduzem."
+        }
+      }
+    },
+    {
+      "file": "src/commands/monitor.js",
+      "line": 149,
+      "column": 7,
+      "expectedFileHash": "sha256:f41470b598abe8a6569e96a2a9e350654297d0b0725ce2f15f5de2056b9202d6",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "color",
+        "statusColor",
+        "v",
+        "name",
+        "v",
+        "status"
+      ],
+      "reason": "A moldura tem espaçamento e os colchetes de `[${v.status}]`, que são pontuação do formato e permanecem; `color('●', statusColor)` é glifo com ANSI, `v.name` é nome de view do usuário e `v.status` é vocabulário fechado do produto. Nenhum dos três se traduz.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/monitor.js:149, dentro de `render`; `statusColor` deriva de `v.status` em monitor.js:148 por comparação com os literais 'active' e 'stale'."
+    },
+    {
+      "file": "src/commands/monitor.js",
+      "line": 156,
+      "column": 3,
+      "expectedFileHash": "sha256:f41470b598abe8a6569e96a2a9e350654297d0b0725ce2f15f5de2056b9202d6",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "color",
+        "tokenBudget",
+        "toLocaleString",
+        "budgetColor"
+      ],
+      "reason": "Moldura ` tokens (orçamento de contexto)` é frase do produto e deve ser traduzida; a interpolação é número formatado por `toLocaleString()` e preservá-la mantém a formatação de locale que o runtime aplica.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/monitor.js:156; `tokenBudget` vem de `getTokenBudget()` (monitor.js:128) e `budgetColor` é escolhido por faixa numérica em monitor.js:155."
+    },
+    {
+      "file": "src/commands/monitor.js",
+      "line": 166,
+      "column": 5,
+      "expectedFileHash": "sha256:f41470b598abe8a6569e96a2a9e350654297d0b0725ce2f15f5de2056b9202d6",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "fallow",
+        "total"
+      ],
+      "reason": "Moldura ` issues total (Fallow)` é frase do produto; `fallow.total` é contagem numérica, sem idioma.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/monitor.js:166; `fallow` vem de `getFallowSummary()` em monitor.js:129."
+    },
+    {
+      "file": "src/commands/monitor.js",
+      "line": 179,
+      "column": 11,
+      "expectedFileHash": "sha256:f41470b598abe8a6569e96a2a9e350654297d0b0725ce2f15f5de2056b9202d6",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "e",
+        "message",
+        "e"
+      ],
+      "reason": "Mesmo par do ponto 74, outra frase: `monitor: erro ao ler sprint ROI: ` traduz, e o texto de erro do runtime é preservado como veio.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/monitor.js:179, dentro de `render`, em bloco catch; identificador do parâmetro do catch."
+    },
+    {
+      "file": "src/commands/monitor.js",
+      "line": 187,
+      "column": 27,
+      "expectedFileHash": "sha256:f41470b598abe8a6569e96a2a9e350654297d0b0725ce2f15f5de2056b9202d6",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "roi",
+        "tokens_saved",
+        "toLocaleString"
+      ],
+      "reason": "Moldura `  Tokens salvos: ` é frase do produto; a interpolação é número formatado, sem idioma.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/monitor.js:187, sob a guarda `if (roi.tokens_saved)`; `roi` é o objeto de ROI do sprint lido no mesmo escopo."
+    },
+    {
+      "file": "src/commands/monitor.js",
+      "line": 188,
+      "column": 42,
+      "expectedFileHash": "sha256:f41470b598abe8a6569e96a2a9e350654297d0b0725ce2f15f5de2056b9202d6",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "roi",
+        "fallow_blocks"
+      ],
+      "reason": "Moldura `  Injeções barradas: ` é frase do produto; a interpolação é contagem numérica.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/monitor.js:188, sob a guarda `if (roi.fallow_blocks !== undefined)`."
+    },
+    {
+      "file": "src/commands/monitor.js",
+      "line": 189,
+      "column": 43,
+      "expectedFileHash": "sha256:f41470b598abe8a6569e96a2a9e350654297d0b0725ce2f15f5de2056b9202d6",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "roi",
+        "files_modified"
+      ],
+      "reason": "Moldura `  Arquivos modificados: ` é frase do produto; a interpolação é contagem numérica.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/monitor.js:189, sob a guarda `if (roi.files_modified !== undefined)`."
     }
   ]
 }

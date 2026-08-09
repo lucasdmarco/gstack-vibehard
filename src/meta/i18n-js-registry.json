@@ -1,6 +1,7 @@
 {
   "convertedFiles": [
-    "src/cli/index.js"
+    "src/cli/index.js",
+    "src/commands/monitor.js"
   ],
   "files": {
     "src/cli/index.js": {
@@ -412,7 +413,7 @@
               "COLORS",
               "bold"
             ],
-            "kind": "interpolated",
+            "kind": "no_local_frame",
             "resolved": false
           },
           "rule": "render-primitive-impl",
@@ -509,6 +510,507 @@
         }
       ],
       "fileHash": "sha256:c9d4f9a265489024b05bc3873363f3610c525211533142b31cd157f19f162041"
+    },
+    "src/commands/monitor.js": {
+      "entries": [
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.warn",
+          "calleePath": "console.warn",
+          "canonicalName": "warn",
+          "column": 5,
+          "line": 74,
+          "provenance": {
+            "ids": [
+              "e",
+              "message",
+              "e"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "terminal_control",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "process.stdout.write",
+          "calleePath": "process.stdout.write",
+          "canonicalName": "write",
+          "column": 3,
+          "line": 120,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "stream-terminal-control",
+          "sink": "stdout"
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 131,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 132,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 133,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 136,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 5,
+          "line": 139,
+          "provenance": {
+            "ids": [
+              "icon",
+              "h",
+              "id"
+            ],
+            "kind": "no_local_frame",
+            "resolved": false
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 143,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 5,
+          "line": 145,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 7,
+          "line": 149,
+          "provenance": {
+            "ids": [
+              "color",
+              "statusColor",
+              "v",
+              "name",
+              "v",
+              "status"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 154,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 156,
+          "provenance": {
+            "ids": [
+              "color",
+              "tokenBudget",
+              "toLocaleString",
+              "budgetColor"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 159,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 5,
+          "line": 161,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 24,
+          "line": 163,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 30,
+          "line": 164,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 33,
+          "line": 165,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 5,
+          "line": 166,
+          "provenance": {
+            "ids": [
+              "fallow",
+              "total"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.warn",
+          "calleePath": "console.warn",
+          "canonicalName": "warn",
+          "column": 11,
+          "line": 179,
+          "provenance": {
+            "ids": [
+              "e",
+              "message",
+              "e"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 5,
+          "line": 186,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 27,
+          "line": 187,
+          "provenance": {
+            "ids": [
+              "roi",
+              "tokens_saved",
+              "toLocaleString"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 42,
+          "line": 188,
+          "provenance": {
+            "ids": [
+              "roi",
+              "fallow_blocks"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 43,
+          "line": 189,
+          "provenance": {
+            "ids": [
+              "roi",
+              "files_modified"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 192,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 193,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "terminal_control",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "process.stdout.write",
+          "calleePath": "process.stdout.write",
+          "canonicalName": "write",
+          "column": 7,
+          "line": 205,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "stream-terminal-control",
+          "sink": "stdout"
+        },
+        {
+          "audience": "terminal_control",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "process.stdout.write",
+          "calleePath": "process.stdout.write",
+          "canonicalName": "write",
+          "column": 7,
+          "line": 213,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "stream-terminal-control",
+          "sink": "stdout"
+        }
+      ],
+      "fileHash": "sha256:f41470b598abe8a6569e96a2a9e350654297d0b0725ce2f15f5de2056b9202d6"
     }
   },
   "schema": "gstack.i18n-js-registry.v1"

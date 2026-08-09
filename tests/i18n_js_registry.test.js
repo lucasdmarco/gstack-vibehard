@@ -439,7 +439,7 @@ test("o registry commitado declara o que foi reconciliado, com entradas reais", 
   const { REGISTRY_PATH, REGISTRY_SCHEMA } = await gen()
   const r = JSON.parse(readFileSync(path.join(repoRoot, REGISTRY_PATH), "utf8"))
   assert.equal(r.schema, REGISTRY_SCHEMA)
-  assert.deepEqual(r.convertedFiles, ["src/cli/index.js"], "só o arquivo da Fatia 5")
+  assert.deepEqual(r.convertedFiles, ["src/cli/index.js", "src/commands/monitor.js"], "só o arquivo da Fatia 5")
   assert.deepEqual(Object.keys(r.files).sort(), r.convertedFiles)
   assert.ok(r.files["src/cli/index.js"].entries.length > 0, "declarado sem entradas seria anúncio vazio")
 })

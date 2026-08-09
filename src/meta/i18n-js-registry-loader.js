@@ -191,7 +191,10 @@ const problemaArquivo = (file, dados) => {
 }
 
 /** Formas de provenance que o gerador emite. */
-const PROVENANCE_KINDS = Object.freeze(["literal_only", "interpolated"])
+// `no_local_frame`: ha interpolacao mas nenhuma moldura literal com texto — so
+// espacamento entre dados. Nao e `literal_only` (ha ids) nem `interpolated`
+// (nao ha frase a traduzir), e por isso e um kind proprio.
+const PROVENANCE_KINDS = Object.freeze(["literal_only", "interpolated", "no_local_frame"])
 
 /**
  * Provenance COMPLETA — validada aqui, e não só onde é consumida.
@@ -275,7 +278,66 @@ const CAMPOS_OVERRIDE = ["file", "line", "column", "audience", "reason", "owner"
  * por causa de um COMENTÁRIO. É o mesmo falso positivo estrutural que motivou
  * esta fase inteira, e `src/meta/` ainda não está convertido para o AST.
  */
-export const PROVENANCE_STRATEGIES = Object.freeze(["translate_literal_frame_preserve_interpolations"])
+export const PROVENANCE_STRATEGIES = Object.freeze([
+  "translate_literal_frame_preserve_interpolations",
+  // Ponto SEM moldura literal — o template é só espaçamento entre dados. Não há
+  // frame a traduzir, e por isso a estratégia anterior não se aplica: ela promete
+  // preservar interpolações DENTRO de uma frase que aqui não existe. Exige provar,
+  // valor a valor, que nenhum deles carrega linguagem.
+  "preserve_nonlinguistic_dynamic_values",
+])
+
+/**
+ * Estratégia e `kind` da provenance precisam CASAR.
+ *
+ * Sem esta regra, `preserve_nonlinguistic_dynamic_values` viraria a saída fácil
+ * para qualquer moldura inconveniente: bastaria declará-la não-linguística e a
+ * frase literal deixaria de ser traduzida sem que ninguém a tivesse lido.
+ */
+export const STRATEGY_BY_KIND = Object.freeze({
+  interpolated: "translate_literal_frame_preserve_interpolations",
+  no_local_frame: "preserve_nonlinguistic_dynamic_values",
+})
+
+/**
+ * Categorias de valor dinâmico que podem ser preservados sem tradução.
+ *
+ * Lista FECHADA e curta. `human_text` e `unknown` não estão aqui de propósito: se
+ * o valor pode carregar linguagem, a decisão de não traduzi-lo precisa ser feita
+ * em outro lugar, com outro argumento — não escondida numa categoria genérica.
+ */
+export const NONLINGUISTIC_VALUE_CATEGORIES = Object.freeze(["glyph", "identifier", "control"])
+
+/**
+ * `preserve_nonlinguistic_dynamic_values` exige metadado por VALOR, não prosa.
+ *
+ * Uma justificativa em texto livre é irrefutável por construção: quem revisa não
+ * tem como checar se ela cobre todos os identificadores ou só os convenientes.
+ * Aqui cada id declarado em `interpolations` precisa de uma entrada em
+ * `values` com categoria da lista fechada e origem ancorada — e a cobertura é
+ * comparada id a id, então esquecer um reprova.
+ */
+const problemaDeUmValor = (v, id) => {
+  if (!ehObjeto(v)) return `\`values.${id}\` ausente`
+  if (!NONLINGUISTIC_VALUE_CATEGORIES.includes(v.category)) {
+    return `\`values.${id}.category\` inválida: ${JSON.stringify(v.category)}`
+  }
+  return naoVazio(v.origin) ? null : `\`values.${id}.origin\` vazio`
+}
+
+const problemaValoresNaoLinguisticos = (d, i) => {
+  if (d.strategy !== "preserve_nonlinguistic_dynamic_values") return null
+  if (!ehObjeto(d.values)) return `decisão de provenance #${i}: \`values\` ausente ou não é objeto`
+
+  for (const id of d.interpolations) {
+    const problema = problemaDeUmValor(d.values[id], id)
+    if (problema) return `decisão de provenance #${i}: ${problema}`
+  }
+
+  const extras = Object.keys(d.values).filter((k) => !d.interpolations.includes(k))
+  return extras.length === 0 ? null
+    : `decisão de provenance #${i}: \`values\` descreve id inexistente: ${extras.join(", ")}`
+}
 
 /**
  * Procedência do VEREDITO INTEIRO produzido por `loadJsRegistry`.
@@ -322,7 +384,7 @@ const problemaFormaDecisao = (d, i) => {
     return `decisão de provenance #${i}: estratégia desconhecida: ${JSON.stringify(d.strategy)}`
   }
   if (!Array.isArray(d.interpolations)) return `decisão de provenance #${i}: \`interpolations\` não é lista`
-  return null
+  return problemaValoresNaoLinguisticos(d, i)
 }
 
 /**
@@ -352,7 +414,19 @@ const problemaCallsiteDecisao = (d, i, entrada) => {
   if (!mesmosIds(d.interpolations, gerado)) {
     return `decisão de provenance #${i}: interpolações divergem do gerado (decidido=${JSON.stringify([...d.interpolations].sort())}, gerado=${JSON.stringify([...gerado].sort())})`
   }
-  return null
+  return problemaEstrategiaVsKind(d, i, entrada.provenance.kind)
+}
+
+/**
+ * A estratégia precisa casar com o kind do ponto REAL. Sem isto,
+ * `preserve_nonlinguistic_dynamic_values` seria a saída fácil para qualquer
+ * moldura inconveniente: bastaria declará-la não-linguística e a frase literal
+ * deixaria de ser traduzida sem que ninguém a tivesse lido.
+ */
+const problemaEstrategiaVsKind = (d, i, kind) => {
+  const esperada = STRATEGY_BY_KIND[kind]
+  if (!esperada || d.strategy === esperada) return null
+  return `decisão de provenance #${i}: estratégia \`${d.strategy}\` incompatível com \`provenance.kind: ${kind}\` (esperada \`${esperada}\`)`
 }
 
 const problemaReferenciaDecisao = (d, i, registry) => {
