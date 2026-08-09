@@ -222,8 +222,8 @@ test("CENSO: a capacidade melhora `create.js` e não move `monitor.js`", async (
   assert.equal(cre.unknown, 86, "create.js: 95 -> 90 por esta task, 90 -> 86 pelos entrypoints; os `logger.*` seguem pendentes da 3.1b")
 })
 
-test("CENSO: nenhum arquivo foi convertido nesta capacidade", async () => {
+test("CENSO: a alcançabilidade não converteu arquivo algum por si", async () => {
   const { CONVERTED_FILES } = await import(pathToFileURL(path.join(repoRoot, "scripts", "i18n-registry.mjs")).href)
-  assert.deepEqual([...CONVERTED_FILES], ["src/cli/index.js"],
-    "3.1a entrega capacidade; converter exige que o arquivo inteiro esteja resolvido, o que nenhum dos dois está")
+  assert.deepEqual([...CONVERTED_FILES], ["src/cli/index.js", "src/commands/monitor.js"],
+    "3.1a entregou capacidade e converteu nada; monitor.js entrou depois, em d9824f6, com decisões ancoradas")
 })

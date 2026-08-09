@@ -172,14 +172,15 @@ test("interpolado classificado continua com provenance NÃO resolvida", async (t
 // O censo definitivo de monitor.js vive no fim deste arquivo: o último ponto
 // deixou de ser `opaque` quando `interpolation_only` passou a descrevê-lo.
 
-test("CENSO: create.js melhora para 86 e segue não convertido", async () => {
+test("CENSO: create.js melhora para 86 e segue FORA de convertedFiles", async () => {
   const { analyzeFile, createAnalyzer } = await eng()
   const a = createAnalyzer(["src/cli/create.js", "src/cli/index.js"])
   const unk = analyzeFile("src/cli/create.js", a).filter((p) => p.audience === "unknown")
   assert.equal(unk.length, 86, "os `logger.*` seguem pendentes da 3.1b")
 
   const { CONVERTED_FILES } = await import(pathToFileURL(path.join(repoRoot, "scripts", "i18n-registry.mjs")).href)
-  assert.deepEqual([...CONVERTED_FILES], ["src/cli/index.js"], "nenhuma conversão nesta entrega")
+  assert.deepEqual([...CONVERTED_FILES], ["src/cli/index.js", "src/commands/monitor.js"],
+    "os entrypoints não converteram nada; monitor.js entrou em d9824f6")
 })
 
 // ── `interpolation_only`: moldura sem texto (forma, não audiência nova) ─────

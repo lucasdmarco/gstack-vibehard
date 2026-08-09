@@ -168,7 +168,9 @@ test("CENSO: wrappers derrubam os `opaque` de monitor.js", async () => {
     "as 12 molduras interpoladas receberam AUDIÊNCIA na parte 2; a provenance delas segue pendente e é outra decisão")
 })
 
-test("CENSO: nenhum arquivo convertido — provenance segue pendente", async () => {
+test("CENSO: os wrappers não converteram arquivo algum por si", async () => {
   const { CONVERTED_FILES } = await import(pathToFileURL(path.join(repoRoot, "scripts", "i18n-registry.mjs")).href)
-  assert.deepEqual([...CONVERTED_FILES], ["src/cli/index.js"])
+  // monitor.js foi convertido em d9824f6, DEPOIS desta capacidade. O que este
+  // censo afirma continua valendo: os wrappers não converteram nada por si.
+  assert.deepEqual([...CONVERTED_FILES], ["src/cli/index.js", "src/commands/monitor.js"])
 })

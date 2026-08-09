@@ -348,9 +348,11 @@ export function run(info) {
 
 // ── Invariantes da leva ─────────────────────────────────────────────────────
 
-test("`CONVERTED_FILES` permanece intocado nesta task", async () => {
+test("a Task 3 não converteu arquivo algum por si", async () => {
   const { CONVERTED_FILES } = await import(pathToFileURL(path.join(repoRoot, "scripts", "i18n-registry.mjs")).href)
-  assert.deepEqual([...CONVERTED_FILES], ["src/cli/index.js"],
+  // monitor.js entrou em d9824f6, DEPOIS desta task. A afirmação que este teste
+  // guarda continua de pé: a Task 3 instalou regras e não converteu nada.
+  assert.deepEqual([...CONVERTED_FILES], ["src/cli/index.js", "src/commands/monitor.js"],
     "a Task 3 instala regras; converter arquivos é da Task 4, e misturar as duas impediria atribuir qualquer variação de contagem a uma causa")
 })
 

@@ -746,12 +746,13 @@ test("o loader NÃO importa TypeScript nem o engine AST", async () => {
 
 // ── Estado oficial preservado ────────────────────────────────────────────────
 
-test("INVENTÁRIO OFICIAL: registry fresco, um arquivo convertido, 98 unknown", async () => {
+test("INVENTÁRIO OFICIAL: registry fresco, dois arquivos convertidos, 71 unknown", async () => {
   const { buildInventory, phase1Gate } = await imp()
   const inv = buildInventory({ repoRoot })
   assert.equal(inv.blocked, false)
   assert.equal(inv.jsRegistry.ok, true)
-  assert.deepEqual(inv.jsRegistry.convertedFiles, ["src/cli/index.js"], "convertido na Fatia 5")
-  assert.equal(inv.unknown, 98, "os 27 do arquivo migrado saíram; os demais seguem abertos")
-  assert.equal(phase1Gate(inv).ok, false, "98 pendências ainda bloqueiam a Fase 1")
+  assert.deepEqual(inv.jsRegistry.convertedFiles, ["src/cli/index.js", "src/commands/monitor.js"],
+    "cli/index.js na Fatia 5; monitor.js em d9824f6")
+  assert.equal(inv.unknown, 71, "98 -> 71 quando os 27 pontos de monitor.js saíram do extrator regex")
+  assert.equal(phase1Gate(inv).ok, false, "71 pendências ainda bloqueiam a Fase 1")
 })
