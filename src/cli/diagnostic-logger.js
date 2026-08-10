@@ -31,15 +31,23 @@ export class InvalidDiagnosticLoggerError extends TypeError {
 }
 
 /**
- * Marca de normalização.
+ * Registro de identidades normalizadas.
  *
- * `Symbol` e não campo comum: um objeto qualquer não passa a ser logger
- * canônico por declarar `{ __diagnostic: true }`. A marca só é aposta aqui.
+ * `WeakSet`, e NÃO uma marca no próprio objeto. A versão anterior usava
+ * `Symbol.for("gstack.diagnostic-logger.v1")`, que é registro GLOBAL: qualquer
+ * código obtém a mesma chave e a escreve. Um objeto com os quatro métodos vazios
+ * mais essa propriedade passava na validação e escapava pelo curto-circuito de
+ * idempotência — sem wrapper, sem congelamento, e ainda assim reconhecido como
+ * canônico. Marca em propriedade é declaração; pertencer ao WeakSet é fato.
+ *
+ * O conjunto guarda a IDENTIDADE devolvida por este módulo. Copiar todas as
+ * propriedades e símbolos de um wrapper legítimo produz outro objeto, e outro
+ * objeto não está no conjunto.
  */
-const DIAGNOSTIC_LOGGER = Symbol.for("gstack.diagnostic-logger.v1")
+const NORMALIZED = new WeakSet()
 
-/** O objeto passou por `normalizeDiagnosticLogger`? */
-export const isDiagnosticLogger = (v) => Boolean(v) && v[DIAGNOSTIC_LOGGER] === true
+/** O objeto É uma instância devolvida por `normalizeDiagnosticLogger`? */
+export const isDiagnosticLogger = (v) => ehObjeto(v) && NORMALIZED.has(v)
 
 const ehObjeto = (v) => Boolean(v) && (typeof v === "object" || typeof v === "function")
 
@@ -77,6 +85,7 @@ export function normalizeDiagnosticLogger(sink) {
   for (const metodo of DIAGNOSTIC_METHODS) {
     wrapper[metodo] = (mensagem) => Reflect.apply(sink[metodo], sink, [mensagem])
   }
-  Object.defineProperty(wrapper, DIAGNOSTIC_LOGGER, { value: true, enumerable: false })
-  return Object.freeze(wrapper)
+  const normalizado = Object.freeze(wrapper)
+  NORMALIZED.add(normalizado)
+  return normalizado
 }

@@ -100,8 +100,14 @@ test("normalizar duas vezes devolve o MESMO objeto", () => {
 })
 
 /**
- * A marca é `Symbol.for`, e não campo comum, por um motivo específico: um objeto
- * qualquer não pode virar logger canônico só por se declarar um.
+ * A marca é a IDENTIDADE no `WeakSet`, não uma propriedade do objeto.
+ *
+ * A primeira versão usava `Symbol.for("gstack.diagnostic-logger.v1")`, que é
+ * registro GLOBAL: qualquer código obtém a mesma chave e a escreve. Um objeto
+ * com os quatro métodos vazios mais essa propriedade passava na validação e
+ * escapava pelo curto-circuito de idempotência — sem wrapper, sem congelamento,
+ * e reconhecido como canônico. Marca em propriedade é declaração; pertencer ao
+ * conjunto é fato.
  */
 test("objeto que se DECLARA canônico não engana `isDiagnosticLogger`", () => {
   const impostor = { info() {}, success() {}, warn() {}, error() {}, __diagnostic: true, isDiagnosticLogger: true }
@@ -110,6 +116,57 @@ test("objeto que se DECLARA canônico não engana `isDiagnosticLogger`", () => {
   const real = normalizeDiagnosticLogger(impostor)
   assert.equal(isDiagnosticLogger(real), true)
   assert.notEqual(real, impostor, "o impostor foi ENVOLVIDO, não aceito como está")
+})
+
+test("BYPASS: forjar o `Symbol.for` exato NÃO produz logger canônico", () => {
+  const forjado = {
+    info() {}, success() {}, warn() {}, error() {},
+    [Symbol.for("gstack.diagnostic-logger.v1")]: true,
+  }
+  assert.equal(isDiagnosticLogger(forjado), false, "o registro global de símbolos é acessível a qualquer código")
+
+  const saida = normalizeDiagnosticLogger(forjado)
+  assert.notEqual(saida, forjado, "não pode escapar pelo curto-circuito de idempotência")
+  assert.ok(Object.isFrozen(saida), "o objeto forjado NÃO era congelado; o wrapper é")
+  assert.equal(isDiagnosticLogger(saida), true)
+})
+
+test("BYPASS: CÓPIA de um wrapper legítimo não herda a canonicidade", () => {
+  const real = normalizeDiagnosticLogger(captor().sink)
+
+  // Copia tudo: propriedades enumeráveis, não-enumeráveis e símbolos.
+  const clone = Object.create(Object.getPrototypeOf(real))
+  for (const chave of Reflect.ownKeys(real)) {
+    Object.defineProperty(clone, chave, Object.getOwnPropertyDescriptor(real, chave))
+  }
+  assert.deepEqual(Reflect.ownKeys(clone), Reflect.ownKeys(real), "a cópia tem as mesmas chaves")
+  assert.equal(isDiagnosticLogger(clone), false,
+    "mesmas chaves, outra identidade — o conjunto guarda o objeto, não o formato")
+})
+
+test("BYPASS: round-trip por JSON perde a canonicidade", () => {
+  const real = normalizeDiagnosticLogger(captor().sink)
+  const viaJson = { ...JSON.parse(JSON.stringify(real)), info() {}, success() {}, warn() {}, error() {} }
+  assert.equal(isDiagnosticLogger(viaJson), false, "serializar e reconstruir cria outro objeto")
+})
+
+test("apenas a identidade DEVOLVIDA pelo normalizador pertence ao conjunto", () => {
+  const { sink } = captor()
+  const real = normalizeDiagnosticLogger(sink)
+
+  assert.equal(isDiagnosticLogger(sink), false, "o sink de origem não é o logger canônico")
+  assert.equal(isDiagnosticLogger(real), true)
+  assert.equal(isDiagnosticLogger({ ...real }), false, "spread produz outro objeto")
+  for (const v of [null, undefined, 0, "", "logger", true, Symbol("x")]) {
+    assert.equal(isDiagnosticLogger(v), false, `${String(v)} não pode pertencer ao conjunto`)
+  }
+})
+
+test("idempotência vale na INSTÂNCIA canônica deste módulo", () => {
+  const real = normalizeDiagnosticLogger(captor().sink)
+  assert.equal(normalizeDiagnosticLogger(real), real, "repasse não empilha wrapper")
+  assert.equal(normalizeDiagnosticLogger(normalizeDiagnosticLogger(real)), real,
+    "estável sob repetição — o conjunto reconhece a identidade, não um campo copiável")
 })
 
 // ── Compatibilidade: as duas rotas viram o mesmo contrato ───────────────────
