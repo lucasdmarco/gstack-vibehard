@@ -218,8 +218,8 @@ test("CENSO: a capacidade melhora `create.js` e não move `monitor.js`", async (
   assert.equal(mon.unknown, 0, "0 ao fim da 3.1c; a alcançabilidade por export sozinha não movia nenhum dos 24")
 
   const cre = contar("src/cli/create.js")
-  assert.equal(cre.total, 96)
-  assert.equal(cre.unknown, 13, "create.js: 86 -> 13 pela 3.1b; 73 dos 78 pontos `logger.*` agora têm origem canônica provada")
+  assert.equal(cre.total, 91)
+  assert.equal(cre.unknown, 8, "create.js: 86 -> 13 pela 3.1b; 13 -> 8 após remover o downloader remoto sem consumidores")
 })
 
 test("CENSO: a alcançabilidade não converteu arquivo algum por si", async () => {

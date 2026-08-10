@@ -190,18 +190,15 @@ test("CONTROLE: DESTRUCTURING com renome continua rastreável, sem renome opaco"
  * chamador não há origem observada, e `unresolved` ali é o veredito correto.
  * Afirmar 78/78 exigiria inventar uma prova que não existe.
  */
-test("ALVO: `create.js` real resolve 73 dos 78 pontos de `logger.*`", async () => {
+test("ALVO: `create.js` não mantém o downloader remoto sem consumidores", async () => {
   const { analyzeFile, createAnalyzer } = await eng()
   const a = createAnalyzer(["src/cli/create.js", "src/cli/index.js", "src/cli/diagnostic-logger.js"])
   const doLogger = analyzeFile("src/cli/create.js", a).filter((p) => String(p.callee).startsWith("logger."))
-  const emUnknown = doLogger.filter((p) => p.audience === "unknown")
+  const fonte = readFileSync(path.join(repoRoot, "src", "cli", "create.js"), "utf8")
 
-  assert.equal(doLogger.length, 78)
-  assert.equal(emUnknown.length, 5, "73 resolvidos; os 5 restantes estão em código sem chamador")
-
-  const funcoes = [...new Set(emUnknown.map((p) => p.functions[p.functions.length - 1]))].sort()
-  assert.deepEqual(funcoes, ["fetchRemoteScript", "safeDownloadAndRun"],
-    "os únicos abertos são os do ramo inalcançável — outra função aqui é regressão")
+  assert.doesNotMatch(fonte, /function\s+(?:fetchRemoteScript|safeDownloadAndRun)\s*\(/,
+    "download/execução remota sem consumidores não deve permanecer em create.js")
+  assert.equal(doLogger.length, 73, "remover o ramo morto elimina exatamente seus cinco pontos logger.*")
 })
 
 /**
@@ -210,10 +207,10 @@ test("ALVO: `create.js` real resolve 73 dos 78 pontos de `logger.*`", async () =
  * por onde um logger entra normaliza — e um helper que recebesse objeto sem
  * passar por ali continuaria aberto.
  */
-test("ALVO: create.js cai para 13 unknown, e todo perímetro normaliza", async () => {
+test("ALVO: create.js cai para 8 unknown, e todo perímetro normaliza", async () => {
   const { analyzeFile, createAnalyzer } = await eng()
   const a = createAnalyzer(["src/cli/create.js", "src/cli/index.js", "src/cli/diagnostic-logger.js"])
-  assert.equal(analyzeFile("src/cli/create.js", a).filter((p) => p.audience === "unknown").length, 13)
+  assert.equal(analyzeFile("src/cli/create.js", a).filter((p) => p.audience === "unknown").length, 8)
 
   const fonte = readFileSync(path.join(repoRoot, "src", "cli", "create.js"), "utf8")
   for (const exportada of ["rotateCasdoorCredential", "startCasdoor", "scaffoldVerticalTemplate"]) {

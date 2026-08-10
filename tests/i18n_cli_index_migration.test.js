@@ -92,12 +92,13 @@ test("MATRIZ regex → AST: 35 = 29 reais + 6 falsos positivos", async () => {
 
 // ── Efeito global, derivado ──────────────────────────────────────────────────
 
-test("o inventário global reflete as migrações: 1917 pontos, 71 unknown", async () => {
+test("o inventário global reflete as migrações: 1912 pontos, 71 unknown", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
 
   // 1924 − 6 falsos positivos que saíram da conta.
-  assert.equal(inv.total, 1917, "1916 + 1: o adapter DiagnosticLogger acrescentou uma mensagem de erro tipado")
+  assert.equal(inv.total, 1912,
+    "1917 - 5: a remoção do downloader remoto duplicado de create.js levou seus pontos junto")
   // 125 − 27 unknown que o arquivo tinha.
   assert.equal(inv.unknown, 71, "98 -> 71 pela conversão de monitor.js (27 pontos)")
 })
@@ -107,13 +108,13 @@ test("o inventário global reflete as migrações: 1917 pontos, 71 unknown", asy
  * aritmética fechar não basta — dois erros opostos se cancelariam. Aqui a soma é
  * checada por arquivo, o que localiza qualquer deslocamento.
  */
-test("SPILLOVER: os demais arquivos somam exatamente 1861 pontos", async () => {
+test("SPILLOVER: os demais arquivos somam exatamente 1856 pontos", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
   const CONVERTIDOS = new Set([ALVO, "src/commands/monitor.js"])
   const outros = inv.points.filter((p) => !CONVERTIDOS.has(p.file))
 
-  assert.equal(outros.length, 1861, "nenhum ponto entrou ou saiu fora dos dois alvos")
+  assert.equal(outros.length, 1856, "nenhum ponto entrou ou saiu fora dos dois alvos")
   assert.equal(outros.filter((p) => p.audience === "unknown").length, 71,
     "todos os `unknown` restantes estão FORA do arquivo migrado")
   assert.equal(outros.filter((p) => p.source === "ast_registry").length, 0,

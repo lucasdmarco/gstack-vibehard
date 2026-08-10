@@ -790,11 +790,12 @@ test("CASO REAL: src/cli/index.js tem exatamente 1 pendência, e a decisão a re
  * que a Fatia 4.2 só criava o mecanismo. A Fatia 5 o exercitou de verdade, e o
  * número aqui passa a ser o estado real do repositório.
  */
-test("INVENTÁRIO OFICIAL após a conversão de monitor.js: 71 unknown, 1917 total, 10 decisões aplicadas", async () => {
+test("INVENTÁRIO OFICIAL após a conversão de monitor.js: 71 unknown, 1912 total, 10 decisões aplicadas", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
   assert.equal(inv.unknown, 71, "98 -> 71: monitor.js converteu 27 pontos")
-  assert.equal(inv.total, 1917, "1916 + 1: o adapter DiagnosticLogger acrescentou uma mensagem de erro tipado")
+  assert.equal(inv.total, 1912,
+    "1917 - 5: a remoção do downloader remoto duplicado de create.js levou seus pontos junto")
   assert.deepEqual(inv.jsRegistry.convertedFiles, ["src/cli/index.js", "src/commands/monitor.js"])
   assert.equal(inv.jsRegistry.provenanceDecisionsApplied, 10, "1 de cli/index.js (linha 304) + 9 de monitor.js")
 })

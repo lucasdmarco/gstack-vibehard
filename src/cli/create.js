@@ -20,7 +20,6 @@ import { fileURLToPath } from "node:url"
 import { homedir, tmpdir } from "node:os"
 import { normalizeDiagnosticLogger } from "./diagnostic-logger.js"
 import { deepMerge } from "../installer/merge.js"
-import { checkRemoteDownload } from "../installer/remote-policy.js"
 import { describePlan as describeProvisionPlan, JOURNAL_FILE as PROVISION_JOURNAL } from "../installer/provision-txn.js"
 import { setSecret as defaultSetSecret, brokerStatus as defaultBrokerStatus } from "../secrets/broker.js"
 import { npxArgv, npmArgv } from "../installer/deps.js"
@@ -112,45 +111,6 @@ function safeExec(file, args, opts) {
 
 // curl existe nativamente no Windows 10 1803+ ("curl.exe") e em Unix.
 const curlBinary = () => (process.platform === "win32" ? "curl.exe" : "curl")
-const scriptExt = () => (process.platform === "win32" ? ".ps1" : ".sh")
-// Baixa o script p/ `tmp` e valida (arquivo criado + tamanho mínimo). @returns bool.
-function fetchRemoteScript(url, tmp, logger, label) {
-  execFileSync(curlBinary(), ["-fsSL", url, "-o", tmp], { stdio: "pipe", timeout: 120000, shell: false })
-  if (!existsSync(tmp)) { logger.warn(`${label}: download falhou (arquivo nao criado)`); return false }
-  const content = readFileSync(tmp, "utf-8")
-  if (content.length < 10) { logger.warn(`${label}: download muito pequeno (${content.length} bytes), possivelmente invalido`); return false }
-  return true
-}
-function execRemoteScript(tmp) {
-  if (process.platform === "win32") execFileSync("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", tmp], { stdio: "pipe", timeout: 180000, shell: false })
-  else execFileSync("sh", [tmp], { stdio: "pipe", timeout: 180000, shell: false })
-}
-function safeDownloadAndRun(url, logger, label, opts = {}) {
-  // POLÍTICA REMOTA (P0.6): por padrão NÃO baixa/executa script remoto — sugere o
-  // comando manual. Só prossegue com opt-in explícito + origem na allowlist HTTPS.
-  const policy = checkRemoteDownload(url, opts)
-  if (!policy.allowed) {
-    logger.warn(`${label}: download remoto NÃO executado (${policy.reason}).`)
-    logger.warn(`  Para instalar manualmente: veja ${url} (ou rode com --allow-remote-downloads).`)
-    return false
-  }
-  // Diretório PRIVADO por download (mkdtemp → nome imprevisível, permissão 0700 no
-  // POSIX). Evita TOCTOU/symlink-swap num /tmp compartilhado: nome fixo previsível
-  // (Date.now) permitiria a outro usuário pré-criar/trocar o arquivo antes do exec.
-  const dir = mkdtempSync(join(tmpdir(), "gstack-dl-"))
-  const tmp = join(dir, `script${scriptExt()}`)
-  const cleanup = () => { try { rmSync(dir, { recursive: true, force: true }) } catch { /* cleanup */ } }
-  try {
-    if (!fetchRemoteScript(url, tmp, logger, label)) { cleanup(); return false }
-    execRemoteScript(tmp)
-    cleanup()
-    return true
-  } catch (e) {
-    cleanup()
-    logger.warn(`${label}: falha no download/execucao segura: ${e.message || e}`)
-    return false
-  }
-}
 
 // ─────────────────────────────────────────────────────────────
 //  PHASE 1: Identity & IAM Local (Casdoor)
@@ -466,7 +426,16 @@ function installAtomicViaCargo(logger) {
   return "installed"
 }
 // Retorna o STATUS honesto do componente: "installed" | "degraded" | "skipped".
-function initAtomic(logger, projectDir, opts = {}) {
+/**
+ * `opts` foi removido junto com o downloader remoto.
+ *
+ * O único parâmetro que já passou por aqui era `allowRemote`, e ele nunca foi
+ * lido: `initAtomic` chama `installAtomicViaCargo`, que compila via `cargo` e
+ * não baixa script algum. A opção existia desde antes, encaminhada e ignorada —
+ * a remoção do ramo morto só tornou isso visível. `--allow-remote-downloads`
+ * continua REAL onde tem efeito, em `src/installer/install.js`.
+ */
+function initAtomic(logger, projectDir) {
   if (process.env.GSTACK_SKIP_PREFLIGHT) {
     logger.info("GSTACK_SKIP_PREFLIGHT set — skipping Atomic init")
     return "skipped"
@@ -1670,7 +1639,7 @@ function runFullProvisioning(c, projectDir) {
   if (casdoorUrl) phases.casdoor.credential = rotateCasdoorCredential(logger, casdoorUrl, projectDir)
   console.log(`\n  === Fase 2/5: Atomic VCS ===`)
   writeAtomicConfig(projectDir)
-  phases.atomic = { status: initAtomic(logger, projectDir, { allowRemote: args.includes("--allow-remote-downloads") }) }
+  phases.atomic = { status: initAtomic(logger, projectDir) }
   console.log(`\n  === Fase 3/5: Daemons & Memoria ===`)
   phases.ecc = { status: bootEcc(logger, projectDir) }
   writeControlPlaneConfig(projectDir, projectName)
