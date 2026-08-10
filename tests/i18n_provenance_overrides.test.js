@@ -399,13 +399,13 @@ test("P2: `overridesApplied` conta pela PROPRIEDADE `override`, não pelo texto 
 
 // ── Estado oficial ───────────────────────────────────────────────────────────
 
-test("INVENTÁRIO OFICIAL: 71 unknown, 1912 total, 2 arquivos convertidos", async () => {
+test("INVENTÁRIO OFICIAL: 54 unknown, 1906 total, 2 arquivos convertidos", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
-  assert.equal(inv.unknown, 71, "98 -> 71 pela conversão de monitor.js em d9824f6")
-  assert.equal(inv.total, 1912,
+  assert.equal(inv.unknown, 54, "98 -> 71 pela conversão de monitor.js em d9824f6")
+  assert.equal(inv.total, 1906,
     "1917 - 5: a remoção do downloader remoto duplicado de create.js levou seus pontos junto")
-  assert.deepEqual(inv.jsRegistry.convertedFiles, ["src/cli/index.js", "src/commands/monitor.js"])
+  assert.deepEqual(inv.jsRegistry.convertedFiles, ["src/cli/create.js", "src/cli/index.js", "src/commands/monitor.js"])
   assert.equal(inv.jsRegistry.overridesApplied, 0,
     "nenhum override de AUDIÊNCIA foi necessário em nenhum dos dois arquivos — o AST classificou sem ajuda humana; o que houve foram decisões de PROVENANCE, que são outra coisa")
 })

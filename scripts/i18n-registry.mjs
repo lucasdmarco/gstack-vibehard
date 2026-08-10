@@ -43,7 +43,7 @@ export const OVERRIDES_SCHEMA = "gstack.i18n-js-overrides.v1"
  *
  * Nenhum ponto real foi perdido: 35 do regex = 29 reais + 6 falsos.
  */
-export const CONVERTED_FILES = Object.freeze(["src/cli/index.js", "src/commands/monitor.js"])
+export const CONVERTED_FILES = Object.freeze(["src/cli/index.js", "src/commands/monitor.js", "src/cli/create.js"])
 
 const norm = (p) => String(p).replace(/\\/g, "/")
 
@@ -187,7 +187,7 @@ export function buildRegistry(arquivos, opcoes = {}) {
   const files = {}
   for (const { rel, abs } of alvos) {
     files[rel] = {
-      entries: analyzeFile(abs, analyzer).map((p) => entrada(p, root)).sort(porPosicao),
+      entries: analyzeFile(abs, analyzer, { repoRoot: root }).map((p) => entrada(p, root)).sort(porPosicao),
       fileHash: hashConteudo(readFileSync(abs, "utf8")),
     }
   }

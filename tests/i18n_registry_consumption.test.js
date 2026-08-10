@@ -751,8 +751,8 @@ test("INVENTÁRIO OFICIAL: registry fresco, dois arquivos convertidos, 71 unknow
   const inv = buildInventory({ repoRoot })
   assert.equal(inv.blocked, false)
   assert.equal(inv.jsRegistry.ok, true)
-  assert.deepEqual(inv.jsRegistry.convertedFiles, ["src/cli/index.js", "src/commands/monitor.js"],
-    "cli/index.js na Fatia 5; monitor.js em d9824f6")
-  assert.equal(inv.unknown, 71, "98 -> 71 quando os 27 pontos de monitor.js saíram do extrator regex")
-  assert.equal(phase1Gate(inv).ok, false, "71 pendências ainda bloqueiam a Fase 1")
+  assert.deepEqual(inv.jsRegistry.convertedFiles, ["src/cli/create.js", "src/cli/index.js", "src/commands/monitor.js"],
+    "cli/index.js na Fatia 5; monitor.js em d9824f6; create.js na conversão oficial")
+  assert.equal(inv.unknown, 54, "71 -> 54 quando os 17 pontos in_scope de create.js saíram do extrator regex")
+  assert.equal(phase1Gate(inv).ok, false, "54 pendências ainda bloqueiam a Fase 1")
 })

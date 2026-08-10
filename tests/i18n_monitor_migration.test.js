@@ -54,7 +54,7 @@ async function consumirCom(decisoes) {
 
 test("as quatro contagens do contrato conferem", async () => {
   const i = await inventario()
-  assert.equal(i.jsRegistry.provenanceDecisionsApplied, 10, "aplicadas globalmente: 9 de monitor.js + 1 pré-existente")
+  assert.equal(i.jsRegistry.provenanceDecisionsApplied, 37, "aplicadas globalmente: 9 de monitor.js + 1 pré-existente")
   assert.equal(decisoesDe(ARQ).length, 9, "declaradas para monitor.js")
   assert.equal(decisoesDe("src/cli/index.js").length, 1, "a decisão anterior segue declarada")
   assert.equal(i.provenance.count, 0, "`count` é a quantidade PENDENTE — zero é o alvo")

@@ -1758,6 +1758,41 @@ export const JS_RULES = Object.freeze([
  * ponto. O que nao casar nenhuma destas tres continua `unknown`: extrair sem
  * evidencia mantem o ponto visivel, classificar sem evidencia o falsifica.
  */
+/**
+ * Consumidor declarado para o arquivo — casamento por caminho RELATIVO AO ROOT.
+ *
+ * Sufixo não serve: um fixture em `tmpdir` cujo caminho termine em
+ * `src/cli/create.js` herdaria o consumidor declarado do repositório, e um teste
+ * hostil que exige `unknown` passaria a receber `machine_protocol`. Quem sabe
+ * qual é a raiz é o gerador; ele passa `ctx.repoRoot`, e sem isso a comparação é
+ * por igualdade estrita.
+ */
+/**
+ * Chave CANÔNICA do arquivo: caminho relativo à raiz do projeto.
+ *
+ * A tabela de consumidores é declarada por caminho de repositório
+ * (`src/cli/create.js`), e o gerador analisa por caminho absoluto. Reduzir os
+ * dois à mesma chave é o que permite comparar por IGUALDADE — sufixo, basename
+ * ou substring fariam um arquivo homônimo fora do projeto herdar o consumidor.
+ *
+ * `null` quando o arquivo não está contido na raiz: fora do projeto não há chave
+ * canônica, e portanto não há consumidor.
+ */
+const chaveCanonica = (arquivo, repoRoot) => {
+  const alvo = norm(arquivo)
+  if (!repoRoot) return alvo
+  const raiz = norm(repoRoot).replace(/\/+$/, "")
+  if (!alvo.startsWith(`${raiz}/`)) return null
+  const rel = alvo.slice(raiz.length + 1)
+  // Contenção: `..` no relativo significa que o caminho escapa do projeto.
+  return rel.split("/").includes("..") ? null : rel
+}
+
+const consumidorDe = (arquivo, consumers, repoRoot = null) => {
+  const chave = chaveCanonica(arquivo, repoRoot)
+  return chave ? ((consumers ?? {})[chave] ?? null) : null
+}
+
 export const SINK_RULES = Object.freeze([
   {
     // Guarda POSITIVA. `requiresDebugEnv` ja garante que `!DEBUG` e
@@ -1773,7 +1808,11 @@ export const SINK_RULES = Object.freeze([
   },
   {
     id: "stream-json-protocol",
-    when: (p, ctx) => p.argForm === "serializer" && Boolean(ctx.consumers[p.file]),
+    // Casa por SUFIXO: o gerador analisa por caminho absoluto e o registro de
+    // consumidores é declarado por caminho de repositório. Comparar por igualdade
+    // fazia o mesmo ponto ser `machine_protocol` na análise direta e `unknown` no
+    // registry — divergência silenciosa entre o que se mede e o que se publica.
+    when: (p, ctx) => p.argForm === "serializer" && Boolean(consumidorDe(p.file, ctx.consumers, ctx.repoRoot)),
     audience: "machine_protocol",
     trigger: "structural_serializer",
     reason: "payload de serializador estrutural com consumidor DECLARADO — as duas coisas; serializador sozinho nao prova que alguem consome",
@@ -1794,9 +1833,16 @@ const aplicar = (regras, p, ctx) => {
 }
 
 export function classifyPoint(p, ctx = {}) {
-  const consumers = ctx.consumers ?? MACHINE_PROTOCOL_CONSUMERS
-  if (p.sink) return aplicar(SINK_RULES, p, { consumers })
-  return aplicar(JS_RULES, p, { consumers })
+  // FRONTEIRA DE REPRESENTAÇÃO. `repoRoot` chega como o SO o entrega (`C:\…` no
+  // Windows) e `p.file` já passou por `norm` (`C:/…`). Canonicalizar aqui, uma
+  // vez, é o que mantém a comparação estrita adiante — a alternativa seria
+  // afrouxar o casamento, e aí um arquivo homônimo fora do projeto herdaria o
+  // consumidor declarado.
+  const base = {
+    consumers: ctx.consumers ?? MACHINE_PROTOCOL_CONSUMERS,
+    repoRoot: ctx.repoRoot ? norm(ctx.repoRoot) : null,
+  }
+  return aplicar(p.sink ? SINK_RULES : JS_RULES, p, base)
 }
 
 export const rules = () => JS_RULES.map(({ id, audience, trigger, reason, risk }) =>

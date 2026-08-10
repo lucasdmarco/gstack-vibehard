@@ -34,7 +34,7 @@ const lerJson = (rel) => JSON.parse(readFileSync(path.join(repoRoot, rel), "utf8
 
 test("o registry commitado declara src/cli/index.js convertido", () => {
   const r = lerJson("src/meta/i18n-js-registry.json")
-  assert.deepEqual(r.convertedFiles, [ALVO, "src/commands/monitor.js"], "monitor.js entrou na conversão seguinte")
+  assert.deepEqual(r.convertedFiles, ["src/cli/create.js", "src/cli/index.js", "src/commands/monitor.js"], "o registry ordena alfabeticamente; create.js entrou por último")
   assert.ok(r.files[ALVO], "com entradas próprias")
   assert.match(r.files[ALVO].fileHash, /^sha256:[0-9a-f]{64}$/)
 })
@@ -43,7 +43,7 @@ test("o inventário oficial consome o AST para o arquivo convertido", async () =
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
   assert.equal(inv.blocked, false)
-  assert.deepEqual(inv.jsRegistry.convertedFiles, [ALVO, "src/commands/monitor.js"])
+  assert.deepEqual(inv.jsRegistry.convertedFiles, ["src/cli/create.js", "src/cli/index.js", "src/commands/monitor.js"])
 
   const doAlvo = inv.points.filter((p) => p.file === ALVO)
   assert.ok(doAlvo.length > 0)
@@ -92,15 +92,15 @@ test("MATRIZ regex → AST: 35 = 29 reais + 6 falsos positivos", async () => {
 
 // ── Efeito global, derivado ──────────────────────────────────────────────────
 
-test("o inventário global reflete as migrações: 1912 pontos, 71 unknown", async () => {
+test("o inventário global reflete as migrações: 1906 pontos, 54 unknown", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
 
   // 1924 − 6 falsos positivos que saíram da conta.
-  assert.equal(inv.total, 1912,
+  assert.equal(inv.total, 1906,
     "1917 - 5: a remoção do downloader remoto duplicado de create.js levou seus pontos junto")
   // 125 − 27 unknown que o arquivo tinha.
-  assert.equal(inv.unknown, 71, "98 -> 71 pela conversão de monitor.js (27 pontos)")
+  assert.equal(inv.unknown, 54, "98 -> 71 pela conversão de monitor.js (27 pontos)")
 })
 
 /**
@@ -108,15 +108,15 @@ test("o inventário global reflete as migrações: 1912 pontos, 71 unknown", asy
  * aritmética fechar não basta — dois erros opostos se cancelariam. Aqui a soma é
  * checada por arquivo, o que localiza qualquer deslocamento.
  */
-test("SPILLOVER: os demais arquivos somam exatamente 1856 pontos", async () => {
+test("SPILLOVER: os demais arquivos somam exatamente 1759 pontos", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
-  const CONVERTIDOS = new Set([ALVO, "src/commands/monitor.js"])
+  const CONVERTIDOS = new Set(["src/cli/create.js", "src/cli/index.js", "src/commands/monitor.js"])
   const outros = inv.points.filter((p) => !CONVERTIDOS.has(p.file))
 
-  assert.equal(outros.length, 1856, "nenhum ponto entrou ou saiu fora dos dois alvos")
-  assert.equal(outros.filter((p) => p.audience === "unknown").length, 71,
-    "todos os `unknown` restantes estão FORA do arquivo migrado")
+  assert.equal(outros.length, 1759, "nenhum ponto entrou ou saiu fora dos três alvos")
+  assert.equal(outros.filter((p) => p.audience === "unknown").length, 54,
+    "todos os `unknown` restantes estão FORA dos arquivos migrados")
   assert.equal(outros.filter((p) => p.source === "ast_registry").length, 0,
     "nenhum TERCEIRO arquivo foi convertido junto por acidente")
 })
@@ -127,9 +127,9 @@ test("a decisão de provenance é aplicada exatamente UMA vez, no callsite ancor
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
 
-  assert.equal(inv.jsRegistry.provenanceDecisionsApplied, 10, "1 deste arquivo + 9 de monitor.js")
+  assert.equal(inv.jsRegistry.provenanceDecisionsApplied, 37, "1 deste arquivo + 9 de monitor.js")
 
-  assert.equal(inv.points.filter((p) => p.provenanceDecision != null).length, 10,
+  assert.equal(inv.points.filter((p) => p.provenanceDecision != null).length, 37,
     "10 pontos decididos no total: 1 aqui + 9 em monitor.js")
 
   const comDecisao = inv.points.filter((p) => p.provenanceDecision != null && p.file === ALVO)
@@ -171,10 +171,10 @@ test("o gate segue reprovando — pelos 71 unknown restantes, não por provenanc
   const g = phase1Gate(buildInventory({ repoRoot }))
 
   assert.equal(g.ok, false)
-  assert.equal(g.unknown, 71)
+  assert.equal(g.unknown, 54)
   assert.equal(g.provenanceOk, true, "a única pendência do arquivo migrado foi decidida")
   assert.equal(g.unresolvedProvenance, 0)
-  assert.match(g.reason, /71 ponto/)
+  assert.match(g.reason, /54 ponto/)
 })
 
 test("o registry commitado é EXATAMENTE o que o gerador emite (sem edição manual)", async () => {

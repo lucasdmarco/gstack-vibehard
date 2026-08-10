@@ -207,6 +207,395 @@
       "reason": "Moldura `  Arquivos modificados: ` é frase do produto; a interpolação é contagem numérica.",
       "owner": "certificação RC PRD51 (Fase 1B)",
       "evidence": "src/commands/monitor.js:189, sob a guarda `if (roi.files_modified !== undefined)`."
+    },
+    {
+      "file": "src/cli/create.js",
+      "line": 268,
+      "column": 3,
+      "expectedFileHash": "sha256:7ce0e9f564e20542334f35c262c946e25b513acf1ec8b98329f7e9cf5cc9d96a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "CASDOOR_SECRET_NAME"
+      ],
+      "reason": "Instrui onde a senha ficou guardada. `CASDOOR_SECRET_NAME` é constante do módulo — chave literal do keychain do SO; traduzi-la quebraria a busca pela entrada.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "create.js:268; a constante é definida no topo do arquivo e usada como identificador do segredo."
+    },
+    {
+      "file": "src/cli/create.js",
+      "line": 269,
+      "column": 3,
+      "expectedFileHash": "sha256:7ce0e9f564e20542334f35c262c946e25b513acf1ec8b98329f7e9cf5cc9d96a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "CASDOOR_SECRET_NAME"
+      ],
+      "reason": "Mostra o COMANDO exato a digitar. Tudo entre crases é sintaxe executável e a constante é a chave real do keychain — traduzir qualquer parte produziria um comando que não roda.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "create.js:269; linha de instrução operacional, colada pelo usuário no terminal."
+    },
+    {
+      "file": "src/cli/create.js",
+      "line": 279,
+      "column": 5,
+      "expectedFileHash": "sha256:7ce0e9f564e20542334f35c262c946e25b513acf1ec8b98329f7e9cf5cc9d96a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "e",
+        "message",
+        "e"
+      ],
+      "reason": "Frase sobre falha do keychain. `e.message` vem da exceção do SO ou da biblioteca de secrets; é texto de terceiros e traduzi-lo inventaria conteúdo que a origem não disse.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "create.js:279, dentro de catch do fluxo de guarda de senha do Casdoor."
+    },
+    {
+      "file": "src/cli/create.js",
+      "line": 334,
+      "column": 3,
+      "expectedFileHash": "sha256:7ce0e9f564e20542334f35c262c946e25b513acf1ec8b98329f7e9cf5cc9d96a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "CASDOOR_URL"
+      ],
+      "reason": "Confirma o IAM no ar. `CASDOOR_URL` é endereço de rede — traduzir uma URL a torna inalcançável.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "create.js:334; constante de endpoint do Casdoor local."
+    },
+    {
+      "file": "src/cli/create.js",
+      "line": 604,
+      "column": 5,
+      "expectedFileHash": "sha256:7ce0e9f564e20542334f35c262c946e25b513acf1ec8b98329f7e9cf5cc9d96a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "e",
+        "message"
+      ],
+      "reason": "Informa que um opcional não subiu. `e.message` vem da exceção do Graphify, ferramenta externa.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "create.js:604, catch do bootstrap opcional do Graphify."
+    },
+    {
+      "file": "src/cli/create.js",
+      "line": 618,
+      "column": 5,
+      "expectedFileHash": "sha256:7ce0e9f564e20542334f35c262c946e25b513acf1ec8b98329f7e9cf5cc9d96a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "e",
+        "message"
+      ],
+      "reason": "Mesma forma do ponto 604, outro opcional: `e.message` vem do Headroom.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "create.js:618, catch do bootstrap opcional do Headroom."
+    },
+    {
+      "file": "src/cli/create.js",
+      "line": 1034,
+      "column": 5,
+      "expectedFileHash": "sha256:7ce0e9f564e20542334f35c262c946e25b513acf1ec8b98329f7e9cf5cc9d96a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "e",
+        "message",
+        "e"
+      ],
+      "reason": "Avisa que um config existente foi ignorado. `e.message` é erro de parse/IO do arquivo do usuário.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "create.js:1034, catch de `writeJsonMerge`."
+    },
+    {
+      "file": "src/cli/create.js",
+      "line": 1085,
+      "column": 5,
+      "expectedFileHash": "sha256:7ce0e9f564e20542334f35c262c946e25b513acf1ec8b98329f7e9cf5cc9d96a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "e",
+        "message",
+        "e"
+      ],
+      "reason": "Avisa falha não-bloqueante do Harness Bridge. `e.message` vem da exceção original.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "create.js:1085; o sufixo `(non-blocking)` é da moldura e deve ser traduzido."
+    },
+    {
+      "file": "src/cli/create.js",
+      "line": 1625,
+      "column": 8,
+      "expectedFileHash": "sha256:7ce0e9f564e20542334f35c262c946e25b513acf1ec8b98329f7e9cf5cc9d96a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "report",
+        "mode",
+        "projectDir",
+        "report",
+        "writes",
+        "global",
+        "length",
+        "report",
+        "writes",
+        "global",
+        "join"
+      ],
+      "reason": "Resumo do dry-run. `report.mode` é vocabulário fechado do produto, `projectDir` é caminho de filesystem e `report.writes.global` é lista de caminhos — nenhum é linguagem.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "create.js:1625, ramo NÃO-json do `createDryRun`; o ramo json é o `machine_protocol` da linha 1624."
+    },
+    {
+      "file": "src/cli/create.js",
+      "line": 1652,
+      "column": 3,
+      "expectedFileHash": "sha256:7ce0e9f564e20542334f35c262c946e25b513acf1ec8b98329f7e9cf5cc9d96a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "templateName",
+        "OMNIHARNESS_MAP",
+        "length"
+      ],
+      "reason": "Cabeçalho de fase. `templateName` é identificador de template e o número vem de `OMNIHARNESS_MAP.length`.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "create.js:1652; `Fase 4/5` e `Scaffold` são da moldura."
+    },
+    {
+      "file": "src/cli/create.js",
+      "line": 1660,
+      "column": 15,
+      "expectedFileHash": "sha256:7ce0e9f564e20542334f35c262c946e25b513acf1ec8b98329f7e9cf5cc9d96a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "e",
+        "message",
+        "e"
+      ],
+      "reason": "Falha ao escrever o Harness Bridge. `e.message` é da exceção de IO.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "create.js:1660, catch do bloco de escrita do bridge."
+    },
+    {
+      "file": "src/cli/create.js",
+      "line": 1707,
+      "column": 56,
+      "expectedFileHash": "sha256:7ce0e9f564e20542334f35c262c946e25b513acf1ec8b98329f7e9cf5cc9d96a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "graphTarget",
+        "graphSource"
+      ],
+      "reason": "Confirma symlink do graph. `graphSource` e `graphTarget` são caminhos absolutos de filesystem.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "create.js:1707, ramo de sucesso do `symlinkSync`."
+    },
+    {
+      "file": "src/cli/create.js",
+      "line": 1708,
+      "column": 51,
+      "expectedFileHash": "sha256:7ce0e9f564e20542334f35c262c946e25b513acf1ec8b98329f7e9cf5cc9d96a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "graphTarget"
+      ],
+      "reason": "Fallback de cópia quando o symlink falha. `graphTarget` é caminho de filesystem.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "create.js:1708, catch do `symlinkSync` com `copyFileSync`."
+    },
+    {
+      "file": "src/cli/create.js",
+      "line": 1712,
+      "column": 3,
+      "expectedFileHash": "sha256:7ce0e9f564e20542334f35c262c946e25b513acf1ec8b98329f7e9cf5cc9d96a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "graphTarget"
+      ],
+      "reason": "Registra placeholder aguardando o Graphify. `graphTarget` é caminho.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "create.js:1712; `(aguardando graphify)` é da moldura."
+    },
+    {
+      "file": "src/cli/create.js",
+      "line": 1721,
+      "column": 17,
+      "expectedFileHash": "sha256:7ce0e9f564e20542334f35c262c946e25b513acf1ec8b98329f7e9cf5cc9d96a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "e",
+        "message"
+      ],
+      "reason": "Falha não-bloqueante do symlink do vault. `e.message` é da exceção de filesystem.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "create.js:1721, catch do bloco de vault graph."
+    },
+    {
+      "file": "src/cli/create.js",
+      "line": 1728,
+      "column": 3,
+      "expectedFileHash": "sha256:7ce0e9f564e20542334f35c262c946e25b513acf1ec8b98329f7e9cf5cc9d96a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "vaultProjectDir"
+      ],
+      "reason": "Informa o diretório do projeto no vault. `vaultProjectDir` é caminho.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "create.js:1728; receptor `c.logger`, provado pelo campo do runtime."
+    },
+    {
+      "file": "src/cli/create.js",
+      "line": 1744,
+      "column": 35,
+      "expectedFileHash": "sha256:7ce0e9f564e20542334f35c262c946e25b513acf1ec8b98329f7e9cf5cc9d96a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "compIcon",
+        "st",
+        "name",
+        "st"
+      ],
+      "reason": "Linha de status por componente. `compIcon(st)` devolve glifo e `name`/`st` são identificador e vocabulário fechado de estado.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "create.js:1744, laço sobre `comps`."
+    },
+    {
+      "file": "src/cli/create.js",
+      "line": 1749,
+      "column": 3,
+      "expectedFileHash": "sha256:7ce0e9f564e20542334f35c262c946e25b513acf1ec8b98329f7e9cf5cc9d96a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "projectName",
+        "templateName"
+      ],
+      "reason": "Confirma criação do projeto. `projectName` é nome escolhido pelo usuário e `templateName` é identificador de template.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "create.js:1749; `Projeto` e `criado (template: …)` são da moldura."
+    },
+    {
+      "file": "src/cli/create.js",
+      "line": 1750,
+      "column": 3,
+      "expectedFileHash": "sha256:7ce0e9f564e20542334f35c262c946e25b513acf1ec8b98329f7e9cf5cc9d96a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "projectDir"
+      ],
+      "reason": "Mostra o diretório criado. `projectDir` é caminho.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "create.js:1750; rótulo `Diretorio:` traduz."
+    },
+    {
+      "file": "src/cli/create.js",
+      "line": 1751,
+      "column": 3,
+      "expectedFileHash": "sha256:7ce0e9f564e20542334f35c262c946e25b513acf1ec8b98329f7e9cf5cc9d96a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "templateName"
+      ],
+      "reason": "Mostra o template usado. `templateName` é identificador.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "create.js:1751; rótulo `Template:` traduz."
+    },
+    {
+      "file": "src/cli/create.js",
+      "line": 1754,
+      "column": 24,
+      "expectedFileHash": "sha256:7ce0e9f564e20542334f35c262c946e25b513acf1ec8b98329f7e9cf5cc9d96a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "vaultProjectDir"
+      ],
+      "reason": "Mostra o caminho no vault quando existe. `vaultProjectDir` é caminho.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "create.js:1754, sob guarda `if (vaultProjectDir)`."
+    },
+    {
+      "file": "src/cli/create.js",
+      "line": 1755,
+      "column": 8,
+      "expectedFileHash": "sha256:7ce0e9f564e20542334f35c262c946e25b513acf1ec8b98329f7e9cf5cc9d96a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "projectName"
+      ],
+      "reason": "Explica o modo lite. `projectName` compõe um caminho relativo (`./nome`).",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "create.js:1755, ramo `else` do ponto 1754."
+    },
+    {
+      "file": "src/cli/create.js",
+      "line": 1761,
+      "column": 3,
+      "expectedFileHash": "sha256:7ce0e9f564e20542334f35c262c946e25b513acf1ec8b98329f7e9cf5cc9d96a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "projectName"
+      ],
+      "reason": "Primeiro passo do próximo-passos: `cd <nome>`. `projectName` é o diretório real — traduzi-lo daria um comando que falha.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "create.js:1761; o numeral e `cd` são sintaxe."
+    },
+    {
+      "file": "src/cli/create.js",
+      "line": 1764,
+      "column": 3,
+      "expectedFileHash": "sha256:7ce0e9f564e20542334f35c262c946e25b513acf1ec8b98329f7e9cf5cc9d96a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "projectName"
+      ],
+      "reason": "Aponta o arquivo de trilha. `projectName` compõe o caminho até `NEXT_STEPS.md`.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "create.js:1764; o restante do caminho é literal e não se traduz."
+    },
+    {
+      "file": "src/cli/create.js",
+      "line": 1772,
+      "column": 17,
+      "expectedFileHash": "sha256:7ce0e9f564e20542334f35c262c946e25b513acf1ec8b98329f7e9cf5cc9d96a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "e",
+        "message"
+      ],
+      "reason": "Falha não-bloqueante ao escrever NEXT_STEPS.md. `e.message` é da exceção de IO.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "create.js:1772, catch do bloco de escrita."
+    },
+    {
+      "file": "src/cli/create.js",
+      "line": 1798,
+      "column": 145,
+      "expectedFileHash": "sha256:7ce0e9f564e20542334f35c262c946e25b513acf1ec8b98329f7e9cf5cc9d96a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "op",
+        "id",
+        "e",
+        "message",
+        "e"
+      ],
+      "reason": "Acumula erro por operação no journal. `op.id` é identificador de operação e `e.message` vem da exceção.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "create.js:1798; a string entra em `errors.push`, consumida pelo relatório transacional."
+    },
+    {
+      "file": "src/cli/create.js",
+      "line": 1829,
+      "column": 7,
+      "expectedFileHash": "sha256:7ce0e9f564e20542334f35c262c946e25b513acf1ec8b98329f7e9cf5cc9d96a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "active",
+        "map",
+        "o",
+        "o",
+        "id",
+        "join"
+      ],
+      "reason": "Anuncia rollback após falha do provisionamento. `active.map(o => o.id)` é lista de identificadores de operação.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "create.js:1829; `create falhou após provisionar — revertendo` é a frase que traduz. Receptor `c.logger`."
     }
   ]
 }

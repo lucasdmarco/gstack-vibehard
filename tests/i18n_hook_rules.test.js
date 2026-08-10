@@ -79,6 +79,28 @@ test("CONTROLE NEGATIVO: sink novo em machine_protocol sem consumidor registrado
   assert.equal(audit.semConsumidor[0].sink, "socket")
 })
 
+/**
+ * A conversão AST de `create.js` trouxe o 1º sink JS para cá. Sem ancoragem, declarar
+ * `process.stdout.write` uma vez cobriria TODO `process.stdout.write` do repositório —
+ * a declaração de um comando viraria alvará para os outros ~50 que virão no lote JS.
+ */
+test("CONTROLE NEGATIVO: entrada ANCORADA em arquivo não cobre o mesmo sink em OUTRO arquivo", async () => {
+  const { machineProtocolAudit } = await imp()
+  const ancorada = [{ file: "src/cli/create.js", sink: "process.stdout.write", consumer: "x", contract: "y", evidence: "z" }]
+  const mesmoArquivo = { points: [{ file: "src/cli/create.js", line: 1624, sink: "process.stdout.write", audience: "machine_protocol" }] }
+  const outroArquivo = { points: [{ file: "src/commands/task.js", line: 39, sink: "process.stdout.write", audience: "machine_protocol" }] }
+  assert.equal(machineProtocolAudit(mesmoArquivo, ancorada).ok, true, "cobre o arquivo que declarou")
+  assert.equal(machineProtocolAudit(outroArquivo, ancorada).ok, false, "e SÓ ele — senão a âncora é decorativa")
+})
+
+test("o sink JS de `create --dry-run --json` está declarado com âncora, e não por sink solto", async () => {
+  const { MACHINE_PROTOCOL_CONSUMERS } = await imp()
+  const e = MACHINE_PROTOCOL_CONSUMERS.find((c) => c.sink === "process.stdout.write")
+  assert.ok(e, "o ponto convertido em create.js precisa de declaração própria")
+  assert.equal(e.file, "src/cli/create.js", "declaração de sink JS sem âncora cobriria o repositório inteiro")
+  assert.match(e.evidence, /json_purity_contract/, "a evidência é o contrato `--json` já provado por subprocess real")
+})
+
 test("NEGATIVO: stderr sem NENHUM sinal estrutural continua unknown", async () => {
   const { classifyHookPoint } = await imp()
   const r = classifyHookPoint({ sink: "stderr" })

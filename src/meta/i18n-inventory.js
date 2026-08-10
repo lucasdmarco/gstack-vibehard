@@ -376,6 +376,18 @@ export const MACHINE_PROTOCOL_CONSUMERS = Object.freeze([
     contract: "payload serializado; texto humano vai para stderr",
     evidence: "tests/test_stop_sandbox.py, tests/test_stop_test_gate.py",
   },
+  {
+    // 1º sink JS a chegar aqui: a conversão AST de `create.js` renomeia o rótulo de
+    // sink de `stdout` (regex) para `process.stdout.write`, e o ponto deixa de casar
+    // com a entrada do hook acima. O `file` é o ANCORAMENTO: sem ele, esta declaração
+    // passaria a cobrir todo `process.stdout.write` do repositório — que é exatamente
+    // o depósito que este registro existe para impedir.
+    file: "src/cli/create.js",
+    sink: "process.stdout.write",
+    consumer: "consumidor de máquina do `create --dry-run --json` — stdout inteiro é UM documento JSON",
+    contract: "sob `--json`, o relatório de dry-run sai serializado em stdout; o texto humano fica no ramo `else` (console.log)",
+    evidence: "tests/json_purity_contract.test.js — `create amostra --dry-run --json` roda por subprocess real e prova stdout puro + payload fora do stderr",
+  },
 ])
 
 /** Audiências que exigem consumidor provado para serem aceitas. */
@@ -385,11 +397,24 @@ const REQUIRE_CONSUMER = new Set(["machine_protocol"])
  * Verifica que todo ponto `machine_protocol` do inventário tem consumidor registrado
  * para o seu sink. Um sink novo cair em `machine_protocol` sem entrada aqui é ERRO —
  * é assim que a categoria segura viraria depósito.
+ *
+ * COBERTURA ANCORADA: uma entrada com `file` só cobre pontos DAQUELE arquivo. Sem
+ * `file`, a entrada cobre o sink inteiro — que é o alcance herdado das duas entradas
+ * dos hooks Python.
+ *
+ * DÍVIDA CONHECIDA (reconciliação no lote JS): a entrada `sink: "stdout"` dos hooks
+ * cobre hoje, por colisão de RÓTULO, os pontos JS ainda não convertidos — o scanner
+ * regex rotula `process.stdout.write` como `stdout`, igual ao canal do hook. São ~130
+ * pontos em `src/commands/*` que nenhuma das duas declarações descreve. Converter um
+ * arquivo os tira da colisão (o AST rotula `process.stdout.write`) e força a
+ * declaração real, um a um. Ancorar os hooks em `hooks/` antes disso só trocaria a
+ * cobertura acidental por um gate vermelho de 130 achados sem consumidor declarado.
  */
+const cobre = (c, p) => c.sink === p.sink && (!c.file || c.file === p.file)
+
 export function machineProtocolAudit(inventory, consumers = MACHINE_PROTOCOL_CONSUMERS) {
-  const cobertos = new Set(consumers.map((c) => c.sink))
   const semConsumidor = inventory.points
-    .filter((p) => REQUIRE_CONSUMER.has(p.audience) && !cobertos.has(p.sink))
+    .filter((p) => REQUIRE_CONSUMER.has(p.audience) && !consumers.some((c) => cobre(c, p)))
     .map((p) => ({ file: p.file, line: p.line, sink: p.sink }))
   return { ok: semConsumidor.length === 0, semConsumidor }
 }

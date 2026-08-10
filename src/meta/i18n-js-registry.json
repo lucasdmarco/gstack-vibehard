@@ -1,9 +1,1662 @@
 {
   "convertedFiles": [
+    "src/cli/create.js",
     "src/cli/index.js",
     "src/commands/monitor.js"
   ],
   "files": {
+    "src/cli/create.js": {
+      "entries": [
+        {
+          "audience": "render_primitive",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 18,
+          "line": 65,
+          "provenance": {
+            "ids": [
+              "m"
+            ],
+            "kind": "no_local_frame",
+            "resolved": false
+          },
+          "rule": "local-render-primitive-impl",
+          "sink": null
+        },
+        {
+          "audience": "render_primitive",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 18,
+          "line": 66,
+          "provenance": {
+            "ids": [
+              "m"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "local-render-primitive-impl",
+          "sink": null
+        },
+        {
+          "audience": "render_primitive",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 18,
+          "line": 67,
+          "provenance": {
+            "ids": [
+              "m"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "local-render-primitive-impl",
+          "sink": null
+        },
+        {
+          "audience": "render_primitive",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.error",
+          "calleePath": "console.error",
+          "canonicalName": "error",
+          "column": 18,
+          "line": 68,
+          "provenance": {
+            "ids": [
+              "m"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "local-render-primitive-impl",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.warn",
+          "calleePath": "logger.warn",
+          "canonicalName": "warn",
+          "column": 3,
+          "line": 219,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.warn",
+          "calleePath": "logger.warn",
+          "canonicalName": "warn",
+          "column": 3,
+          "line": 220,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.warn",
+          "calleePath": "logger.warn",
+          "canonicalName": "warn",
+          "column": 3,
+          "line": 221,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.warn",
+          "calleePath": "logger.warn",
+          "canonicalName": "warn",
+          "column": 5,
+          "line": 263,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.success",
+          "calleePath": "logger.success",
+          "canonicalName": "success",
+          "column": 3,
+          "line": 267,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 268,
+          "provenance": {
+            "ids": [
+              "CASDOOR_SECRET_NAME"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 269,
+          "provenance": {
+            "ids": [
+              "CASDOOR_SECRET_NAME"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.warn",
+          "calleePath": "logger.warn",
+          "canonicalName": "warn",
+          "column": 5,
+          "line": 279,
+          "provenance": {
+            "ids": [
+              "e",
+              "message",
+              "e"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.warn",
+          "calleePath": "logger.warn",
+          "canonicalName": "warn",
+          "column": 7,
+          "line": 287,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 5,
+          "line": 299,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.warn",
+          "calleePath": "logger.warn",
+          "canonicalName": "warn",
+          "column": 5,
+          "line": 303,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.warn",
+          "calleePath": "logger.warn",
+          "canonicalName": "warn",
+          "column": 5,
+          "line": 330,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.warn",
+          "calleePath": "logger.warn",
+          "canonicalName": "warn",
+          "column": 5,
+          "line": 331,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.success",
+          "calleePath": "logger.success",
+          "canonicalName": "success",
+          "column": 3,
+          "line": 334,
+          "provenance": {
+            "ids": [
+              "CASDOOR_URL"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 5,
+          "line": 343,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 346,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 351,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 5,
+          "line": 356,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.warn",
+          "calleePath": "logger.warn",
+          "canonicalName": "warn",
+          "column": 5,
+          "line": 360,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 363,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 5,
+          "line": 374,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.warn",
+          "calleePath": "logger.warn",
+          "canonicalName": "warn",
+          "column": 5,
+          "line": 378,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.warn",
+          "calleePath": "logger.warn",
+          "canonicalName": "warn",
+          "column": 5,
+          "line": 410,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 413,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.warn",
+          "calleePath": "logger.warn",
+          "canonicalName": "warn",
+          "column": 5,
+          "line": 421,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.warn",
+          "calleePath": "logger.warn",
+          "canonicalName": "warn",
+          "column": 5,
+          "line": 422,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.success",
+          "calleePath": "logger.success",
+          "canonicalName": "success",
+          "column": 3,
+          "line": 425,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 5,
+          "line": 440,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.success",
+          "calleePath": "logger.success",
+          "canonicalName": "success",
+          "column": 5,
+          "line": 446,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.warn",
+          "calleePath": "logger.warn",
+          "canonicalName": "warn",
+          "column": 3,
+          "line": 449,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 5,
+          "line": 485,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.success",
+          "calleePath": "logger.success",
+          "canonicalName": "success",
+          "column": 5,
+          "line": 493,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.success",
+          "calleePath": "logger.success",
+          "canonicalName": "success",
+          "column": 5,
+          "line": 503,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.success",
+          "calleePath": "logger.success",
+          "canonicalName": "success",
+          "column": 5,
+          "line": 506,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.warn",
+          "calleePath": "logger.warn",
+          "canonicalName": "warn",
+          "column": 3,
+          "line": 509,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.success",
+          "calleePath": "logger.success",
+          "canonicalName": "success",
+          "column": 5,
+          "line": 542,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.warn",
+          "calleePath": "logger.warn",
+          "canonicalName": "warn",
+          "column": 3,
+          "line": 545,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 5,
+          "line": 580,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.success",
+          "calleePath": "logger.success",
+          "canonicalName": "success",
+          "column": 5,
+          "line": 585,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 588,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 5,
+          "line": 596,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.success",
+          "calleePath": "logger.success",
+          "canonicalName": "success",
+          "column": 14,
+          "line": 601,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 10,
+          "line": 602,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 5,
+          "line": 604,
+          "provenance": {
+            "ids": [
+              "e",
+              "message"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 5,
+          "line": 611,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.success",
+          "calleePath": "logger.success",
+          "canonicalName": "success",
+          "column": 14,
+          "line": 616,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 5,
+          "line": 618,
+          "provenance": {
+            "ids": [
+              "e",
+              "message"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.warn",
+          "calleePath": "console.warn",
+          "canonicalName": "warn",
+          "column": 5,
+          "line": 1034,
+          "provenance": {
+            "ids": [
+              "e",
+              "message",
+              "e"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 1050,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.warn",
+          "calleePath": "console.warn",
+          "canonicalName": "warn",
+          "column": 5,
+          "line": 1085,
+          "provenance": {
+            "ids": [
+              "e",
+              "message",
+              "e"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.success",
+          "calleePath": "logger.success",
+          "canonicalName": "success",
+          "column": 7,
+          "line": 1337,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.success",
+          "calleePath": "logger.success",
+          "canonicalName": "success",
+          "column": 7,
+          "line": 1425,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.success",
+          "calleePath": "logger.success",
+          "canonicalName": "success",
+          "column": 7,
+          "line": 1524,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "machine_protocol",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "process.stdout.write",
+          "calleePath": "process.stdout.write",
+          "canonicalName": "write",
+          "column": 34,
+          "line": 1624,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "stream-json-protocol",
+          "sink": "stdout"
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 8,
+          "line": 1625,
+          "provenance": {
+            "ids": [
+              "report",
+              "mode",
+              "projectDir",
+              "report",
+              "writes",
+              "global",
+              "length",
+              "report",
+              "writes",
+              "global",
+              "join"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 1633,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 1640,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 1643,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 1652,
+          "provenance": {
+            "ids": [
+              "templateName",
+              "OMNIHARNESS_MAP",
+              "length"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.warn",
+          "calleePath": "logger.warn",
+          "canonicalName": "warn",
+          "column": 15,
+          "line": 1660,
+          "provenance": {
+            "ids": [
+              "e",
+              "message",
+              "e"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 1664,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.success",
+          "calleePath": "logger.success",
+          "canonicalName": "success",
+          "column": 56,
+          "line": 1707,
+          "provenance": {
+            "ids": [
+              "graphTarget",
+              "graphSource"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 51,
+          "line": 1708,
+          "provenance": {
+            "ids": [
+              "graphTarget"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 1712,
+          "provenance": {
+            "ids": [
+              "graphTarget"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.warn",
+          "calleePath": "logger.warn",
+          "canonicalName": "warn",
+          "column": 17,
+          "line": 1721,
+          "provenance": {
+            "ids": [
+              "e",
+              "message"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 1728,
+          "provenance": {
+            "ids": [
+              "vaultProjectDir"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 1737,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 35,
+          "line": 1744,
+          "provenance": {
+            "ids": [
+              "compIcon",
+              "st",
+              "name",
+              "st"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 48,
+          "line": 1745,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.success",
+          "calleePath": "logger.success",
+          "canonicalName": "success",
+          "column": 3,
+          "line": 1749,
+          "provenance": {
+            "ids": [
+              "projectName",
+              "templateName"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 1750,
+          "provenance": {
+            "ids": [
+              "projectDir"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 1751,
+          "provenance": {
+            "ids": [
+              "templateName"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.warn",
+          "calleePath": "logger.warn",
+          "canonicalName": "warn",
+          "column": 16,
+          "line": 1753,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 24,
+          "line": 1754,
+          "provenance": {
+            "ids": [
+              "vaultProjectDir"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 8,
+          "line": 1755,
+          "provenance": {
+            "ids": [
+              "projectName"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 1756,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "terminal_control",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 1759,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver-spacing",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 1760,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 1761,
+          "provenance": {
+            "ids": [
+              "projectName"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 1762,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 1763,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.info",
+          "calleePath": "logger.info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 1764,
+          "provenance": {
+            "ids": [
+              "projectName"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.warn",
+          "calleePath": "logger.warn",
+          "canonicalName": "warn",
+          "column": 17,
+          "line": 1772,
+          "provenance": {
+            "ids": [
+              "e",
+              "message"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "logger.warn",
+          "calleePath": "logger.warn",
+          "canonicalName": "warn",
+          "column": 145,
+          "line": 1798,
+          "provenance": {
+            "ids": [
+              "op",
+              "id",
+              "e",
+              "message",
+              "e"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "error",
+          "calleePath": "error",
+          "canonicalName": "error",
+          "column": 7,
+          "line": 1829,
+          "provenance": {
+            "ids": [
+              "active",
+              "map",
+              "o",
+              "o",
+              "id",
+              "join"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 17,
+          "line": 1843,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "local",
+          "bindingOrigin": "src/cli/create.js",
+          "callee": "defaultLogger.error",
+          "calleePath": "defaultLogger.error",
+          "canonicalName": "error",
+          "column": 5,
+          "line": 1853,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "canonical-receiver",
+          "sink": null
+        }
+      ],
+      "fileHash": "sha256:7ce0e9f564e20542334f35c262c946e25b513acf1ec8b98329f7e9cf5cc9d96a"
+    },
     "src/cli/index.js": {
       "entries": [
         {

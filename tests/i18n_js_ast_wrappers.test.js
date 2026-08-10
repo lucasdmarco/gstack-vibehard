@@ -172,5 +172,5 @@ test("CENSO: os wrappers não converteram arquivo algum por si", async () => {
   const { CONVERTED_FILES } = await import(pathToFileURL(path.join(repoRoot, "scripts", "i18n-registry.mjs")).href)
   // monitor.js foi convertido em d9824f6, DEPOIS desta capacidade. O que este
   // censo afirma continua valendo: os wrappers não converteram nada por si.
-  assert.deepEqual([...CONVERTED_FILES], ["src/cli/index.js", "src/commands/monitor.js"])
+  assert.deepEqual([...CONVERTED_FILES], ["src/cli/index.js", "src/commands/monitor.js", "src/cli/create.js"])
 })
