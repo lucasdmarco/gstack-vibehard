@@ -356,10 +356,16 @@ test("a Task 3 não converteu arquivo algum por si", async () => {
     "a Task 3 instala regras; converter arquivos é da Task 4, e misturar as duas impediria atribuir qualquer variação de contagem a uma causa")
 })
 
-test("o registro de consumidores nasce VAZIO e é declarativo", async () => {
+test("o registro de consumidores só admite entrada com prova apontável", async () => {
   const { MACHINE_PROTOCOL_CONSUMERS } = await eng()
-  assert.deepEqual(MACHINE_PROTOCOL_CONSUMERS, {},
-    "nenhum consumidor foi provado ainda; preenchê-lo por antecipação daria `machine_protocol` a arquivos sem parser conhecido")
+  // Nasceu vazio na Task 3 e ganhou a primeira entrada quando um consumidor REAL
+  // foi identificado. O invariante nunca foi "estar vazio" -- é que cada entrada
+  // nomeie o teste que consome a saída, e não o formato que ela aparenta ter.
+  for (const [arquivo, d] of Object.entries(MACHINE_PROTOCOL_CONSUMERS)) {
+    assert.ok(arquivo.startsWith("src/"), `chave deve ser caminho de fonte: ${arquivo}`)
+    assert.ok(d.consumer && d.proof, `${arquivo} sem consumidor ou prova`)
+    assert.ok(d.proof.includes("tests/"), `${arquivo}: a prova precisa apontar um teste real`)
+  }
 })
 
 test("toda audiência emitida pelas regras novas é declarada em AUDIENCES", async () => {

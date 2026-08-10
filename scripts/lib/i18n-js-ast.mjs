@@ -1007,15 +1007,85 @@ export function propagarDoEntrypoint(ctx, raizes) {
  * canonico. Ausencia de entrada NAO e permissao: significa que aquele caminho
  * nunca foi percorrido a partir do `DISPATCH`.
  */
-export function origemDoReceptor(node, cadeiaDeFuncoes, receptores) {
-  const c = node.expression
-  if (!ts.isPropertyAccessExpression(c) || !ts.isIdentifier(c.expression)) return null
-  const receptor = c.expression.text
+/** Valor abstrato de um binding, procurando da função mais interna para fora. */
+const valorNaCadeia = (nome, cadeiaDeFuncoes, receptores) => {
   for (const fn of cadeiaDeFuncoes) {
-    const v = receptores.get(`${fn}#${receptor}`)
-    if (v) return v.k === "canonical" ? v.origin : null
+    const v = receptores.get(`${fn}#${nome}`)
+    if (v) return v
   }
   return null
+}
+
+/**
+ * Origem do receptor de `obj.metodo(...)`, lida do estado propagado.
+ *
+ * Trata DUAS formas de receptor, porque `create.js` usa as duas:
+ *
+ *   `logger.warn(…)`    — identificador simples, resolvido direto;
+ *   `c.logger.info(…)`  — acesso a campo, onde `c` é o objeto do runtime e o
+ *                          campo carrega o logger já normalizado.
+ *
+ * A segunda não é conveniência: sem ela, o mesmo logger provado ficaria
+ * `unknown` só por ser lido de um campo em vez de um parâmetro. A prova é a
+ * mesma — o valor abstrato do campo — e é ela que decide, nunca o formato.
+ *
+ * Um `defaultLogger.error(…)` que resolve, pelo binding, ao logger canônico
+ * local do módulo também conta: é o mesmo objeto que o adapter normaliza.
+ */
+/** `logger.warn(…)` — receptor é identificador simples. */
+const origemPorIdentificador = (alvo, cadeia, receptores, ctx) => {
+  const v = valorNaCadeia(alvo.text, cadeia, receptores)
+  if (v) return v.k === "canonical" ? v.origin : null
+  // Fora do estado propagado: pode ser o logger canônico do próprio módulo.
+  return ctx ? origemDeLoggerLocal(alvo, ctx) : null
+}
+
+/** `c.logger.info(…)` — receptor é CAMPO de um objeto já resumido. */
+const ehAcessoSimples = (n) => ts.isIdentifier(n.expression) && ts.isIdentifier(n.name)
+
+const origemPorCampo = (alvo, cadeia, receptores) => {
+  if (!ehAcessoSimples(alvo)) return null
+  const base = valorNaCadeia(alvo.expression.text, cadeia, receptores)
+  const campo = base?.k === "object" ? base.fields.get(alvo.name.text) : null
+  return campo?.k === "canonical" ? campo.origin : null
+}
+
+export function origemDoReceptor(node, cadeiaDeFuncoes, receptores, ctx = null) {
+  const c = node.expression
+  if (!ts.isPropertyAccessExpression(c)) return null
+  const alvo = c.expression
+  if (ts.isIdentifier(alvo)) return origemPorIdentificador(alvo, cadeiaDeFuncoes, receptores, ctx)
+  if (ts.isPropertyAccessExpression(alvo)) return origemPorCampo(alvo, cadeiaDeFuncoes, receptores)
+  return null
+}
+
+/**
+ * O ponto está DENTRO de um método do logger canônico local?
+ *
+ * `defaultLogger` é `{ info: (m) => console.log(`  ${m}`), … }`. O `console.log`
+ * ali dentro não é uma mensagem: é a IMPLEMENTAÇÃO do canal. O texto vem do
+ * chamador — exatamente a mesma semântica de `render-primitive-impl` no módulo
+ * canônico, e contá-lo como público duplicaria no inventário a frase que já foi
+ * contada no callsite.
+ *
+ * A prova é `ehLoggerCanonicoLocal` sobre o objeto que contém o método: o mesmo
+ * predicado que exige emissão pura em todas as propriedades. Um objeto qualquer
+ * com um arrow que chama `console.log` não passa.
+ */
+function dentroDeLoggerCanonicoLocal(node, ctx) {
+  for (let p = node.parent; p; p = p.parent) {
+    if (ts.isObjectLiteralExpression(p)) return ehLoggerCanonicoLocal(p, ctx.checker)
+    if (ts.isFunctionDeclaration(p) || ts.isMethodDeclaration(p)) return false
+  }
+  return false
+}
+
+/** O identificador resolve, por binding, ao logger canônico local do módulo? */
+function origemDeLoggerLocal(id, ctx) {
+  const d = declaracaoResolvida(ctx.checker, id, ctx.sf)
+  if (!d || !ts.isVariableDeclaration(d) || !d.initializer) return null
+  if (sofreMutacao(ctx.sf, id.text)) return null
+  return ehLoggerCanonicoLocal(d.initializer, ctx.checker) ? norm(ctx.sf.fileName) : null
 }
 
 /** Chamadas a `nome`, no arquivo, com o no da chamada. */
@@ -1389,6 +1459,10 @@ const PARTE_POR_FORMA = [
   [ts.isParenthesizedExpression, (n, acc, rec) => rec(n.expression, acc)],
   [ehConcatenacao, (n, acc, rec) => { rec(n.left, acc); rec(n.right, acc) }],
   [ts.isTemplateExpression, espalharTemplate],
+  // `a || b` entrega UM dos lados. Ambos contribuem para a forma: se um deles
+  // e frase literal, ha texto a traduzir mesmo quando o outro e opaco.
+  [(n) => ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.BarBarToken,
+    (n, acc, rec) => { rec(n.left, acc); rec(n.right, acc) }],
   [ehLiteralDeTexto, (n, acc) => acc.push({ tipo: "literal", texto: n.text })],
 ]
 
@@ -1513,7 +1587,20 @@ export function formaDoArgumento(arg, ctx = null) {
  * (ver `tests/i18n_js_ast_command_surfaces.test.js`, que exercita a regra com
  * consumidor injetado, e a Fatia 4, que migra `monitor.js` e `create.js`).
  */
-export const MACHINE_PROTOCOL_CONSUMERS = Object.freeze({})
+export const MACHINE_PROTOCOL_CONSUMERS = Object.freeze({
+  /**
+   * `create --dry-run --json` emite o plano por `process.stdout.write`.
+   *
+   * O consumidor é REAL e executa o CLI de verdade: `json_purity_contract.test.js`
+   * roda `create amostra --dry-run --json`, exige que stdout seja um documento
+   * JSON puro e que o payload não vaze pelo stderr. Não é um mock do formato — é
+   * um parser sobre a saída do processo.
+   */
+  "src/cli/create.js": Object.freeze({
+    consumer: "json_purity_contract",
+    proof: "tests/json_purity_contract.test.js — `create amostra --dry-run --json` na lista SUCESSO",
+  }),
+})
 
 /**
  * As tres condicoes de `command-human-branch`, nomeadas separadamente.
@@ -1626,6 +1713,18 @@ export const JS_RULES = Object.freeze([
      * `terminal_control` que descreve isso: ausência de idioma, não ausência de
      * classificação.
      */
+    /**
+     * Metodo do logger canonico LOCAL — `defaultLogger.info` e companhia. Mesma
+     * razao de `render-primitive-impl` no modulo canonico: a funcao so decora, e
+     * contar como publico duplicaria a frase ja contada no callsite.
+     */
+    id: "local-render-primitive-impl",
+    when: (p) => p.inLocalRenderPrimitive === true && p.binding.kind === "global",
+    audience: "render_primitive",
+    trigger: "channel_implementation",
+    reason: "console.* dentro de metodo do logger canonico local: implementa o canal, o texto vem do chamador",
+  },
+  {
     id: "canonical-receiver-spacing",
     when: (p) => Boolean(p.receiverOrigin) && p.argForm === "control_only" && p.underMachineGuard !== true,
     audience: "terminal_control",
@@ -1836,7 +1935,9 @@ export function analyzeFile(filePath, analyzer = null, ctx = {}) {
       reachableFromEntrypoint: alcancavelDaqui(ancestry(node).functions, alcanceCanonico),
       // Origem do RECEPTOR quando a chamada e `obj.metodo(...)`: consulta o
       // valor propagado para aquele parametro, na funcao que contem o ponto.
-      receiverOrigin: origemDoReceptor(node, ancestry(node).functions, receptores),
+      receiverOrigin: origemDoReceptor(node, ancestry(node).functions, receptores, ctxAst),
+      // Implementacao do canal, nao mensagem: o texto vem do chamador.
+      inLocalRenderPrimitive: dentroDeLoggerCanonicoLocal(node, ctxAst),
       templateIds: templateIdentifiers(arg0),
       argKind: arg0 ? ts.SyntaxKind[arg0.kind] : "none",
       // Forma ESTRUTURAL do argumento — o que permite decidir sobre um

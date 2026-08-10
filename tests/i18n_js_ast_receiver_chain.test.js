@@ -207,10 +207,11 @@ test("ALVO: `create.js` não mantém o downloader remoto sem consumidores", asyn
  * por onde um logger entra normaliza — e um helper que recebesse objeto sem
  * passar por ali continuaria aberto.
  */
-test("ALVO: create.js cai para 8 unknown, e todo perímetro normaliza", async () => {
+test("ALVO: create.js chega a unknown ZERO, e todo perímetro normaliza", async () => {
   const { analyzeFile, createAnalyzer } = await eng()
   const a = createAnalyzer(["src/cli/create.js", "src/cli/index.js", "src/cli/diagnostic-logger.js"])
-  assert.equal(analyzeFile("src/cli/create.js", a).filter((p) => p.audience === "unknown").length, 8)
+  assert.equal(analyzeFile("src/cli/create.js", a).filter((p) => p.audience === "unknown").length, 0,
+    "8 -> 0 quando os quatro grupos residuais ganharam regra estrutural própria")
 
   const fonte = readFileSync(path.join(repoRoot, "src", "cli", "create.js"), "utf8")
   for (const exportada of ["rotateCasdoorCredential", "startCasdoor", "scaffoldVerticalTemplate"]) {

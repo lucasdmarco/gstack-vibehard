@@ -172,12 +172,12 @@ test("interpolado classificado continua com provenance NÃO resolvida", async (t
 // O censo definitivo de monitor.js vive no fim deste arquivo: o último ponto
 // deixou de ser `opaque` quando `interpolation_only` passou a descrevê-lo.
 
-test("CENSO: create.js cai a 8 unknown e segue FORA de convertedFiles", async () => {
+test("CENSO: create.js chega a unknown ZERO e segue FORA de convertedFiles", async () => {
   const { analyzeFile, createAnalyzer } = await eng()
   const a = createAnalyzer(["src/cli/create.js", "src/cli/index.js", "src/cli/diagnostic-logger.js"])
   const unk = analyzeFile("src/cli/create.js", a).filter((p) => p.audience === "unknown")
-  assert.equal(unk.length, 8,
-    "90 -> 86 pelos entrypoints desta task; 86 -> 13 pela 3.1b.1, que resolveu 73 dos 78 `logger.*`")
+  assert.equal(unk.length, 0,
+    "90 -> 86 pelos entrypoints; 86 -> 13 pela 3.1b.1; 13 -> 8 pela remoção do ramo morto; 8 -> 0 pela classificação dos residuais")
 
   const { CONVERTED_FILES } = await import(pathToFileURL(path.join(repoRoot, "scripts", "i18n-registry.mjs")).href)
   assert.deepEqual([...CONVERTED_FILES], ["src/cli/index.js", "src/commands/monitor.js"],
