@@ -18,6 +18,7 @@ import { mkdir, writeFile } from "node:fs/promises"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { homedir, tmpdir } from "node:os"
+import { normalizeDiagnosticLogger } from "./diagnostic-logger.js"
 import { deepMerge } from "../installer/merge.js"
 import { checkRemoteDownload } from "../installer/remote-policy.js"
 import { describePlan as describeProvisionPlan, JOURNAL_FILE as PROVISION_JOURNAL } from "../installer/provision-txn.js"
@@ -1559,7 +1560,11 @@ const resolveTemplateName = (args) => {
 }
 function createRuntime(options) {
   return {
-    logger: options.logger || defaultLogger,
+    // TODA rota — a default e a injetada por chamador ou teste — atravessa o
+    // mesmo adapter. Audiência pertence à MENSAGEM; a injeção troca apenas o
+    // transporte. Sem este ponto único, `createProject({ logger })` faria a
+    // mesma frase parecer ter audiência diferente conforme quem chamou.
+    logger: normalizeDiagnosticLogger(options.logger ?? defaultLogger),
     cwd: options.cwd || process.cwd(),
     projectRoot: options.projectRoot || getProjectRoot(),
     execSync: options.execSync || defaultExecSync,
