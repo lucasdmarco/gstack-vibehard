@@ -347,7 +347,16 @@ function rotateInDir(logger, url, projectDir, d, dir) {
   return doRotate(logger, url, projectDir, d, dir)
 }
 /** Rotaciona o admin/123 do Casdoor. @returns rotated|already_rotated|insecure_default|rotation_failed */
-export function rotateCasdoorCredential(logger, url, projectDir, deps = {}) {
+/**
+ * PERÍMETRO exportado: o logger vem de um chamador arbitrário.
+ *
+ * O adapter é aplicado aqui pelo mesmo motivo que em `createRuntime` — um helper
+ * não pode receber objeto que não atravessou o contrato. Logger válido injetado
+ * é transporte aceito; objeto que não passa na validação falha na entrada, com
+ * erro tipado, em vez de quebrar no primeiro método ausente.
+ */
+export function rotateCasdoorCredential(rawLogger, url, projectDir, deps = {}) {
+  const logger = normalizeDiagnosticLogger(rawLogger)
   const d = { exec: safeExec, setSecret: defaultSetSecret, brokerStatus: defaultBrokerStatus, generate: generateCasdoorPassword, ...deps }
   // Dir PRIVADO (mkdtemp → 0700 no POSIX): cookie jar de sessão admin e senha em claro
   // passam por aqui. Removido sempre, mesmo em exceção.
@@ -394,7 +403,9 @@ function composeCasdoorUp(logger, projectDir, projectName, deps) {
   logger.info("Aguardando o Casdoor responder (primeiro boot cria o schema; pode levar ~1min)...")
   return casdoorVerdict(logger, deps.probe)
 }
-export function startCasdoor(logger, projectDir, projectName, deps = {}) {
+/** PERÍMETRO exportado — mesma razão de `rotateCasdoorCredential`. */
+export function startCasdoor(rawLogger, projectDir, projectName, deps = {}) {
+  const logger = normalizeDiagnosticLogger(rawLogger)
   const d = {
     exec: safeExec, hasDocker: () => Boolean(findBinary("docker")), write: writeCasdoorCompose,
     probe: () => casdoorHealthy(CASDOOR_URL), ...deps,
@@ -1269,7 +1280,9 @@ Enable a team:
 //  Vertical Templates
 // ─────────────────────────────────────────────────────────────
 
-export function scaffoldVerticalTemplate(templateName, projectDir, projectName, logger) {
+/** PERÍMETRO exportado — mesma razão de `rotateCasdoorCredential`. */
+export function scaffoldVerticalTemplate(templateName, projectDir, projectName, rawLogger) {
+  const logger = normalizeDiagnosticLogger(rawLogger)
   const t = (name) => join(projectDir, name)
   const e = () => ensureGstackDir(projectDir)
 

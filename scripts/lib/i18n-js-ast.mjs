@@ -172,6 +172,8 @@ const ehConstDeFuncao = (d) => ts.isIdentifier(d.name) && d.initializer && isFun
 const declaracoesDeVariavel = (st) =>
   (ts.isVariableStatement(st) ? st.declarationList.declarations.filter(ehConstDeFuncao) : [])
 
+export function declaracoesDeFuncaoPublica(sf) { return declaracoesDeFuncao(sf) }
+
 function declaracoesDeFuncao(sf) {
   const mapa = new Map()
   for (const st of sf.statements) {
@@ -355,6 +357,774 @@ export function entrypointsCanonicos(program, checker) {
     porArquivo.get(raiz.arquivo).add(raiz.nome)
   }
   return porArquivo
+}
+
+// ── Provenance do receptor (Task 3.1b) ───────────────────────────────────────
+
+/**
+ * DOMINIO ABSTRATO do receptor de um metodo — `logger.warn(...)`.
+ *
+ * `create.js` tem 78 pontos nessa forma, e `logger` e SEMPRE parametro: quem
+ * decide o que ele e sao os chamadores. O checker resolve o membro (`warn`), nao
+ * o objeto, e por isso todos ficavam `unknown`.
+ *
+ * Tres estados, e a ordem do join importa:
+ *
+ *   unresolved  — falta prova. ABSORVE tudo: um unico callsite dinamico,
+ *                 externo ou irresolvivel derruba a analise inteira, porque
+ *                 basta um caminho nao inspecionado para a conclusao ser falsa;
+ *   canonical   — todos os callsites convergem para a MESMA origem provada;
+ *   conflict    — origens diferentes. Nao e "escolha a mais comum": duas origens
+ *                 significam que o mesmo codigo imprime em canais diferentes.
+ *
+ * O que NUNCA basta: o nome `logger`, o metodo ser `warn`/`info`/`error`, ou o
+ * argumento ser literal. Sao exatamente os sinais que parecem prova e nao sao.
+ */
+export const RECEPTOR_UNRESOLVED = Object.freeze({ state: "unresolved", origin: null })
+export const receptorCanonical = (origin) => Object.freeze({ state: "canonical", origin })
+export const RECEPTOR_CONFLICT = Object.freeze({ state: "conflict", origin: null })
+
+/** `unresolved` absorve; origens iguais mantem; diferentes viram `conflict`. */
+const temEstado = (a, b, e) => a.state === e || b.state === e
+
+const estadoDominanteDoReceptor = (a, b) => {
+  if (temEstado(a, b, "unresolved")) return RECEPTOR_UNRESOLVED
+  if (temEstado(a, b, "conflict")) return RECEPTOR_CONFLICT
+  return null
+}
+
+const receptorAusente = (a, b) => !a || !b
+
+export function joinReceptor(a, b) {
+  if (receptorAusente(a, b)) return a ?? b
+  const dominante = estadoDominanteDoReceptor(a, b)
+  if (dominante) return dominante
+  return a.origin === b.origin ? a : RECEPTOR_CONFLICT
+}
+
+/**
+ * Limite de iteracoes do fixpoint.
+ *
+ * Repasse de parametro (`f(logger)` chamando `g(logger)`) forma cadeias, e ciclo
+ * mutuo forma laco. O limite e DETERMINISTICO e o estouro vira `unresolved`, nao
+ * uma resposta parcial: uma analise que nao convergiu nao sabe o que concluiu.
+ */
+export const LIMITE_FIXPOINT = 12
+
+/**
+ * Origem canonica de um argumento, no ponto de chamada.
+ *
+ * So conta import cuja declaracao resolve no modulo canonico de render — o mesmo
+ * criterio de `render-via-canonical-helper`, que ja exige CONTRATO de audiencia
+ * comprovado. Namespace (`import * as cli`), objeto literal montado na hora,
+ * chamada de fabrica e qualquer expressao que nao seja identificador resolvido
+ * ficam `unresolved`.
+ */
+const ehBindingDeclarado = (k) => k === "import" || k === "local"
+
+const receptorDeParametro = (arg) => ({ state: "parameter", origin: null, nome: arg.text })
+
+const receptorDoBinding = (binding) => {
+  if (!ehBindingDeclarado(binding.kind)) return RECEPTOR_UNRESOLVED
+  const canonico = binding.declaredIn && isCanonicalRenderFile(binding.declaredIn)
+  return canonico ? receptorCanonical(norm(binding.declaredIn)) : RECEPTOR_UNRESOLVED
+}
+
+export function origemDoArgumento(arg, checker, currentFile) {
+  if (!arg || !ts.isIdentifier(arg)) return RECEPTOR_UNRESOLVED
+  const b = resolveBinding(checker, arg, currentFile)
+  return b.kind === "parameter" ? receptorDeParametro(arg) : receptorDoBinding(b)
+}
+
+// ── Propagacao field-sensitive (Task 3.1b.1) ─────────────────────────────────
+
+/**
+ * O objeto literal e um LOGGER CANONICO LOCAL?
+ *
+ * `create.js:63` define `defaultLogger` como literal cujos metodos escrevem em
+ * `console.*`. Ele nao vem do modulo de render, mas E o canal humano do modulo —
+ * e o contrato de audiencia esta a vista, no proprio corpo de cada metodo.
+ *
+ * Exige que TODAS as propriedades sejam funcoes que escrevem em `console`. Uma
+ * unica que faca outra coisa derruba: um objeto meio-logger nao e logger.
+ */
+/** A chamada e `console.<metodo>(...)` com `console` GLOBAL, nao um homonimo. */
+const chamadaDeMembro = (n) => ts.isCallExpression(n) && ts.isPropertyAccessExpression(n.expression)
+const identificadorConsole = (n) => ts.isIdentifier(n) && n.text === "console"
+const declaradoNaLib = (d) => d.getSourceFile().isDeclarationFile
+
+const ehEmissaoDeConsole = (n, checker) => {
+  if (!chamadaDeMembro(n)) return false
+  const obj = n.expression.expression
+  if (!identificadorConsole(obj)) return false
+
+  // `console` TEM simbolo — o TypeScript o resolve pela lib padrao —, entao
+  // "sem simbolo = global" estava errado. O que distingue o global do runtime de
+  // um `const console = {…}` local e ONDE ele foi declarado: lib (`.d.ts`) ou
+  // codigo do projeto. Sem declaracao alguma tambem e global.
+  const sym = checker.getSymbolAtLocation(obj)
+  const decls = sym?.getDeclarations() ?? []
+  return decls.length === 0 || decls.every(declaradoNaLib)
+}
+
+/** Chamadas em qualquer profundidade do corpo — para contar emissoes e efeitos. */
+/**
+ * `ts.forEachChild` INTERROMPE a travessia quando o callback devolve valor
+ * truthy — e a versao anterior devolvia o acumulador, entao parava no primeiro
+ * filho e via uma chamada de cada corpo. O callback precisa ser void.
+ */
+const chamadasEm = (node, acc = []) => {
+  if (ts.isCallExpression(node)) acc.push(node)
+  ts.forEachChild(node, (n) => { chamadasEm(n, acc) })
+  return acc
+}
+
+/**
+ * O metodo e uma EMISSAO PURA da mensagem que recebeu?
+ *
+ * Exige, de uma vez: um parametro; corpo de expressao unica; essa expressao e
+ * `console.<m>(...)` com `console` global; o argumento CONTEM o parametro; e
+ * tudo o mais ao redor e literal de decoracao. Uma segunda chamada no corpo
+ * (serializacao, efeito colateral, telemetria) reprova, assim como um metodo que
+ * ignora a mensagem ou mistura uma segunda fonte textual.
+ */
+/** Expressão única do corpo: `=> expr`, `{ return expr }` ou `{ expr }`. */
+const expressaoUnicaDoCorpo = (fn) => {
+  const direto = corpoDeReturnUnico(fn)
+  if (direto) return direto
+  if (!ts.isBlock(fn.body) || fn.body.statements.length !== 1) return null
+  const [st] = fn.body.statements
+  return ts.isExpressionStatement(st) ? st.expression : null
+}
+
+/**
+ * O argumento leva EXATAMENTE a mensagem recebida, decorada só por literais.
+ *
+ * Duas rejeições distintas: folha `outro` é acesso dinâmico ou efeito, e o
+ * conteúdo deixa de ser previsível; mais de um identificador significa segunda
+ * fonte textual entrando na frase, e aí a mensagem não é a que chegou.
+ */
+const argumentoSoLevaAMensagem = (arg, nomeParam) => {
+  const folhas = foliasDaExpressao(arg)
+  if (folhas.some((f) => f.tipo === "outro")) return false
+  const idents = folhas.filter((f) => f.tipo === "ident").map((f) => f.nome)
+  return idents.length === 1 && idents[0] === nomeParam
+}
+
+/** Um parâmetro nomeado — a mensagem. Aridade diferente não é emissão. */
+const temAridadeDeEmissao = (fn) => isFunctionLike(fn)
+  && fn.parameters.length === 1 && ts.isIdentifier(fn.parameters[0].name)
+
+function ehEmissaoPura(fn, checker) {
+  if (!temAridadeDeEmissao(fn)) return false
+  const corpo = expressaoUnicaDoCorpo(fn)
+  if (!corpo || !ehEmissaoDeConsole(corpo, checker)) return false
+  // UMA emissão e nada mais: a chamada ao console é a única do corpo.
+  if (chamadasEm(corpo).length !== 1 || corpo.arguments.length !== 1) return false
+  return argumentoSoLevaAMensagem(corpo.arguments[0], fn.parameters[0].name.text)
+}
+
+/**
+ * O objeto literal e um LOGGER CANONICO LOCAL?
+ *
+ * `create.js:63` define `defaultLogger` assim, e ele E o canal humano do modulo:
+ * o contrato de audiencia esta a vista, no corpo de cada metodo.
+ *
+ * A versao anterior perguntava apenas "todas as propriedades escrevem em
+ * console?" — o que aprovaria um logger que tambem serializa, tem efeito
+ * colateral ou concatena conteudo opaco. Aqui cada metodo precisa ser emissao
+ * PURA da mensagem recebida, com chave estatica. Uma unica propriedade fora do
+ * padrao derruba o objeto inteiro: um meio-logger nao e logger.
+ */
+export function ehLoggerCanonicoLocal(node, checker) {
+  if (!node || !ts.isObjectLiteralExpression(node) || node.properties.length === 0) return false
+  if (!checker) return false
+  return node.properties.every((p) => {
+    const nomeEstatico = p.name && (ts.isIdentifier(p.name) || ts.isStringLiteral(p.name))
+    if (!nomeEstatico) return false
+    if (ts.isMethodDeclaration(p)) return ehEmissaoPura(p, checker)
+    return ts.isPropertyAssignment(p) && ehEmissaoPura(p.initializer, checker)
+  })
+}
+
+/** A propriedade `nome` esta AUSENTE do objeto literal, de forma comprovavel? */
+/**
+ * A propriedade impede provar a ausência de `nome`?
+ *
+ * Duas razões distintas, ambas fatais: spread e chave computada trazem o que não
+ * está escrito aqui (a ausência deixa de ser verificável), e a própria
+ * propriedade `nome` presente significa que ela não está ausente.
+ */
+const impedeProvaDeAusencia = (p, nome) => {
+  if (ts.isSpreadAssignment(p)) return true
+  if (!p.name) return false
+  if (ts.isComputedPropertyName(p.name)) return true
+  return ts.isIdentifier(p.name) && p.name.text === nome
+}
+
+export function ausenciaComprovada(node, nome) {
+  if (!node || !ts.isObjectLiteralExpression(node)) return false
+  return !node.properties.some((p) => impedeProvaDeAusencia(p, nome))
+}
+
+const baseDeAtribuicao = (n) => {
+  if (!ts.isBinaryExpression(n) || n.operatorToken.kind !== ts.SyntaxKind.EqualsToken) return null
+  const alvo = n.left
+  if (ts.isPropertyAccessExpression(alvo) || ts.isElementAccessExpression(alvo)) return alvo.expression
+  return alvo
+}
+
+const mutaPropriedadeDe = (n, nome) => {
+  const alvo = baseDeAtribuicao(n)
+  if (!alvo || !ts.isIdentifier(alvo) || alvo.text !== nome) return false
+  return ts.isPropertyAccessExpression(n.left) || ts.isElementAccessExpression(n.left)
+}
+
+const percorrerNos = (raiz, visitar) => {
+  visitar(raiz)
+  ts.forEachChild(raiz, (filho) => { percorrerNos(filho, visitar) })
+}
+
+/** O identificador e reatribuido ou tem propriedade mutada depois de criado? */
+export function sofreMutacao(sf, nome) {
+  let mutado = false
+  percorrerNos(sf, (n) => { if (mutaPropriedadeDe(n, nome)) mutado = true })
+  return mutado
+}
+
+// ── Avaliador abstrato (Task 3.1b.1) ─────────────────────────────────────────
+
+/**
+ * CINCO VALORES DISTINTOS. `ABSENT` nao pode ser `null` nem `UNRESOLVED`: ele e
+ * a PROVA que resolve `options.logger || defaultLogger`. Sem um valor proprio
+ * para "a propriedade comprovadamente nao esta la", o fallback seria
+ * indistinguivel de "nao sei o que tem la", e o caminho do dispatcher nunca
+ * fecharia.
+ */
+export const AV = Object.freeze({
+  ABSENT: Object.freeze({ k: "absent" }),
+  UNRESOLVED: Object.freeze({ k: "unresolved" }),
+  CONFLICT: Object.freeze({ k: "conflict" }),
+})
+export const avCanonical = (origin) => Object.freeze({ k: "canonical", origin })
+export const avObject = (fields, exact) => Object.freeze({ k: "object", fields, exact })
+
+/** `unresolved` absorve; canonicos iguais mantem; diferentes viram conflict. */
+const algumEstado = (a, b, k) => a.k === k || b.k === k
+
+/**
+ * Join de valores da MESMA espécie.
+ *
+ * Canônicos só permanecem canônicos com a mesma origem — origens diferentes são
+ * conflito, não "escolha uma". Duas ausências continuam ausência: é a única
+ * espécie que se soma sem perder informação. `object` abre, porque comparar
+ * campo a campo exigiria um reticulado que esta análise não tem.
+ */
+const joinMesmaEspecie = (a, b) => {
+  if (a.k === "canonical") return a.origin === b.origin ? a : AV.CONFLICT
+  return a.k === "absent" ? a : AV.UNRESOLVED
+}
+
+const estadoDominanteAv = (a, b) => {
+  if (algumEstado(a, b, "unresolved")) return AV.UNRESOLVED
+  if (algumEstado(a, b, "conflict")) return AV.CONFLICT
+  return null
+}
+
+const avAusente = (a, b) => !a || !b
+
+export function joinAv(a, b) {
+  if (avAusente(a, b)) return a ?? b
+  const dominante = estadoDominanteAv(a, b)
+  if (dominante) return dominante
+  return a.k === b.k ? joinMesmaEspecie(a, b) : AV.UNRESOLVED
+}
+
+const LIMITE_AV = 16
+
+/** Campos de um objeto literal. `exact:false` quando ha spread/chave dinamica. */
+/** Nome estático da propriedade, ou `null` quando ela só existe em runtime. */
+const nomeEstaticoDaProp = (p) => {
+  if (!p.name || ts.isComputedPropertyName(p.name)) return null
+  return ts.isIdentifier(p.name) || ts.isStringLiteral(p.name) ? p.name.text : null
+}
+
+/**
+ * Absorve um spread. Só objeto EXATO já resumido contribui: seus campos entram e
+ * a exatidão se preserva. Qualquer outra coisa é desconhecida, e dali em diante
+ * não se prova a ausência de campo nenhum.
+ */
+const absorverSpread = (p, fields, env, ctx, prof) => {
+  const v = avaliarExpr(p.expression, env, ctx, prof + 1)
+  if (v.k !== "object" || !v.exact) return false
+  for (const [k, val] of v.fields) fields.set(k, val)
+  return true
+}
+
+function camposDoLiteral(node, env, ctx, prof) {
+  const fields = new Map()
+  let exact = true
+  for (const p of node.properties) {
+    if (ts.isSpreadAssignment(p)) {
+      exact = absorverSpread(p, fields, env, ctx, prof) && exact
+      continue
+    }
+    const nome = nomeEstaticoDaProp(p)
+    if (!nome) { exact = false; continue }
+    fields.set(nome, avaliarExpr(ts.isPropertyAssignment(p) ? p.initializer : p, env, ctx, prof + 1))
+  }
+  return avObject(fields, exact)
+}
+
+/** `a || b`: so o `ABSENT` comprovado a esquerda deixa o fallback valer. */
+function avaliarFallback(node, env, ctx, prof) {
+  const esq = avaliarExpr(node.left, env, ctx, prof + 1)
+  if (esq.k === "absent") return avaliarExpr(node.right, env, ctx, prof + 1)
+  if (esq.k === "canonical") return esq
+  return AV.UNRESOLVED
+}
+
+/** `obj.campo`: campo do objeto exato, ou `ABSENT` quando comprovadamente falta. */
+function avaliarAcesso(node, env, ctx, prof) {
+  if (!ts.isIdentifier(node.name)) return AV.UNRESOLVED
+  const alvo = avaliarExpr(node.expression, env, ctx, prof + 1)
+  if (alvo.k !== "object") return AV.UNRESOLVED
+  const v = alvo.fields.get(node.name.text)
+  if (v) return v
+  // Ausencia so e PROVA quando o objeto e exato: com spread desconhecido, o
+  // campo pode estar la sem aparecer aqui.
+  return alvo.exact ? AV.ABSENT : AV.UNRESOLVED
+}
+
+/** O modulo que define o contrato do canal de diagnostico. */
+export const DIAGNOSTIC_ADAPTER_MODULE = "src/cli/diagnostic-logger.js"
+const ADAPTER_FN = "normalizeDiagnosticLogger"
+
+const declaracaoDoAdapter = (node, checker) => {
+  const sym = checker.getSymbolAtLocation(node)
+  if (!sym) return null
+  return unalias(checker, sym).getDeclarations()?.[0] ?? null
+}
+
+const pertenceAoModuloDoAdapter = (decl) => {
+  if (!decl) return false
+  return norm(decl.getSourceFile().fileName).endsWith(DIAGNOSTIC_ADAPTER_MODULE)
+}
+
+/**
+ * A chamada e ao ADAPTER CANONICO, resolvido pelo checker?
+ *
+ * Nome nao basta: uma funcao local chamada `normalizeDiagnosticLogger` noutro
+ * modulo nao e o adapter. A declaracao precisa vir de
+ * `src/cli/diagnostic-logger.js`, que e onde o contrato vive e onde a marca de
+ * procedencia (WeakSet) e aposta.
+ *
+ * ESTA E A LINHA QUE SEPARA transporte de bypass. Um logger VALIDO injetado por
+ * um chamador e transporte aceito — ele atravessa o adapter e sai com o mesmo
+ * contrato de audiencia que o default. O que continua proibido e um helper
+ * receber objeto que NAO passou por aqui: nesse caso ninguem verificou os quatro
+ * metodos, ninguem congelou o wrapper, e a audiencia da mensagem deixa de ter
+ * garantia.
+ */
+function ehChamadaAoAdapter(node, ctx) {
+  if (!ts.isCallExpression(node)) return false
+  if (!ts.isIdentifier(node.expression)) return false
+  if (node.expression.text !== ADAPTER_FN) return false
+  return pertenceAoModuloDoAdapter(declaracaoDoAdapter(node.expression, ctx.checker))
+}
+
+/** Identificador: parametro do env, logger canonico local, ou binding. */
+const declaracaoInicializada = (d) => Boolean(d) && ts.isVariableDeclaration(d) && Boolean(d.initializer)
+
+const valorDaDeclaracao = (node, d, env, ctx, prof) => {
+  if (sofreMutacao(ctx.sf, node.text)) return AV.UNRESOLVED
+  if (ehLoggerCanonicoLocal(d.initializer, ctx.checker)) return avCanonical(norm(ctx.sf.fileName))
+  return avaliarExpr(d.initializer, env, ctx, prof + 1)
+}
+
+function avaliarIdentificador(node, env, ctx, prof) {
+  if (env.has(node.text)) return env.get(node.text)
+  const d = declaracaoResolvida(ctx.checker, node, ctx.sf)
+  if (!declaracaoInicializada(d)) return AV.UNRESOLVED
+  // Reatribuicao ou mutacao de propriedade em qualquer ponto do modulo invalida
+  // o resumo: o valor lido aqui pode nao ser o valor no momento da chamada.
+  return valorDaDeclaracao(node, d, env, ctx, prof)
+}
+
+/**
+ * Retorno de uma funcao local, avaliado com as declaracoes locais no ambiente.
+ *
+ * `corpoDeReturnUnico` sozinho nao serve: `resolveCreateCtx` faz
+ * `const rt = createRuntime(options); return { logger: rt.logger, … }`, e exigir
+ * statement unico descartaria justamente a cadeia real. Aqui as declaracoes
+ * `const` sao avaliadas em ordem e entram no ambiente; qualquer outro tipo de
+ * statement (if, loop, atribuicao) interrompe — o fluxo deixa de ser linear e o
+ * resumo deixaria de descrever o que a funcao devolve.
+ */
+/** Marca como `UNRESOLVED` todo binding cujo objeto sofre atribuicao no statement. */
+function invalidarMutados(st, local) {
+  percorrerNos(st, (n) => {
+    const base = baseDeAtribuicao(n)
+    if (base && ts.isIdentifier(base) && local.has(base.text)) local.set(base.text, AV.UNRESOLVED)
+  })
+}
+
+/** Liga um `const { a, b: c } = expr` ao ambiente, preservando a identidade do campo. */
+const elementoDestructuringSuportado = (el) => !el.dotDotDotToken && ts.isIdentifier(el.name)
+
+const campoDoElemento = (el) =>
+  el.propertyName && ts.isIdentifier(el.propertyName) ? el.propertyName.text : el.name.text
+
+const valorDoCampo = (fonte, campo) => {
+  if (fonte.k !== "object") return AV.UNRESOLVED
+  const valor = fonte.fields.get(campo)
+  return valor ?? (fonte.exact ? AV.ABSENT : AV.UNRESOLVED)
+}
+
+const ligarElementoDestructuring = (el, fonte, local) => {
+  if (!elementoDestructuringSuportado(el)) return false
+  local.set(el.name.text, valorDoCampo(fonte, campoDoElemento(el)))
+  return true
+}
+
+function ligarDestructuring(pattern, fonte, local) {
+  for (const el of pattern.elements) {
+    if (!ligarElementoDestructuring(el, fonte, local)) return false
+  }
+  return true
+}
+
+/** Uma declaracao `const` no ambiente. `false` quando a forma nao e suportada. */
+function ligarDeclaracao(d, local, ctx, prof) {
+  if (!d.initializer) return false
+  if (ts.isIdentifier(d.name)) {
+    local.set(d.name.text, avaliarExpr(d.initializer, local, ctx, prof + 1))
+    return true
+  }
+  if (!ts.isObjectBindingPattern(d.name)) return false
+  return ligarDestructuring(d.name, avaliarExpr(d.initializer, local, ctx, prof + 1), local)
+}
+
+const resultadoDoAmbiente = (local, ret = null) => ({ local, ret })
+
+const corpoEmBloco = (fn) => fn.body && ts.isBlock(fn.body) ? fn.body : null
+
+const retornoDoStatement = (st) => {
+  if (!ts.isReturnStatement(st)) return null
+  return { encontrou: true, expressao: st.expression ?? null }
+}
+
+const ligarStatementLocal = (st, local, ctx, prof) => {
+  if (!ts.isVariableStatement(st)) return true
+  for (const d of st.declarationList.declarations) {
+    if (!ligarDeclaracao(d, local, ctx, prof)) return false
+  }
+  return true
+}
+
+/**
+ * Ambiente de uma funcao: parametros mais as declaracoes `const` do corpo,
+ * avaliadas em ordem. Para no primeiro statement que nao seja declaracao ou
+ * `return` — a partir dali o fluxo deixa de ser linear e o resumo deixaria de
+ * descrever o que a funcao faz.
+ */
+export function ambienteLocal(fn, env, ctx, prof) {
+  const local = new Map(env)
+  const bloco = corpoEmBloco(fn)
+  if (!bloco) return resultadoDoAmbiente(local, fn.body ?? null)
+  for (const st of bloco.statements) {
+    const retorno = retornoDoStatement(st)
+    if (retorno) return resultadoDoAmbiente(local, retorno.expressao)
+    // Atribuicao a propriedade de um binding conhecido (`o.logger = outro`)
+    // invalida o resumo daquele objeto: o valor que chega na chamada seguinte
+    // nao e o que o literal descrevia.
+    invalidarMutados(st, local)
+    if (!ligarStatementLocal(st, local, ctx, prof)) return resultadoDoAmbiente(local)
+  }
+  return resultadoDoAmbiente(local)
+}
+
+function retornoDaFuncao(fn, env, ctx, prof) {
+  const direto = corpoDeReturnUnico(fn)
+  if (direto) return { ret: direto, env }
+  const { local, ret } = ambienteLocal(fn, env, ctx, prof)
+  return { ret, env: local }
+}
+
+/** Chamada a funcao local com retorno analisavel: resumo instanciado. */
+const alvoLocalDaChamada = (node, ctx) => {
+  if (!ts.isIdentifier(node.expression)) return null
+  const nome = nomeLocalResolvido(ctx.checker, node.expression, ctx.sf, ctx.decls)
+  const fn = nome ? ctx.decls.get(nome) : null
+  return fn ? { nome, fn } : null
+}
+
+const ambienteDosParametros = (fn, node, env, ctx, prof) => {
+  const interno = new Map()
+  fn.parameters.forEach((p, i) => {
+    if (ts.isIdentifier(p.name)) interno.set(p.name.text, avaliarExpr(node.arguments[i], env, ctx, prof + 1))
+  })
+  return interno
+}
+
+const calcularResumoDaChamada = (alvo, node, env, ctx, prof, chave) => {
+  ctx.emCurso.add(chave)
+  const interno = ambienteDosParametros(alvo.fn, node, env, ctx, prof)
+  const { ret, env: envRet } = retornoDaFuncao(alvo.fn, interno, ctx, prof)
+  const resultado = ret ? avaliarExpr(ret, envRet, ctx, prof + 1) : AV.UNRESOLVED
+  ctx.emCurso.delete(chave)
+  ctx.cache.set(chave, resultado)
+  return resultado
+}
+
+function avaliarChamada(node, env, ctx, prof) {
+  const alvo = alvoLocalDaChamada(node, ctx)
+  if (!alvo) return AV.UNRESOLVED
+  const chave = `${alvo.nome}#${assinaturaAbstrata(node, env, ctx, prof)}`
+  if (ctx.cache.has(chave)) return ctx.cache.get(chave)
+  if (ctx.emCurso.has(chave)) return AV.UNRESOLVED
+  return calcularResumoDaChamada(alvo, node, env, ctx, prof, chave)
+}
+
+/** Assinatura abstrata dos argumentos — chave do cache por chamada. */
+const assinaturaAbstrata = (node, env, ctx, prof) => node.arguments
+  .map((a) => { const v = avaliarExpr(a, env, ctx, prof + 1); return v.k === "object" ? `o:${[...v.fields.keys()].sort()}:${v.exact}` : v.k })
+  .join("|")
+
+const ehFallback = (node) => ts.isBinaryExpression(node)
+  && node.operatorToken.kind === ts.SyntaxKind.BarBarToken
+
+const avaliarObjetoAbstrato = (node, env, ctx, prof) =>
+  ehLoggerCanonicoLocal(node, ctx.checker)
+    ? avCanonical(norm(ctx.sf.fileName))
+    : camposDoLiteral(node, env, ctx, prof)
+
+const avaliarCallAbstrato = (node, env, ctx, prof) =>
+  ehChamadaAoAdapter(node, ctx)
+    ? avCanonical(norm(DIAGNOSTIC_ADAPTER_MODULE))
+    : avaliarChamada(node, env, ctx, prof)
+
+const REGRAS_AVALIACAO = [
+  { aceita: ts.isParenthesizedExpression, avaliar: (n, e, c, p) => avaliarExpr(n.expression, e, c, p + 1) },
+  { aceita: ts.isObjectLiteralExpression, avaliar: avaliarObjetoAbstrato },
+  { aceita: ehFallback, avaliar: avaliarFallback },
+  { aceita: ts.isPropertyAccessExpression, avaliar: avaliarAcesso },
+  { aceita: ts.isCallExpression, avaliar: avaliarCallAbstrato },
+  { aceita: ts.isIdentifier, avaliar: avaliarIdentificador },
+]
+
+/**
+ * Avaliador abstrato de UMA expressao. Toda forma nao coberta cai em
+ * `UNRESOLVED` — nao ha caso default otimista.
+ */
+export function avaliarExpr(node, env, ctx, prof = 0) {
+  if (!node || prof > LIMITE_AV) return AV.UNRESOLVED
+  const regra = REGRAS_AVALIACAO.find((r) => r.aceita(node))
+  return regra ? regra.avaliar(node, env, ctx, prof) : AV.UNRESOLVED
+}
+
+/**
+ * Valor abstrato de cada PARAMETRO de cada funcao, propagado a partir do
+ * entrypoint canonico.
+ *
+ * A analise comeca EXCLUSIVAMENTE nos handlers do `DISPATCH` que vivem neste
+ * arquivo. Exports chamados por testes ou por consumidores diretos nao entram no
+ * join: `createProject({ args, logger: outro })` num teste nao pode contaminar a
+ * prova do caminho do CLI, e por isso o percurso e dirigido pelas chamadas
+ * ALCANCADAS a partir da raiz, nunca por todas as chamadas do modulo.
+ *
+ * Devolve `Map<"funcao#param", valor>`.
+ */
+const assinaturaDoAmbiente = (env) => [...env.entries()]
+  .map(([k, v]) => `${k}:${v.k}`).sort().join(",")
+
+const prepararPercurso = (ctx, nomeFn, env, prof, visitados) => {
+  const fn = ctx.decls.get(nomeFn)
+  if (!fn || prof > LIMITE_AV) return null
+  const marca = `${nomeFn}(${assinaturaDoAmbiente(env)})`
+  if (visitados.has(marca)) return null
+  visitados.add(marca)
+  return fn
+}
+
+const registrarAmbiente = (estado, nomeFn, local) => {
+  for (const [nome, valor] of local) {
+    const chave = `${nomeFn}#${nome}`
+    estado.set(chave, joinAv(estado.get(chave), valor))
+  }
+}
+
+const chamadaLocal = (chamada, ctx) => {
+  if (!ts.isIdentifier(chamada.expression)) return null
+  const nome = nomeLocalResolvido(ctx.checker, chamada.expression, ctx.sf, ctx.decls)
+  const fn = nome ? ctx.decls.get(nome) : null
+  return fn ? { nome, fn } : null
+}
+
+const ambienteDaChamada = (chamada, destino, local, ctx, prof) => {
+  const filho = new Map()
+  destino.parameters.forEach((p, i) => {
+    const valor = ehExportada(destino) ? AV.UNRESOLVED : avaliarExpr(chamada.arguments[i], local, ctx, prof + 1)
+    if (ts.isIdentifier(p.name)) filho.set(p.name.text, valor)
+  })
+  return filho
+}
+
+const propagarChamadas = (fn, local, ctx, prof, percorrer) => {
+  for (const chamada of chamadasEm(fn)) {
+    const alvo = chamadaLocal(chamada, ctx)
+    if (!alvo) continue
+    percorrer(alvo.nome, ambienteDaChamada(chamada, alvo.fn, local, ctx, prof), prof + 1)
+  }
+}
+
+export function propagarDoEntrypoint(ctx, raizes) {
+  const estado = new Map()
+  const visitados = new Set()
+
+  const percorrer = (nomeFn, env, prof) => {
+    const fn = prepararPercurso(ctx, nomeFn, env, prof, visitados)
+    if (!fn) return
+
+    // Parametros MAIS as declaracoes locais: `const c = resolveCreateCtx(o)` e
+    // `const { logger } = …` precisam estar no ambiente para que a chamada
+    // seguinte seja avaliada com o que o corpo realmente construiu.
+    const { local } = ambienteLocal(fn, env, ctx, prof)
+    registrarAmbiente(estado, nomeFn, local)
+
+    propagarChamadas(fn, local, ctx, prof, percorrer)
+  }
+
+  for (const raiz of raizes) percorrer(raiz, new Map(), 0)
+  return estado
+}
+
+/**
+ * Origem do receptor de `obj.metodo(...)`, lida do estado propagado.
+ *
+ * `null` quando a chamada nao tem receptor identificador, quando a funcao que a
+ * contem nao foi alcancada a partir do entrypoint, ou quando o valor nao e
+ * canonico. Ausencia de entrada NAO e permissao: significa que aquele caminho
+ * nunca foi percorrido a partir do `DISPATCH`.
+ */
+export function origemDoReceptor(node, cadeiaDeFuncoes, receptores) {
+  const c = node.expression
+  if (!ts.isPropertyAccessExpression(c) || !ts.isIdentifier(c.expression)) return null
+  const receptor = c.expression.text
+  for (const fn of cadeiaDeFuncoes) {
+    const v = receptores.get(`${fn}#${receptor}`)
+    if (v) return v.k === "canonical" ? v.origin : null
+  }
+  return null
+}
+
+/** Chamadas a `nome`, no arquivo, com o no da chamada. */
+function callsitesDe(sf, nome, checker, decls) {
+  const achados = []
+  const visitar = (n) => {
+    if (ts.isCallExpression(n) && ts.isIdentifier(n.expression)
+      && nomeLocalResolvido(checker, n.expression, sf, decls) === nome) achados.push(n)
+    ts.forEachChild(n, visitar)
+  }
+  visitar(sf)
+  return achados
+}
+
+/**
+ * A funcao e referenciada sem ser CHAMADA? Callback, atribuicao, export.
+ *
+ * O teste nao pode ser "o pai e uma CallExpression": em `lista.forEach(emitir)`
+ * o pai de `emitir` E uma CallExpression — a do `forEach` —, e `emitir` esta ali
+ * como ARGUMENTO. Quem recebeu o callback passa o argumento que quiser, entao os
+ * callsites visiveis deixam de esgotar os chamadores. O que caracteriza chamada
+ * e o identificador ocupar a posicao de CALLEE.
+ */
+const ehCalleeDaChamada = (n) => Boolean(n.parent) && ts.isCallExpression(n.parent) && n.parent.expression === n
+
+const ehDeclaracaoDoIdentificador = (n) => Boolean(n.parent)
+  && (ts.isFunctionDeclaration(n.parent) || ts.isVariableDeclaration(n.parent))
+
+const referenciaComoValor = (n, nome, checker, sf, decls) => {
+  if (!ts.isIdentifier(n) || n.text !== nome) return false
+  if (ehCalleeDaChamada(n) || ehDeclaracaoDoIdentificador(n)) return false
+  return nomeLocalResolvido(checker, n, sf, decls) === nome
+}
+
+function ehUsadaComoValor(sf, nome, checker, decls) {
+  let usada = false
+  percorrerNos(sf, (n) => {
+    if (referenciaComoValor(n, nome, checker, sf, decls)) usada = true
+  })
+  return usada
+}
+
+/** Rest, destructuring ou parametro inexistente tornam a posicao instavel. */
+const posicaoEstavel = (fn, nomeParam) =>
+  indiceDoParametro(fn, nomeParam) >= 0 && !fn.parameters.some((p) => p.dotDotDotToken)
+
+const indiceDoParametro = (fn, nomeParam) =>
+  fn.parameters.findIndex((p) => ts.isIdentifier(p.name) && p.name.text === nomeParam)
+
+const receptorNaoObservavel = (fn, nomeFuncao, nomeParam, ctx) => {
+  if (!fn || !posicaoEstavel(fn, nomeParam)) return true
+  if (ehExportada(fn)) return true
+  return ehUsadaComoValor(ctx.sf, nomeFuncao, ctx.checker, ctx.decls)
+}
+
+const agregarCallsites = (chamadas, idx, ctx, profundidade, vistos) => {
+  const contribuicao = (c) => contribuicaoDoCallsite(c, idx, ctx, profundidade, vistos)
+  return chamadas.map(contribuicao).reduce(joinReceptor, null) ?? RECEPTOR_UNRESOLVED
+}
+
+/**
+ * Resolve o receptor de um parametro por FIXPOINT sobre os callsites.
+ *
+ * Cada chamada da funcao contribui com a origem do argumento naquela posicao. Se
+ * o argumento e, ele proprio, um parametro de quem chama, a pergunta sobe um
+ * nivel — e e por isso que precisa de fixpoint em vez de uma passada.
+ *
+ * FAIL-CLOSED em cada porta de saida: funcao usada como valor (alguem pode
+ * chama-la de fora), parametro com rest/destructuring, callsite sem argumento
+ * naquela posicao, e estouro do limite de iteracoes. Todos viram `unresolved`.
+ */
+export function resolverReceptor(nomeFuncao, nomeParam, ctx, profundidade = 0, vistos = new Set()) {
+  const chave = `${nomeFuncao}#${nomeParam}`
+  if (profundidade > LIMITE_FIXPOINT) return RECEPTOR_UNRESOLVED
+  // Ciclo: a contribuicao deste no ja esta sendo calculada. Devolver `null` o
+  // torna neutro no join — o laco nao inventa origem nem derruba as outras.
+  if (vistos.has(chave)) return null
+
+  const fn = ctx.decls.get(nomeFuncao)
+  if (receptorNaoObservavel(fn, nomeFuncao, nomeParam, ctx)) return RECEPTOR_UNRESOLVED
+  // Exportada: o chamador pode estar fora do modulo. Usada como valor: quem
+  // recebeu o callback passa o argumento que quiser. Sem chamada: nada observado.
+  const idx = indiceDoParametro(fn, nomeParam)
+  const chamadas = callsitesDe(ctx.sf, nomeFuncao, ctx.checker, ctx.decls)
+  if (chamadas.length === 0) return RECEPTOR_UNRESOLVED
+
+  const proximos = new Set([...vistos, chave])
+  return agregarCallsites(chamadas, idx, ctx, profundidade, proximos)
+}
+
+/**
+ * O que UM callsite diz sobre o receptor.
+ *
+ * Quando o argumento e, ele proprio, um parametro de quem chama, a pergunta SOBE
+ * um nivel — e e por isso que uma passada nao basta e o fixpoint existe.
+ */
+function contribuicaoDoCallsite(c, idx, ctx, profundidade, vistos) {
+  const local = origemDoArgumento(c.arguments[idx], ctx.checker, ctx.sf.fileName)
+  if (local.state !== "parameter") return local
+  const externa = ancestrais(c).find((f) => ctx.decls.get(f))
+  if (!externa) return RECEPTOR_UNRESOLVED
+  return resolverReceptor(externa, local.nome, ctx, profundidade + 1, vistos)
+}
+
+/** Nomes das funcoes que envolvem o no, de dentro para fora. */
+const ancestrais = (node) => {
+  const nomes = []
+  for (let p = node.parent; p; p = p.parent) if (isFunctionLike(p)) nomes.push(funcName(p))
+  return nomes
 }
 
 /** Env vars que constituem ativacao explicita de depuracao. */
@@ -701,7 +1471,11 @@ const resumoDasPartes = (partes) => {
  */
 const FORMAS_DO_ARGUMENTO = [
   [(r) => r.serializador && !r.temOpaco && r.soSeparadores, (r) => ({ forma: "serializer", serializador: r.serializador })],
-  [(r) => !r.serializador && !r.temOpaco && r.soControle, () => ({ forma: "control_only" })],
+  // Bytes de controle E espaçamento puro caem no mesmo lugar: `logger.info("")`
+  // imprime uma linha em branco. Não há palavra a traduzir num separador, e
+  // deixá-lo `opaque` o colocaria na fila do que ainda precisa ser investigado.
+  [(r) => !r.serializador && !r.temOpaco && (r.soControle || (r.literais.length > 0 && r.soSeparadores)),
+    () => ({ forma: "control_only" })],
   [(r) => r.temTexto && !r.temOpaco, () => ({ forma: "text_literal" })],
   [(r) => r.temTexto, () => ({ forma: "text" })],
   /**
@@ -838,6 +1612,35 @@ export const JS_RULES = Object.freeze([
      * dois pontos classificados de forma diferente, que e o comportamento certo:
      * a audiencia e do PONTO, nao do arquivo.
      */
+    /**
+     * Receptor com origem CANONICA PROVADA (3.1b.1).
+     *
+     * `logger.warn("...")` onde o avaliador abstrato provou, a partir do
+     * `DISPATCH`, que `logger` e o logger canonico do modulo. O nome `logger`, o
+     * metodo `warn` e a literalidade do argumento continuam nao valendo nada
+     * sozinhos — o que vale e a origem propagada.
+     */
+    /**
+     * Receptor canônico emitindo só espaçamento — `logger.info("")` imprime uma
+     * linha em branco. O canal é o humano, mas não há palavra a traduzir, e é
+     * `terminal_control` que descreve isso: ausência de idioma, não ausência de
+     * classificação.
+     */
+    id: "canonical-receiver-spacing",
+    when: (p) => Boolean(p.receiverOrigin) && p.argForm === "control_only" && p.underMachineGuard !== true,
+    audience: "terminal_control",
+    trigger: "control_bytes",
+    reason: "receptor canonico com argumento de puro espacamento ou controle: nao ha idioma numa linha em branco",
+  },
+  {
+    id: "canonical-receiver",
+    when: (p) => Boolean(p.receiverOrigin) && p.underMachineGuard !== true
+      && ["text_literal", "text", "interpolation_only"].includes(p.argForm),
+    audience: "public_diagnostic",
+    trigger: "proved_receiver",
+    reason: "receptor com origem canonica provada por avaliacao abstrata a partir do entrypoint do DISPATCH",
+  },
+  {
     id: "command-human-branch",
     when: (p) => ehConsoleDeProjeto(p) && ehSuperficieDeComando(p) && ehFraseHumana(p),
     audience: "public_diagnostic",
@@ -1000,7 +1803,10 @@ export function analyzeFile(filePath, analyzer = null, ctx = {}) {
   const alcanceCanonico = canonicas ? alcancaveisDeExport(a.checker, sf, canonicas) : { alcancadas: new Set() }
   // Contexto de resolucao para wrappers transparentes (3.1c): mesmo grafo de
   // declaracoes locais da 3.1a, entao a identidade de no ja esta conferida.
-  const ctxAst = { checker: a.checker, sf, decls: declaracoesDeFuncao(sf) }
+  const ctxAst = { checker: a.checker, sf, decls: declaracoesDeFuncao(sf), cache: new Map(), emCurso: new Set() }
+  // Valor abstrato de cada parametro, propagado SO a partir dos handlers do
+  // DISPATCH que vivem neste arquivo (3.1b.1).
+  const receptores = propagarDoEntrypoint(ctxAst, canonicas ?? [])
 
   const registrar = (node, d) => {
     const arg0 = node.arguments[0]
@@ -1028,6 +1834,9 @@ export function analyzeFile(filePath, analyzer = null, ctx = {}) {
       reachableFromExport: alcancavelDaqui(ancestry(node).functions, alcance),
       // Criterio ESTRITO: so handler do DISPATCH conta como origem.
       reachableFromEntrypoint: alcancavelDaqui(ancestry(node).functions, alcanceCanonico),
+      // Origem do RECEPTOR quando a chamada e `obj.metodo(...)`: consulta o
+      // valor propagado para aquele parametro, na funcao que contem o ponto.
+      receiverOrigin: origemDoReceptor(node, ancestry(node).functions, receptores),
       templateIds: templateIdentifiers(arg0),
       argKind: arg0 ? ts.SyntaxKind[arg0.kind] : "none",
       // Forma ESTRUTURAL do argumento — o que permite decidir sobre um

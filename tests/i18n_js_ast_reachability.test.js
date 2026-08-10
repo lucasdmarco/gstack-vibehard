@@ -219,7 +219,7 @@ test("CENSO: a capacidade melhora `create.js` e não move `monitor.js`", async (
 
   const cre = contar("src/cli/create.js")
   assert.equal(cre.total, 96)
-  assert.equal(cre.unknown, 86, "create.js: 95 -> 90 por esta task, 90 -> 86 pelos entrypoints; os `logger.*` seguem pendentes da 3.1b")
+  assert.equal(cre.unknown, 13, "create.js: 86 -> 13 pela 3.1b; 73 dos 78 pontos `logger.*` agora têm origem canônica provada")
 })
 
 test("CENSO: a alcançabilidade não converteu arquivo algum por si", async () => {
