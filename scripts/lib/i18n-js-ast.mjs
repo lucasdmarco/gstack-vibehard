@@ -333,28 +333,100 @@ const declaracaoDoHandler = (id, checker) => {
   return bruto ? (unalias(checker, bruto).getDeclarations()?.[0] ?? null) : null
 }
 
+/**
+ * Nome do COMANDO na chave do `DISPATCH` — `create:` ou `"publish-guard":`.
+ *
+ * Chave computada ja foi barrada por `ehEntradaNomeada`; aqui so restam as duas
+ * formas literais. Qualquer outra devolve `null` e a entrada nao vira raiz: o
+ * comando precisa ser LEGIVEL estaticamente para poder ser declarado numa prova.
+ */
+const nomeDaChave = (n) => {
+  if (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) return n.text
+  return ts.isIdentifier(n) ? n.text : null
+}
+
 function raizDaPropriedade(prop, checker) {
   if (!ehEntradaNomeada(prop)) return null
   const decl = declaracaoDoHandler(chamadaDiretaDe(prop.initializer), checker)
   const nome = decl ? (nomeSeIdentifier(decl.name) ?? nomeDeVariavel(decl.parent)) : null
-  return nome ? { arquivo: norm(decl.getSourceFile().fileName), nome } : null
+  if (!nome) return null
+  return { arquivo: norm(decl.getSourceFile().fileName), nome, comando: nomeDaChave(prop.name) }
 }
 
 /**
+ * Entradas do `DISPATCH` por arquivo, PRESERVANDO o comando:
+ * `{ "<arquivo>": [{ command, handler }] }`.
+ *
+ * `entrypointsCanonicos` colapsava isto num `Set` de nomes de handler, e com o
+ * comando perdido nao havia como distinguir `dev`/`stop` de `logs`/`open` dentro
+ * de `runtime-supervisor.js` — os quatro moram no mesmo arquivo. Um consumidor
+ * provado para um NAO pode cobrir os outros, e essa distincao so existe se o
+ * comando sobreviver a derivacao.
+ *
+ * A cadeia continua sendo a canonica: comando -> handler -> import -> arquivo,
+ * com o identificador resolvido pelo checker ate a declaracao. Vazio quando o
+ * `DISPATCH` nao e encontrado — ausencia de prova, nao permissao.
+ */
+const objetoDispatchDoPrograma = (program) => {
+  const index = program.getSourceFiles().find((s) => isCanonicalRenderFile(s.fileName))
+  return index ? objetoDispatch(index) : null
+}
+
+/**
+ * Entrada utilizavel do DISPATCH, ou `null`. Sem comando legivel a entrada nao
+ * entra: alias nao resolvido e chave dinamica nao podem virar cobertura.
+ */
+const entradaDeComando = (prop, checker) => {
+  const raiz = raizDaPropriedade(prop, checker)
+  if (!raiz) return null
+  return raiz.comando ? { arquivo: raiz.arquivo, command: raiz.comando, handler: raiz.nome } : null
+}
+
+const acrescentar = (mapa, chave, valor) => {
+  if (!mapa.has(chave)) mapa.set(chave, [])
+  mapa.get(chave).push(valor)
+}
+
+export function entrypointsPorComando(program, checker) {
+  const porArquivo = new Map()
+  const obj = objetoDispatchDoPrograma(program)
+  if (!obj) return porArquivo
+  for (const prop of obj.properties) {
+    const e = entradaDeComando(prop, checker)
+    if (e) acrescentar(porArquivo, e.arquivo, { command: e.command, handler: e.handler })
+  }
+  return porArquivo
+}
+
+/**
+ * Grafo de alcance de CADA comando, separadamente.
+ *
+ * A uniao dos handlers (`alcanceCanonico`) responde "algum comando chega aqui?".
+ * Para a ancora fina a pergunta e outra — "QUAIS comandos chegam aqui?" —, e ela
+ * so tem resposta com um grafo por raiz.
+ */
+function alcancePorComandoDe(checker, sf, entradas) {
+  const mapa = new Map()
+  for (const e of entradas ?? []) {
+    if (!mapa.has(e.command)) mapa.set(e.command, alcancaveisDeExport(checker, sf, [e.handler]))
+  }
+  return mapa
+}
+
+/** Comandos que alcancam a cadeia de funcoes do ponto. Ordenado: saida estavel. */
+const comandosQueAlcancam = (cadeia, alcancePorComando) => [...alcancePorComando]
+  .filter(([, alcance]) => alcancavelDaqui(cadeia, alcance))
+  .map(([comando]) => comando)
+  .sort()
+
+/**
  * Declaracoes-raiz por arquivo: `{ "<arquivo>": Set<nomeDaFuncao> }`.
- * Vazio quando o `DISPATCH` nao e encontrado — ausencia de prova, nao permissao.
+ * Projecao de `entrypointsPorComando` — mesma derivacao, comando descartado.
  */
 export function entrypointsCanonicos(program, checker) {
   const porArquivo = new Map()
-  const index = program.getSourceFiles().find((s) => isCanonicalRenderFile(s.fileName))
-  const obj = index ? objetoDispatch(index) : null
-  if (!obj) return porArquivo
-
-  for (const prop of obj.properties) {
-    const raiz = raizDaPropriedade(prop, checker)
-    if (!raiz) continue
-    if (!porArquivo.has(raiz.arquivo)) porArquivo.set(raiz.arquivo, new Set())
-    porArquivo.get(raiz.arquivo).add(raiz.nome)
+  for (const [arquivo, entradas] of entrypointsPorComando(program, checker)) {
+    porArquivo.set(arquivo, new Set(entradas.map((e) => e.handler)))
   }
   return porArquivo
 }
@@ -1793,6 +1865,64 @@ const consumidorDe = (arquivo, consumers, repoRoot = null) => {
   return chave ? ((consumers ?? {})[chave] ?? null) : null
 }
 
+/**
+ * MODO do ponto — qual ramo do comando ele serve.
+ *
+ * `--json` e o ramo de maquina, detectado por `underMachineGuard` (a guarda
+ * estrutural, nao a string "--json" no texto). Fora dele o ponto e saida humana,
+ * e uma prova de `--json` nao fala sobre ele.
+ */
+export const MODO_JSON = "--json"
+const modoDoPonto = (p) => (p.underMachineGuard === true ? MODO_JSON : null)
+
+/**
+ * ANCORA FINA para modulo COMPARTILHADO: arquivo + comando + modo.
+ *
+ * `runtime-supervisor.js` e alcancado por `dev`, `stop`, `logs` e `open`. Declarar
+ * o ARQUIVO cobriria os quatro com a prova de dois — a mesma doenca da cobertura
+ * por nome de sink, um nivel acima. Aqui a unidade de prova identifica qual
+ * comando, em qual ramo, com qual consumidor e qual evidencia.
+ *
+ * UNIVERSAL, nao existencial: TODA rota que chega ao ponto precisa estar provada.
+ * Duas rotas convergentes cobrem so a intersecao realmente provada — se `dev`
+ * (provado) e `logs` (nao provado) alcancam o mesmo ponto, o ponto NAO e coberto,
+ * porque rodar `logs` executa aquela escrita sem nenhum consumidor que a leia.
+ *
+ * Fail-closed em cada porta: sem comando derivado do DISPATCH, com modo diferente
+ * do provado, ou com entrada sem `command`/`consumer`/`evidence`, nao cobre.
+ */
+const declaracaoCobre = (d, comando, modo) =>
+  d && d.command === comando && d.mode === modo && Boolean(d.consumer) && Boolean(d.evidence)
+
+function coberturaAncorada(entrada, p) {
+  const declaradas = entrada.commands
+  if (!Array.isArray(declaradas) || declaradas.length === 0) return false
+  const comandos = p.commands ?? []
+  // Handler compartilhado sem rota provada, ponto fora de qualquer handler do
+  // DISPATCH, chamada dinamica: nada a casar, permanece unknown.
+  if (comandos.length === 0) return false
+  const modo = modoDoPonto(p)
+  return comandos.every((c) => declaradas.some((d) => declaracaoCobre(d, c, modo)))
+}
+
+/**
+ * Consumidor provado para o ponto, nas DUAS formas:
+ *
+ *   file-scoped  `{ consumer, proof }`      — contrato existente, inalterado.
+ *                                             Exato quando o arquivo inteiro
+ *                                             serve um comando so (`create.js`).
+ *   ancorada     `{ commands: [{ command, mode, consumer, evidence }] }`
+ *                                           — para modulo compartilhado.
+ *
+ * A forma ancorada e escolhida pela presenca de `commands`; nada muda para quem
+ * ja declarava por arquivo.
+ */
+const consumidorProvado = (p, ctx) => {
+  const entrada = consumidorDe(p.file, ctx.consumers, ctx.repoRoot)
+  if (!entrada) return false
+  return Array.isArray(entrada.commands) ? coberturaAncorada(entrada, p) : true
+}
+
 export const SINK_RULES = Object.freeze([
   {
     // Guarda POSITIVA. `requiresDebugEnv` ja garante que `!DEBUG` e
@@ -1812,7 +1942,7 @@ export const SINK_RULES = Object.freeze([
     // consumidores é declarado por caminho de repositório. Comparar por igualdade
     // fazia o mesmo ponto ser `machine_protocol` na análise direta e `unknown` no
     // registry — divergência silenciosa entre o que se mede e o que se publica.
-    when: (p, ctx) => p.argForm === "serializer" && Boolean(consumidorDe(p.file, ctx.consumers, ctx.repoRoot)),
+    when: (p, ctx) => p.argForm === "serializer" && consumidorProvado(p, ctx),
     audience: "machine_protocol",
     trigger: "structural_serializer",
     reason: "payload de serializador estrutural com consumidor DECLARADO — as duas coisas; serializador sozinho nao prova que alguem consome",
@@ -1946,6 +2076,10 @@ export function analyzeFile(filePath, analyzer = null, ctx = {}) {
   // Raizes DERIVADAS do DISPATCH real; vazio quando nao provado.
   const canonicas = entrypointsCanonicos(a.program, a.checker).get(norm(filePath)) ?? null
   const alcanceCanonico = canonicas ? alcancaveisDeExport(a.checker, sf, canonicas) : { alcancadas: new Set() }
+  // Alcance POR COMANDO, nao pela uniao dos handlers: e o que permite dizer que
+  // um ponto pertence a `dev` e nao a `logs` dentro do mesmo arquivo.
+  const alcancePorComando = alcancePorComandoDe(a.checker, sf,
+    entrypointsPorComando(a.program, a.checker).get(norm(filePath)))
   // Contexto de resolucao para wrappers transparentes (3.1c): mesmo grafo de
   // declaracoes locais da 3.1a, entao a identidade de no ja esta conferida.
   const ctxAst = { checker: a.checker, sf, decls: declaracoesDeFuncao(sf), cache: new Map(), emCurso: new Set() }
@@ -1979,6 +2113,9 @@ export function analyzeFile(filePath, analyzer = null, ctx = {}) {
       reachableFromExport: alcancavelDaqui(ancestry(node).functions, alcance),
       // Criterio ESTRITO: so handler do DISPATCH conta como origem.
       reachableFromEntrypoint: alcancavelDaqui(ancestry(node).functions, alcanceCanonico),
+      // Comandos canonicos que alcancam o ponto — a ancora fina da prova de
+      // consumidor. Vazio quando nenhum handler do DISPATCH chega aqui.
+      commands: comandosQueAlcancam(ancestry(node).functions, alcancePorComando),
       // Origem do RECEPTOR quando a chamada e `obj.metodo(...)`: consulta o
       // valor propagado para aquele parametro, na funcao que contem o ponto.
       receiverOrigin: origemDoReceptor(node, ancestry(node).functions, receptores, ctxAst),
