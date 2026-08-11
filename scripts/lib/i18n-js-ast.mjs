@@ -1638,9 +1638,53 @@ const FORMAS_DO_ARGUMENTO = [
   [(r) => !r.temTexto && r.temOpaco && r.literais.length > 0, () => ({ forma: "interpolation_only" })],
 ]
 
+/** `null` ABSORVE: um lado nao-literal derruba a concatenacao inteira. */
+const juntarTexto = (a, b) => (a === null || b === null ? null : a + b)
+
+/**
+ * Texto quando a expressao INTEIRA e composta so de literais de string.
+ * Mesma tabela por forma de `FLAG_POR_FORMA`: cada caso legivel isoladamente,
+ * caminhamento em um lugar so.
+ */
+const TEXTO_POR_FORMA = [
+  [ehLiteralDeTexto, (n) => n.text],
+  [ts.isParenthesizedExpression, (n, rec) => rec(n.expression)],
+  [ehConcatenacao, (n, rec) => juntarTexto(rec(n.left), rec(n.right))],
+]
+
+function textoLiteralInteiro(node) {
+  if (!node) return null
+  const caso = TEXTO_POR_FORMA.find(([forma]) => forma(node))
+  return caso ? caso[1](node, textoLiteralInteiro) : null
+}
+
+/**
+ * O argumento inteiro e um DOCUMENTO JSON escrito por extenso?
+ *
+ * Fato ESTRUTURAL, nao heuristica sobre o texto: ou o literal completo parseia
+ * como objeto/array, ou nao. A unica diferenca para `JSON.stringify(x)` e que a
+ * serializacao aconteceu em tempo de AUTORIA — o payload e o mesmo.
+ *
+ * Escalar parseavel NAO conta: `"3"` e `"null"` sao JSON validos e nao sao
+ * documento de contrato. E a mesma fronteira que `pureJsonStdout` ja usa.
+ */
+function ehDocumentoJsonLiteral(node) {
+  const txt = textoLiteralInteiro(node)
+  if (txt === null) return false
+  const limpo = txt.trim()
+  if (!limpo.startsWith("{") && !limpo.startsWith("[")) return false
+  try {
+    const v = JSON.parse(limpo)
+    return v !== null && typeof v === "object"
+  } catch { return false }
+}
+
 export function formaDoArgumento(arg, ctx = null) {
   const partes = partesDaExpressao(arg, [], ctx)
   if (partes.length === 0) return { forma: "none", partes }
+  // Antes das demais formas: sem isto o payload cairia em `text_literal` e
+  // seria lido como frase humana, que e exatamente o que ele nao e.
+  if (ehDocumentoJsonLiteral(arg)) return { forma: "json_document_literal", partes }
   const r = resumoDasPartes(partes)
   const caso = FORMAS_DO_ARGUMENTO.find(([quando]) => quando(r))
   return { ...(caso ? caso[1](r) : { forma: "opaque" }), partes }
@@ -1671,6 +1715,29 @@ export const MACHINE_PROTOCOL_CONSUMERS = Object.freeze({
   "src/cli/create.js": Object.freeze({
     consumer: "json_purity_contract",
     proof: "tests/json_purity_contract.test.js — `create amostra --dry-run --json` na lista SUCESSO",
+  }),
+  /**
+   * `qa --json` — forma ANCORADA (arquivo + comando + modo).
+   *
+   * `qa.js` e alcancado so pelo comando `qa`, entao a forma file-scoped tambem
+   * daria o resultado certo hoje. A ancorada e usada mesmo assim porque diz o
+   * que a prova REALMENTE cobre: o modo `--json`, e nao a saida humana do mesmo
+   * comando (`section`/`info` no ramo `else`).
+   *
+   * Os dois pontos do ramo de maquina estao no teste, um a um: o veredito
+   * (`JSON.stringify`) e a recusa (`{"error":"not_a_git_repo"}`, ja serializada
+   * em tempo de autoria). O teste roda `node src/index.js qa --json` por
+   * subprocesso — comando publico, nao `qaCommand()` direto.
+   */
+  "src/commands/qa.js": Object.freeze({
+    commands: Object.freeze([
+      Object.freeze({
+        command: "qa",
+        mode: "--json",
+        consumer: "qa_json_contract",
+        evidence: "tests/qa_json_contract.test.js — `qa --json` dentro e fora de repo git, stdout puro + schema minimo (verdict/blocked/findings/byLens, error)",
+      }),
+    ]),
   }),
 })
 
@@ -1946,6 +2013,23 @@ export const SINK_RULES = Object.freeze([
     audience: "machine_protocol",
     trigger: "structural_serializer",
     reason: "payload de serializador estrutural com consumidor DECLARADO — as duas coisas; serializador sozinho nao prova que alguem consome",
+  },
+  {
+    /**
+     * Documento JSON escrito por extenso, no ramo de maquina, com consumidor
+     * provado para AQUELE comando e modo. As tres condicoes juntas.
+     *
+     * A guarda de maquina e exigida aqui e nao em `stream-json-protocol` porque
+     * `JSON.stringify(x)` ja e evidencia de serializacao por si so; um literal
+     * nao e — ele so vira payload quando esta no ramo que o contrato de `--json`
+     * governa. Sem a guarda, um literal JSON numa mensagem qualquer entraria.
+     */
+    id: "stream-json-document-literal",
+    when: (p, ctx) => p.argForm === "json_document_literal"
+      && p.underMachineGuard === true && consumidorProvado(p, ctx),
+    audience: "machine_protocol",
+    trigger: "structural_serializer",
+    reason: "documento JSON completo no ramo de maquina, com consumidor declarado para o comando: serializado em tempo de autoria, mas payload de contrato igual",
   },
   {
     id: "stream-terminal-control",

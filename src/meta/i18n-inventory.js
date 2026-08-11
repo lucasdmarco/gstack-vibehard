@@ -388,6 +388,17 @@ export const MACHINE_PROTOCOL_CONSUMERS = Object.freeze([
     contract: "sob `--json`, o relatório de dry-run sai serializado em stdout; o texto humano fica no ramo `else` (console.log)",
     evidence: "tests/json_purity_contract.test.js — `create amostra --dry-run --json` roda por subprocess real e prova stdout puro + payload fora do stderr",
   },
+  {
+    // Lote JS 1/14. Âncora por arquivo é EXATA aqui: só o comando `qa` alcança
+    // `qa.js`. A âncora por comando/modo (arquivo + command + mode) vive na
+    // camada do AST, que é onde a classificação acontece; aqui a pergunta é
+    // apenas "todo ponto `machine_protocol` tem consumidor declarado?".
+    file: "src/commands/qa.js",
+    sink: "process.stdout.write",
+    consumer: "consumidor de máquina do `qa --json` — veredito e recusa, ambos documento JSON único",
+    contract: "sob `--json`, stdout é UM documento: o veredito (`verdict`/`blocked`/`findings`/`byLens`) ou a recusa (`{\"error\":\"not_a_git_repo\"}`); a saída humana fica no ramo `else`",
+    evidence: "tests/qa_json_contract.test.js — `node src/index.js qa --json` por subprocess real, dentro e fora de repo git, com stdout puro e schema mínimo",
+  },
 ])
 
 /** Audiências que exigem consumidor provado para serem aceitas. */

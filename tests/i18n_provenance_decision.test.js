@@ -790,12 +790,17 @@ test("CASO REAL: src/cli/index.js tem exatamente 1 pendência, e a decisão a re
  * que a Fatia 4.2 só criava o mecanismo. A Fatia 5 o exercitou de verdade, e o
  * número aqui passa a ser o estado real do repositório.
  */
-test("INVENTÁRIO OFICIAL após a conversão de monitor.js: 54 unknown, 1906 total, 10 decisões aplicadas", async () => {
+test("INVENTÁRIO OFICIAL: total estável, convertidos declarados, decisões todas aplicadas", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
-  assert.equal(inv.unknown, 54, "98 -> 71: monitor.js converteu 27 pontos")
+  // O TOTAL não pode se mover: converter troca a FONTE do ponto, não a existência
+  // dele. O `unknown` GLOBAL cai a cada arquivo do lote JS — censo canônico dele
+  // em `i18n_inventory.test.js`, para não haver N cópias a reescrever por leva.
   assert.equal(inv.total, 1906,
     "1917 - 5: a remoção do downloader remoto duplicado de create.js levou seus pontos junto")
-  assert.deepEqual(inv.jsRegistry.convertedFiles, ["src/cli/create.js", "src/cli/index.js", "src/commands/monitor.js"])
-  assert.equal(inv.jsRegistry.provenanceDecisionsApplied, 37, "1 de cli/index.js (linha 304) + 9 de monitor.js")
+  const gen = await import(`file:///${path.join(repoRoot, "scripts", "i18n-registry.mjs").replace(/\\/g, "/")}?t=${Date.now()}`)
+  assert.deepEqual(inv.jsRegistry.convertedFiles, [...gen.CONVERTED_FILES].sort())
+  const declaradas = JSON.parse(readFileSync(path.join(repoRoot, "src/meta/i18n-js-overrides.json"), "utf8")).provenanceDecisions
+  assert.equal(inv.jsRegistry.provenanceDecisionsApplied, declaradas.length,
+    "toda decisão declarada é aplicada")
 })

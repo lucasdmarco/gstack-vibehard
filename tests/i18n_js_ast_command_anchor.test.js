@@ -217,6 +217,68 @@ test("CONTROLE NEGATIVO: ponto fora de qualquer handler do DISPATCH continua unk
     "sem rota provada nao ha o que casar — ausencia de prova, nao permissao")
 })
 
+// ── Documento JSON escrito por extenso ──────────────────────────────────────
+
+/** Fixture com DISPATCH de um comando so, para os casos de literal. */
+function fixtureLiteral(corpo) {
+  const root = mkdtempSync(path.join(tmpdir(), "gstack-lit-"))
+  mkdirSync(path.join(root, "src", "cli"), { recursive: true })
+  mkdirSync(path.join(root, "src", "commands"), { recursive: true })
+  const canonical = path.join(root, "src", "cli", "index.js")
+  writeFileSync(canonical, `
+import { qaCommand } from "../commands/x.js"
+export function info(msg) { console.log(msg) }
+const DISPATCH = { qa: (a) => qaCommand(a) }
+`)
+  const alvo = path.join(root, "src", "commands", "x.js")
+  writeFileSync(alvo, `export function qaCommand(a) {\n${corpo}\n}\n`)
+  return { root, alvo, canonical }
+}
+
+const provaQa = [{ command: "qa", mode: "--json", consumer: "qa_json_contract", evidence: "fixture" }]
+
+test("POSITIVO: documento JSON por extenso, no ramo de maquina, com consumidor do comando", async (t) => {
+  const f = fixtureLiteral(`  if (a.includes("--json")) process.stdout.write('{"error":"nope"}\\n')`)
+  t.after(() => cleanupTmp(f.root))
+  const [p] = await pontosAnotados(f, ancorado(f, provaQa))
+  assert.equal(p.argForm, "json_document_literal", "o literal INTEIRO parseia como objeto")
+  assert.equal(p.audience, "machine_protocol")
+  assert.equal(p.rule, "stream-json-document-literal")
+})
+
+test("CONTROLE NEGATIVO: literal que NAO parseia como documento continua text_literal", async (t) => {
+  const f = fixtureLiteral(`  if (a.includes("--json")) process.stdout.write("tudo certo\\n")`)
+  t.after(() => cleanupTmp(f.root))
+  const [p] = await pontosAnotados(f, ancorado(f, provaQa))
+  assert.equal(p.argForm, "text_literal")
+  assert.equal(p.audience, "unknown", "frase nao vira protocolo por estar no ramo de maquina")
+})
+
+test("CONTROLE NEGATIVO: escalar JSON valido NAO e documento de contrato", async (t) => {
+  for (const lit of ['"3"', '"null"', '\'"pronto"\'']) {
+    const f = fixtureLiteral(`  if (a.includes("--json")) process.stdout.write(${lit})`)
+    const [p] = await pontosAnotados(f, ancorado(f, provaQa))
+    cleanupTmp(f.root)
+    assert.notEqual(p.argForm, "json_document_literal", `${lit} parseia, mas nao e objeto nem array`)
+  }
+})
+
+test("CONTROLE NEGATIVO: documento JSON FORA do ramo de maquina nao e coberto", async (t) => {
+  const f = fixtureLiteral(`  process.stdout.write('{"error":"nope"}\\n')`)
+  t.after(() => cleanupTmp(f.root))
+  const [p] = await pontosAnotados(f, ancorado(f, provaQa))
+  assert.equal(p.argForm, "json_document_literal")
+  assert.equal(p.audience, "unknown",
+    "literal so vira payload no ramo que o contrato de `--json` governa")
+})
+
+test("CONTROLE NEGATIVO: documento JSON no ramo de maquina SEM consumidor provado", async (t) => {
+  const f = fixtureLiteral(`  if (a.includes("--json")) process.stdout.write('{"error":"nope"}\\n')`)
+  t.after(() => cleanupTmp(f.root))
+  const [p] = await pontosAnotados(f, {})
+  assert.equal(p.audience, "unknown", "as tres condicoes sao exigidas juntas")
+})
+
 // ── Requisito 7: o contrato file-scoped existente segue intacto ──────────────
 
 test("REGRESSAO: o contrato file-scoped `{consumer, proof}` continua valendo para o arquivo", async (t) => {

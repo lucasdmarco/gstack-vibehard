@@ -31,6 +31,7 @@ const overrides = () => JSON.parse(readFileSync(path.join(repoRoot, OVERRIDES), 
 const registry = () => JSON.parse(readFileSync(path.join(repoRoot, "src/meta/i18n-js-registry.json"), "utf8"))
 
 const decisoesDe = (arquivo) => overrides().provenanceDecisions.filter((d) => d.file === arquivo)
+const decisoesTodas = () => overrides().provenanceDecisions
 
 /**
  * Consome um conjunto ADULTERADO de decisões pelo caminho REAL.
@@ -54,7 +55,11 @@ async function consumirCom(decisoes) {
 
 test("as quatro contagens do contrato conferem", async () => {
   const i = await inventario()
-  assert.equal(i.jsRegistry.provenanceDecisionsApplied, 37, "aplicadas globalmente: 9 de monitor.js + 1 pré-existente")
+  // Global DERIVADO: o total cresce a cada arquivo do lote JS. O que este teste
+  // guarda são as contagens DESTE arquivo (abaixo) e o invariante de que toda
+  // decisão declarada é aplicada.
+  assert.equal(i.jsRegistry.provenanceDecisionsApplied, decisoesTodas().length,
+    "toda decisão declarada é aplicada — nenhuma anunciada sem efeito")
   assert.equal(decisoesDe(ARQ).length, 9, "declaradas para monitor.js")
   assert.equal(decisoesDe("src/cli/index.js").length, 1, "a decisão anterior segue declarada")
   assert.equal(i.provenance.count, 0, "`count` é a quantidade PENDENTE — zero é o alvo")

@@ -43,7 +43,13 @@ export const OVERRIDES_SCHEMA = "gstack.i18n-js-overrides.v1"
  *
  * Nenhum ponto real foi perdido: 35 do regex = 29 reais + 6 falsos.
  */
-export const CONVERTED_FILES = Object.freeze(["src/cli/index.js", "src/commands/monitor.js", "src/cli/create.js"])
+export const CONVERTED_FILES = Object.freeze([
+  "src/cli/index.js", "src/commands/monitor.js", "src/cli/create.js",
+  // Lote JS, arquivo 1/14. Os dois pontos de maquina (`qa.js:29` e `qa.js:44`)
+  // so saem de `unknown` porque `qa --json` ganhou consumidor REAL declarado na
+  // ancora fina — ver tests/qa_json_contract.test.js.
+  "src/commands/qa.js",
+])
 
 const norm = (p) => String(p).replace(/\\/g, "/")
 

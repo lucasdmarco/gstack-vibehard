@@ -746,13 +746,17 @@ test("o loader NÃO importa TypeScript nem o engine AST", async () => {
 
 // ── Estado oficial preservado ────────────────────────────────────────────────
 
-test("INVENTÁRIO OFICIAL: registry fresco, dois arquivos convertidos, 71 unknown", async () => {
+test("INVENTÁRIO OFICIAL: registry fresco, convertidos declarados, gate ainda bloqueando", async () => {
   const { buildInventory, phase1Gate } = await imp()
   const inv = buildInventory({ repoRoot })
   assert.equal(inv.blocked, false)
   assert.equal(inv.jsRegistry.ok, true)
-  assert.deepEqual(inv.jsRegistry.convertedFiles, ["src/cli/create.js", "src/cli/index.js", "src/commands/monitor.js"],
-    "cli/index.js na Fatia 5; monitor.js em d9824f6; create.js na conversão oficial")
-  assert.equal(inv.unknown, 54, "71 -> 54 quando os 17 pontos in_scope de create.js saíram do extrator regex")
-  assert.equal(phase1Gate(inv).ok, false, "54 pendências ainda bloqueiam a Fase 1")
+  // Lista DERIVADA: ela cresce a cada arquivo do lote JS, e recopiá-la aqui
+  // transformaria este teste (que é sobre CONSUMO do registry) em censo a
+  // reescrever por leva. O número global de `unknown` tem censo canônico em
+  // `i18n_inventory.test.js`.
+  const gen = await import(`file:///${path.join(repoRoot, "scripts", "i18n-registry.mjs").replace(/\\/g, "/")}?t=${Date.now()}`)
+  assert.deepEqual(inv.jsRegistry.convertedFiles, [...gen.CONVERTED_FILES].sort())
+  assert.ok(inv.unknown > 0, "o lote JS não terminou")
+  assert.equal(phase1Gate(inv).ok, false, "pendências ainda bloqueiam a Fase 1")
 })

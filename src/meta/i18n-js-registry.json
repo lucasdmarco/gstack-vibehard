@@ -2,7 +2,8 @@
   "convertedFiles": [
     "src/cli/create.js",
     "src/cli/index.js",
-    "src/commands/monitor.js"
+    "src/commands/monitor.js",
+    "src/commands/qa.js"
   ],
   "files": {
     "src/cli/create.js": {
@@ -2664,6 +2665,166 @@
         }
       ],
       "fileHash": "sha256:f41470b598abe8a6569e96a2a9e350654297d0b0725ce2f15f5de2056b9202d6"
+    },
+    "src/commands/qa.js": {
+      "entries": [
+        {
+          "audience": "machine_protocol",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "process.stdout.write",
+          "calleePath": "process.stdout.write",
+          "canonicalName": "write",
+          "column": 17,
+          "line": 29,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "stream-json-document-literal",
+          "sink": "stdout"
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "error",
+          "calleePath": "error",
+          "canonicalName": "error",
+          "column": 5,
+          "line": 30,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "machine_protocol",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "process.stdout.write",
+          "calleePath": "process.stdout.write",
+          "canonicalName": "write",
+          "column": 15,
+          "line": 44,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "stream-json-protocol",
+          "sink": "stdout"
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "section",
+          "calleePath": "section",
+          "canonicalName": "section",
+          "column": 3,
+          "line": 46,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "success",
+          "calleePath": "success",
+          "canonicalName": "success",
+          "column": 32,
+          "line": 47,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 52,
+          "provenance": {
+            "ids": [
+              "JSON",
+              "stringify",
+              "gate",
+              "byLens"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "error",
+          "calleePath": "error",
+          "canonicalName": "error",
+          "column": 23,
+          "line": 53,
+          "provenance": {
+            "ids": [
+              "gate",
+              "critical",
+              "gate",
+              "high",
+              "strict",
+              "gate",
+              "medium"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "warn",
+          "calleePath": "warn",
+          "canonicalName": "warn",
+          "column": 8,
+          "line": 54,
+          "provenance": {
+            "ids": [
+              "gate",
+              "medium",
+              "gate",
+              "low",
+              "strict"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        }
+      ],
+      "fileHash": "sha256:b840e2bc4733766acc923651080a9c1255e3b290a1f8295f37a2c20dd2c3e4e2"
     }
   },
   "schema": "gstack.i18n-js-registry.v1"

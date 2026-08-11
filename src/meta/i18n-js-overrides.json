@@ -596,6 +596,58 @@
       "reason": "Anuncia rollback após falha do provisionamento. `active.map(o => o.id)` é lista de identificadores de operação.",
       "owner": "certificação RC PRD51 (Fase 1B)",
       "evidence": "create.js:1829; `create falhou após provisionar — revertendo` é a frase que traduz. Receptor `c.logger`."
+    },
+    {
+      "file": "src/commands/qa.js",
+      "expectedFileHash": "sha256:b840e2bc4733766acc923651080a9c1255e3b290a1f8295f37a2c20dd2c3e4e2",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "owner": "certificacao RC PRD51 (Fase 1B, lote JS 1/14)",
+      "line": 52,
+      "column": 3,
+      "interpolations": [
+        "JSON",
+        "stringify",
+        "gate",
+        "byLens"
+      ],
+      "reason": "Moldura   Por lente:  e frase para o operador ler e deve ser traduzida. A interpolacao e JSON.stringify(gate.byLens) — um objeto ja serializado, contagem por lente; traduzir o conteudo serializado quebraria as chaves que nomeiam as lentes (eval, shell, …), que sao identificadores do produto, nao texto.",
+      "evidence": "qa.js:52 — ramo humano do comando (fora de if (json)); gate.byLens vem de evaluateQa e tem lente como CHAVE."
+    },
+    {
+      "file": "src/commands/qa.js",
+      "expectedFileHash": "sha256:b840e2bc4733766acc923651080a9c1255e3b290a1f8295f37a2c20dd2c3e4e2",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "owner": "certificacao RC PRD51 (Fase 1B, lote JS 1/14)",
+      "line": 53,
+      "column": 23,
+      "interpolations": [
+        "gate",
+        "critical",
+        "gate",
+        "high",
+        "strict",
+        "gate",
+        "medium"
+      ],
+      "reason": "Moldura traduzivel (BLOQUEADO:, crit, \u0007lto, Corrija antes de entregar.) com contagens numericas interpoladas. As interpolacoes sao numeros — nao carregam idioma. ATENCAO ao traduzir: o ternario de strict embute uma SEGUNDA moldura ( · N medio (strict)) que tambem precisa de traducao; --strict dentro dela e nome de flag e nao pode ser traduzido.",
+      "evidence": "qa.js:53 — ramo humano; gate.critical/high/medium sao contadores inteiros de evaluateQa."
+    },
+    {
+      "file": "src/commands/qa.js",
+      "expectedFileHash": "sha256:b840e2bc4733766acc923651080a9c1255e3b290a1f8295f37a2c20dd2c3e4e2",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "owner": "certificacao RC PRD51 (Fase 1B, lote JS 1/14)",
+      "line": 54,
+      "column": 8,
+      "interpolations": [
+        "gate",
+        "medium",
+        "gate",
+        "low",
+        "strict"
+      ],
+      "reason": "Mesma forma da linha 53: moldura traduzivel com contagens numericas. O ternario de strict carrega a frase ; --strict bloqueia medio, que e traduzivel EXCETO o literal --strict, que e a flag real da CLI e quebraria o comando se traduzida.",
+      "evidence": "qa.js:54 — ramo humano, caminho nao bloqueado; gate.medium/low sao contadores inteiros."
     }
   ]
 }

@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs"
+import { mkdtempSync, writeFileSync, mkdirSync, readFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL, fileURLToPath } from "node:url"
@@ -168,9 +168,11 @@ test("CENSO: wrappers derrubam os `opaque` de monitor.js", async () => {
     "as 12 molduras interpoladas receberam AUDIÊNCIA na parte 2; a provenance delas segue pendente e é outra decisão")
 })
 
-test("CENSO: os wrappers não converteram arquivo algum por si", async () => {
+test("CENSO: os wrappers não convertem arquivo — conversão é declaração explícita", async () => {
+  // Travava a lista inteira; com o lote JS ela cresce, e a asserção quebrava em
+  // conversões alheias a esta capacidade. Fica o invariante verificável: a lista
+  // declarada é exatamente o artefato commitado.
   const { CONVERTED_FILES } = await import(pathToFileURL(path.join(repoRoot, "scripts", "i18n-registry.mjs")).href)
-  // monitor.js foi convertido em d9824f6, DEPOIS desta capacidade. O que este
-  // censo afirma continua valendo: os wrappers não converteram nada por si.
-  assert.deepEqual([...CONVERTED_FILES], ["src/cli/index.js", "src/commands/monitor.js", "src/cli/create.js"])
+  const r = JSON.parse(readFileSync(path.join(repoRoot, "src", "meta", "i18n-js-registry.json"), "utf8"))
+  assert.deepEqual([...CONVERTED_FILES].sort(), r.convertedFiles)
 })

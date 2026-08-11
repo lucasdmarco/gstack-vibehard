@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs"
+import { mkdtempSync, writeFileSync, mkdirSync, readFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL, fileURLToPath } from "node:url"
@@ -225,10 +225,14 @@ export function run(json, dados) {
  * emite LITERAL, e só `underMachineGuard` pode segurá-lo.
  */
 test("HOMÔNIMO: literal puro DENTRO do ramo `if (json)` não é canal humano", async (t) => {
+  // O literal NÃO pode ser um documento JSON (`"{}"` era). Se for, `argForm` vira
+  // `json_document_literal` e é a FORMA que barra o ponto — a guarda de modo
+  // máquina deixaria de ser o que decide, e a lacuna que este teste fecha
+  // (desligar `underMachineGuard` não quebrava nada) voltaria em silêncio.
   const f = fixture(`
 export function run(json) {
   if (json) {
-    console.log("{}")
+    console.log("pronto")
   }
 }
 `)
@@ -348,12 +352,25 @@ export function run(info) {
 
 // ── Invariantes da leva ─────────────────────────────────────────────────────
 
-test("a Task 3 não converteu arquivo algum por si", async () => {
+/**
+ * Este censo travava a lista INTEIRA de convertidos. Com o lote JS ela cresce a
+ * cada arquivo, então a asserção quebrava em conversões que não têm nada a ver
+ * com esta task — e o comentário virava falso a cada leva ("monitor.js entrou
+ * depois", "create.js depois", …).
+ *
+ * O que ela realmente guarda é que converter é ATO DECLARADO: nenhum arquivo
+ * entra por efeito colateral de uma capacidade. Isso se verifica sem congelar a
+ * lista — a declaração e o artefato têm que ser a mesma coisa, e todo declarado
+ * precisa ter entrada real.
+ */
+test("converter é ato declarado — nenhuma capacidade converte arquivo por efeito colateral", async () => {
   const { CONVERTED_FILES } = await import(pathToFileURL(path.join(repoRoot, "scripts", "i18n-registry.mjs")).href)
-  // monitor.js entrou em d9824f6, DEPOIS desta task. A afirmação que este teste
-  // guarda continua de pé: a Task 3 instalou regras e não converteu nada.
-  assert.deepEqual([...CONVERTED_FILES], ["src/cli/index.js", "src/commands/monitor.js", "src/cli/create.js"],
-    "a Task 3 instala regras; converter arquivos é da Task 4, e misturar as duas impediria atribuir qualquer variação de contagem a uma causa")
+  const r = JSON.parse(readFileSync(path.join(repoRoot, "src", "meta", "i18n-js-registry.json"), "utf8"))
+  assert.deepEqual([...CONVERTED_FILES].sort(), r.convertedFiles,
+    "a lista declarada e o artefato commitado são a mesma coisa vista de dois ângulos")
+  for (const f of r.convertedFiles) {
+    assert.ok(r.files[f].entries.length > 0, `${f} declarado sem entradas seria conversão anunciada e não feita`)
+  }
 })
 
 test("o registro de consumidores só admite entrada com prova apontável", async () => {
@@ -361,10 +378,24 @@ test("o registro de consumidores só admite entrada com prova apontável", async
   // Nasceu vazio na Task 3 e ganhou a primeira entrada quando um consumidor REAL
   // foi identificado. O invariante nunca foi "estar vazio" -- é que cada entrada
   // nomeie o teste que consome a saída, e não o formato que ela aparenta ter.
+  //
+  // Duas formas convivem: file-scoped `{consumer, proof}` (exata quando o arquivo
+  // inteiro serve um comando só) e ANCORADA `{commands:[{command, mode, consumer,
+  // evidence}]}` (para módulo compartilhado). A exigência de prova apontável é a
+  // mesma nas duas — muda só onde ela fica.
+  const exigirProva = (rotulo, consumer, prova) => {
+    assert.ok(consumer, `${rotulo} sem consumidor`)
+    assert.ok(prova && prova.includes("tests/"), `${rotulo}: a prova precisa apontar um teste real`)
+  }
   for (const [arquivo, d] of Object.entries(MACHINE_PROTOCOL_CONSUMERS)) {
     assert.ok(arquivo.startsWith("src/"), `chave deve ser caminho de fonte: ${arquivo}`)
-    assert.ok(d.consumer && d.proof, `${arquivo} sem consumidor ou prova`)
-    assert.ok(d.proof.includes("tests/"), `${arquivo}: a prova precisa apontar um teste real`)
+    if (!Array.isArray(d.commands)) { exigirProva(arquivo, d.consumer, d.proof); continue }
+    assert.ok(d.commands.length > 0, `${arquivo}: forma ancorada sem comando algum não prova nada`)
+    for (const c of d.commands) {
+      assert.ok(c.command, `${arquivo}: entrada ancorada precisa dizer QUAL comando`)
+      assert.ok(c.mode, `${arquivo}/${c.command}: precisa dizer qual modo/branch`)
+      exigirProva(`${arquivo}/${c.command} ${c.mode}`, c.consumer, c.evidence)
+    }
   }
 })
 

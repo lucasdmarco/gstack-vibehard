@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs"
+import { mkdtempSync, writeFileSync, mkdirSync, readFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL, fileURLToPath } from "node:url"
@@ -179,9 +179,12 @@ test("CENSO: create.js chega a unknown ZERO (convertido na fatia oficial)", asyn
   assert.equal(unk.length, 0,
     "90 -> 86 pelos entrypoints; 86 -> 13 pela 3.1b.1; 13 -> 8 pela remoção do ramo morto; 8 -> 0 pela classificação dos residuais")
 
+  // A lista cresce a cada arquivo do lote JS; travá-la aqui quebrava este censo
+  // em conversões alheias. O invariante que resta é o verificável: declaração e
+  // artefato são a mesma coisa.
   const { CONVERTED_FILES } = await import(pathToFileURL(path.join(repoRoot, "scripts", "i18n-registry.mjs")).href)
-  assert.deepEqual([...CONVERTED_FILES], ["src/cli/index.js", "src/commands/monitor.js", "src/cli/create.js"],
-    "os entrypoints não converteram nada por si; monitor.js e create.js entraram em fatias próprias")
+  const r = JSON.parse(readFileSync(path.join(repoRoot, "src", "meta", "i18n-js-registry.json"), "utf8"))
+  assert.deepEqual([...CONVERTED_FILES].sort(), r.convertedFiles)
 })
 
 // ── `interpolation_only`: moldura sem texto (forma, não audiência nova) ─────

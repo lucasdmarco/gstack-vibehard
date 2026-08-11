@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs"
+import { mkdtempSync, writeFileSync, mkdirSync, readFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL, fileURLToPath } from "node:url"
@@ -223,8 +223,13 @@ test("CENSO: a capacidade melhora `create.js` e não move `monitor.js`", async (
     "create.js: 95 -> 90 por esta task; o restante caiu nas fatias seguintes até zerar")
 })
 
-test("CENSO: a alcançabilidade não converteu arquivo algum por si", async () => {
+/**
+ * Travava a lista inteira e quebrava a cada arquivo do lote JS — conversões que
+ * nada têm a ver com esta capacidade. O invariante que sobrevive: converter é ato
+ * DECLARADO, e a declaração precisa bater com o artefato.
+ */
+test("CENSO: a alcançabilidade não converte arquivo — conversão é declaração explícita", async () => {
   const { CONVERTED_FILES } = await import(pathToFileURL(path.join(repoRoot, "scripts", "i18n-registry.mjs")).href)
-  assert.deepEqual([...CONVERTED_FILES], ["src/cli/index.js", "src/commands/monitor.js", "src/cli/create.js"],
-    "3.1a entregou capacidade e converteu nada; monitor.js entrou depois, em d9824f6, com decisões ancoradas")
+  const r = JSON.parse(readFileSync(path.join(repoRoot, "src", "meta", "i18n-js-registry.json"), "utf8"))
+  assert.deepEqual([...CONVERTED_FILES].sort(), r.convertedFiles)
 })

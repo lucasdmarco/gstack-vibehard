@@ -30,11 +30,33 @@ const imp = () => import(`file:///${path.join(repoRoot, "src", "meta", "i18n-inv
 const ALVO = "src/cli/index.js"
 const lerJson = (rel) => JSON.parse(readFileSync(path.join(repoRoot, rel), "utf8"))
 
+/**
+ * Lista de convertidos DERIVADA da fonte única, não recopiada aqui.
+ *
+ * Estes censos travavam a lista inteira, então CADA arquivo novo do lote JS
+ * quebrava testes que não falam sobre ele — e a correção mecânica seria reescrever
+ * a lista N vezes, transformando censo em ruído. O que estes testes precisam
+ * afirmar é outra coisa: que o ARTEFATO bate com a lista DECLARADA (nenhuma
+ * conversão acidental) e que `ALVO` está entre os convertidos.
+ */
+const convertidosDeclarados = async () => {
+  const gen = await import(`file:///${path.join(repoRoot, "scripts", "i18n-registry.mjs").replace(/\\/g, "/")}?t=${Date.now()}`)
+  return [...gen.CONVERTED_FILES].sort()
+}
+
+/** Pontos que NÃO pertencem a arquivo convertido. */
+const forasDosConvertidos = (inv) => {
+  const convertidos = new Set(inv.jsRegistry.convertedFiles)
+  return inv.points.filter((p) => !convertidos.has(p.file))
+}
+
 // ── O arquivo está convertido, pelos artefatos oficiais ──────────────────────
 
-test("o registry commitado declara src/cli/index.js convertido", () => {
+test("o registry commitado declara src/cli/index.js convertido", async () => {
   const r = lerJson("src/meta/i18n-js-registry.json")
-  assert.deepEqual(r.convertedFiles, ["src/cli/create.js", "src/cli/index.js", "src/commands/monitor.js"], "o registry ordena alfabeticamente; create.js entrou por último")
+  assert.ok(r.convertedFiles.includes(ALVO), "o alvo desta fatia está declarado")
+  assert.deepEqual(r.convertedFiles, await convertidosDeclarados(),
+    "o artefato bate com a lista declarada — nenhuma conversão acidental entrou")
   assert.ok(r.files[ALVO], "com entradas próprias")
   assert.match(r.files[ALVO].fileHash, /^sha256:[0-9a-f]{64}$/)
 })
@@ -43,7 +65,7 @@ test("o inventário oficial consome o AST para o arquivo convertido", async () =
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
   assert.equal(inv.blocked, false)
-  assert.deepEqual(inv.jsRegistry.convertedFiles, ["src/cli/create.js", "src/cli/index.js", "src/commands/monitor.js"])
+  assert.deepEqual(inv.jsRegistry.convertedFiles, await convertidosDeclarados())
 
   const doAlvo = inv.points.filter((p) => p.file === ALVO)
   assert.ok(doAlvo.length > 0)
@@ -92,15 +114,29 @@ test("MATRIZ regex → AST: 35 = 29 reais + 6 falsos positivos", async () => {
 
 // ── Efeito global, derivado ──────────────────────────────────────────────────
 
-test("o inventário global reflete as migrações: 1906 pontos, 54 unknown", async () => {
+/**
+ * O TOTAL é o invariante que não pode se mover: converter troca a FONTE do ponto
+ * (regex -> AST), nunca a existência dele. "Nenhum ponto perdido" é o critério do
+ * lote, e é aqui que ele é medido.
+ *
+ * O `unknown` GLOBAL, ao contrário, cai a cada arquivo reconciliado — é medição em
+ * movimento, e travá-la aqui só produziria uma reescrita por conversão. O censo
+ * canônico do número vive em `i18n_inventory.test.js`; aqui vale a RELAÇÃO, que é
+ * o que este arquivo tem a dizer: todo `unknown` restante está fora dos convertidos.
+ */
+test("o inventário global reflete as migrações: 1906 pontos, unknown só fora dos convertidos", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
 
   // 1924 − 6 falsos positivos que saíram da conta.
   assert.equal(inv.total, 1906,
     "1917 - 5: a remoção do downloader remoto duplicado de create.js levou seus pontos junto")
-  // 125 − 27 unknown que o arquivo tinha.
-  assert.equal(inv.unknown, 54, "98 -> 71 pela conversão de monitor.js (27 pontos)")
+
+  const convertidos = new Set(inv.jsRegistry.convertedFiles)
+  const unknownEmConvertido = inv.points.filter((p) => convertidos.has(p.file) && p.audience === "unknown")
+  assert.deepEqual(unknownEmConvertido, [],
+    "arquivo só é declarado convertido com unknown ZERO — é a regra do lote")
+  assert.equal(inv.unknown, forasDosConvertidos(inv).filter((p) => p.audience === "unknown").length)
 })
 
 /**
@@ -108,17 +144,19 @@ test("o inventário global reflete as migrações: 1906 pontos, 54 unknown", asy
  * aritmética fechar não basta — dois erros opostos se cancelariam. Aqui a soma é
  * checada por arquivo, o que localiza qualquer deslocamento.
  */
-test("SPILLOVER: os demais arquivos somam exatamente 1759 pontos", async () => {
+test("SPILLOVER: converter um arquivo não mexe em ponto de outro", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
-  const CONVERTIDOS = new Set(["src/cli/create.js", "src/cli/index.js", "src/commands/monitor.js"])
-  const outros = inv.points.filter((p) => !CONVERTIDOS.has(p.file))
+  const outros = forasDosConvertidos(inv)
 
-  assert.equal(outros.length, 1759, "nenhum ponto entrou ou saiu fora dos três alvos")
-  assert.equal(outros.filter((p) => p.audience === "unknown").length, 54,
-    "todos os `unknown` restantes estão FORA dos arquivos migrados")
+  // A soma é derivada em vez de travada porque ela muda a cada conversão; o que
+  // NÃO pode mudar é a partição: convertido vem do AST, o resto vem do scanner.
+  const doRegistry = inv.points.length - outros.length
+  assert.equal(outros.length + doRegistry, inv.total, "a partição cobre o inventário inteiro")
   assert.equal(outros.filter((p) => p.source === "ast_registry").length, 0,
-    "nenhum TERCEIRO arquivo foi convertido junto por acidente")
+    "nenhum arquivo NÃO declarado foi convertido junto por acidente")
+  assert.equal(inv.points.filter((p) => p.source === "ast_registry").length, doRegistry,
+    "todo ponto de arquivo convertido vem do registry, e só ele")
 })
 
 // ── Decisão de provenance: aplicada exatamente UMA vez ───────────────────────
@@ -127,10 +165,13 @@ test("a decisão de provenance é aplicada exatamente UMA vez, no callsite ancor
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
 
-  assert.equal(inv.jsRegistry.provenanceDecisionsApplied, 37, "1 deste arquivo + 9 de monitor.js")
-
-  assert.equal(inv.points.filter((p) => p.provenanceDecision != null).length, 37,
-    "10 pontos decididos no total: 1 aqui + 9 em monitor.js")
+  // O invariante é declarado === aplicado, não o número absoluto: o total cresce
+  // a cada arquivo do lote, e travá-lo aqui só geraria reescrita por conversão.
+  const declaradas = lerJson("src/meta/i18n-js-overrides.json").provenanceDecisions.length
+  assert.equal(inv.jsRegistry.provenanceDecisionsApplied, declaradas,
+    "toda decisão declarada é aplicada — nenhuma fica anunciada sem efeito")
+  assert.equal(inv.points.filter((p) => p.provenanceDecision != null).length, declaradas,
+    "e cada uma atinge exatamente um ponto")
 
   const comDecisao = inv.points.filter((p) => p.provenanceDecision != null && p.file === ALVO)
   assert.equal(comDecisao.length, 1, "uma decisão, um ponto — NESTE arquivo")
@@ -166,15 +207,19 @@ test("nenhum OVERRIDE foi necessário — e o invariante declarado===aplicado va
 
 // ── Gate ─────────────────────────────────────────────────────────────────────
 
-test("o gate segue reprovando — pelos 71 unknown restantes, não por provenance", async () => {
+test("o gate segue reprovando pelos unknown restantes, NÃO por provenance", async () => {
   const { buildInventory, phase1Gate } = await imp()
-  const g = phase1Gate(buildInventory({ repoRoot }))
+  const inv = buildInventory({ repoRoot })
+  const g = phase1Gate(inv)
 
   assert.equal(g.ok, false)
-  assert.equal(g.unknown, 54)
-  assert.equal(g.provenanceOk, true, "a única pendência do arquivo migrado foi decidida")
+  // A CAUSA é o que este teste guarda; o número cai a cada arquivo do lote e o
+  // censo canônico dele está em `i18n_inventory.test.js`.
+  assert.ok(g.unknown > 0, "ainda há ponto sem classificação — o lote não terminou")
+  assert.equal(g.unknown, inv.unknown)
+  assert.equal(g.provenanceOk, true, "as pendências dos arquivos migrados foram decididas")
   assert.equal(g.unresolvedProvenance, 0)
-  assert.match(g.reason, /54 ponto/)
+  assert.match(g.reason, new RegExp(`${g.unknown} ponto`))
 })
 
 test("o registry commitado é EXATAMENTE o que o gerador emite (sem edição manual)", async () => {

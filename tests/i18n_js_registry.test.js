@@ -439,11 +439,12 @@ test("o registry commitado declara o que foi reconciliado, com entradas reais", 
   const { REGISTRY_PATH, REGISTRY_SCHEMA } = await gen()
   const r = JSON.parse(readFileSync(path.join(repoRoot, REGISTRY_PATH), "utf8"))
   assert.equal(r.schema, REGISTRY_SCHEMA)
-  // `src/cli/create.js` entra na conversão desta fatia. A lista é do ARTEFATO, que sai
-  // ordenado alfabeticamente — não a ordem de inserção de `CONVERTED_FILES`.
-  assert.deepEqual(r.convertedFiles,
-    ["src/cli/create.js", "src/cli/index.js", "src/commands/monitor.js"],
-    "os arquivos reconciliados até a fatia de `create.js`")
+  // Lista DERIVADA da fonte única: ela cresce a cada arquivo do lote JS, e
+  // recopiá-la aqui faria toda conversão quebrar um teste que não fala sobre ela.
+  // O artefato sai ordenado alfabeticamente — não na ordem de inserção.
+  const { CONVERTED_FILES } = await gen()
+  assert.deepEqual(r.convertedFiles, [...CONVERTED_FILES].sort(),
+    "o artefato commitado declara exatamente o que a fonte única declara")
   assert.deepEqual(Object.keys(r.files).sort(), r.convertedFiles)
   // Vale para TODO declarado, não só o primeiro: declarar sem entradas é anúncio vazio.
   for (const f of r.convertedFiles) {

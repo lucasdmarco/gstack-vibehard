@@ -165,3 +165,35 @@ test("validateRegistry recusa script que NÃO é alcançado pelo runtime (não p
   assert.equal(r.ok, false)
   assert.match(r.problemas[0].erro, /não é alcançado pelo runtime/)
 })
+
+// -- CENSO GLOBAL CANONICO ---------------------------------------------------
+
+/**
+ * O UNICO lugar onde o numero global vive.
+ *
+ * Antes, seis arquivos de teste repetiam `unknown === 54` e a lista inteira de
+ * convertidos. Cada arquivo do lote JS quebrava os seis, e a correcao mecanica
+ * era reescrever o mesmo numero em seis lugares -- censo virando ruido. Os
+ * outros arquivos passaram a afirmar RELACOES (todo unknown esta fora dos
+ * convertidos, declarado === aplicado, total estavel) e apontam para ca.
+ *
+ * ATUALIZE AQUI, e so aqui, a cada arquivo reconciliado no lote JS.
+ */
+test("CENSO GLOBAL: 1906 pontos, 53 unknown, 4 arquivos convertidos", async () => {
+  const { buildInventory } = await imp()
+  const inv = buildInventory({ repoRoot })
+
+  // TOTAL e invariante do lote: converter troca a FONTE do ponto (regex -> AST),
+  // nunca a existencia dele. "Nenhum ponto perdido" e medido aqui.
+  assert.equal(inv.total, 1906, "converter nao pode criar nem sumir com ponto")
+
+  // Medicao em movimento: cai a cada arquivo reconciliado. 54 -> 53 com qa.js.
+  assert.equal(inv.unknown, 53, "lote JS 1/14: qa.js saiu de 2 unknown para 0")
+  assert.equal(inv.jsRegistry.convertedFiles.length, 4)
+  assert.equal(inv.blocked, false)
+
+  // A relacao que sustenta o numero: nenhum convertido guarda unknown.
+  const convertidos = new Set(inv.jsRegistry.convertedFiles)
+  assert.equal(inv.points.filter((p) => convertidos.has(p.file) && p.audience === "unknown").length, 0,
+    "arquivo so e declarado convertido com unknown ZERO")
+})
