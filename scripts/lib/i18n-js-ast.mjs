@@ -243,24 +243,105 @@ const nomeLocalResolvido = (checker, id, sf, decls) => {
  *   identificador sombreado   — resolve para outra declaracao (checado por
  *                               IDENTIDADE do no, como em `ehMesmaDeclaracao`)
  */
+/**
+ * DUAS FORMAS de valor provam handler, e a segunda NAO e um relaxamento.
+ *
+ *   `detect: (a) => detectCmd(a)`  delegacao — o alvo esta na chamada do corpo
+ *   `search: ctxSearch`            REFERENCIA DIRETA — o alvo E o valor
+ *
+ * `context.js:294` usa a segunda em TODAS as oito entradas, e exigir
+ * `isFunctionLike` rejeitava a tabela INTEIRA (`.every`), nao apenas a entrada:
+ * os oito handlers ficavam sem aresta e os cinco pontos de saida saiam com
+ * `commands: []`. As duas formas dizem a mesma coisa — qual funcao roda quando a
+ * chave e escolhida —, e `chamadaDiretaDe` (usada pelo DISPATCH canonico desde
+ * sempre) ja as trata como equivalentes. Divergir aqui seria descrever o mesmo
+ * fato com dois criterios.
+ *
+ * A IDENTIDADE nao vem do texto do valor: quem decide qual declaracao e o
+ * handler e `nomeLocalResolvido`, por identidade de no. Identificador que
+ * resolve para outro arquivo (handler importado) e forma legitima de entrada e
+ * simplesmente nao produz aresta LOCAL — alcance cross-modulo nao e modelado
+ * aqui. Rejeitar a tabela por causa dele apagaria o despacho das outras
+ * entradas, que estao provadas.
+ */
+const ehValorDeHandler = (n) => isFunctionLike(n) || ts.isIdentifier(n)
+
 const ehEntradaDeDespacho = (p) => ts.isPropertyAssignment(p)
   && !ts.isComputedPropertyName(p.name)
-  && isFunctionLike(p.initializer)
+  && ehValorDeHandler(p.initializer)
 
-const ehTabelaDeDespacho = (d) => ts.isIdentifier(d.name)
-  && d.initializer && ts.isObjectLiteralExpression(d.initializer)
-  && d.initializer.properties.length > 0
-  && d.initializer.properties.every(ehEntradaDeDespacho)
+/**
+ * `Object.freeze({...})` desembrulhado para o literal, ou `null`.
+ *
+ * `visual.js` congela as TRES tabelas que usa, e `research.js` congela a de
+ * NotebookLM. O wrapper e uma `CallExpression`, entao `isObjectLiteralExpression`
+ * dava `false` e nenhuma delas era reconhecida — `SUBCOMMANDS[sub]` partia o
+ * grafo e os doze pontos de `visual.js` saiam com `commands: []`.
+ *
+ * Congelar torna a tabela MAIS provavel, nao menos: em modulo ES (sempre
+ * strict) `SUBCOMMANDS.novo = f` lanca TypeError, entao a enumeracao estatica
+ * das chaves e exatamente o conjunto que existe em runtime. Aceitar aqui e
+ * reconhecer uma prova mais forte, nao abrir excecao.
+ *
+ * `Object` precisa ser o GLOBAL do runtime. Um `const Object = { freeze: (x) => x }`
+ * do projeto nao congela nada, e a decisao e pela DECLARACAO (lib `.d.ts` ou
+ * nenhuma), o mesmo criterio de `ehEmissaoDeConsole` — nao pelo nome.
+ */
+const ehNomeado = (n, texto) => ts.isIdentifier(n) && n.text === texto
 
-/** `nome -> VariableDeclaration` das tabelas de despacho top-level do arquivo. */
-function tabelasDeDespacho(sf) {
+const ehGlobalDoRuntime = (n, checker) => {
+  const decls = checker.getSymbolAtLocation(n)?.getDeclarations() ?? []
+  return decls.length === 0 || decls.every(declaradoNaLib)
+}
+
+const ehCalleeObjectFreeze = (callee, checker) => ts.isPropertyAccessExpression(callee)
+  && ehNomeado(callee.name, "freeze")
+  && ehNomeado(callee.expression, "Object")
+  && ehGlobalDoRuntime(callee.expression, checker)
+
+const literalCongelado = (n, checker) => {
+  if (!ts.isCallExpression(n) || !ehCalleeObjectFreeze(n.expression, checker)) return null
+  const [arg] = n.arguments
+  return arg && ts.isObjectLiteralExpression(arg) ? arg : null
+}
+
+/** Literal da tabela, com ou sem `Object.freeze` em volta. */
+const literalDaTabela = (init, checker) => {
+  if (!init) return null
+  if (ts.isObjectLiteralExpression(init)) return init
+  return literalCongelado(init, checker)
+}
+
+const ehTabelaDeDespacho = (d, checker) => {
+  if (!ts.isIdentifier(d.name)) return false
+  const literal = literalDaTabela(d.initializer, checker)
+  return Boolean(literal)
+    && literal.properties.length > 0
+    && literal.properties.every(ehEntradaDeDespacho)
+}
+
+/**
+ * `nome -> ObjectLiteralExpression` das tabelas de despacho top-level do arquivo.
+ *
+ * MUTACAO POSTERIOR DERRUBA. `const SUBS = {...}` impede reatribuir o binding,
+ * mas nao impede `SUBS.extra = f` mais adiante — e nesse caso o conjunto de
+ * chaves lido em runtime nao e o que o literal enumera. Enumerar mesmo assim
+ * seria afirmar um dominio de chaves que o arquivo desmente. `sofreMutacao`
+ * cobre `SUBS.k = v` e `SUBS[k] = v`; a tabela congelada nunca cai aqui, porque
+ * a mesma atribuicao lancaria em runtime.
+ */
+const declaracoesDeTopo = (sf) => sf.statements
+  .filter(ts.isVariableStatement)
+  .flatMap((st) => [...st.declarationList.declarations])
+
+function tabelasDeDespacho(sf, checker) {
   const mapa = new Map()
-  for (const st of sf.statements) {
-    if (!ts.isVariableStatement(st)) continue
-    if (!(st.declarationList.flags & ts.NodeFlags.Const)) continue
-    for (const d of st.declarationList.declarations) {
-      if (ehTabelaDeDespacho(d)) mapa.set(d.name.text, d)
-    }
+  for (const d of declaracoesDeTopo(sf)) {
+    // `ehConstDeTopo` e a MESMA nocao ja usada por `ehVersaoDePackageJson`: um
+    // unico lugar decide o que e "const de topo deste arquivo".
+    if (!ehConstDeTopo(d, sf) || !ehTabelaDeDespacho(d, checker)) continue
+    if (sofreMutacao(sf, d.name.text)) continue
+    mapa.set(d.name.text, { decl: d, literal: literalDaTabela(d.initializer, checker) })
   }
   return mapa
 }
@@ -279,10 +360,34 @@ function chamadasLocaisEm(no, checker, sf, decls) {
   return alvos
 }
 
+/**
+ * Alvos locais de UMA entrada da tabela.
+ *
+ * As duas contribuicoes sao somadas de proposito. `chamadasLocaisEm` percorre o
+ * corpo do arrow e pega TODAS as chamadas locais — sobre-aproximacao na direcao
+ * conservadora, porque `coberturaAncorada` exige `commands.every(...)`: mais
+ * comandos alcancando um ponto significa mais rotas a provar, nunca menos.
+ * `chamadaDiretaDe` acrescenta o caso em que nao ha corpo a percorrer porque o
+ * handler E o valor (`search: ctxSearch`).
+ */
+const alvosDaEntrada = (prop, checker, sf, decls) => {
+  const alvos = chamadasLocaisEm(prop.initializer, checker, sf, decls)
+  const ref = chamadaDiretaDe(prop.initializer)
+  const alvo = ref ? nomeLocalResolvido(checker, ref, sf, decls) : null
+  if (alvo) alvos.add(alvo)
+  return alvos
+}
+
 /** `nomeDaTabela -> Set<funcaoLocal alcancavel por qualquer entrada dela>`. */
 function alvosDasTabelas(tabelas, checker, sf, decls) {
   const mapa = new Map()
-  for (const [nome, d] of tabelas) mapa.set(nome, chamadasLocaisEm(d.initializer, checker, sf, decls))
+  for (const [nome, { literal }] of tabelas) {
+    const alvos = new Set()
+    for (const prop of literal.properties) {
+      for (const a of alvosDaEntrada(prop, checker, sf, decls)) alvos.add(a)
+    }
+    mapa.set(nome, alvos)
+  }
   return mapa
 }
 
@@ -293,15 +398,15 @@ function alvosDasTabelas(tabelas, checker, sf, decls) {
  */
 const tabelaLidaDinamicamente = (n, checker, sf, tabelas) => {
   if (!ts.isElementAccessExpression(n) || !ts.isIdentifier(n.expression)) return null
-  const d = tabelas.get(n.expression.text)
-  if (!d) return null
-  return declaracaoResolvida(checker, n.expression, sf) === d ? n.expression.text : null
+  const t = tabelas.get(n.expression.text)
+  if (!t) return null
+  return declaracaoResolvida(checker, n.expression, sf) === t.decl ? n.expression.text : null
 }
 
 /** Arestas `chamadora -> chamada`, apenas de chamadas estaticas resolvidas. */
 function arestasDeChamada(checker, sf, decls) {
   const arestas = new Map([...decls.keys()].map((k) => [k, new Set()]))
-  const tabelas = tabelasDeDespacho(sf)
+  const tabelas = tabelasDeDespacho(sf, checker)
   const alvosDeTabela = alvosDasTabelas(tabelas, checker, sf, decls)
 
   for (const [nome, corpo] of decls) {
