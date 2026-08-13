@@ -129,6 +129,150 @@ export function run(nome) {
   assert.equal((await analisar(f))[0].audience, "unknown")
 })
 
+/**
+ * TABELA DE DESPACHO TOP-LEVEL lida por chave dinâmica — a ÚNICA exceção ao
+ * `obj[k]()` acima, e ela precisa dos dois lados provados.
+ *
+ * MOTIVO MEDIDO: é o idioma de roteamento de subcomando de quase todo
+ * `src/commands/*.js`. Com o grafo partido nele, TODO ponto de `secrets.js`,
+ * `visual.js` e `context.js` fora do corpo imediato do handler saía com
+ * `commands: []`, e a âncora fina — fail-closed em lista vazia — não podia
+ * cobrir nenhum. A saída sem esta capacidade seria declarar consumidor por
+ * ARQUIVO em treze arquivos, ou seja, desligar a checagem de rota exatamente
+ * onde ela faz falta.
+ *
+ * A soma é conservadora NA DIREÇÃO CERTA: como o índice não é estático, somam-se
+ * TODAS as entradas, e `coberturaAncorada` exige `commands.every(...)` — mais
+ * comandos alcançando o ponto significa mais rotas a provar, nunca menos.
+ */
+test("DESPACHO: tabela `const` top-level lida por chave dinâmica alcança as entradas", async (t) => {
+  const f = fixture(`
+function doctor() { console.log("Sou o doctor.") }
+function lista() { console.log("Sou o list.") }
+const SUBS = { doctor: () => doctor(), list: () => lista() }
+export function run(sub) { const h = SUBS[sub]; return h && h() }
+`)
+  t.after(() => cleanupTmp(f.root))
+  const a = await alcance(f)
+  assert.equal(a.alcancadas.has("doctor"), true, "a aresta existe de verdade: `run` pode chegar em qualquer entrada")
+  assert.equal(a.alcancadas.has("lista"), true, "chave dinâmica ⇒ TODAS as entradas, não a primeira")
+})
+
+test("DESPACHO: a soma não vaza entre tabelas — ler A não alcança as entradas de B", async (t) => {
+  const f = fixture(`
+function daA() { console.log("Sou da A.") }
+function daB() { console.log("Sou da B.") }
+const A = { x: () => daA() }
+const B = { y: () => daB() }
+export function run(k) { return A[k]() }
+`)
+  t.after(() => cleanupTmp(f.root))
+  const a = await alcance(f)
+  assert.equal(a.alcancadas.has("daA"), true)
+  assert.equal(a.alcancadas.has("daB"), false,
+    "só a tabela REALMENTE lida soma; senão a capacidade viraria 'tudo alcança tudo'")
+})
+
+test("HOSTIL DESPACHO: tabela `let` não cria aresta — pode ser reatribuída", async (t) => {
+  const f = fixture(`
+function render() { console.log("Talvez eu rode.") }
+let SUBS = { r: () => render() }
+export function run(k) { return SUBS[k]() }
+`)
+  t.after(() => cleanupTmp(f.root))
+  assert.equal((await alcance(f)).alcancadas.has("render"), false,
+    "sem `const` a tabela lida em runtime pode não ser esta")
+})
+
+test("HOSTIL DESPACHO: valor NÃO function-like derruba a tabela inteira", async (t) => {
+  const f = fixture(`
+function render() { console.log("Talvez eu rode.") }
+const SUBS = { r: () => render(), versao: 2 }
+export function run(k) { return SUBS[k]() }
+`)
+  t.after(() => cleanupTmp(f.root))
+  assert.equal((await alcance(f)).alcancadas.has("render"), false,
+    "objeto de configuração não é tabela de despacho; aceitar 'quase' é aceitar qualquer objeto")
+})
+
+test("HOSTIL DESPACHO: SPREAD derruba — a lista de entradas deixa de ser enumerável", async (t) => {
+  const f = fixture(`
+function render() { console.log("Talvez eu rode.") }
+const OUTRAS = {}
+const SUBS = { ...OUTRAS, r: () => render() }
+export function run(k) { return SUBS[k]() }
+`)
+  t.after(() => cleanupTmp(f.root))
+  assert.equal((await alcance(f)).alcancadas.has("render"), false,
+    "com spread não se sabe o conjunto de chaves nem de valores")
+})
+
+test("HOSTIL DESPACHO: chave COMPUTADA derruba", async (t) => {
+  const f = fixture(`
+function render() { console.log("Talvez eu rode.") }
+const NOME = "r"
+const SUBS = { [NOME]: () => render() }
+export function run(k) { return SUBS[k]() }
+`)
+  t.after(() => cleanupTmp(f.root))
+  assert.equal((await alcance(f)).alcancadas.has("render"), false,
+    "chave já é dinâmica em tempo de AUTORIA")
+})
+
+test("HOSTIL DESPACHO: parâmetro que SOMBREIA a tabela não cria aresta", async (t) => {
+  const f = fixture(`
+function render() { console.log("Talvez eu rode.") }
+const SUBS = { r: () => render() }
+export function run(SUBS, k) { return SUBS[k]() }
+`)
+  t.after(() => cleanupTmp(f.root))
+  assert.equal((await alcance(f)).alcancadas.has("render"), false,
+    "identidade do nó, não coincidência de nome — quem decide o que `SUBS` é aqui é o chamador")
+})
+
+/**
+ * ISOLA a capacidade: é a LEITURA DINÂMICA que soma, não a existência da tabela.
+ *
+ * Sem este controle, os positivos acima seriam satisfeitos por uma implementação
+ * que simplesmente marcasse alcançável tudo que aparece em qualquer tabela
+ * top-level — e aí `SUBS` sequer precisaria ser lido para "alcançar".
+ */
+test("HOSTIL DESPACHO: tabela top-level NUNCA lida não alcança nada", async (t) => {
+  const f = fixture(`
+function render() { console.log("Talvez eu rode.") }
+const SUBS = { r: () => render() }
+export function run() { console.log("Não leio a tabela.") }
+`)
+  t.after(() => cleanupTmp(f.root))
+  assert.equal((await alcance(f)).alcancadas.has("render"), false,
+    "quem soma é o acesso `SUBS[k]`; tabela declarada e não lida não alcança ninguém")
+})
+
+/**
+ * FRONTEIRA da capacidade, registrada como ela é — não como seria conveniente.
+ *
+ * Aqui a aresta `run -> render` EXISTE, e já existia antes desta capacidade: a
+ * chamada `render()` está lexicalmente dentro do corpo de `run`, e o walk de
+ * `arestasDeChamada` sempre percorreu o corpo inteiro, funções aninhadas
+ * inclusive. Não é a tabela local que cria o alcance — é o call site.
+ *
+ * O contraste com "HOSTIL: chamada DINÂMICA não cria aresta" (tabela local com
+ * `{ render }`, REFERÊNCIA e não chamada) é exatamente o que separa as duas
+ * coisas, e é por isso que aquele teste continua verde.
+ */
+test("FRONTEIRA: tabela local com CHAMADA no corpo já alcançava — o call site é lexical", async (t) => {
+  const f = fixture(`
+function render() { console.log("Chamada lexicalmente dentro de run.") }
+export function run(k) {
+  const SUBS = { r: () => render() }
+  return SUBS[k]()
+}
+`)
+  t.after(() => cleanupTmp(f.root))
+  assert.equal((await alcance(f)).alcancadas.has("render"), true,
+    "comportamento PRÉ-EXISTENTE do walk de corpo; atribuí-lo à tabela de despacho seria ler a capacidade errado")
+})
+
 test("HOSTIL: função passada como CALLBACK não conta", async (t) => {
   const f = fixture(`
 function render() { console.log("Sou callback.") }

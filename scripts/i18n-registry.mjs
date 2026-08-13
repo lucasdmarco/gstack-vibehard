@@ -49,6 +49,13 @@ export const CONVERTED_FILES = Object.freeze([
   // so saem de `unknown` porque `qa --json` ganhou consumidor REAL declarado na
   // ancora fina — ver tests/qa_json_contract.test.js.
   "src/commands/qa.js",
+  // Lote JS, arquivo 2/14. Os dois pontos de maquina (`secrets.js:67` e
+  // `secrets.js:74`) sao subcomandos diferentes — `secrets doctor --json` e
+  // `secrets list --json` —, ambos provados em tests/secrets_json_contract.test.js.
+  // Este arquivo so pode usar a ancora fina por causa da aresta de tabela de
+  // despacho (`arestasDeChamada`): sem ela, `SECRETS_SUBS[sub]` partia o grafo e
+  // os dois pontos saiam com `commands: []`.
+  "src/commands/secrets.js",
 ])
 
 const norm = (p) => String(p).replace(/\\/g, "/")

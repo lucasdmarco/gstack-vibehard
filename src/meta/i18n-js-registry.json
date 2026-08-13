@@ -3,7 +3,8 @@
     "src/cli/create.js",
     "src/cli/index.js",
     "src/commands/monitor.js",
-    "src/commands/qa.js"
+    "src/commands/qa.js",
+    "src/commands/secrets.js"
   ],
   "files": {
     "src/cli/create.js": {
@@ -2825,6 +2826,524 @@
         }
       ],
       "fileHash": "sha256:b840e2bc4733766acc923651080a9c1255e3b290a1f8295f37a2c20dd2c3e4e2"
+    },
+    "src/commands/secrets.js": {
+      "entries": [
+        {
+          "audience": "terminal_control",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "process.stdout.write",
+          "calleePath": "process.stdout.write",
+          "canonicalName": "write",
+          "column": 50,
+          "line": 18,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "stream-terminal-control",
+          "sink": "stdout"
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "warn",
+          "calleePath": "warn",
+          "canonicalName": "warn",
+          "column": 3,
+          "line": 38,
+          "provenance": {
+            "ids": [
+              "sub"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 39,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 32,
+          "line": 55,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "section",
+          "calleePath": "section",
+          "canonicalName": "section",
+          "column": 3,
+          "line": 59,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 60,
+          "provenance": {
+            "ids": [
+              "report",
+              "provider",
+              "report",
+              "available"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "warn",
+          "calleePath": "warn",
+          "canonicalName": "warn",
+          "column": 26,
+          "line": 61,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "machine_protocol",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "process.stdout.write",
+          "calleePath": "process.stdout.write",
+          "canonicalName": "write",
+          "column": 15,
+          "line": 67,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "stream-json-protocol",
+          "sink": "stdout"
+        },
+        {
+          "audience": "machine_protocol",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "process.stdout.write",
+          "calleePath": "process.stdout.write",
+          "canonicalName": "write",
+          "column": 15,
+          "line": 74,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "stream-json-protocol",
+          "sink": "stdout"
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "section",
+          "calleePath": "section",
+          "canonicalName": "section",
+          "column": 3,
+          "line": 75,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 29,
+          "line": 76,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 26,
+          "line": 77,
+          "provenance": {
+            "ids": [
+              "s",
+              "name",
+              "s",
+              "sensitive",
+              "s",
+              "setAt"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "error",
+          "calleePath": "error",
+          "canonicalName": "error",
+          "column": 16,
+          "line": 82,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "error",
+          "calleePath": "error",
+          "canonicalName": "error",
+          "column": 28,
+          "line": 83,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "warn",
+          "calleePath": "warn",
+          "canonicalName": "warn",
+          "column": 17,
+          "line": 87,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "success",
+          "calleePath": "success",
+          "canonicalName": "success",
+          "column": 3,
+          "line": 89,
+          "provenance": {
+            "ids": [
+              "name",
+              "status",
+              "provider"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 92,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "error",
+          "calleePath": "error",
+          "canonicalName": "error",
+          "column": 16,
+          "line": 97,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "success",
+          "calleePath": "success",
+          "canonicalName": "success",
+          "column": 3,
+          "line": 99,
+          "provenance": {
+            "ids": [
+              "name"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 12,
+          "line": 107,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 47,
+          "line": 109,
+          "provenance": {
+            "ids": [
+              "file",
+              "file"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "warn",
+          "calleePath": "warn",
+          "canonicalName": "warn",
+          "column": 98,
+          "line": 109,
+          "provenance": {
+            "ids": [
+              "e",
+              "message"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "error",
+          "calleePath": "error",
+          "canonicalName": "error",
+          "column": 19,
+          "line": 114,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "warn",
+          "calleePath": "warn",
+          "canonicalName": "warn",
+          "column": 33,
+          "line": 117,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "section",
+          "calleePath": "section",
+          "canonicalName": "section",
+          "column": 3,
+          "line": 118,
+          "provenance": {
+            "ids": [
+              "keys",
+              "length",
+              "file"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "success",
+          "calleePath": "success",
+          "canonicalName": "success",
+          "column": 62,
+          "line": 119,
+          "provenance": {
+            "ids": [
+              "k"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "error",
+          "calleePath": "error",
+          "canonicalName": "error",
+          "column": 27,
+          "line": 137,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "error",
+          "calleePath": "error",
+          "canonicalName": "error",
+          "column": 28,
+          "line": 146,
+          "provenance": {
+            "ids": [
+              "e",
+              "code",
+              "e",
+              "message"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        }
+      ],
+      "fileHash": "sha256:85c4844c99c01dda21a8c8a72e4faf20fbd428f0319301a30ef67ac5f202e7b8"
     }
   },
   "schema": "gstack.i18n-js-registry.v1"

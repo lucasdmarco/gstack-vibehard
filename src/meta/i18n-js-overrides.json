@@ -648,6 +648,153 @@
       ],
       "reason": "Mesma forma da linha 53: moldura traduzivel com contagens numericas. O ternario de strict carrega a frase ; --strict bloqueia medio, que e traduzivel EXCETO o literal --strict, que e a flag real da CLI e quebraria o comando se traduzida.",
       "evidence": "qa.js:54 — ramo humano, caminho nao bloqueado; gate.medium/low sao contadores inteiros."
+    },
+    {
+      "file": "src/commands/secrets.js",
+      "line": 38,
+      "column": 3,
+      "expectedFileHash": "sha256:85c4844c99c01dda21a8c8a72e4faf20fbd428f0319301a30ef67ac5f202e7b8",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "sub"
+      ],
+      "reason": "Moldura literal `Subcomando desconhecido: ` é frase do produto e deve ser traduzida. `sub` é o subcomando que o USUÁRIO digitou (ou o default `doctor`) — traduzi-lo quebraria a correspondência com o que ele escreveu, que é a única utilidade da mensagem.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/secrets.js:38, em `secretsCommand`, no ramo de subcomando não reconhecido. `sub` vem de secrets.js:33 — `args.find((a) => !a.startsWith(\"-\")) || \"doctor\"`: token cru da linha de comando, ou o identificador do subcomando default."
+    },
+    {
+      "file": "src/commands/secrets.js",
+      "line": 60,
+      "column": 3,
+      "expectedFileHash": "sha256:85c4844c99c01dda21a8c8a72e4faf20fbd428f0319301a30ef67ac5f202e7b8",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "report",
+        "provider",
+        "report",
+        "available"
+      ],
+      "reason": "Moldura literal `  Provider: ` é frase do produto e deve ser traduzida. `report.provider` é o identificador do backend de keychain (`windows-dpapi`, `macos-keychain`, `libsecret`) e não se traduz; `report.available` só decide entre os glifos `✓`/`✗`, que não têm idioma. DÍVIDA DE MIGRAÇÃO REGISTRADA, não resolvida aqui: o fallback `\"(nenhum keychain disponível)\"` é prosa PT-BR escrita DENTRO da interpolação (`report.provider || \"…\"`), e esta estratégia preserva interpolações inteiras — logo essa frase escaparia da tradução. A correção é da Fase 2 e é de CÓDIGO (içar o fallback para fora da interpolação); declará-la traduzida aqui seria falso.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/secrets.js:60, em `renderSecretsDoctor`. `report` vem de `buildSecretsReport` (secrets.js:42-52), que copia `status.provider`/`status.available` de `brokerStatus(opts)`; nenhum dos dois passa por literal do projeto que não seja o fallback citado."
+    },
+    {
+      "file": "src/commands/secrets.js",
+      "line": 77,
+      "column": 26,
+      "expectedFileHash": "sha256:85c4844c99c01dda21a8c8a72e4faf20fbd428f0319301a30ef67ac5f202e7b8",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "s",
+        "name",
+        "s",
+        "sensitive",
+        "s",
+        "setAt"
+      ],
+      "reason": "Molduras literais `  • ` e ` — guardado em ` são frase do produto e devem ser traduzidas. Os três valores não carregam idioma: `s.name` é o NOME do segredo (identificador escolhido pelo usuário, ex.: STRIPE_SECRET_KEY), `s.sensitive` só escolhe entre o glifo ` 🔒` e a string vazia, e `s.setAt` é carimbo de tempo (ou `?`). O comentário `// NUNCA o valor` no mesmo callsite registra que o segredo em si não entra aqui.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/secrets.js:77, em `listSecrets`, iterando `listSecretNames(cwd)` (secrets.js:73) — o índice de nomes, que não contém valores."
+    },
+    {
+      "file": "src/commands/secrets.js",
+      "line": 89,
+      "column": 3,
+      "expectedFileHash": "sha256:85c4844c99c01dda21a8c8a72e4faf20fbd428f0319301a30ef67ac5f202e7b8",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "name",
+        "status",
+        "provider"
+      ],
+      "reason": "Moldura literal `Guardado ` / ` no keychain (` / `).` é frase do produto e deve ser traduzida. `name` é o nome do segredo digitado pelo usuário e `status.provider` é o identificador do backend de keychain; traduzir qualquer um faria a mensagem descrever algo que não existe com aquele nome.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/secrets.js:89, em `setCmd`, após `setSecret`. `name` vem de secrets.js:81 — `args.filter((a) => !a.startsWith(\"-\"))[1]`, token cru da linha de comando; `status` é o retorno de `brokerStatus(opts)`."
+    },
+    {
+      "file": "src/commands/secrets.js",
+      "line": 99,
+      "column": 3,
+      "expectedFileHash": "sha256:85c4844c99c01dda21a8c8a72e4faf20fbd428f0319301a30ef67ac5f202e7b8",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "name"
+      ],
+      "reason": "Moldura literal `Removido ` / ` (keychain + índice).` é frase do produto e deve ser traduzida. `name` é o nome do segredo digitado pelo usuário — identificador, não texto.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/secrets.js:99, em `deleteCmd`, após `deleteSecret`. `name` vem de secrets.js:96 — `args.filter((a) => !a.startsWith(\"-\"))[1]`."
+    },
+    {
+      "file": "src/commands/secrets.js",
+      "line": 109,
+      "column": 47,
+      "expectedFileHash": "sha256:85c4844c99c01dda21a8c8a72e4faf20fbd428f0319301a30ef67ac5f202e7b8",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "file",
+        "file"
+      ],
+      "reason": "Não há prosa a traduzir nesta moldura: os literais são espaçamento, a seta ` → ` e o sufixo `.imported`. O sufixo é parte de um NOME DE ARQUIVO REAL em disco — o `renameSync` da mesma linha cria `${file}.imported` —, então traduzi-lo faria a mensagem apontar para um arquivo que não existe. `file` é caminho do sistema de arquivos.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/secrets.js:109, em `maybeRenameEnv`, no ramo de sucesso do `try`. `file` vem de `importCmd` (secrets.js:112): argumento da linha de comando ou `join(cwd, \".env\")`."
+    },
+    {
+      "file": "src/commands/secrets.js",
+      "line": 109,
+      "column": 98,
+      "expectedFileHash": "sha256:85c4844c99c01dda21a8c8a72e4faf20fbd428f0319301a30ef67ac5f202e7b8",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "e",
+        "message"
+      ],
+      "reason": "Moldura literal `Não renomeei: ` é frase do produto e deve ser traduzida. `e.message` é texto de erro do `renameSync` — origem externa (Node/sistema operacional) — e preservá-lo intacto é a única leitura honesta: traduzir mensagem alheia inventaria conteúdo.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/secrets.js:109, no `catch` do `renameSync` em `maybeRenameEnv`; o identificador vem do parâmetro do catch, sem passar por nenhum literal do projeto."
+    },
+    {
+      "file": "src/commands/secrets.js",
+      "line": 118,
+      "column": 3,
+      "expectedFileHash": "sha256:85c4844c99c01dda21a8c8a72e4faf20fbd428f0319301a30ef67ac5f202e7b8",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "keys",
+        "length",
+        "file"
+      ],
+      "reason": "Moldura literal `secrets import — ` / ` variável(is) de ` é frase do produto e deve ser traduzida — inclusive a marca de plural `(is)`, que a Fase 2 deve substituir por forma plural real do alvo. `keys.length` é contagem (número) e `file` é caminho do sistema de arquivos; nenhum dos dois tem idioma.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/secrets.js:118, em `importCmd`. `keys` é `Object.keys(pairs)` sobre o retorno de `parseDotEnv` (secrets.js:115-116); `file` é o mesmo caminho de secrets.js:112."
+    },
+    {
+      "file": "src/commands/secrets.js",
+      "line": 119,
+      "column": 62,
+      "expectedFileHash": "sha256:85c4844c99c01dda21a8c8a72e4faf20fbd428f0319301a30ef67ac5f202e7b8",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "k"
+      ],
+      "reason": "Moldura literal `  ✓ ` / ` → keychain` é a superfície de leitura e cabe ao tradutor. `k` é o NOME da variável de ambiente lida do `.env` — identificador do projeto do usuário, que precisa continuar batendo com a chave realmente gravada no keychain.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/secrets.js:119, em `importCmd`, no laço sobre `Object.keys(pairs)`; o comentário `// valores nunca impressos` no mesmo callsite registra que só a CHAVE sai."
+    },
+    {
+      "file": "src/commands/secrets.js",
+      "line": 146,
+      "column": 28,
+      "expectedFileHash": "sha256:85c4844c99c01dda21a8c8a72e4faf20fbd428f0319301a30ef67ac5f202e7b8",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "e",
+        "code",
+        "e",
+        "message"
+      ],
+      "reason": "Moldura literal `Falha ao executar: ` é frase do produto e deve ser traduzida. `e.code || e.message` vem do evento `error` do `spawn`: `e.code` é identificador de erro do Node (`ENOENT`, `EACCES`) e `e.message` é texto do runtime/sistema operacional. Traduzir qualquer um dos dois quebraria a correspondência com o que a origem reportou.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/secrets.js:146, em `runCmd`, no handler de `child.on(\"error\", …)`; o identificador vem do parâmetro do callback, sem passar por literal do projeto."
     }
   ]
 }

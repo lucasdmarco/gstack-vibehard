@@ -399,6 +399,18 @@ export const MACHINE_PROTOCOL_CONSUMERS = Object.freeze([
     contract: "sob `--json`, stdout é UM documento: o veredito (`verdict`/`blocked`/`findings`/`byLens`) ou a recusa (`{\"error\":\"not_a_git_repo\"}`); a saída humana fica no ramo `else`",
     evidence: "tests/qa_json_contract.test.js — `node src/index.js qa --json` por subprocess real, dentro e fora de repo git, com stdout puro e schema mínimo",
   },
+  {
+    // Lote JS 2/14. Âncora por arquivo é EXATA aqui: só o comando `secrets`
+    // alcança `secrets.js` (é o único importador, em src/cli/index.js:20). A
+    // âncora fina por comando/modo vive na camada do AST, que é onde a
+    // classificação acontece; aqui a pergunta é apenas "todo ponto
+    // `machine_protocol` tem consumidor declarado?".
+    file: "src/commands/secrets.js",
+    sink: "process.stdout.write",
+    consumer: "consumidor de máquina do `secrets --json` — relatório do doctor e listagem de nomes, cada um documento JSON único",
+    contract: "sob `--json`, stdout é UM documento: o relatório de `doctor` (`provider`/`available`/`required`/`stored`/`missing`/`ok`) ou a listagem de `list` (`names`); a saída humana fica no ramo `else`. O VALOR do segredo nunca entra em nenhum dos dois",
+    evidence: "tests/secrets_json_contract.test.js — `node src/index.js secrets doctor --json` e `secrets list --json` por subprocess real, com stdout puro, schema mínimo e controle de ausência de campo de valor",
+  },
 ])
 
 /** Audiências que exigem consumidor provado para serem aceitas. */

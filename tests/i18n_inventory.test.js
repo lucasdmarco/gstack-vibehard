@@ -179,7 +179,7 @@ test("validateRegistry recusa script que NÃO é alcançado pelo runtime (não p
  *
  * ATUALIZE AQUI, e so aqui, a cada arquivo reconciliado no lote JS.
  */
-test("CENSO GLOBAL: 1906 pontos, 53 unknown, 4 arquivos convertidos", async () => {
+test("CENSO GLOBAL: 1906 pontos, 52 unknown, 5 arquivos convertidos", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
 
@@ -187,9 +187,16 @@ test("CENSO GLOBAL: 1906 pontos, 53 unknown, 4 arquivos convertidos", async () =
   // nunca a existencia dele. "Nenhum ponto perdido" e medido aqui.
   assert.equal(inv.total, 1906, "converter nao pode criar nem sumir com ponto")
 
-  // Medicao em movimento: cai a cada arquivo reconciliado. 54 -> 53 com qa.js.
-  assert.equal(inv.unknown, 53, "lote JS 1/14: qa.js saiu de 2 unknown para 0")
-  assert.equal(inv.jsRegistry.convertedFiles.length, 4)
+  // Medicao em movimento: cai a cada arquivo reconciliado. 54 -> 53 com qa.js;
+  // 53 -> 52 com secrets.js.
+  //
+  // POR QUE -1 E NAO -2, ja que o AST media DOIS unknown em secrets.js: antes da
+  // conversao o arquivo era medido pelo extrator REGEX, que via 1 unknown nos
+  // mesmos 28 pontos. O delta do censo e (unknown do regex) -> (unknown do AST),
+  // nao (unknown do AST antes) -> 0. Trocar a fonte de medicao e o objetivo da
+  // fase; esperar -2 seria comparar duas reguas diferentes.
+  assert.equal(inv.unknown, 52, "lote JS 2/14: secrets.js saiu de 1 unknown (regex) para 0 (AST)")
+  assert.equal(inv.jsRegistry.convertedFiles.length, 5)
   assert.equal(inv.blocked, false)
 
   // A relacao que sustenta o numero: nenhum convertido guarda unknown.

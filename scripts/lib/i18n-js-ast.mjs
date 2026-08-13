@@ -210,18 +210,113 @@ const nomeLocalResolvido = (checker, id, sf, decls) => {
   return ehMesmaDeclaracao(d, declarada) ? id.text : null
 }
 
+/**
+ * TABELA DE DESPACHO LOCAL — `const SUBS = { doctor: () => f(), list: () => g() }`
+ * lida por chave DINAMICA (`SUBS[sub]`).
+ *
+ * POR QUE EXISTE. E o idioma com que quase todo `src/commands/*.js` roteia seus
+ * subcomandos, e ele partia o grafo em dois. `secretsCommand` faz
+ * `SECRETS_SUBS[sub]`; o alvo real (`doctorSecrets`) so e chamado DENTRO do
+ * valor da propriedade. Nenhuma aresta nascia: o objeto nem entrava em
+ * `declaracoesDeFuncao` (`ehConstDeFuncao` exige inicializador function-like, e
+ * um literal de objeto nao e), entao os corpos das entradas nunca eram
+ * percorridos. Consequencia MEDIDA: todo ponto de `secrets.js`, `visual.js` e
+ * `context.js` fora do corpo imediato do handler saia com `commands: []`, e a
+ * ancora fina — que e fail-closed em lista vazia — nao podia cobrir NENHUM
+ * deles. A alternativa seria declarar consumidor por ARQUIVO em treze arquivos,
+ * isto e, desligar a verificacao de rota justamente onde ela e necessaria.
+ *
+ * POR QUE E SEGURO SOMAR AQUI. A aresta e real: quem le a tabela por chave
+ * dinamica pode alcancar QUALQUER entrada dela. Como o indice nao e conhecido
+ * estaticamente, somam-se todas — sobre-aproximacao na direcao CONSERVADORA para
+ * a ancora, porque `coberturaAncorada` exige `commands.every(...)`: mais
+ * comandos alcancando o ponto significa MAIS rotas a provar, nunca menos.
+ *
+ * FAIL-CLOSED em tudo o que nao for exatamente esta forma:
+ *
+ *   nao-`const`               — reatribuivel; a tabela lida nao seria esta
+ *   inicializador nao-literal — nada a enumerar
+ *   tabela vazia              — nao ha despacho
+ *   spread / getter / metodo / shorthand — entrada que nao se le como valor fixo
+ *   chave computada           — a propria chave e dinamica em tempo de AUTORIA
+ *   valor nao function-like   — nao e handler
+ *   identificador sombreado   — resolve para outra declaracao (checado por
+ *                               IDENTIDADE do no, como em `ehMesmaDeclaracao`)
+ */
+const ehEntradaDeDespacho = (p) => ts.isPropertyAssignment(p)
+  && !ts.isComputedPropertyName(p.name)
+  && isFunctionLike(p.initializer)
+
+const ehTabelaDeDespacho = (d) => ts.isIdentifier(d.name)
+  && d.initializer && ts.isObjectLiteralExpression(d.initializer)
+  && d.initializer.properties.length > 0
+  && d.initializer.properties.every(ehEntradaDeDespacho)
+
+/** `nome -> VariableDeclaration` das tabelas de despacho top-level do arquivo. */
+function tabelasDeDespacho(sf) {
+  const mapa = new Map()
+  for (const st of sf.statements) {
+    if (!ts.isVariableStatement(st)) continue
+    if (!(st.declarationList.flags & ts.NodeFlags.Const)) continue
+    for (const d of st.declarationList.declarations) {
+      if (ehTabelaDeDespacho(d)) mapa.set(d.name.text, d)
+    }
+  }
+  return mapa
+}
+
+/** Chamadas locais estaticas dentro de um no. Mesma regra de aresta de sempre. */
+function chamadasLocaisEm(no, checker, sf, decls) {
+  const alvos = new Set()
+  const visitar = (n) => {
+    if (ts.isCallExpression(n) && ts.isIdentifier(n.expression)) {
+      const alvo = nomeLocalResolvido(checker, n.expression, sf, decls)
+      if (alvo) alvos.add(alvo)
+    }
+    ts.forEachChild(n, visitar)
+  }
+  visitar(no)
+  return alvos
+}
+
+/** `nomeDaTabela -> Set<funcaoLocal alcancavel por qualquer entrada dela>`. */
+function alvosDasTabelas(tabelas, checker, sf, decls) {
+  const mapa = new Map()
+  for (const [nome, d] of tabelas) mapa.set(nome, chamadasLocaisEm(d.initializer, checker, sf, decls))
+  return mapa
+}
+
+/**
+ * `TABELA[chave]` cujo identificador resolve para ESTA tabela — ou `null`.
+ * Acesso por propriedade fixa (`TABELA.doctor`) nao passa por aqui: ele e
+ * estatico e nao precisa da soma.
+ */
+const tabelaLidaDinamicamente = (n, checker, sf, tabelas) => {
+  if (!ts.isElementAccessExpression(n) || !ts.isIdentifier(n.expression)) return null
+  const d = tabelas.get(n.expression.text)
+  if (!d) return null
+  return declaracaoResolvida(checker, n.expression, sf) === d ? n.expression.text : null
+}
+
 /** Arestas `chamadora -> chamada`, apenas de chamadas estaticas resolvidas. */
 function arestasDeChamada(checker, sf, decls) {
   const arestas = new Map([...decls.keys()].map((k) => [k, new Set()]))
+  const tabelas = tabelasDeDespacho(sf)
+  const alvosDeTabela = alvosDasTabelas(tabelas, checker, sf, decls)
+
   for (const [nome, corpo] of decls) {
     const visitar = (n) => {
-      // `f()` — identificador simples. `obj.f()` e `obj[k]()` NAO criam aresta:
-      // resolver o receptor e o problema da 3.1b, e presumi-lo aqui inventaria
-      // alcance que nao foi provado.
+      // `f()` — identificador simples. `obj.f()` NAO cria aresta: resolver o
+      // receptor e o problema da 3.1b, e presumi-lo aqui inventaria alcance que
+      // nao foi provado.
       if (ts.isCallExpression(n) && ts.isIdentifier(n.expression)) {
         const alvo = nomeLocalResolvido(checker, n.expression, sf, decls)
         if (alvo) arestas.get(nome).add(alvo)
       }
+      // `obj[k]()` continua sem aresta no caso geral. A UNICA excecao e a tabela
+      // de despacho top-level provada acima, onde as entradas SAO enumeraveis.
+      const tabela = tabelaLidaDinamicamente(n, checker, sf, tabelas)
+      if (tabela) for (const alvo of alvosDeTabela.get(tabela)) arestas.get(nome).add(alvo)
       ts.forEachChild(n, visitar)
     }
     visitar(corpo)
@@ -1736,6 +1831,32 @@ export const MACHINE_PROTOCOL_CONSUMERS = Object.freeze({
         mode: "--json",
         consumer: "qa_json_contract",
         evidence: "tests/qa_json_contract.test.js — `qa --json` dentro e fora de repo git, stdout puro + schema minimo (verdict/blocked/findings/byLens, error)",
+      }),
+    ]),
+  }),
+  /**
+   * `secrets --json` — forma ANCORADA (arquivo + comando + modo).
+   *
+   * Os dois pontos de maquina do arquivo sao SUBCOMANDOS diferentes do mesmo
+   * comando: `secrets.js:67` (`secrets doctor --json`) e `secrets.js:74`
+   * (`secrets list --json`). O teste roda os DOIS por subprocesso do comando
+   * publico; provar so um cobriria o arquivo alegando prova de um caminho so.
+   *
+   * ESTE ARQUIVO SO PODE USAR A FORMA ANCORADA POR CAUSA DA ARESTA DE DESPACHO.
+   * Antes dela, `SECRETS_SUBS[sub]` partia o grafo e todo ponto fora do corpo
+   * imediato de `secretsCommand` saia com `commands: []` — inclusive 67 e 74 —,
+   * e `coberturaAncorada` e fail-closed em lista vazia. A alternativa teria sido
+   * declarar o ARQUIVO inteiro, que aqui ate seria exato (so o comando `secrets`
+   * alcanca `secrets.js`), mas cobriria de antemao qualquer serializador futuro
+   * do arquivo, inclusive fora do ramo `--json`. Ver `arestasDeChamada`.
+   */
+  "src/commands/secrets.js": Object.freeze({
+    commands: Object.freeze([
+      Object.freeze({
+        command: "secrets",
+        mode: "--json",
+        consumer: "secrets_json_contract",
+        evidence: "tests/secrets_json_contract.test.js — `secrets doctor --json` e `secrets list --json` por subprocesso real, stdout puro + schema minimo (provider/available/required/stored/missing/ok; names) + controle de que nenhum payload carrega campo de valor de segredo",
       }),
     ]),
   }),
