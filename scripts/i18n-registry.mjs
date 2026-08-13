@@ -56,6 +56,12 @@ export const CONVERTED_FILES = Object.freeze([
   // despacho (`arestasDeChamada`): sem ela, `SECRETS_SUBS[sub]` partia o grafo e
   // os dois pontos saiam com `commands: []`.
   "src/commands/secrets.js",
+  // Lote JS, arquivo 3/14. Unico ponto (`src/index.js:13`) e a superficie de
+  // `--version`, classificada pela regra NOVA `cli-version-surface` — nenhuma
+  // regra existente podia descreve-la (console.log nao tem sink; as regras de
+  // machine_protocol vivem em SINK_RULES; a forma e `opaque`, nao frase).
+  // Prova publica: tests/cli_version_contract.test.js roda o `bin` do manifesto.
+  "src/index.js",
 ])
 
 const norm = (p) => String(p).replace(/\\/g, "/")

@@ -1483,6 +1483,174 @@ export function underMachineGuard(node) {
   return false
 }
 
+// ── Superficie publica de VERSAO (`--version`) ───────────────────────────────
+
+/**
+ * `console.log(pkg.version)` no entrypoint publico e uma superficie de leitura
+ * REAL, mas nenhuma regra existente podia descreve-la: `console.log` nao tem
+ * sink, e as regras de `machine_protocol` vivem todas em `SINK_RULES`;
+ * `command-human-branch` exige frase (`text_literal`/`text`) e aqui a forma e
+ * `opaque`. O ponto ficava `unknown` por falta de vocabulario, nao por duvida.
+ *
+ * A regra construida sobre estes predicados e DELIBERADAMENTE estreita — ela
+ * descreve UMA superficie, nao "console opaco em entrypoint". Cada predicado
+ * abaixo e uma porta fail-closed independente, e todas precisam abrir.
+ *
+ * A versao NAO e protocolo de maquina: nao ha serializador, nao ha documento e o
+ * consumidor humano (`gstack_vibehard --version` no terminal) e o caso comum.
+ * Tambem nao e `out_of_scope` so por nao ter moldura linguistica local: o ponto
+ * E superficie publica, e a claim English-first fala do canal, nao da existencia
+ * de palavra traduzivel naquele callsite.
+ */
+const FLAGS_DE_VERSAO = new Set(["--version", "-v"])
+
+/** `process.argv` — acesso de propriedade no global `process`. */
+const ehProcessArgv = (n) => ts.isPropertyAccessExpression(n)
+  && ts.isIdentifier(n.expression) && n.expression.text === "process"
+  && ts.isIdentifier(n.name) && n.name.text === "argv"
+
+/** `process.argv` ou `process.argv.slice(...)`. Qualquer outra origem nao serve. */
+const derivaDeArgv = (n) => {
+  if (!n) return false
+  if (ehProcessArgv(n)) return true
+  if (!ts.isCallExpression(n) || !ts.isPropertyAccessExpression(n.expression)) return false
+  return n.expression.name.text === "slice" && ehProcessArgv(n.expression.expression)
+}
+
+/**
+ * Inicializador de um `const` TOP-LEVEL deste arquivo, resolvido por IDENTIDADE.
+ *
+ * Identidade e nao nome: e o que faz um `const pkg` local dentro de funcao, ou um
+ * parametro chamado `pkg`, NAO responderem por este predicado. O checker resolve
+ * para a declaracao que realmente vale naquele escopo; se ela nao for o const de
+ * topo do proprio arquivo, o predicado fecha.
+ */
+/** A declaracao e um `const` no TOPO do proprio arquivo (nao dentro de funcao)? */
+const ehConstDeTopo = (d, sf) => {
+  const lista = d.parent
+  if (!lista || !ts.isVariableDeclarationList(lista)) return false
+  if (!(lista.flags & ts.NodeFlags.Const)) return false
+  const stmt = lista.parent
+  return Boolean(stmt) && ts.isVariableStatement(stmt) && stmt.parent === sf
+}
+
+/** Declaracao de variavel para a qual o identificador resolve NESTE arquivo. */
+const declaracaoDeVariavelResolvida = (n, ctxAst) => {
+  if (!n || !ts.isIdentifier(n)) return null
+  const d = declaracaoResolvida(ctxAst.checker, n, ctxAst.sf)
+  return d && ts.isVariableDeclaration(d) ? d : null
+}
+
+const constanteTopLevelResolvida = (n, ctxAst) => {
+  const d = declaracaoDeVariavelResolvida(n, ctxAst)
+  return d && ehConstDeTopo(d, ctxAst.sf) ? (d.initializer ?? null) : null
+}
+
+/** `<derivado de argv>[0]`, direto ou atraves de um `const` de topo. */
+const ehArgvIndiceZero = (n, ctxAst) => {
+  if (!ts.isElementAccessExpression(n)) return false
+  const idx = n.argumentExpression
+  if (!idx || !ts.isNumericLiteral(idx) || idx.text !== "0") return false
+  return derivaDeArgv(n.expression) || derivaDeArgv(constanteTopLevelResolvida(n.expression, ctxAst))
+}
+
+const ehIgualdadeEstrita = (n) => ts.isBinaryExpression(n)
+  && n.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken
+
+/** O lado literal da comparacao, quando ele e uma flag de versao. */
+const literalDeFlagDeVersao = (n) => {
+  const lit = ts.isStringLiteral(n.left) ? n.left : ts.isStringLiteral(n.right) ? n.right : null
+  return lit && FLAGS_DE_VERSAO.has(lit.text) ? lit : null
+}
+
+/** `argv[0] === "<flag>"` — devolve a flag, ou `null`. So igualdade ESTRITA. */
+const flagDeVersaoComparada = (n, ctxAst) => {
+  if (!ehIgualdadeEstrita(n)) return null
+  const lit = literalDeFlagDeVersao(n)
+  if (!lit) return null
+  return ehArgvIndiceZero(lit === n.left ? n.right : n.left, ctxAst) ? lit.text : null
+}
+
+/** Operandos de uma cadeia de `||`, achatada. Parenteses sao transparentes. */
+const operandosDeOu = (n) => {
+  if (ts.isParenthesizedExpression(n)) return operandosDeOu(n.expression)
+  if (ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.BarBarToken) {
+    return [...operandosDeOu(n.left), ...operandosDeOu(n.right)]
+  }
+  return [n]
+}
+
+/**
+ * A condicao inteira e SO sobre flags de versao?
+ *
+ * Mesma disciplina de `requiresDebugEnv`: um unico operando estranho derruba
+ * tudo. `args[0] === "--version" || temFlag(x)` nao e branch de versao — no ramo
+ * `then` dele o ponto pode rodar por outro motivo, e a prova de `--version` nao
+ * falaria sobre esse caminho. Exige `--version` presente: `-v` sozinho seria uma
+ * superficie que o contrato publico nao promete isoladamente.
+ */
+const ehCondicaoDeFlagDeVersao = (n, ctxAst) => {
+  const flags = operandosDeOu(n).map((o) => flagDeVersaoComparada(o, ctxAst))
+  return !flags.includes(null) && flags.includes("--version")
+}
+
+/**
+ * O ponto esta no ramo THEN de um `if` de flag de versao?
+ *
+ * Mesma disciplina de `underDebugGuard`/`underMachineGuard`: para na fronteira
+ * da funcao e olha SO o `then` — no `else` estamos no caminho em que a flag NAO
+ * foi passada.
+ */
+export function underVersionFlagGuard(node, ctxAst) {
+  for (let p = node.parent; p; p = p.parent) {
+    if (isFunctionLike(p)) break
+    if (!ts.isIfStatement(p)) continue
+    if (!ehCondicaoDeFlagDeVersao(p.expression, ctxAst)) continue
+    if (contains(p.thenStatement, node)) return true
+  }
+  return false
+}
+
+const CAMINHO_DE_PACKAGE_JSON = /(?:^|[/\\])package\.json$/
+
+/** Ha um literal de caminho terminando em `package.json` em algum lugar do no? */
+const mencionaPackageJson = (n) => {
+  let achou = false
+  const visitar = (x) => {
+    if (ts.isStringLiteral(x) && CAMINHO_DE_PACKAGE_JSON.test(x.text)) achou = true
+    ts.forEachChild(x, visitar)
+  }
+  visitar(n)
+  return achou
+}
+
+const ehLeituraSincronaDeArquivo = (n) => {
+  if (!n || !ts.isCallExpression(n)) return false
+  const nome = calleeDotted(n)
+  return nome === "readFileSync" || nome === "fs.readFileSync"
+}
+
+/** `JSON.parse(readFileSync(<... "package.json">, …))` — leitura do manifesto. */
+const ehLeituraDePackageJson = (n) => {
+  if (!n || !ts.isCallExpression(n) || calleeDotted(n) !== "JSON.parse") return false
+  const arg = n.arguments[0]
+  return ehLeituraSincronaDeArquivo(arg) && arg.arguments.some(mencionaPackageJson)
+}
+
+/**
+ * O argumento e EXATAMENTE `<const do manifesto>.version`.
+ *
+ * Exigir a forma exata e o que recusa `console.log(\`v${pkg.version}\`)` e
+ * qualquer concatenacao: ali existe prosa/moldura, e essa e outra pergunta, com
+ * outra resposta (a moldura entra na traducao). Aqui nao ha o que traduzir
+ * porque o argumento e o valor cru do manifesto, e so por isso.
+ */
+const ehVersaoDePackageJson = (arg, ctxAst) => {
+  if (!arg || !ts.isPropertyAccessExpression(arg)) return false
+  if (!ts.isIdentifier(arg.name) || arg.name.text !== "version") return false
+  return ehLeituraDePackageJson(constanteTopLevelResolvida(arg.expression, ctxAst))
+}
+
 /** Identificadores interpolados num template literal (sem resolver origem). */
 function templateIdentifiers(arg) {
   if (!arg || !ts.isTemplateExpression(arg)) return null
@@ -1907,6 +2075,44 @@ export const JS_RULES = Object.freeze([
     risk: "raw_stack_paths_and_secrets",
   },
   {
+    /**
+     * SUPERFICIE PUBLICA DE VERSAO — a menor regra que descreve `--version`.
+     *
+     * SEIS portas, todas obrigatorias, e cada uma recusa um falso positivo
+     * concreto que as outras deixariam passar:
+     *
+     *   1. ramo de flag de versao derivado de argv  — a mesma expressao FORA do
+     *      branch nao e superficie de versao;
+     *   2. argumento e exatamente `<manifesto>.version` — recusa concatenacao
+     *      com prosa e `version` de qualquer outro objeto;
+     *   3. `console.log` — `console.error` e outro canal, e versao em stderr
+     *      nao e o contrato;
+     *   4. `console` GLOBAL — um `console` local sombreado nao e o do runtime;
+     *   5. o arquivo e `bin` do package.json — superficie publica derivada do
+     *      manifesto, nunca do nome do arquivo;
+     *   6. prova publica declarada — sem teste que rode o binario, nao ha
+     *      contrato, so intencao.
+     *
+     * A ordem das condicoes e por CUSTO: as estruturais primeiro, a leitura do
+     * manifesto por ultimo, para que ela so aconteca nos pontos que ja passaram
+     * por todo o resto.
+     *
+     * NAO e uma regra generica de "console opaco em entrypoint". Um
+     * `console.log(config)` no mesmo arquivo, fora do branch, continua `unknown`
+     * — que e o estado correto para uma pergunta ainda nao respondida.
+     */
+    id: "cli-version-surface",
+    when: (p, ctx) => p.underVersionFlagGuard === true
+      && p.argIsPackageJsonVersion === true
+      && p.callee === "console.log"
+      && p.consoleIsRuntimeGlobal === true
+      && provaDeVersaoDeclarada(p, ctx)
+      && ehEntrypointDeBin(p.file, ctx.repoRoot),
+    audience: "public_diagnostic",
+    trigger: "version_surface",
+    reason: "saida do binario publico sob a flag de versao, com o valor cru do manifesto e prova que executa o binario: superficie de leitura do usuario. Ausencia de moldura traduzivel neste callsite nao a tira do escopo — a claim e sobre o CANAL",
+  },
+  {
     id: "render-primitive-impl",
     when: (p) => isCanonicalRenderFile(p.file)
       && p.binding.kind === "global"
@@ -2054,6 +2260,53 @@ const consumidorDe = (arquivo, consumers, repoRoot = null) => {
 }
 
 /**
+ * O arquivo e um entrypoint PUBLICO declarado em `package.json.bin`?
+ *
+ * Derivado do manifesto, nunca de lista manual nem do nome do arquivo: o que faz
+ * `src/index.js` ser superficie publica e `bin` aponta-lo, e se amanha deixar de
+ * apontar a classificacao muda sozinha. Sem leitura possivel, fecha.
+ *
+ * Nao ha cache de proposito. So os pontos que ja passaram por todas as portas
+ * estruturais chegam aqui, entao a leitura e rara — e um cache por raiz seria
+ * exatamente o tipo de estado que faz um fixture herdar o manifesto de outro.
+ */
+const alvosDeBin = (repoRoot) => {
+  try {
+    const pkg = JSON.parse(readFileSync(`${norm(repoRoot).replace(/\/+$/, "")}/package.json`, "utf8"))
+    const vals = typeof pkg.bin === "string" ? [pkg.bin] : Object.values(pkg.bin ?? {})
+    return new Set(vals.filter((v) => typeof v === "string").map((v) => norm(v).replace(/^\.\//, "")))
+  } catch { return new Set() }
+}
+
+const ehEntrypointDeBin = (arquivo, repoRoot) => {
+  if (!repoRoot) return false
+  const chave = chaveCanonica(arquivo, repoRoot)
+  return Boolean(chave) && alvosDeBin(repoRoot).has(chave)
+}
+
+/**
+ * PROVAS PUBLICAS da superficie de versao, por arquivo.
+ *
+ * Registro separado de `MACHINE_PROTOCOL_CONSUMERS` de proposito: aquele existe
+ * para auditar `machine_protocol` ("todo ponto de protocolo tem parser real"), e
+ * versao NAO e protocolo. Fundir os dois faria o audit do inventario cobrar
+ * contrato de maquina de um ponto que nunca prometeu um.
+ *
+ * Cada entrada nomeia o teste que executa o BINARIO PUBLICO e afere o contrato.
+ */
+export const VERSION_SURFACE_PROOFS = Object.freeze({
+  "src/index.js": Object.freeze({
+    consumer: "cli_version_contract",
+    evidence: "tests/cli_version_contract.test.js — `gstack_vibehard --version` e `-v` pelo bin do package.json, por subprocesso: exit 0, stdout com UMA linha igual a package.json.version, stderr vazio e nenhum arquivo criado no sandbox",
+  }),
+})
+
+const provaDeVersaoDeclarada = (p, ctx) => {
+  const e = consumidorDe(p.file, ctx.versionProofs, ctx.repoRoot)
+  return Boolean(e && e.consumer && e.evidence)
+}
+
+/**
  * MODO do ponto — qual ramo do comando ele serve.
  *
  * `--json` e o ramo de maquina, detectado por `underMachineGuard` (a guarda
@@ -2175,6 +2428,7 @@ export function classifyPoint(p, ctx = {}) {
   // consumidor declarado.
   const base = {
     consumers: ctx.consumers ?? MACHINE_PROTOCOL_CONSUMERS,
+    versionProofs: ctx.versionProofs ?? VERSION_SURFACE_PROOFS,
     repoRoot: ctx.repoRoot ? norm(ctx.repoRoot) : null,
   }
   return aplicar(p.sink ? SINK_RULES : JS_RULES, p, base)
@@ -2314,6 +2568,18 @@ export function analyzeFile(filePath, analyzer = null, ctx = {}) {
       ...ancestry(node),
       underDebugGuard: underDebugGuard(node),
       underMachineGuard: underMachineGuard(node),
+      // Ramo `then` de um `if` de flag de versao derivado de argv, e argumento
+      // que E o valor cru do manifesto. Dois fatos SEPARADOS de proposito: cada
+      // um falha por um motivo diferente, e junta-los esconderia qual porta
+      // fechou. So `cli-version-surface` os consome.
+      underVersionFlagGuard: underVersionFlagGuard(node, ctxAst),
+      argIsPackageJsonVersion: ehVersaoDePackageJson(arg0, ctxAst),
+      // `binding.kind` NAO serve para decidir isto: `resolverAlvo` devolve
+      // `GLOBAL_BINDING` para todo `console.*` por construcao, entao um
+      // `const console = {…}` local passaria por global. `ehEmissaoDeConsole`
+      // decide pela DECLARACAO (lib `.d.ts` ou nenhuma = runtime; declarado no
+      // projeto = sombreado), que e a pergunta certa.
+      consoleIsRuntimeGlobal: ehEmissaoDeConsole(node, ctxAst.checker),
       // Funcao top-level que contem o ponto (ultima da cadeia de ancestralidade).
       reachableFromExport: alcancavelDaqui(ancestry(node).functions, alcance),
       // Criterio ESTRITO: so handler do DISPATCH conta como origem.

@@ -4,7 +4,8 @@
     "src/cli/index.js",
     "src/commands/monitor.js",
     "src/commands/qa.js",
-    "src/commands/secrets.js"
+    "src/commands/secrets.js",
+    "src/index.js"
   ],
   "files": {
     "src/cli/create.js": {
@@ -3344,6 +3345,28 @@
         }
       ],
       "fileHash": "sha256:85c4844c99c01dda21a8c8a72e4faf20fbd428f0319301a30ef67ac5f202e7b8"
+    },
+    "src/index.js": {
+      "entries": [
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 13,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "cli-version-surface",
+          "sink": null
+        }
+      ],
+      "fileHash": "sha256:f880b4af5f239a688640d3be484fe1340ee565515213c521f6ee84449a3a4909"
     }
   },
   "schema": "gstack.i18n-js-registry.v1"
