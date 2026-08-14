@@ -69,6 +69,12 @@ export const CONVERTED_FILES = Object.freeze([
   // (`tabelasDeDespacho`): o grafo desce do handler do DISPATCH pelas chamadas
   // estaticas, e sem rota derivada `commands` seria `[]`.
   "src/commands/orchestrate.js",
+  // Lote JS, arquivo 5/14. Unico residual era `init.js:241` — `console.log()`
+  // SEM argumento, linha em branco entre blocos do relatorio humano —, fechado
+  // pela regra nova `console-blank-line` (`terminal_control`). Nenhum ponto deste
+  // arquivo e de maquina, entao nao ha consumidor a declarar: a prova aqui e a
+  // da REGRA (tests/i18n_js_ast_blank_line.test.js), nao de contrato publico.
+  "src/commands/init.js",
 ])
 
 const norm = (p) => String(p).replace(/\\/g, "/")

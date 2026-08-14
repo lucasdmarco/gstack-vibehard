@@ -2239,6 +2239,44 @@ export const JS_RULES = Object.freeze([
     reason: "saida do binario publico sob a flag de versao, com o valor cru do manifesto e prova que executa o binario: superficie de leitura do usuario. Ausencia de moldura traduzivel neste callsite nao a tira do escopo — a claim e sobre o CANAL",
   },
   {
+    /**
+     * LINHA EM BRANCO — `console.log()` sem argumento nenhum.
+     *
+     * `init.js:241` e `install.js:931` sao isto: espacamento vertical entre
+     * blocos do relatorio humano. Nao ha moldura, nao ha valor, nao ha string —
+     * o runtime escreve UM `\n` e nada mais. `terminal_control` e exatamente a
+     * categoria ("ausencia de idioma, nao ausencia de decisao"), e e a mesma ja
+     * usada por `canonical-receiver-spacing` e `stream-terminal-control` para
+     * `logger.info("")`, que imprime a mesma linha em branco por outro caminho.
+     * Ter tres formas de escrever a mesma linha e ninguem descrevendo a terceira
+     * era o que mantinha estes dois pontos em `unknown`.
+     *
+     * `argKind === "none"` e o teste EXATO, e nao `argForm`: `argKind` e definido
+     * como "existe um arg0?" (`arg0 ? SyntaxKind[arg0.kind] : "none"`), entao
+     * distingue `console.log()` de `console.log(undefined)` — no segundo ha
+     * argumento, e o que ele imprime e outra pergunta.
+     *
+     * SO `console`, e so o GLOBAL do runtime. Para `console.log()` a semantica e
+     * garantida pela plataforma; para um helper do projeto (`info()`) o que sai
+     * depende da implementacao do helper, que e outra prova. Um
+     * `const console = {…}` local tambem nao vale — a decisao e pela DECLARACAO,
+     * como em `ehEmissaoDeConsole`.
+     *
+     * FORA DO RAMO DE MAQUINA, obrigatoriamente. Um `console.log()` solto dentro
+     * de `--json` injetaria um `\n` no meio do documento e QUEBRARIA o contrato;
+     * chama-lo de `terminal_control` benigno esconderia um bug real. A mesma
+     * guarda que `canonical-receiver-spacing` ja usa.
+     */
+    id: "console-blank-line",
+    when: (p) => p.argKind === "none"
+      && p.callee === "console.log"
+      && p.consoleIsRuntimeGlobal === true
+      && p.underMachineGuard !== true,
+    audience: "terminal_control",
+    trigger: "vertical_spacing",
+    reason: "console.log() sem argumento: o runtime escreve uma quebra de linha e nada mais. Nao ha unidade traduzivel — ausencia de idioma, nao ausencia de decisao",
+  },
+  {
     id: "render-primitive-impl",
     when: (p) => isCanonicalRenderFile(p.file)
       && p.binding.kind === "global"

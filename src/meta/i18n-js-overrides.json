@@ -905,6 +905,129 @@
       "reason": "A moldura é o nome do comando seguido de separador, e traduz-se como cabeçalho de seção. `plan.id` não se traduz: é o identificador do plano que o usuário passou no argumento e que nomeia o diretório `.gstack/tasks/<id>/`. Traduzi-lo apontaria para um caminho que não existe em disco.",
       "owner": "certificação RC PRD51 (Fase 1B)",
       "evidence": "src/commands/orchestrate.js:167 — `section(`orchestrate — ${plan.id}`)`; o mesmo `id` é lido de `.gstack/tasks/<id>/task.json` em orchestrate.js:45-51 e ecoado como `planId` no payload de máquina."
+    },
+    {
+      "file": "src/commands/init.js",
+      "line": 46,
+      "column": 5,
+      "expectedFileHash": "sha256:a63bf39ced69842e3c2e79875285102921724d5c360c794f6b6005806df75b1b",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "projectName"
+      ],
+      "reason": "A moldura traduz-se. `projectName` não: é o nome que o usuário digitou no argumento e, aqui, é literalmente o diretório que `existsSync` acabou de checar duas linhas acima. Traduzi-lo faria a mensagem nomear um diretório diferente do que foi verificado — o usuário procuraria no lugar errado.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/init.js:44-46 — `if (existsSync(projectDir)) { error(...) }`, onde `projectDir` é derivado de `projectName`."
+    },
+    {
+      "file": "src/commands/init.js",
+      "line": 57,
+      "column": 5,
+      "expectedFileHash": "sha256:a63bf39ced69842e3c2e79875285102921724d5c360c794f6b6005806df75b1b",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "e",
+        "message",
+        "e"
+      ],
+      "reason": "A moldura 'Python check: ' traduz-se. `e.message` não pode ser traduzido porque não é texto do projeto: vem da falha de spawn do `python` — tipicamente ENOENT do sistema operacional, no idioma e no vocabulário do SO. Traduzir quebraria a correspondência com o que o usuário encontra ao buscar o erro.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/init.js:55-57 — o `catch (e)` envolve a checagem de disponibilidade do Python no PATH."
+    },
+    {
+      "file": "src/commands/init.js",
+      "line": 67,
+      "column": 7,
+      "expectedFileHash": "sha256:a63bf39ced69842e3c2e79875285102921724d5c360c794f6b6005806df75b1b",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "localVer",
+        "latest"
+      ],
+      "reason": "A moldura traduz-se. As duas interpolações são STRINGS DE VERSÃO semver: `localVer` sai do pacote instalado e `latest` vem de `npm view @gstack-vibehard/installer version`. Número de versão não tem idioma, e alterá-lo tornaria impossível comparar com o que o npm reporta.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/init.js:64-67 — `latest` é a saída de `execFileSync(\"npm\", [\"view\", ...])`; `localVer` é derivado de `local` na linha 65."
+    },
+    {
+      "file": "src/commands/init.js",
+      "line": 70,
+      "column": 7,
+      "expectedFileHash": "sha256:a63bf39ced69842e3c2e79875285102921724d5c360c794f6b6005806df75b1b",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "localVer"
+      ],
+      "reason": "A moldura ('gstack_vibehard' e o sufixo '— atualizado') traduz-se; o nome do pacote dentro dela é identificador e permanece. `localVer` é a versão semver instalada, mesmo valor do ramo anterior — sem idioma a traduzir. Este é o ramo em que local e remoto COINCIDEM, e por isso só há uma versão na frase.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/init.js:68-70 — ramo `else` de `if (latest !== localVer)`."
+    },
+    {
+      "file": "src/commands/init.js",
+      "line": 73,
+      "column": 5,
+      "expectedFileHash": "sha256:a63bf39ced69842e3c2e79875285102921724d5c360c794f6b6005806df75b1b",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "e",
+        "message",
+        "e"
+      ],
+      "reason": "A moldura 'version check pulado: ' traduz-se. `e.message` vem de origem EXTERNA e diferente da do :57: aqui a falha é do subprocesso `npm view`, isto é, rede, registry ou proxy — mensagem redigida pelo npm, não pelo projeto. Traduzi-la inventaria um texto que o npm nunca emitiu.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/init.js:72-73 — `catch (e)` do bloco que chama `npm view` com timeout de 10s."
+    },
+    {
+      "file": "src/commands/init.js",
+      "line": 76,
+      "column": 3,
+      "expectedFileHash": "sha256:a63bf39ced69842e3c2e79875285102921724d5c360c794f6b6005806df75b1b",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "projectName",
+        "variant"
+      ],
+      "reason": "A moldura traduz-se. As duas interpolações não, por razões distintas: `projectName` é o nome escolhido pelo usuário, e `variant` é TOKEN DE ENUM da CLI (o valor aceito em `--variant`, como 'fullstack'). Traduzir o token faria a mensagem exibir um valor que a própria CLI recusaria se digitado de volta.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/init.js:76 — `info(`Criando projeto '${projectName}' (variante: ${variant})...`)`; `variant` alimenta a seleção de template mais adiante no arquivo."
+    },
+    {
+      "file": "src/commands/init.js",
+      "line": 186,
+      "column": 5,
+      "expectedFileHash": "sha256:a63bf39ced69842e3c2e79875285102921724d5c360c794f6b6005806df75b1b",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "projectName"
+      ],
+      "reason": "A moldura traduz-se. `projectName` aqui compõe um CAMINHO — a frase termina em `${projectName}/`, com a barra indicando diretório de destino da cópia do template. Traduzir produziria um caminho que não existe em disco.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/init.js:185-186 — `copyRecursive(TEMPLATE_ROOT, projectDir)` imediatamente antes, com `projectDir` derivado de `projectName`."
+    },
+    {
+      "file": "src/commands/init.js",
+      "line": 242,
+      "column": 3,
+      "expectedFileHash": "sha256:a63bf39ced69842e3c2e79875285102921724d5c360c794f6b6005806df75b1b",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "projectName"
+      ],
+      "reason": "A moldura traduz-se. `projectName` é devolvido ao usuário como confirmação do nome que ele mesmo escolheu; traduzi-lo faria o programa relatar a criação de um projeto com nome diferente do que foi criado em disco.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/init.js:242 — `success(`Projeto '${projectName}' criado com sucesso!`)`, logo após a linha em branco de `console.log()` classificada por `console-blank-line`."
+    },
+    {
+      "file": "src/commands/init.js",
+      "line": 244,
+      "column": 3,
+      "expectedFileHash": "sha256:a63bf39ced69842e3c2e79875285102921724d5c360c794f6b6005806df75b1b",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "projectName"
+      ],
+      "reason": "CASO ATÍPICO, registrado por extenso: a parte literal deste callsite NÃO é prosa — é o comando de shell 'cd', dentro de um bloco de 'Próximos passos' feito para ser COPIADO. Traduzir 'cd' produziria uma linha que o shell recusa. Ou seja, a estratégia se aplica pela FORMA (moldura literal + interpolação preservada), mas o que efetivamente se traduz aqui é NADA: nem o comando, nem `projectName`, que é o diretório real criado em disco. Esta decisão existe justamente para que ninguém, mais tarde, traduza o comando por analogia com as outras molduras deste arquivo.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/init.js:243-246 — `info(\"Proximos passos:\")` seguido de `cd ${projectName}`, `pnpm install` e `pnpm dev`; as duas últimas não têm interpolação e por isso não aparecem como pendência, mas são o mesmo bloco copiável."
     }
   ]
 }

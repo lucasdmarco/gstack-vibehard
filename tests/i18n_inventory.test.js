@@ -179,7 +179,7 @@ test("validateRegistry recusa script que NÃO é alcançado pelo runtime (não p
  *
  * ATUALIZE AQUI, e so aqui, a cada arquivo reconciliado no lote JS.
  */
-test("CENSO GLOBAL: 1906 pontos, 50 unknown, 7 arquivos convertidos", async () => {
+test("CENSO GLOBAL: 1906 pontos, 49 unknown, 8 arquivos convertidos", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
 
@@ -201,8 +201,10 @@ test("CENSO GLOBAL: 1906 pontos, 50 unknown, 7 arquivos convertidos", async () =
   // embora o AST media DOIS unknown no arquivo, pelo mesmo motivo de secrets.js:
   // antes da conversao o arquivo era medido pelo extrator REGEX, que via 1
   // unknown. O delta do censo e sempre (unknown do regex) -> (unknown do AST).
-  assert.equal(inv.unknown, 50, "lote JS 4/14: orchestrate.js (recusa + resultado de `--json`) saiu para 0")
-  assert.equal(inv.jsRegistry.convertedFiles.length, 7)
+  //
+  // 50 -> 49 com init.js (lote JS 5/14), pela regra nova `console-blank-line`.
+  assert.equal(inv.unknown, 49, "lote JS 5/14: init.js (linha em branco de `console.log()`) saiu para 0")
+  assert.equal(inv.jsRegistry.convertedFiles.length, 8)
   assert.equal(inv.blocked, false)
 
   // A relacao que sustenta o numero: nenhum convertido guarda unknown.
