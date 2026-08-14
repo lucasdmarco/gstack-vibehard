@@ -2123,6 +2123,27 @@ export const MACHINE_PROTOCOL_CONSUMERS = Object.freeze({
    * alcanca `secrets.js`), mas cobriria de antemao qualquer serializador futuro
    * do arquivo, inclusive fora do ramo `--json`. Ver `arestasDeChamada`.
    */
+  /**
+   * Lote JS 4/14. Os dois pontos sao RAMOS diferentes do mesmo comando e do
+   * mesmo modo — a recusa (`orchestrate.js:47`) e o resultado (`:172`) —, por
+   * isso UMA declaracao ancorada cobre os dois: `coberturaAncorada` casa por
+   * (command, mode), e ambos sao (`orchestrate`, `--json`).
+   *
+   * Este arquivo so alcanca a ancora fina por causa da capacidade C-3: o
+   * `DISPATCH` liga `orchestrate` -> `orchestrateCommand`, e dali o grafo desce
+   * pelas chamadas estaticas. Sem rota derivada, `commands` seria `[]` e a
+   * ancora e fail-closed em lista vazia.
+   */
+  "src/commands/orchestrate.js": Object.freeze({
+    commands: Object.freeze([
+      Object.freeze({
+        command: "orchestrate",
+        mode: "--json",
+        consumer: "orchestrate_json_contract",
+        evidence: "tests/orchestrate_json_contract.test.js — `orchestrate <plano> --yes --json` e `orchestrate <inexistente> --json` por subprocesso real em repo git, stdout puro nos DOIS ramos + schema minimo do resultado (planId/status/steps/limits/handoff/reviewerCoverage) e da recusa ({error}), com controle negativo de que o ramo sem --json nao satisfaz o contrato",
+      }),
+    ]),
+  }),
   "src/commands/secrets.js": Object.freeze({
     commands: Object.freeze([
       Object.freeze({

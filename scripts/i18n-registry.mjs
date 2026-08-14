@@ -62,6 +62,13 @@ export const CONVERTED_FILES = Object.freeze([
   // machine_protocol vivem em SINK_RULES; a forma e `opaque`, nao frase).
   // Prova publica: tests/cli_version_contract.test.js roda o `bin` do manifesto.
   "src/index.js",
+  // Lote JS, arquivo 4/14. Os dois pontos de maquina (`orchestrate.js:47` e
+  // `:172`) sao a RECUSA e o RESULTADO do mesmo `orchestrate --json`, ambos
+  // provados em tests/orchestrate_json_contract.test.js por subprocesso real.
+  // Este arquivo so alcanca a ancora fina por causa da capacidade C-3
+  // (`tabelasDeDespacho`): o grafo desce do handler do DISPATCH pelas chamadas
+  // estaticas, e sem rota derivada `commands` seria `[]`.
+  "src/commands/orchestrate.js",
 ])
 
 const norm = (p) => String(p).replace(/\\/g, "/")

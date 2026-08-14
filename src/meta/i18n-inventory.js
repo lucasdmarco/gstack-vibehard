@@ -411,6 +411,18 @@ export const MACHINE_PROTOCOL_CONSUMERS = Object.freeze([
     contract: "sob `--json`, stdout é UM documento: o relatório de `doctor` (`provider`/`available`/`required`/`stored`/`missing`/`ok`) ou a listagem de `list` (`names`); a saída humana fica no ramo `else`. O VALOR do segredo nunca entra em nenhum dos dois",
     evidence: "tests/secrets_json_contract.test.js — `node src/index.js secrets doctor --json` e `secrets list --json` por subprocess real, com stdout puro, schema mínimo e controle de ausência de campo de valor",
   },
+  {
+    // Lote JS 4/14. Âncora por arquivo é EXATA aqui: só o comando `orchestrate`
+    // alcança `orchestrate.js`. Os dois pontos são RAMOS do mesmo comando e modo
+    // — recusa e resultado —, e a distinção entre eles vive na camada do AST
+    // (arquivo + command + mode); aqui a pergunta é apenas "todo ponto
+    // `machine_protocol` tem consumidor declarado?".
+    file: "src/commands/orchestrate.js",
+    sink: "process.stdout.write",
+    consumer: "consumidor de máquina do `orchestrate --json` — resultado da orquestração e recusa por plano ausente, cada um documento JSON único",
+    contract: "sob `--json`, stdout é UM documento: o resultado (`planId`/`status`/`steps`/`limits`/`handoff`/`reviewerCoverage`) ou a recusa (`{\"error\":\"plan_not_found\"}`); a saída humana fica no ramo `else`. Recusa e resultado se distinguem pelo DOCUMENTO, não pelo código de saída",
+    evidence: "tests/orchestrate_json_contract.test.js — `orchestrate <plano> --yes --json` e `orchestrate <inexistente> --json` por subprocess real em repo git, com stdout puro nos dois ramos e controle negativo do ramo sem `--json`",
+  },
 ])
 
 /** Audiências que exigem consumidor provado para serem aceitas. */

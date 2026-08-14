@@ -179,7 +179,7 @@ test("validateRegistry recusa script que NÃO é alcançado pelo runtime (não p
  *
  * ATUALIZE AQUI, e so aqui, a cada arquivo reconciliado no lote JS.
  */
-test("CENSO GLOBAL: 1906 pontos, 51 unknown, 6 arquivos convertidos", async () => {
+test("CENSO GLOBAL: 1906 pontos, 50 unknown, 7 arquivos convertidos", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
 
@@ -196,8 +196,13 @@ test("CENSO GLOBAL: 1906 pontos, 51 unknown, 6 arquivos convertidos", async () =
   // nao (unknown do AST antes) -> 0. Trocar a fonte de medicao e o objetivo da
   // fase; esperar -2 seria comparar duas reguas diferentes.
   // 52 -> 51 com src/index.js, pela regra nova `cli-version-surface`.
-  assert.equal(inv.unknown, 51, "lote JS 3/14: src/index.js (superficie de --version) saiu de 1 unknown para 0")
-  assert.equal(inv.jsRegistry.convertedFiles.length, 6)
+  //
+  // 51 -> 50 com orchestrate.js (lote JS 4/14). Aqui o delta e -1 e nao -2
+  // embora o AST media DOIS unknown no arquivo, pelo mesmo motivo de secrets.js:
+  // antes da conversao o arquivo era medido pelo extrator REGEX, que via 1
+  // unknown. O delta do censo e sempre (unknown do regex) -> (unknown do AST).
+  assert.equal(inv.unknown, 50, "lote JS 4/14: orchestrate.js (recusa + resultado de `--json`) saiu para 0")
+  assert.equal(inv.jsRegistry.convertedFiles.length, 7)
   assert.equal(inv.blocked, false)
 
   // A relacao que sustenta o numero: nenhum convertido guarda unknown.

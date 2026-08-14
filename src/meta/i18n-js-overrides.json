@@ -795,6 +795,116 @@
       "reason": "Moldura literal `Falha ao executar: ` é frase do produto e deve ser traduzida. `e.code || e.message` vem do evento `error` do `spawn`: `e.code` é identificador de erro do Node (`ENOENT`, `EACCES`) e `e.message` é texto do runtime/sistema operacional. Traduzir qualquer um dos dois quebraria a correspondência com o que a origem reportou.",
       "owner": "certificação RC PRD51 (Fase 1B)",
       "evidence": "src/commands/secrets.js:146, em `runCmd`, no handler de `child.on(\"error\", …)`; o identificador vem do parâmetro do callback, sem passar por literal do projeto."
+    },
+    {
+      "file": "src/commands/orchestrate.js",
+      "line": 83,
+      "column": 16,
+      "expectedFileHash": "sha256:e33dc3018594e84a6ae2799c0a6cb8438e113206ea4b9f0cb3a88dc4482d71ae",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "parallelPreflightNote",
+        "analysis"
+      ],
+      "reason": "A moldura 'Paralelismo: ' é texto público e traduz-se aqui. A interpolação NÃO se traduz NESTE callsite, e o motivo não é que ela seja não-linguística — ela é prosa: `parallelPreflightNote(analysis)` devolve a frase que descreve o que `--parallel` fará. Traduzi-la aqui seria traduzir a mesma frase duas vezes, porque ela já é redigida em `parallelPreflightNote`. A tradução pertence a quem a escreve, não a quem a imprime.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/orchestrate.js:83 — `if (!a.json) info(`  Paralelismo: ${parallelPreflightNote(analysis)}`)`; a função vive em src/project-plan/, que ainda não foi convertida no lote JS e responderá por esta frase quando for."
+    },
+    {
+      "file": "src/commands/orchestrate.js",
+      "line": 105,
+      "column": 3,
+      "expectedFileHash": "sha256:e33dc3018594e84a6ae2799c0a6cb8438e113206ea4b9f0cb3a88dc4482d71ae",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "reviewer",
+        "id",
+        "reviewer",
+        "note",
+        "knownReviewers",
+        "join"
+      ],
+      "reason": "A moldura é traduzível, INCLUSIVE o literal de fallback 'sem detalhe', que é escrito neste callsite e por isso é responsabilidade dele. As três interpolações não se traduzem, por três razões distintas: `reviewer.id` e a lista de `knownReviewers()` são IDENTIFICADORES que o usuário digita em `--reviewer` (traduzi-los quebraria a correspondência com o que ele precisa escrever), e `reviewer.note` vem do plugin de reviewer, possivelmente externo ao projeto — não há como garantir idioma de origem.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/orchestrate.js:105 — `warn(`Reviewer '${reviewer.id}' indisponível: ${reviewer.note || \"sem detalhe\"} (disponíveis: ${knownReviewers().join(\", \")})`)`; o ramo só roda com `!json`, então é saída humana por construção."
+    },
+    {
+      "file": "src/commands/orchestrate.js",
+      "line": 159,
+      "column": 23,
+      "expectedFileHash": "sha256:e33dc3018594e84a6ae2799c0a6cb8438e113206ea4b9f0cb3a88dc4482d71ae",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "result",
+        "handoff",
+        "reason"
+      ],
+      "reason": "A moldura '⛔ handoff: ' traduz-se aqui. `result.handoff.reason` não se traduz neste callsite porque é produzido pelo motor de orquestração e é o MESMO valor que sai em `--json` no campo `handoff` — traduzi-lo aqui dessincronizaria a superfície humana da de máquina, fazendo o mesmo handoff ter dois textos conforme o modo.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/orchestrate.js:159 — `if (result.handoff) error(`  ⛔ handoff: ${result.handoff.reason}`)`; o mesmo `handoff` é serializado em orchestrate.js:172, provado em tests/orchestrate_json_contract.test.js."
+    },
+    {
+      "file": "src/commands/orchestrate.js",
+      "line": 161,
+      "column": 3,
+      "expectedFileHash": "sha256:e33dc3018594e84a6ae2799c0a6cb8438e113206ea4b9f0cb3a88dc4482d71ae",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "branches",
+        "join"
+      ],
+      "reason": "A moldura traduz-se, e o literal de fallback '(nenhum)' também — ele é escrito aqui, não recebido. A interpolação não se traduz: `branches` são NOMES DE REF do git, construídos em orchestrate.js:160 como `orch/${plan.id}-${s.stepId}`. Traduzir um nome de branch produziria uma string que não existe no repositório e que o usuário não conseguiria dar `git checkout`.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/orchestrate.js:161 — `info(`  Branches prontos pra merge (SEM auto-merge): ${branches.join(\", \") || \"(nenhum)\"}`)`; a origem dos valores é a linha 160, imediatamente acima."
+    },
+    {
+      "file": "src/commands/orchestrate.js",
+      "line": 162,
+      "column": 3,
+      "expectedFileHash": "sha256:e33dc3018594e84a6ae2799c0a6cb8438e113206ea4b9f0cb3a88dc4482d71ae",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "result",
+        "reviewerCoverage",
+        "result",
+        "reviewer",
+        "result",
+        "reviewer",
+        "id",
+        "result",
+        "reviewer",
+        "mode"
+      ],
+      "reason": "A moldura 'Cobertura de revisão: ' traduz-se. As interpolações não, e aqui a razão é de CONTRATO, não de idioma: `reviewerCoverage` é token de enum ('deterministic_only') que sai idêntico em `--json`, e `reviewer.id`/`reviewer.mode` identificam o plugin escolhido. Traduzir qualquer um faria a saída humana divergir do payload de máquina do mesmo comando — dois vocabulários para o mesmo fato.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/orchestrate.js:162 — `reviewerCoverage` aparece no documento provado por tests/orchestrate_json_contract.test.js, que asserta `typeof j.reviewerCoverage === \"string\"`; o valor observado em execução real é 'deterministic_only'."
+    },
+    {
+      "file": "src/commands/orchestrate.js",
+      "line": 164,
+      "column": 34,
+      "expectedFileHash": "sha256:e33dc3018594e84a6ae2799c0a6cb8438e113206ea4b9f0cb3a88dc4482d71ae",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "l"
+      ],
+      "reason": "A moldura literal deste callsite é só indentação e um bullet ('   • '), então na prática não há frase a traduzir AQUI. O motor classifica o ponto como `interpolated` e não `no_local_frame` porque o bullet não é apenas espaçamento — é fail-closed correto: um literal não-branco pode carregar linguagem, e presumir o contrário seria a saída fácil. A interpolação também não se traduz neste ponto, e a razão NÃO é que ela seja não-linguística: `result.limits` são frases em português redigidas pelo motor de orquestração ('reviewer LLM é advisory — nunca aprova sem o gate determinístico passar'). A tradução é devida, e é devida na ORIGEM das frases; este laço apenas as imprime. Declarar `preserve_nonlinguistic_dynamic_values` aqui seria FALSO, porque afirmaria que o valor não carrega idioma quando ele é prosa inteira.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/orchestrate.js:164 — `for (const l of result.limits) info(`   • ${l}`)`; as frases saem também em `--json` no campo `limits`, verificado como array por tests/orchestrate_json_contract.test.js, e foram observadas em execução real do comando."
+    },
+    {
+      "file": "src/commands/orchestrate.js",
+      "line": 167,
+      "column": 3,
+      "expectedFileHash": "sha256:e33dc3018594e84a6ae2799c0a6cb8438e113206ea4b9f0cb3a88dc4482d71ae",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "plan",
+        "id"
+      ],
+      "reason": "A moldura é o nome do comando seguido de separador, e traduz-se como cabeçalho de seção. `plan.id` não se traduz: é o identificador do plano que o usuário passou no argumento e que nomeia o diretório `.gstack/tasks/<id>/`. Traduzi-lo apontaria para um caminho que não existe em disco.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/orchestrate.js:167 — `section(`orchestrate — ${plan.id}`)`; o mesmo `id` é lido de `.gstack/tasks/<id>/task.json` em orchestrate.js:45-51 e ecoado como `planId` no payload de máquina."
     }
   ]
 }
