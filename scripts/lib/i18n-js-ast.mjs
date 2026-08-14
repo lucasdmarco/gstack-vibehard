@@ -2144,6 +2144,26 @@ export const MACHINE_PROTOCOL_CONSUMERS = Object.freeze({
       }),
     ]),
   }),
+  /**
+   * Lote JS 6/14. Onze pontos de maquina em CINCO subcomandos, todos no par
+   * (`visual`, `--json`) — uma declaracao ancorada cobre o par inteiro, e por
+   * isso a prova exercita ramo a ramo em vez de um so.
+   *
+   * LACUNA DECLARADA, nao escondida: `visual.js:138` (`emitCancelled`) so roda
+   * quando o usuario responde NAO a um confirm INTERATIVO. Sem TTY o fluxo para
+   * antes, em `hooksInstallRefused` — que a prova cobre. Os outros dez estao
+   * exercitados por subprocesso, um a um.
+   */
+  "src/commands/visual.js": Object.freeze({
+    commands: Object.freeze([
+      Object.freeze({
+        command: "visual",
+        mode: "--json",
+        consumer: "visual_json_contract",
+        evidence: "tests/visual_json_contract.test.js — dez dos onze pontos de maquina por subprocesso real: doctor (:61), detect (:83), explain (:94), check sem navegador (:37, blocked=true), hooks status (:105), hooks install recusado (:121) e aplicado (:144), context sem design system (:193) e com (:201), context sync (:210); stdout puro e payload fora do stderr em todos, mais controle negativo do ramo sem --json. NAO cobre :138 (emitCancelled), alcancavel so com TTY respondendo NAO ao confirm",
+      }),
+    ]),
+  }),
   "src/commands/secrets.js": Object.freeze({
     commands: Object.freeze([
       Object.freeze({

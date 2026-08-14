@@ -423,6 +423,16 @@ export const MACHINE_PROTOCOL_CONSUMERS = Object.freeze([
     contract: "sob `--json`, stdout é UM documento: o resultado (`planId`/`status`/`steps`/`limits`/`handoff`/`reviewerCoverage`) ou a recusa (`{\"error\":\"plan_not_found\"}`); a saída humana fica no ramo `else`. Recusa e resultado se distinguem pelo DOCUMENTO, não pelo código de saída",
     evidence: "tests/orchestrate_json_contract.test.js — `orchestrate <plano> --yes --json` e `orchestrate <inexistente> --json` por subprocess real em repo git, com stdout puro nos dois ramos e controle negativo do ramo sem `--json`",
   },
+  {
+    // Lote JS 6/14. Âncora por arquivo é EXATA: só o comando `visual` alcança
+    // `visual.js`. Os onze pontos vivem em cinco subcomandos do mesmo par
+    // (comando, modo); a distinção fina vive na camada do AST.
+    file: "src/commands/visual.js",
+    sink: "process.stdout.write",
+    consumer: "consumidor de máquina do `visual --json` — doctor, detect, explain, check, hooks e context, cada ramo um documento JSON único",
+    contract: "sob `--json`, stdout é UM documento por ramo: relatório do motor (`counts`/`activeRules`), achados do detector (`findings`/`counts`), regra explicada (`ruleId`/`status`), gate visual (`driverAvailable`/`blocked`/`problems`), projeções de hook (`results`), recusa por falta de consentimento (`{error:\"needs_confirmation\"}`), estado/execução do design context (`status`/`sourceHash`, `applied`/`plans`) ou a recusa por design system ausente (`{error:\"no_design_system\"}`). A saída humana fica no ramo `else`",
+    evidence: "tests/visual_json_contract.test.js — dez dos onze pontos por subprocess real, com stdout puro e controle negativo do ramo sem `--json`. NÃO cobre `visual.js:138` (`emitCancelled`), que exige TTY respondendo NÃO ao confirm — lacuna declarada, não presumida",
+  },
 ])
 
 /** Audiências que exigem consumidor provado para serem aceitas. */
