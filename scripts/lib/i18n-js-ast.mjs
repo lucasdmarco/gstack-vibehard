@@ -2277,6 +2277,30 @@ export const JS_RULES = Object.freeze([
     reason: "console.log() sem argumento: o runtime escreve uma quebra de linha e nada mais. Nao ha unidade traduzivel — ausencia de idioma, nao ausencia de decisao",
   },
   {
+    /**
+     * TEXTO MONTADO PELO PROJETO, impresso no canal humano.
+     *
+     * `visual.js:86` (`console.log(renderFeedbackMarkdown(feedback))`) e
+     * `research.js:294` (`console.log(renderEpistemicHuman(review))`). As portas
+     * estruturais estao em `origemDeTextoRenderizado`; aqui ficam as duas de
+     * contexto: fora do ramo de maquina, e alcancado por handler do DISPATCH.
+     *
+     * POR QUE `public_diagnostic` E NAO `render_primitive` -- a decisao que o
+     * levantamento anterior errou. A hipotese registrada no handoff era de DUPLA
+     * CONTAGEM: as frases viveriam nos modulos chamados e seriam contadas la.
+     * MEDIDO, e falso: `src/skills/design-feedback.js` e `src/epistemic/render.js`
+     * tem ZERO chamadas de sink, logo ZERO pontos no inventario. Classificar
+     * estes dois callsites como fora de escopo nao evitaria duplicata nenhuma —
+     * apagaria da claim frases que o usuario le no terminal.
+     *
+     * DIVIDA REGISTRADA, e ela e da MEDICAO, nao deste ponto. O inventario conta
+     * PONTOS DE EMISSAO; texto montado em modulo que so retorna string e
+     * invisivel para ele. Estes dois callsites entram na claim e apontam para
+     * onde o texto mora (`textOrigin`), mas as frases de dentro daqueles modulos
+     * seguem sem ponto proprio. Fechar isso e mudar o modelo de medicao da Fase
+     * 1B, nao classificar melhor um callsite — fica como achado, com os dois
+     * arquivos nomeados.
+     */
     id: "render-primitive-impl",
     when: (p) => isCanonicalRenderFile(p.file)
       && p.binding.kind === "global"
@@ -2375,6 +2399,47 @@ export const JS_RULES = Object.freeze([
     audience: "public_diagnostic",
     trigger: "command_human_branch",
     reason: "console.* com argumento INTEIRAMENTE literal, em funcao exportada, fora do ramo de maquina: frase redigida para alguem ler. Parte opaca derruba a regra: concatenar identificador desconhecido forma qualquer coisa, inclusive uma query logada num modulo de banco, que nao e canal do CLI",
+  },
+  {
+    /**
+     * TEXTO MONTADO PELO PROJETO, impresso no canal humano.
+     *
+     * `visual.js:86` (`console.log(renderFeedbackMarkdown(feedback))`) e
+     * `research.js:294` (`console.log(renderEpistemicHuman(review))`). As portas
+     * estruturais estao em `origemDeTextoRenderizado`; aqui ficam as duas de
+     * contexto: fora do ramo de maquina, e alcancado por handler do DISPATCH.
+     *
+     * ULTIMA DE PROPOSITO — e a posicao faz parte da regra. Colocada antes de
+     * `command-human-branch`, ela ROUBAVA 15 pontos ja classificados de
+     * `monitor.js` (arquivo convertido): a audiencia continuava
+     * `public_diagnostic`, mas o `rule` gravado no registry mudava, produzindo
+     * churn num artefato commitado sem corrigir classificacao nenhuma. Como
+     * fallback, ela so descreve o que nenhuma regra existente descreve.
+     *
+     * POR QUE `public_diagnostic` E NAO `render_primitive` -- a decisao que o
+     * levantamento anterior errou. A hipotese registrada no handoff era de DUPLA
+     * CONTAGEM: as frases viveriam nos modulos chamados e seriam contadas la.
+     * MEDIDO, e falso: `src/skills/design-feedback.js` e `src/epistemic/render.js`
+     * tem ZERO chamadas de sink, logo ZERO pontos no inventario. Classificar
+     * estes dois callsites como fora de escopo nao evitaria duplicata nenhuma —
+     * apagaria da claim frases que o usuario le no terminal.
+     *
+     * DIVIDA REGISTRADA, e ela e da MEDICAO, nao deste ponto. O inventario conta
+     * PONTOS DE EMISSAO; texto montado em modulo que so retorna string e
+     * invisivel para ele. Estes callsites entram na claim e apontam para onde o
+     * texto mora (`textOrigin`), mas as frases de dentro daqueles modulos seguem
+     * sem ponto proprio. Fechar isso e mudar o modelo de medicao da Fase 1B, nao
+     * classificar melhor um callsite.
+     */
+    id: "console-project-rendered-text",
+    when: (p) => p.callee === "console.log"
+      && p.consoleIsRuntimeGlobal === true
+      && typeof p.textOrigin === "string"
+      && p.underMachineGuard !== true
+      && p.reachableFromEntrypoint === true,
+    audience: "public_diagnostic",
+    trigger: "project_rendered_text",
+    reason: "console.log do retorno de funcao do PROJETO cujo tipo de retorno e string, no ramo humano e alcancada por handler do DISPATCH: o canal e publico e o texto e nosso. A ausencia de literal NESTE callsite nao o tira do escopo — a claim e sobre o CANAL, e `textOrigin` diz onde a frase mora",
   },
 ])
 
@@ -2584,6 +2649,82 @@ const aplicar = (regras, p, ctx) => {
   return { audience: r.audience, trigger: r.trigger, rule: r.id }
 }
 
+/**
+ * ORIGEM DO TEXTO RENDERIZADO — `console.log(renderEpistemicHuman(review))`.
+ *
+ * Devolve o arquivo do PROJETO cuja funcao produziu a string, ou `null`.
+ *
+ * POR QUE EXISTE. `visual.js:86` e `research.js:294` imprimem o retorno de uma
+ * funcao que MONTA prosa a partir de dados. No callsite nao ha string alguma —
+ * a forma e `opaque` —, e por isso os dois ficavam `unknown`. Mas o canal e o
+ * humano e o texto e do projeto: deixa-los fora da claim seria perder de vista
+ * frases que o usuario le.
+ *
+ * TRES PORTAS, e a segunda foi descoberta MEDINDO, nao raciocinando:
+ *
+ *   1. o argumento e uma CHAMADA (nao identificador, nao acesso a propriedade —
+ *      `console.log(config)` continua `unknown`, que e o estado certo para uma
+ *      pergunta em aberto);
+ *   2. a declaracao do callee esta DENTRO do projeto — nem `.d.ts` de lib, nem
+ *      `node_modules`. Sem esta porta a regra pegaria metodo nativo: o probe em
+ *      `install.js:359` mostrou `` `…`.trimEnd() ``, cuja declaracao vive em
+ *      `lib.es2019.string.d.ts` e cujo retorno TAMBEM e `string`. "Retorna
+ *      string" sozinho nao distingue codigo do projeto de biblioteca padrao;
+ *   3. o tipo de RETORNO e `string`, perguntado ao checker. E o fato estrutural
+ *      que substitui o palpite por nome — `render*` nao entra nesta decisao.
+ *
+ * O que NAO se conclui daqui: que o texto esta contado em algum lugar. Nao esta
+ * — ver a nota de divida no proprio ponto que consome esta funcao.
+ */
+const CAMINHO_EXTERNO = /(?:^|[/\\])node_modules[/\\]/
+
+/** A declaracao E a funcao, ou a funcao esta no inicializador dela. */
+const funcaoDaDeclaracao = (d) => {
+  if (isFunctionLike(d)) return d
+  return ts.isVariableDeclaration(d) && d.initializer && isFunctionLike(d.initializer) ? d.initializer : null
+}
+
+const arquivoDeProjeto = (sf) => sf && !sf.isDeclarationFile && !CAMINHO_EXTERNO.test(norm(sf.fileName))
+
+/** Funcao do PROJETO para a qual o callee do argumento resolve, ou `null`. */
+const funcaoDeProjetoChamada = (arg, checker) => {
+  const sym = checker.getSymbolAtLocation(arg.expression)
+  if (!sym) return null
+  const [decl] = unalias(checker, sym).getDeclarations() ?? []
+  const fn = decl ? funcaoDaDeclaracao(decl) : null
+  return fn && arquivoDeProjeto(fn.getSourceFile()) ? fn : null
+}
+
+/** O tipo de retorno declarado/inferido e exatamente `string`? */
+const retornaString = (fn, checker) => {
+  const assinatura = checker.getSignatureFromDeclaration(fn)
+  if (!assinatura) return false
+  return checker.typeToString(checker.getReturnTypeOfSignature(assinatura)) === "string"
+}
+
+/**
+ * Caminho RELATIVO ao repo. Absoluto gravaria `C:/Users/<nome>/…` se algum dia
+ * for persistido, e mudaria por maquina.
+ */
+const relativoAoRepo = (abs, repoRoot) => {
+  if (!repoRoot) return abs
+  const raiz = `${norm(repoRoot).replace(/\/$/, "")}/`
+  return abs.startsWith(raiz) ? abs.slice(raiz.length) : abs
+}
+
+/** Ha o que inspecionar: argumento presente, que E chamada, e checker a mao. */
+const ehChamadaComChecker = (arg, ctx) =>
+  Boolean(arg) && Boolean(ctx) && Boolean(ctx.checker) && ts.isCallExpression(arg)
+
+export function origemDeTextoRenderizado(arg, ctxAst) {
+  if (!ehChamadaComChecker(arg, ctxAst)) return null
+  const fn = funcaoDeProjetoChamada(arg, ctxAst.checker)
+  if (!fn) return null
+  return retornaString(fn, ctxAst.checker)
+    ? relativoAoRepo(norm(fn.getSourceFile().fileName), ctxAst.repoRoot)
+    : null
+}
+
 export function classifyPoint(p, ctx = {}) {
   // FRONTEIRA DE REPRESENTAÇÃO. `repoRoot` chega como o SO o entrega (`C:\…` no
   // Windows) e `p.file` já passou por `norm` (`C:/…`). Canonicalizar aqui, uma
@@ -2705,7 +2846,11 @@ export function analyzeFile(filePath, analyzer = null, ctx = {}) {
     entrypointsPorComando(a.program, a.checker).get(norm(filePath)))
   // Contexto de resolucao para wrappers transparentes (3.1c): mesmo grafo de
   // declaracoes locais da 3.1a, entao a identidade de no ja esta conferida.
-  const ctxAst = { checker: a.checker, sf, decls: declaracoesDeFuncao(sf), cache: new Map(), emCurso: new Set() }
+  const ctxAst = {
+    checker: a.checker, sf, decls: declaracoesDeFuncao(sf), cache: new Map(), emCurso: new Set(),
+    // Usado por `origemDeTextoRenderizado` para relativizar o caminho da origem.
+    repoRoot: ctx.repoRoot,
+  }
   // Valor abstrato de cada parametro, propagado SO a partir dos handlers do
   // DISPATCH que vivem neste arquivo (3.1b.1).
   const receptores = propagarDoEntrypoint(ctxAst, canonicas ?? [])
@@ -2738,6 +2883,9 @@ export function analyzeFile(filePath, analyzer = null, ctx = {}) {
       // fechou. So `cli-version-surface` os consome.
       underVersionFlagGuard: underVersionFlagGuard(node, ctxAst),
       argIsPackageJsonVersion: ehVersaoDePackageJson(arg0, ctxAst),
+      // Arquivo do projeto que PRODUZIU o texto impresso, quando o argumento e
+      // chamada a funcao de retorno `string` declarada aqui dentro.
+      textOrigin: origemDeTextoRenderizado(arg0, ctxAst),
       // `binding.kind` NAO serve para decidir isto: `resolverAlvo` devolve
       // `GLOBAL_BINDING` para todo `console.*` por construcao, entao um
       // `const console = {…}` local passaria por global. `ehEmissaoDeConsole`
