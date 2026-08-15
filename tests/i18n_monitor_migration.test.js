@@ -210,9 +210,16 @@ test("a estratégia não-linguística tem lista FECHADA e mapeamento por kind", 
   for (const proibida of ["human_text", "unknown", "text", "any"]) {
     assert.ok(!NONLINGUISTIC_VALUE_CATEGORIES.includes(proibida), `\`${proibida}\` não pode ser categoria preservável`)
   }
-  assert.equal(STRATEGY_BY_KIND.interpolated, "translate_literal_frame_preserve_interpolations")
-  assert.equal(STRATEGY_BY_KIND.no_local_frame, "preserve_nonlinguistic_dynamic_values")
-  assert.equal(PROVENANCE_STRATEGIES.length, 2, "duas estratégias; uma terceira exigiria decisão explícita")
+  assert.deepEqual([...STRATEGY_BY_KIND.interpolated], ["translate_literal_frame_preserve_interpolations"],
+    "havendo moldura literal a tradução é do próprio callsite — não há segunda opção")
+  // `no_local_frame` passou a aceitar DUAS por decisão humana explícita: o caso
+  // "não tem moldura E o valor é prosa" não cabia em nenhuma das anteriores sem
+  // mentir na categoria. As duas se excluem pelo que a decisão consegue provar —
+  // categoria fechada por valor, ou origem ancorada — e nunca por preferência.
+  assert.deepEqual([...STRATEGY_BY_KIND.no_local_frame].sort(),
+    ["preserve_nonlinguistic_dynamic_values", "translate_at_value_origin"])
+  assert.equal(PROVENANCE_STRATEGIES.length, 3,
+    "três estratégias; uma quarta exigiria decisão explícita, como esta terceira exigiu")
 })
 
 test("só UM ponto usa a estratégia não-linguística, e ele tem values completo", () => {

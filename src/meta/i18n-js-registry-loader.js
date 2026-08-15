@@ -285,7 +285,33 @@ export const PROVENANCE_STRATEGIES = Object.freeze([
   // preservar interpolações DENTRO de uma frase que aqui não existe. Exige provar,
   // valor a valor, que nenhum deles carrega linguagem.
   "preserve_nonlinguistic_dynamic_values",
+  /**
+   * Ponto SEM moldura literal cujo valor interpolado E LINGUISTICO — prosa
+   * redigida noutro lugar do projeto e apenas RENDERIZADA aqui.
+   *
+   * Nasceu de tres callsites reais que nenhuma das duas anteriores descrevia sem
+   * mentir: `translate_literal_frame_preserve_interpolations` promete traduzir
+   * uma moldura que aqui nao existe, e `preserve_nonlinguistic_dynamic_values`
+   * exigiria declarar a frase como `glyph`/`identifier`/`control` — falso no
+   * unico campo que o revisor consegue conferir.
+   *
+   * A contrapartida do vocabulario novo e ser MAIS exigente, nao menos: em vez
+   * de categoria por valor, exige a ORIGEM ancorada (arquivo, linha, coluna e
+   * hash do arquivo de origem). Uma origem que se mova invalida a decisao, do
+   * mesmo jeito que `expectedFileHash` do sink ja faz.
+   */
+  "translate_at_value_origin",
 ])
+
+/**
+ * Onde a frase e REDIGIDA. Lista FECHADA, e curta pelo mesmo motivo das outras:
+ * cresce com evidencia, nunca por conveniencia. Hoje os dois casos provados sao
+ * literais escritos em modulo do proprio projeto.
+ */
+export const ORIGIN_SOURCE_KINDS = Object.freeze(["project_module_literal"])
+
+/** A decisao precisa DIZER que a traducao acontece na origem, nao no sink. */
+export const TRANSLATION_SITE_ORIGIN = "value_origin"
 
 /**
  * Estratégia e `kind` da provenance precisam CASAR.
@@ -294,9 +320,18 @@ export const PROVENANCE_STRATEGIES = Object.freeze([
  * para qualquer moldura inconveniente: bastaria declará-la não-linguística e a
  * frase literal deixaria de ser traduzida sem que ninguém a tivesse lido.
  */
+/**
+ * `no_local_frame` passou a aceitar DUAS, e a escolha nao e livre: elas se
+ * excluem pelo que a decisao consegue PROVAR. `preserve_nonlinguistic_dynamic_values`
+ * exige categoria fechada por valor; `translate_at_value_origin` exige origem
+ * ancorada e proibe categoria. Nenhuma decisao satisfaz as duas.
+ *
+ * `interpolated` continua com UMA: havendo moldura literal, a traducao e daqui,
+ * e mandar traduzir "na origem" deixaria a moldura orfa.
+ */
 export const STRATEGY_BY_KIND = Object.freeze({
-  interpolated: "translate_literal_frame_preserve_interpolations",
-  no_local_frame: "preserve_nonlinguistic_dynamic_values",
+  interpolated: Object.freeze(["translate_literal_frame_preserve_interpolations"]),
+  no_local_frame: Object.freeze(["preserve_nonlinguistic_dynamic_values", "translate_at_value_origin"]),
 })
 
 /**
@@ -375,6 +410,107 @@ const problemaCamposDecisao = (d, i) => {
   return null
 }
 
+/**
+ * `translate_at_value_origin` — a ORIGEM e o que a decisao tem de provar.
+ *
+ * O que esta camada verifica, com o disco na mao: a origem existe, esta contida
+ * no repositorio, e o `expectedFileHash` dela CONFERE. Uma frase que se mova
+ * invalida a decisao, exatamente como o hash do sink ja faz — e e isso que
+ * impede a decisao de envelhecer em silencio quando o modulo de origem muda.
+ *
+ * O que esta camada NAO verifica, e esta dito para nao parecer que verifica: se
+ * a linha/coluna apontam para um literal REALMENTE traduzivel, e se ha uma so
+ * origem possivel. Isso exige AST, e este modulo e runtime sem TypeScript por
+ * contrato. A prova estrutural vive em
+ * `tests/i18n_translate_at_value_origin.test.js`, que resolve cada origem pelo
+ * engine e reprova nome de variavel/propriedade/metodo como evidencia.
+ *
+ * CATEGORIA E PROIBIDA aqui. `glyph`/`identifier`/`control` pertencem a
+ * `preserve_nonlinguistic_dynamic_values`; aceita-las nas duas faria a escolha
+ * entre estrategias virar preferencia, e a diferenca entre "nao tem idioma" e
+ * "tem idioma, e mora noutro lugar" e justamente o que se quer registrar.
+ */
+const CAMPOS_DA_ORIGEM = ["file", "line", "column", "expectedFileHash"]
+
+const campoAusente = (o, campos) => campos.find((c) => o[c] === undefined)
+
+const problemaAncoraDaOrigem = (o, id) => {
+  if (!inteiroPositivo(o.line)) return `\`values.${id}.origin.line\` inválida`
+  // Coluna EXIGIDA: duas frases cabem na mesma linha, e ancorar só por linha
+  // atingiria a errada em silêncio.
+  if (!inteiroPositivo(o.column)) return `\`values.${id}.origin.column\` inválida`
+  return HASH_RE.test(o.expectedFileHash) ? null : `\`values.${id}.origin.expectedFileHash\` malformado`
+}
+
+const problemaFormaDaOrigem = (o, id) => {
+  if (!ehObjeto(o)) return `\`values.${id}.origin\` ausente ou não é objeto`
+  const faltando = campoAusente(o, CAMPOS_DA_ORIGEM)
+  if (faltando) return `\`values.${id}.origin.${faltando}\` ausente`
+  const daPath = pathProblem(o.file)
+  return daPath ? `\`values.${id}.origin.file\`: ${daPath}` : problemaAncoraDaOrigem(o, id)
+}
+
+/** A origem existe em disco, está contida no repo e o hash dela confere? */
+const problemaOrigemNoDisco = (o, id, repoRoot) => {
+  const alvo = resolverDentro(repoRoot, o.file)
+  if (!alvo.ok) return `\`values.${id}.origin.file\`: ${alvo.reason}`
+  const fonte = lerFonte(alvo.abs)
+  if (!fonte.ok) return `\`values.${id}.origin.file\` ilegível: ${fonte.code}`
+  if (hashFileContent(fonte.texto) !== o.expectedFileHash) {
+    return `\`values.${id}.origin\` obsoleta — o arquivo de origem mudou desde a decisão`
+  }
+  return null
+}
+
+const CAMPOS_DE_JUSTIFICATIVA = ["reason", "owner", "evidence"]
+const justificativaVazia = (v) => CAMPOS_DE_JUSTIFICATIVA.find((c) => !naoVazio(v[c]))
+
+const problemaDoValorDeOrigem = (v, id) => {
+  if (v.id !== id) return `\`values.${id}.id\` não confere com a chave`
+  if (v.category !== undefined) {
+    return `\`values.${id}.category\` não pertence a esta estratégia — categoria é de \`preserve_nonlinguistic_dynamic_values\``
+  }
+  if (!ORIGIN_SOURCE_KINDS.includes(v.sourceKind)) {
+    return `\`values.${id}.sourceKind\` inválido: ${JSON.stringify(v.sourceKind)}`
+  }
+  const vazio = justificativaVazia(v)
+  return vazio ? `\`values.${id}.${vazio}\` vazio` : null
+}
+
+const problemaDeUmaOrigem = (v, id, repoRoot) => {
+  if (!ehObjeto(v)) return `\`values.${id}\` ausente`
+  return problemaDoValorDeOrigem(v, id)
+    || problemaFormaDaOrigem(v.origin, id)
+    || problemaOrigemNoDisco(v.origin, id, repoRoot)
+}
+
+/**
+ * EXATAMENTE um por templateId, nos dois sentidos: faltar deixa um valor sem
+ * decisão, sobrar declara origem para um id que o gerador não extraiu.
+ */
+const problemaDeCobertura = (d) => {
+  const extras = Object.keys(d.values).filter((id) => !d.interpolations.includes(id))
+  return extras.length > 0 ? `\`values\` tem entrada sem templateId correspondente: ${extras.join(", ")}` : null
+}
+
+const problemaDeAlgumaOrigem = (d, repoRoot) => {
+  for (const id of d.interpolations) {
+    const problema = problemaDeUmaOrigem(d.values[id], id, repoRoot)
+    if (problema) return problema
+  }
+  return null
+}
+
+const problemaOrigensLinguisticas = (d, i, repoRoot) => {
+  if (d.strategy !== "translate_at_value_origin") return null
+  if (d.translationSite !== TRANSLATION_SITE_ORIGIN) {
+    return `decisão de provenance #${i}: \`translationSite\` deve ser ${JSON.stringify(TRANSLATION_SITE_ORIGIN)} — a decisão precisa DIZER que a tradução é na origem, não no sink`
+  }
+  if (!ehObjeto(d.values)) return `decisão de provenance #${i}: \`values\` ausente ou não é objeto`
+  const problema = problemaDeCobertura(d) || problemaDeAlgumaOrigem(d, repoRoot)
+  return problema ? `decisão de provenance #${i}: ${problema}` : null
+}
+
 const problemaFormaDecisao = (d, i) => {
   const daPath = pathProblem(d.file)
   if (daPath) return `decisão de provenance #${i}: ${daPath}`
@@ -424,9 +560,9 @@ const problemaCallsiteDecisao = (d, i, entrada) => {
  * deixaria de ser traduzida sem que ninguém a tivesse lido.
  */
 const problemaEstrategiaVsKind = (d, i, kind) => {
-  const esperada = STRATEGY_BY_KIND[kind]
-  if (!esperada || d.strategy === esperada) return null
-  return `decisão de provenance #${i}: estratégia \`${d.strategy}\` incompatível com \`provenance.kind: ${kind}\` (esperada \`${esperada}\`)`
+  const aceitas = STRATEGY_BY_KIND[kind]
+  if (!aceitas || aceitas.includes(d.strategy)) return null
+  return `decisão de provenance #${i}: estratégia \`${d.strategy}\` incompatível com \`provenance.kind: ${kind}\` (aceitas: ${aceitas.join(", ")})`
 }
 
 const problemaReferenciaDecisao = (d, i, registry) => {
@@ -436,21 +572,22 @@ const problemaReferenciaDecisao = (d, i, registry) => {
   return problemaCallsiteDecisao(d, i, alvo.entries.find((e) => e.line === d.line && e.column === d.column))
 }
 
-const problemaDecisao = (d, i, registry) => {
+const problemaDecisao = (d, i, registry, repoRoot) => {
   if (!ehObjeto(d)) return `decisão de provenance #${i} não é objeto (${JSON.stringify(d)})`
   return problemaCamposDecisao(d, i)
     || problemaFormaDecisao(d, i)
+    || problemaOrigensLinguisticas(d, i, repoRoot)
     || problemaReferenciaDecisao(d, i, registry)
 }
 
-function validarDecisoesProvenance(o, registry) {
+function validarDecisoesProvenance(o, registry, repoRoot) {
   const lista = o.provenanceDecisions
   if (lista === undefined) return null           // campo opcional
   if (!Array.isArray(lista)) return "provenanceDecisions ausente ou não é lista"
 
   const ancoras = new Set()
   for (const [i, d] of lista.entries()) {
-    const problema = problemaDecisao(d, i, registry)
+    const problema = problemaDecisao(d, i, registry, repoRoot)
     if (problema) return problema
 
     const ancora = `${d.file}|${d.line}|${d.column}`
@@ -575,7 +712,8 @@ function carregarRegistry(repoRoot) {
 function carregarOverrides(repoRoot, registry) {
   const ovr = lerJson(join(repoRoot, OVERRIDES_FILE), OVERRIDES_FILE)
   if (!ovr.ok) return ovr
-  const problema = validarOverrides(ovr.data, registry) || validarDecisoesProvenance(ovr.data, registry)
+  const problema = validarOverrides(ovr.data, registry)
+    || validarDecisoesProvenance(ovr.data, registry, repoRoot)
   return problema ? falha("corrupt", problema, { file: OVERRIDES_FILE }) : ovr
 }
 
