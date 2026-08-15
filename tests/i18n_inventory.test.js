@@ -179,7 +179,7 @@ test("validateRegistry recusa script que NÃO é alcançado pelo runtime (não p
  *
  * ATUALIZE AQUI, e so aqui, a cada arquivo reconciliado no lote JS.
  */
-test("CENSO GLOBAL: 1906 pontos, 49 unknown, 8 arquivos convertidos", async () => {
+test("CENSO GLOBAL: 1906 pontos, 48 unknown, 9 arquivos convertidos", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
 
@@ -203,8 +203,14 @@ test("CENSO GLOBAL: 1906 pontos, 49 unknown, 8 arquivos convertidos", async () =
   // unknown. O delta do censo e sempre (unknown do regex) -> (unknown do AST).
   //
   // 50 -> 49 com init.js (lote JS 5/14), pela regra nova `console-blank-line`.
-  assert.equal(inv.unknown, 49, "lote JS 5/14: init.js (linha em branco de `console.log()`) saiu para 0")
-  assert.equal(inv.jsRegistry.convertedFiles.length, 8)
+  //
+  // 49 -> 48 com visual.js (lote JS 6/14). Aqui o delta e -1 embora o AST
+  // medisse DOZE unknown no arquivo, pela mesma troca de regua de sempre: o
+  // regex via 1. O arquivo so fechou com TRES coisas juntas — C-3 (tabela
+  // congelada), C-4(b) (`console.log(renderFeedbackMarkdown(...))`) e a prova
+  // publica de `visual --json` cobrindo dez dos onze pontos de maquina.
+  assert.equal(inv.unknown, 48, "lote JS 6/14: visual.js (cinco subcomandos de `--json` + texto renderizado) saiu para 0")
+  assert.equal(inv.jsRegistry.convertedFiles.length, 9)
   assert.equal(inv.blocked, false)
 
   // A relacao que sustenta o numero: nenhum convertido guarda unknown.

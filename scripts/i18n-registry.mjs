@@ -75,6 +75,13 @@ export const CONVERTED_FILES = Object.freeze([
   // arquivo e de maquina, entao nao ha consumidor a declarar: a prova aqui e a
   // da REGRA (tests/i18n_js_ast_blank_line.test.js), nao de contrato publico.
   "src/commands/init.js",
+  // Lote JS, arquivo 6/14. Onze pontos de maquina em cinco subcomandos
+  // (prova em tests/visual_json_contract.test.js), mais `visual.js:86`, que so
+  // fechou com C-4(b) (`console-project-rendered-text`). A decisao de
+  // `visual.js:97` e a PRIMEIRA da estrategia `translate_at_value_origin`: a
+  // frase mora em `src/skills/design-rule-registry.js:20` e aqui e so
+  // renderizada.
+  "src/commands/visual.js",
 ])
 
 const norm = (p) => String(p).replace(/\\/g, "/")

@@ -1028,6 +1028,308 @@
       "reason": "CASO ATÍPICO, registrado por extenso: a parte literal deste callsite NÃO é prosa — é o comando de shell 'cd', dentro de um bloco de 'Próximos passos' feito para ser COPIADO. Traduzir 'cd' produziria uma linha que o shell recusa. Ou seja, a estratégia se aplica pela FORMA (moldura literal + interpolação preservada), mas o que efetivamente se traduz aqui é NADA: nem o comando, nem `projectName`, que é o diretório real criado em disco. Esta decisão existe justamente para que ninguém, mais tarde, traduza o comando por analogia com as outras molduras deste arquivo.",
       "owner": "certificação RC PRD51 (Fase 1B)",
       "evidence": "src/commands/init.js:243-246 — `info(\"Proximos passos:\")` seguido de `cd ${projectName}`, `pnpm install` e `pnpm dev`; as duas últimas não têm interpolação e por isso não aparecem como pendência, mas são o mesmo bloco copiável."
+    },
+    {
+      "file": "src/commands/visual.js",
+      "line": 28,
+      "column": 3,
+      "expectedFileHash": "sha256:af3bea8b6f34c5e219c561e9f19765257b916a26fd7a78601336dfcde403c264",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "result",
+        "url"
+      ],
+      "reason": "A moldura ('visual gate — ') traduz-se; o literal de fallback '(sem url)' também é deste callsite e traduz. `result.url` não: é o endereço que o usuário passou em `--url`, e traduzir uma URL produziria um endereço que não existe.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/visual.js:27-28 — `section(`visual gate — ${result.url || \"(sem url)\"}`)`; a URL entra por `--url` e é ecoada de volta."
+    },
+    {
+      "file": "src/commands/visual.js",
+      "line": 30,
+      "column": 3,
+      "expectedFileHash": "sha256:af3bea8b6f34c5e219c561e9f19765257b916a26fd7a78601336dfcde403c264",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "result",
+        "status",
+        "result",
+        "blocked"
+      ],
+      "reason": "A moldura traduz-se. `result.status` é TOKEN de enum do gate ('needs_browser', 'validated') que sai idêntico em `--json`, e `result.blocked` é booleano — nenhum dos dois tem idioma, e traduzir o token dessincronizaria a saída humana do payload de máquina do mesmo comando.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/visual.js:30 — os dois campos aparecem no documento provado por tests/visual_json_contract.test.js, que asserta `blocked === true` sem navegador."
+    },
+    {
+      "file": "src/commands/visual.js",
+      "line": 31,
+      "column": 36,
+      "expectedFileHash": "sha256:af3bea8b6f34c5e219c561e9f19765257b916a26fd7a78601336dfcde403c264",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "p"
+      ],
+      "reason": "A moldura é só o bullet de indentação. `p` é cada item de `result.problems`, frase redigida pelo próprio gate visual ('sem driver de navegador — instale playwright...'); a tradução dela é devida na origem, não neste laço que apenas a imprime.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/visual.js:31 — `for (const p of result.problems) info(`    • ${p}`)`; a lista `problems` é observável no payload de `visual check --json`."
+    },
+    {
+      "file": "src/commands/visual.js",
+      "line": 63,
+      "column": 3,
+      "expectedFileHash": "sha256:af3bea8b6f34c5e219c561e9f19765257b916a26fd7a78601336dfcde403c264",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "registry",
+        "counts",
+        "active",
+        "registry",
+        "counts",
+        "notYetVendored"
+      ],
+      "reason": "A moldura traduz-se. As duas interpolações são CONTAGENS numéricas de regras — número não tem idioma e formatá-lo aqui não é traduzir.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/visual.js:63 — `counts.active`/`counts.notYetVendored` são inteiros, assertados como `typeof number` em tests/visual_json_contract.test.js."
+    },
+    {
+      "file": "src/commands/visual.js",
+      "line": 64,
+      "column": 41,
+      "expectedFileHash": "sha256:af3bea8b6f34c5e219c561e9f19765257b916a26fd7a78601336dfcde403c264",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "id"
+      ],
+      "reason": "A moldura é o glifo de marcação mais espaçamento. `id` é o IDENTIFICADOR da regra ('impeccable-color-contrast-wcag'), que o usuário digita em `visual explain <rule-id>`; traduzi-lo faria a listagem exibir um valor que a própria CLI recusaria de volta.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/visual.js:64 — `for (const id of payload.activeRules) success(`  ✓ ${id}`)`; o mesmo id é aceito por `explain`, provado em tests/visual_json_contract.test.js."
+    },
+    {
+      "file": "src/commands/visual.js",
+      "line": 79,
+      "column": 11,
+      "expectedFileHash": "sha256:af3bea8b6f34c5e219c561e9f19765257b916a26fd7a78601336dfcde403c264",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "target"
+      ],
+      "reason": "A moldura traduz-se. `target` é o CAMINHO do arquivo de elementos informado pelo usuário; traduzi-lo apontaria para um arquivo que não existe em disco, justamente na mensagem que diz não ter conseguido lê-lo.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/visual.js:75-79 — `target` vem de `positionalAfter(args, \"detect\")` e é o caminho passado no comando."
+    },
+    {
+      "file": "src/commands/visual.js",
+      "line": 84,
+      "column": 3,
+      "expectedFileHash": "sha256:af3bea8b6f34c5e219c561e9f19765257b916a26fd7a78601336dfcde403c264",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "target"
+      ],
+      "reason": "Mesma origem do :79 (o caminho informado), mas outro papel: aqui ele é o CABEÇALHO da seção que identifica qual arquivo foi analisado. A moldura ('visual detect — ') traduz; o caminho não, pelo mesmo motivo — é endereço em disco, não texto.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/visual.js:84 — `section(`visual detect — ${target}`)`, no ramo de sucesso, depois da leitura do arquivo."
+    },
+    {
+      "file": "src/commands/visual.js",
+      "line": 85,
+      "column": 3,
+      "expectedFileHash": "sha256:af3bea8b6f34c5e219c561e9f19765257b916a26fd7a78601336dfcde403c264",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "result",
+        "counts",
+        "checked",
+        "result",
+        "counts",
+        "findings",
+        "result",
+        "counts",
+        "skipped"
+      ],
+      "reason": "A moldura traduz-se, incluindo a explicação entre parênteses ('cor não-parseável'), que é redigida aqui. As três interpolações são contagens numéricas do detector — sem idioma.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/visual.js:85 — `counts` é assertado como presente no payload de `visual detect --json`."
+    },
+    {
+      "file": "src/commands/visual.js",
+      "line": 93,
+      "column": 16,
+      "expectedFileHash": "sha256:af3bea8b6f34c5e219c561e9f19765257b916a26fd7a78601336dfcde403c264",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "ruleId"
+      ],
+      "reason": "A moldura traduz-se, e o literal de fallback '(nenhuma informada)' também: ele é escrito neste callsite. `ruleId` é o identificador que o usuário digitou e que não foi encontrado — traduzi-lo esconderia o que ele de fato escreveu, que é a informação útil para corrigir.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/visual.js:91-93 — ramo em que `getDesignRule(ruleId)` devolve `null`."
+    },
+    {
+      "file": "src/commands/visual.js",
+      "line": 95,
+      "column": 3,
+      "expectedFileHash": "sha256:af3bea8b6f34c5e219c561e9f19765257b916a26fd7a78601336dfcde403c264",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "rule",
+        "ruleId"
+      ],
+      "reason": "A moldura ('visual explain — ') traduz-se. `rule.ruleId` é o identificador canônico da regra no registro, usado como chave de consulta; traduzi-lo quebraria a correspondência com o valor aceito no argumento.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/visual.js:95 — ramo de sucesso, com `rule` resolvido pelo registro de regras."
+    },
+    {
+      "file": "src/commands/visual.js",
+      "line": 96,
+      "column": 3,
+      "expectedFileHash": "sha256:af3bea8b6f34c5e219c561e9f19765257b916a26fd7a78601336dfcde403c264",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "rule",
+        "status",
+        "rule",
+        "category",
+        "rule",
+        "source"
+      ],
+      "reason": "A moldura traduz-se. Os três são TOKENS do registro de regras — `status` ('active'/'not_yet_vendored'), `category` ('color-contrast') e `source` ('impeccable') —, todos saindo idênticos em `visual explain --json`. Traduzir qualquer um faria o mesmo fato ter dois vocabulários conforme o modo.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/visual.js:96 — os três campos estão no documento provado por tests/visual_json_contract.test.js; `rule.status` é usado como CONTROLE NEGATIVO de origem em tests/i18n_value_origin_resolution.test.js, por ter DUAS origens possíveis e ser token, não frase."
+    },
+    {
+      "file": "src/commands/visual.js",
+      "line": 98,
+      "column": 8,
+      "expectedFileHash": "sha256:af3bea8b6f34c5e219c561e9f19765257b916a26fd7a78601336dfcde403c264",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "rule",
+        "reason"
+      ],
+      "reason": "A moldura ('ainda não vendorizada: ') traduz-se. `rule.reason` NÃO é traduzido aqui, e a razão é diferente da do :97: ele descreve o arquivo upstream e o tamanho dele ('cli/engine/rules/checks.mjs (2703 linhas, ver upstream-map.md)') — é referência a artefato externo com caminho e contagem, não prosa do produto.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/visual.js:98 — ramo `else` de `if (rule.status === \"active\")`; os `reason` vivem em src/skills/design-rule-registry.js e citam caminhos do upstream Impeccable."
+    },
+    {
+      "file": "src/commands/visual.js",
+      "line": 194,
+      "column": 37,
+      "expectedFileHash": "sha256:af3bea8b6f34c5e219c561e9f19765257b916a26fd7a78601336dfcde403c264",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "ds",
+        "status"
+      ],
+      "reason": "A moldura traduz-se. `ds.status` é token do resolvedor de design system ('missing', 'complete', 'bypassed', 'generated') e é o MESMO valor que sai no payload `{error:\"no_design_system\", status:...}` — traduzir dessincronizaria humano e máquina.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/visual.js:190-194 — o payload de máquina do mesmo ramo é provado em tests/visual_json_contract.test.js (`error === \"no_design_system\"`)."
+    },
+    {
+      "file": "src/commands/visual.js",
+      "line": 203,
+      "column": 3,
+      "expectedFileHash": "sha256:af3bea8b6f34c5e219c561e9f19765257b916a26fd7a78601336dfcde403c264",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "st",
+        "status",
+        "String",
+        "st",
+        "sourceHash",
+        "slice"
+      ],
+      "reason": "A moldura traduz-se. `st.status` é token de drift ('absent'/'stale'/'synced') e `sourceHash` é um digest sha256 truncado — nenhum dos dois tem idioma, e alterar o digest o tornaria inútil para comparar com o artefato.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/visual.js:203 — `sourceHash` é assertado como começando por 'sha256:' em tests/visual_json_contract.test.js."
+    },
+    {
+      "file": "src/commands/visual.js",
+      "line": 211,
+      "column": 28,
+      "expectedFileHash": "sha256:af3bea8b6f34c5e219c561e9f19765257b916a26fd7a78601336dfcde403c264",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "p",
+        "action",
+        "p",
+        "file"
+      ],
+      "reason": "A moldura é só espaçamento e o separador ': '. `p.action` é token do plano ('create'/'update') e `p.file` é o caminho do arquivo que será escrito; traduzir o caminho produziria um arquivo que o comando não escreve, e traduzir a ação divergiria do que sai em `--json`.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/visual.js:211 — dentro de `emitSyncResult`, ramo humano; `plans` é assertado como lista no payload de `visual context sync --yes --json`."
+    },
+    {
+      "file": "src/commands/visual.js",
+      "line": 212,
+      "column": 27,
+      "expectedFileHash": "sha256:af3bea8b6f34c5e219c561e9f19765257b916a26fd7a78601336dfcde403c264",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "r",
+        "conflicts",
+        "length"
+      ],
+      "reason": "A moldura traduz-se inteira — é a frase que explica a política de não sobrescrever edição humana. A interpolação é uma CONTAGEM de arquivos em conflito: número, sem idioma.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/visual.js:212 — `r.conflicts` é a lista de arquivos com edição humana detectada pelo sync."
+    },
+    {
+      "file": "src/commands/visual.js",
+      "line": 219,
+      "column": 74,
+      "expectedFileHash": "sha256:af3bea8b6f34c5e219c561e9f19765257b916a26fd7a78601336dfcde403c264",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "p",
+        "action",
+        "p",
+        "file"
+      ],
+      "reason": "Mesma forma do :211 e pelas mesmas razões (ação é token, arquivo é caminho), mas em outro momento do fluxo: aqui o plano é mostrado ANTES de pedir confirmação, para o humano ver o que muda antes de autorizar. São dois callsites porque são dois instantes distintos, e cada um responde por si.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/visual.js:216-219 — `confirmSync` imprime o plano e só então chama `confirm(...)`; o :211 imprime o resultado já aplicado."
+    },
+    {
+      "file": "src/commands/visual.js",
+      "line": 97,
+      "column": 33,
+      "expectedFileHash": "sha256:af3bea8b6f34c5e219c561e9f19765257b916a26fd7a78601336dfcde403c264",
+      "strategy": "translate_at_value_origin",
+      "translationSite": "value_origin",
+      "interpolations": [
+        "rule",
+        "description"
+      ],
+      "reason": "NÃO há moldura literal: o template é `  ${rule.description}`, cujos literais são só indentação. E o valor É linguístico — a frase 'Contraste WCAG 2.1 AA entre texto e fundo — 4.5:1 (texto normal) ou 3:1 (texto grande).' é prosa do produto, redigida no registro de regras. Por isso nenhuma das duas estratégias anteriores serve: não há frame a traduzir, e declarar a frase como glyph/identifier/control seria falso. A tradução é devida na ORIGEM; este callsite apenas renderiza.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/visual.js:97 — `if (rule.status === \"active\") info(`  ${rule.description}`)`. O checker resolve `description` para UMA declaração (src/skills/design-rule-registry.js:20:5), um StringLiteral de frase, provado em tests/i18n_value_origin_resolution.test.js. O mesmo teste usa `rule.status` (linha 96) como controle negativo: DUAS origens possíveis e literais que são tokens, não frases.",
+      "values": {
+        "rule": {
+          "id": "rule",
+          "sourceKind": "project_module_literal",
+          "origin": {
+            "file": "src/skills/design-rule-registry.js",
+            "line": 20,
+            "column": 5,
+            "expectedFileHash": "sha256:16219d3ba4b01e707391a8ae490c7b228304b3a03df20217cc929ea78b1db0e9"
+          },
+          "reason": "Portador da frase: `rule` é a entrada do registro de regras resolvida por `getDesignRule(ruleId)`; ele não é a frase, mas é por ele que ela chega ao sink.",
+          "owner": "certificação RC PRD51 (Fase 1B)",
+          "evidence": "src/skills/design-rule-registry.js:20:5 — a propriedade `description` da única regra com status `active`."
+        },
+        "description": {
+          "id": "description",
+          "sourceKind": "project_module_literal",
+          "origin": {
+            "file": "src/skills/design-rule-registry.js",
+            "line": 20,
+            "column": 5,
+            "expectedFileHash": "sha256:16219d3ba4b01e707391a8ae490c7b228304b3a03df20217cc929ea78b1db0e9"
+          },
+          "reason": "A frase em si. É prosa do produto e deve ser traduzida ali, uma vez, e não em cada lugar que a imprima.",
+          "owner": "certificação RC PRD51 (Fase 1B)",
+          "evidence": "src/skills/design-rule-registry.js:20:5 — StringLiteral 'Contraste WCAG 2.1 AA entre texto e fundo — 4.5:1 (texto normal) ou 3:1 (texto grande).'"
+        }
+      }
     }
   ]
 }
