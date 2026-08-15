@@ -199,10 +199,27 @@ test("NEGATIVO: chamada em catch NAO vira publica nem passthrough automaticament
   } finally { cleanupTmp(f.root) }
 })
 
-test("external_passthrough NAO e alcancavel por nenhuma regra desta fatia", async () => {
-  const { rules } = await eng()
+/**
+ * ATUALIZADO EM C-4(a). Ate aqui este teste afirmava que a audiencia era
+ * inalcancavel por QUALQUER regra, e isso deixou de ser verdade: existe agora
+ * `stream-external-passthrough`, com provador estrutural de origem
+ * (`tests/i18n_js_ast_external_passthrough.test.js`).
+ *
+ * O que continua valendo, e e o que este arquivo tem a dizer, e que ela nao
+ * pode ser concedida por uma regra de `JS_RULES`. Essas classificam o CANAL
+ * (console e helpers de render) e nao tem em maos a cadeia de valor ate o
+ * subprocesso; conceder a audiencia dali seria decidir por posicao no arquivo,
+ * que foi o erro de `runtime-stack-passthrough`.
+ */
+test("external_passthrough so pode vir de regra de STREAM, nunca de JS_RULES", async () => {
+  const { rules, SINK_RULES } = await eng()
   assert.deepEqual(rules().filter((r) => r.audience === "external_passthrough"), [],
-    "exige subprocesso externo identificado — nenhuma regra AST pode conceder isso")
+    "nenhuma regra de canal pode conceder repasse externo — ela nao ve a origem dos bytes")
+  assert.deepEqual(
+    SINK_RULES.filter((r) => r.audience === "external_passthrough").map((r) => r.id),
+    ["stream-external-passthrough"],
+    "e ha exatamente UMA regra que a alcanca, a que exige a prova de origem",
+  )
 })
 
 // ── Prompt: cadeia inteira ────────────────────────────────────────────────────

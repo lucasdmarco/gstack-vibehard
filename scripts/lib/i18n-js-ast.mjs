@@ -2691,6 +2691,334 @@ const consumidorProvado = (p, ctx) => {
   return Array.isArray(entrada.commands) ? coberturaAncorada(entrada, p) : true
 }
 
+// ── Origem dos bytes de um repasse de subprocesso (C-4(a)) ───────────────────
+
+/**
+ * `external_passthrough` — a audiencia que o vocabulario declara desde o inicio
+ * e que nenhuma regra alcancava. O que faltava nao era a regra: era PROVAR de
+ * onde os bytes vem.
+ *
+ * A audiencia TIRA um ponto da claim English-first. Isso inverte o onus: para
+ * INCLUIR basta provar o canal; para EXCLUIR e preciso provar a origem, e um
+ * erro aqui apaga do inventario frases que o usuario le. Por isso cada porta
+ * abaixo falha FECHADA — o que nao se prova continua `unknown`, que e o estado
+ * correto de uma pergunta em aberto.
+ *
+ * A regra `runtime-stack-passthrough` do prototipo foi removida por errar
+ * exatamente isto (ver a nota em `JS_RULES`): chamava de externo o `err.stack`
+ * que o proprio GStack decide imprimir.
+ */
+
+/**
+ * Identidade de MODULO, nao de funcao.
+ *
+ * Perguntar "o callee se chama `execFileSync`?" seria classificar por nome — e
+ * erraria nos dois sentidos: `import { execFileSync as rodar }` escaparia, e uma
+ * funcao local homonima entraria. O fato estrutural e a procedencia do
+ * identificador: ele foi importado do modulo que abre processos.
+ *
+ * Resolver pelo ESPECIFICADOR do import, e nao pelo checker de tipos, tambem
+ * elimina a dependencia de `@types/node` — que e devDependency. Uma regra cujo
+ * veredito mudasse com a presenca de tipos instalados seria uma mina: o mesmo
+ * commit classificaria diferente em maquina limpa.
+ */
+const MODULOS_DE_SUBPROCESSO = new Set(["child_process", "node:child_process"])
+
+/** Declaracao do simbolo SEM `unalias`: aqui a propria importacao e a prova. */
+const declaracaoDoSimbolo = (n, checker) => {
+  const sym = checker.getSymbolAtLocation(n)
+  return sym?.getDeclarations()?.[0] ?? null
+}
+
+/** Especificador do `import` que contem a declaracao, ou `null`. */
+const especificadorDoImport = (d) => {
+  let n = d
+  while (n && !ts.isImportDeclaration(n)) n = n.parent
+  return n && ts.isStringLiteral(n.moduleSpecifier) ? n.moduleSpecifier.text : null
+}
+
+/** `f()` e `ns.f()`: o identificador cuja declaracao carrega o import. */
+const idImportadoDoCallee = (c) => {
+  if (ts.isIdentifier(c)) return c
+  return ts.isPropertyAccessExpression(c) && ts.isIdentifier(c.expression) ? c.expression : null
+}
+
+/**
+ * Declaracao do identificador do callee, ou `null`.
+ *
+ * NAO ha uma segunda porta perguntando se a declaracao "e de import": so as
+ * partes de uma `ImportDeclaration` tem uma `ImportDeclaration` por ancestral,
+ * entao `especificadorDoImport` ja responde as duas perguntas de uma vez. A
+ * porta extra existiu e o mutation control a apontou — nenhum mutante que a
+ * removesse quebrava teste algum, porque ela nunca podia recusar nada sozinha.
+ */
+const declaracaoDoCallee = (node, checker) => {
+  const id = idImportadoDoCallee(node.expression)
+  return id ? declaracaoDoSimbolo(id, checker) : null
+}
+
+/** A chamada abre um subprocesso? Devolve o proprio no, ou `null`. */
+export function chamadaDeSubprocesso(node, checker) {
+  if (!ts.isCallExpression(node)) return null
+  const d = declaracaoDoCallee(node, checker)
+  const modulo = d ? especificadorDoImport(d) : null
+  return modulo && MODULOS_DE_SUBPROCESSO.has(modulo) ? node : null
+}
+
+/**
+ * ANCORA DO MODULO — `import.meta.url`, `__dirname`, `__filename`.
+ *
+ * Um caminho montado a partir da localizacao do PROPRIO arquivo fonte descreve,
+ * por construcao, um artefato que viaja junto com esse arquivo. E o fato que
+ * separa "o GStack executa um script dele mesmo noutro processo" de "o GStack
+ * executa uma ferramenta de terceiros".
+ *
+ * `import.meta` e uma MetaProperty — forma sintatica, nao nome. Os dois globais
+ * CJS so contam quando NAO tem declaracao no programa, pelo mesmo criterio que
+ * `consoleIsRuntimeGlobal` usa: um `const __dirname = …` local e outra coisa, e
+ * a cadeia continua por ele como qualquer identificador.
+ */
+const ANCORA_DO_MODULO = "<self>"
+const GLOBAIS_DE_MODULO = new Set(["__dirname", "__filename"])
+const LIMITE_CAMINHO = 8
+
+const ehMetaDoModulo = (n) => ts.isMetaProperty(n)
+  || (ts.isPropertyAccessExpression(n) && ts.isMetaProperty(n.expression))
+
+const ehGlobalDeModulo = (n, ctx) => ts.isIdentifier(n)
+  && GLOBAIS_DE_MODULO.has(n.text)
+  && !declaracaoResolvida(ctx.checker, n, ctx.sf)
+
+/**
+ * Inicializador de um `const` DESTE arquivo, ou `null`.
+ *
+ * `const` E porta, nao detalhe. `let`/`var` podem ser reatribuidos em qualquer
+ * ponto, e o inicializador deixa de descrever o valor lido no callsite.
+ *
+ * A exigencia esta AQUI e nao em `sofreMutacao` de proposito: aquele helper e
+ * compartilhado com o avaliador abstrato e, apesar do que o comentario dele diz,
+ * detecta so mutacao de PROPRIEDADE (`x.a = …`) — reatribuicao simples passa. Ir
+ * mexer nele mudaria a classificacao de pontos que esta fatia nao reviu.
+ */
+const ehDeclaracaoConst = (d) => Boolean(d.parent)
+  && ts.isVariableDeclarationList(d.parent)
+  && (d.parent.flags & ts.NodeFlags.Const) !== 0
+
+const inicializadorDeConstLocal = (id, ctx) => {
+  const d = declaracaoResolvida(ctx.checker, id, ctx.sf)
+  if (!d || !ts.isVariableDeclaration(d) || !d.initializer) return null
+  return ehDeclaracaoConst(d) ? d.initializer : null
+}
+
+/**
+ * `null` ABSORVE, e a lista VAZIA tambem vira `null`.
+ *
+ * Uma chamada cujos argumentos nao resolvem nao pode contribuir "nada": tratar
+ * `resolvePythonCmd()` como zero segmentos deixaria um alvo DINAMICO passar por
+ * "resolvido e sem ancora", que e a porta do veredito `external`. Nada provado
+ * precisa dizer nada provado.
+ */
+const juntarSegmentos = (nos, ctx, prof, rec) => {
+  if (nos.length === 0) return null
+  const partes = nos.map((a) => rec(a, ctx, prof + 1))
+  return partes.some((p) => p === null) ? null : partes.flat()
+}
+
+const SEGMENTO_POR_FORMA = [
+  [ehLiteralDeTexto, (n) => [n.text]],
+  [(n, ctx) => ehMetaDoModulo(n) || ehGlobalDeModulo(n, ctx), () => [ANCORA_DO_MODULO]],
+  [(n) => ts.isIdentifier(n), (n, ctx, prof, rec) => {
+    const init = inicializadorDeConstLocal(n, ctx)
+    return init ? rec(init, ctx, prof + 1) : null
+  }],
+  [(n) => ts.isArrayLiteralExpression(n), (n, ctx, prof, rec) => juntarSegmentos(n.elements, ctx, prof, rec)],
+  [(n) => ts.isCallExpression(n), (n, ctx, prof, rec) => juntarSegmentos(n.arguments, ctx, prof, rec)],
+]
+
+/**
+ * Segmentos ESTATICOS de um argumento de spawn, ou `null` quando nao resolvem.
+ *
+ * Nao interessa o caminho final — interessa se a ANCORA aparece. Por isso os
+ * segmentos entram concatenados e sem normalizacao: `join`, `resolve` e
+ * concatenacao de literais dao a mesma resposta para a unica pergunta feita.
+ */
+export function segmentosDeCaminho(n, ctx, prof = 0) {
+  if (!n || prof > LIMITE_CAMINHO) return null
+  const caso = SEGMENTO_POR_FORMA.find(([forma]) => forma(n, ctx))
+  return caso ? caso[1](n, ctx, prof, segmentosDeCaminho) : null
+}
+
+export const ARTEFATO_PROJETO = "project"
+export const ARTEFATO_EXTERNO = "external"
+export const ARTEFATO_INDEFINIDO = "unresolved"
+
+/** Ramos por onde a busca da ancora desce, sem exigir que o galho inteiro resolva. */
+const RAMOS_DE_ARGUMENTO = [
+  [(n) => ts.isArrayLiteralExpression(n), (n) => [...n.elements]],
+  [(n) => ts.isSpreadElement(n), (n) => [n.expression]],
+  [(n) => ts.isCallExpression(n), (n) => [...n.arguments]],
+]
+
+/**
+ * EXISTENCIAL, e de proposito: basta a ancora aparecer em UM ramo.
+ *
+ * `execFileSync(py, [INDEXER, ...subArgs])` e a forma real. Exigir que a lista
+ * inteira resolvesse faria o spread `...subArgs` — argumentos de busca, que
+ * mudam a cada chamada — apagar a prova de que argv[1] e um script NOSSO. O que
+ * se pergunta aqui nao e "qual e a linha de comando" e sim "ha um artefato do
+ * proprio modulo nela".
+ */
+const ehAncoraDoModulo = (n, ctx) => ehMetaDoModulo(n) || ehGlobalDeModulo(n, ctx)
+
+const ancoraPorIdentificador = (n, ctx, prof, rec) => {
+  const init = inicializadorDeConstLocal(n, ctx)
+  return Boolean(init) && rec(init, ctx, prof + 1)
+}
+
+const ancoraPorRamo = (n, ctx, prof, rec) => {
+  const caso = RAMOS_DE_ARGUMENTO.find(([forma]) => forma(n))
+  return Boolean(caso) && caso[1](n).some((c) => rec(c, ctx, prof + 1))
+}
+
+function contemAncoraDeModulo(n, ctx, prof = 0) {
+  if (!n || prof > LIMITE_CAMINHO) return false
+  if (ehAncoraDoModulo(n, ctx)) return true
+  return ts.isIdentifier(n)
+    ? ancoraPorIdentificador(n, ctx, prof, contemAncoraDeModulo)
+    : ancoraPorRamo(n, ctx, prof, contemAncoraDeModulo)
+}
+
+/**
+ * De QUEM e o artefato que o subprocesso executa?
+ *
+ *   project    — a ancora do modulo aparece em algum argumento: o alvo viaja com
+ *                o pacote, e a saida dele e texto do produto;
+ *   external   — nenhuma ancora E o COMANDO (argumento 0) resolve estaticamente;
+ *   unresolved — nenhuma ancora e o comando e dinamico. Alvo que so se conhece
+ *                em runtime nao e alvo externo: e alvo desconhecido.
+ *
+ * So o argumento 0 precisa resolver, e nao a chamada inteira. Em todas as APIs
+ * de `child_process` e ele o comando; o objeto de opcoes NUNCA vai resolver como
+ * caminho, e exigi-lo tornaria `external` inalcancavel por um motivo que nao tem
+ * nada a ver com a pergunta.
+ */
+export function artefatoDeSubprocesso(chamada, ctx) {
+  const args = [...chamada.arguments]
+  if (args.some((a) => contemAncoraDeModulo(a, ctx))) return ARTEFATO_PROJETO
+  return segmentosDeCaminho(args[0], ctx) ? ARTEFATO_EXTERNO : ARTEFATO_INDEFINIDO
+}
+
+// ── Cadeia de repasse: do sink ate o subprocesso ─────────────────────────────
+
+export const REPASSE_AUSENTE = "none"
+const LIMITE_REPASSE = 12
+
+/**
+ * Retornos de uma funcao, em QUALQUER profundidade do corpo.
+ *
+ * `corpoDeReturnUnico` nao serve: o caso real (`runIndexer`) tem um `return`
+ * dentro do `try` e outro dentro do `catch`, e ignorar o segundo afirmaria sobre
+ * o caminho feliz como se fosse o unico.
+ */
+function expressoesDeRetorno(fn) {
+  if (!fn.body) return null
+  if (!ts.isBlock(fn.body)) return [fn.body]
+  const saida = []
+  percorrerNos(fn.body, (n) => { if (ts.isReturnStatement(n) && n.expression) saida.push(n.expression) })
+  return saida.length > 0 ? saida : null
+}
+
+/**
+ * Funcao top-level DESTE arquivo para a qual o callee resolve, ou `null`.
+ *
+ * Arrow entra aqui e NAO em `isFunctionLike`: aquele predicado governa o grafo
+ * de alcance e o reconhecimento de wrapper, e alarga-lo mexeria na
+ * classificacao de pontos que ninguem reviu. O helper de uma linha
+ * (`const asStr = (x) => …`) e a forma dominante do repositorio, e sem ele a
+ * cadeia pararia por uma lacuna acidental — escondendo onde ela REALMENTE para.
+ */
+const ehFuncaoOuArrow = (n) => isFunctionLike(n) || ts.isArrowFunction(n)
+
+const funcaoOuArrowDaDeclaracao = (d) => {
+  if (ehFuncaoOuArrow(d)) return d
+  return ts.isVariableDeclaration(d) && d.initializer && ehFuncaoOuArrow(d.initializer) ? d.initializer : null
+}
+
+const funcaoLocalDoCallee = (node, ctx) => {
+  if (!ts.isIdentifier(node.expression)) return null
+  const d = declaracaoResolvida(ctx.checker, node.expression, ctx.sf)
+  return d ? funcaoOuArrowDaDeclaracao(d) : null
+}
+
+/** Inicializador do campo pendente num literal de objeto, ou `null`. */
+const campoDoLiteral = (ret, campo) => {
+  if (!ts.isObjectLiteralExpression(ret)) return null
+  const prop = ret.properties.find((p) => ts.isPropertyAssignment(p) && nomeEstaticoDaProp(p) === campo)
+  return prop ? prop.initializer : null
+}
+
+/**
+ * UNIVERSAL, nao existencial: todo caminho de retorno precisa dar a mesma
+ * resposta. Um `stdout` que vem do subprocesso no `try` e de origem nao
+ * resolvida no `catch` NAO e repasse provado — e repasse na metade das vezes,
+ * e a metade que falta e justamente a que ninguem olhou.
+ */
+const juntarRepasse = (a, b) => {
+  if (a === b) return a
+  return a === REPASSE_AUSENTE || b === REPASSE_AUSENTE ? REPASSE_AUSENTE : ARTEFATO_INDEFINIDO
+}
+
+const REPASSE_POR_FORMA = [
+  // Identificador: `const` local nao mutado. Reatribuicao em qualquer ponto do
+  // modulo invalida a leitura, pela mesma razao de `avaliarIdentificador`.
+  [(n) => ts.isIdentifier(n), (n, ctx, campo, prof, rec) => {
+    if (sofreMutacao(ctx.sf, n.text)) return ARTEFATO_INDEFINIDO
+    const init = inicializadorDeConstLocal(n, ctx)
+    return init ? rec(init, ctx, campo, prof + 1) : ARTEFATO_INDEFINIDO
+  }],
+  // `E.f` — segue por `E` guardando o campo. Campo sobre campo (`r.a.b`) nao e
+  // suportado: seguir dois niveis exigiria um resumo de objeto que esta cadeia
+  // nao tem, e presumir seria inventar.
+  [(n) => ts.isPropertyAccessExpression(n) && ts.isIdentifier(n.name),
+    (n, ctx, campo, prof, rec) =>
+      (campo ? ARTEFATO_INDEFINIDO : rec(n.expression, ctx, n.name.text, prof + 1))],
+  [(n) => ts.isCallExpression(n), (n, ctx, campo, prof, rec) => repasseDeChamada(n, ctx, campo, prof, rec)],
+]
+
+/** Chamada: base (subprocesso) ou salto para os retornos da funcao local. */
+function repasseDeChamada(node, ctx, campo, prof, rec) {
+  const spawn = chamadaDeSubprocesso(node, ctx.checker)
+  if (spawn) return artefatoDeSubprocesso(spawn, ctx)
+  const fn = funcaoLocalDoCallee(node, ctx)
+  const retornos = fn ? expressoesDeRetorno(fn) : null
+  if (!retornos) return REPASSE_AUSENTE
+  return retornos
+    .map((r) => seguirRetorno(r, ctx, campo, prof, rec))
+    .reduce(juntarRepasse)
+}
+
+/** Com campo pendente o retorno precisa ser literal de objeto que o declare. */
+const seguirRetorno = (ret, ctx, campo, prof, rec) => {
+  if (!campo) return rec(ret, ctx, null, prof + 1)
+  const valor = campoDoLiteral(ret, campo)
+  return valor ? rec(valor, ctx, null, prof + 1) : ARTEFATO_INDEFINIDO
+}
+
+/**
+ * Origem dos bytes que chegam ao sink: `project`, `external`, `unresolved` ou
+ * `none` (nao ha subprocesso nenhum na cadeia — a pergunta nao se aplica).
+ *
+ * Formas aceitas na cadeia: identificador de `const` local, acesso a campo e
+ * chamada a funcao local. Qualquer outra coisa — coercao, metodo de biblioteca,
+ * parametro, `catch` — interrompe em `unresolved`. E restritivo de proposito:
+ * ver a nota de onus no topo da secao.
+ */
+export function origemDeRepasse(arg, ctx, campo = null, prof = 0) {
+  if (!arg || prof > LIMITE_REPASSE || !ctx?.checker) return REPASSE_AUSENTE
+  const caso = REPASSE_POR_FORMA.find(([forma]) => forma(arg))
+  return caso ? caso[1](arg, ctx, campo, prof, origemDeRepasse) : REPASSE_AUSENTE
+}
+
 export const SINK_RULES = Object.freeze([
   {
     // Guarda POSITIVA. `requiresDebugEnv` ja garante que `!DEBUG` e
@@ -2751,6 +3079,40 @@ export const SINK_RULES = Object.freeze([
     audience: "terminal_control",
     trigger: "control_bytes",
     reason: "literal composto so de bytes de controle (CSI/BEL/CR): nao ha idioma num apagar-linha",
+  },
+  {
+    /**
+     * REPASSE DE BYTES DE FERRAMENTA EXTERNA — C-4(a).
+     *
+     * TRES portas, e nenhuma delas e o nome de nada:
+     *
+     *   1. `byteOrigin === "external"` — a cadeia de valor chega a uma chamada de
+     *      `child_process` cujo artefato NAO se ancora no proprio modulo. Um alvo
+     *      dinamico da `unresolved`, nao `external`;
+     *   2. `argForm === "opaque"` — nao ha UM literal no argumento. Assim que o
+     *      GStack escreve uma moldura (`error(\`falhou: ${r.stderr}\`)`), a frase
+     *      e dele e o ponto pertence a claim, por mais que o dado venha de fora;
+     *   3. fora de guarda de debug — aquela guarda descreve outra coisa
+     *      (`internal_debug`) e ja e a primeira regra da lista; a porta esta aqui
+     *      para que a leitura da regra nao dependa da ordem.
+     *
+     * MEDIDO NO REPOSITORIO REAL: zero pontos. Os unicos candidatos de repasse
+     * cru (`context.js:249/260/278/280`) reprovam na porta 1, e por um motivo
+     * que a prova nomeia — o subprocesso deles e
+     * `src/context-docs/py/context_db.py`, que VIAJA NO PACOTE e imprime prosa
+     * escrita pelo GStack. Chama-los de externos apagaria da claim mensagens que
+     * o usuario le. Ver `tests/i18n_js_ast_external_passthrough.test.js`.
+     *
+     * O zero de hoje e portanto MEDIDO, e nao mais "inalcancavel por design".
+     */
+    id: "stream-external-passthrough",
+    when: (p) => p.byteOrigin === ARTEFATO_EXTERNO
+      && p.argForm === "opaque"
+      && p.underDebugGuard !== true,
+    audience: "external_passthrough",
+    trigger: "subprocess_bytes",
+    reason: "bytes capturados de ferramenta de FORA do pacote e reemitidos sem uma unica moldura do projeto: nao ha unidade traduzivel porque nao ha autoria nossa. A origem e provada pela cadeia de valor ate a chamada de subprocesso, e o artefato dela nao se ancora no modulo",
+    risk: "raw_external_output",
   },
 ])
 
@@ -3016,6 +3378,10 @@ export function analyzeFile(filePath, analyzer = null, ctx = {}) {
       // Implementacao do canal, nao mensagem: o texto vem do chamador.
       inLocalRenderPrimitive: dentroDeLoggerCanonicoLocal(node, ctxAst),
       templateIds: templateIdentifiers(arg0),
+      // De onde vem o BYTE, quando o argumento e um repasse: `project`,
+      // `external`, `unresolved` ou `none`. So `external` classifica — as outras
+      // tres deixam o ponto onde estava, que e o que fecha a porta.
+      byteOrigin: origemDeRepasse(arg0, ctxAst),
       argKind: arg0 ? ts.SyntaxKind[arg0.kind] : "none",
       // Forma ESTRUTURAL do argumento — o que permite decidir sobre um
       // `process.*.write` sem apelar para a identidade do arquivo.
