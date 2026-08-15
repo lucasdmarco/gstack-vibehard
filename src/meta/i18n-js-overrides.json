@@ -1330,6 +1330,49 @@
           "evidence": "src/skills/design-rule-registry.js:20:5 — StringLiteral 'Contraste WCAG 2.1 AA entre texto e fundo — 4.5:1 (texto normal) ou 3:1 (texto grande).'"
         }
       }
+    },
+    {
+      "file": "scripts/sync-qg-version.mjs",
+      "line": 35,
+      "column": 5,
+      "expectedFileHash": "sha256:d6e5c6d7efa32db11df4ff5f780d023d00708db0318df901176b569e8bc65454",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "r",
+        "version",
+        "r",
+        "changed"
+      ],
+      "reason": "A moldura traduz-se, e os dois literais de estado ('(atualizado)' e '(já sincronizado)') também: eles são escritos NESTE callsite, no ternário. `r.version` não se traduz — é a versão semver lida do manifesto do QG, e alterá-la tornaria impossível conferir contra o arquivo sincronizado.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "scripts/sync-qg-version.mjs:33-35 — `syncQgVersion()` devolve `{version, changed}`; a mensagem sai por `process.stderr.write` no ramo `isMain`, isto é, quando o npm roda o lifecycle `version`."
+    },
+    {
+      "file": "scripts/sync-qg-version.mjs",
+      "line": 37,
+      "column": 5,
+      "expectedFileHash": "sha256:d6e5c6d7efa32db11df4ff5f780d023d00708db0318df901176b569e8bc65454",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "e",
+        "message"
+      ],
+      "reason": "A moldura ('sync-qg-version: ERRO — ') traduz-se. `e.message` não: a exceção vem da leitura/escrita do manifesto do QG ou do próprio `syncQgVersion`, e pode carregar código de erro do sistema de arquivos. Traduzir quebraria a correspondência com o que o SO reportou, justamente na mensagem que precede `process.exit(1)`.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "scripts/sync-qg-version.mjs:36-39 — bloco `catch` do ramo `isMain`, seguido de saída com código 1."
+    },
+    {
+      "file": "scripts/clean-pkg.mjs",
+      "line": 28,
+      "column": 1,
+      "expectedFileHash": "sha256:b2d4fc60079509d71bd1aa7858eed90a3e2fb5e0f728c66f838cd5d232c91c65",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "removed"
+      ],
+      "reason": "A moldura traduz-se inteira, inclusive a enumeração dos artefatos ('__pycache__/.pyc/.pyo'), que é literal deste callsite. `removed` é uma CONTAGEM de arquivos apagados — número não tem idioma.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "scripts/clean-pkg.mjs:26-28 — `walk(process.cwd())` incrementa `removed`; a saída vai por `console.error` DE PROPÓSITO (comentário na linha 27: não contaminar `npm pack --json`), e roda no lifecycle `prepack`."
     }
   ]
 }

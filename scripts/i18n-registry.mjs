@@ -82,6 +82,12 @@ export const CONVERTED_FILES = Object.freeze([
   // frase mora em `src/skills/design-rule-registry.js:20` e aqui e so
   // renderizada.
   "src/commands/visual.js",
+  // Lote JS, arquivos 7 e 8/14 — C-5. Nao sao comandos da CLI e nao estao no
+  // DISPATCH; o npm os executa SOZINHO (`version` e `prepack`), e por isso a
+  // saida deles pertence a claim. Ver `console-lifecycle-diagnostic` e
+  // `stream-lifecycle-diagnostic`.
+  "scripts/sync-qg-version.mjs",
+  "scripts/clean-pkg.mjs",
 ])
 
 const norm = (p) => String(p).replace(/\\/g, "/")

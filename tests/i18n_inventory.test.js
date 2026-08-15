@@ -179,13 +179,21 @@ test("validateRegistry recusa script que NÃO é alcançado pelo runtime (não p
  *
  * ATUALIZE AQUI, e so aqui, a cada arquivo reconciliado no lote JS.
  */
-test("CENSO GLOBAL: 1906 pontos, 48 unknown, 9 arquivos convertidos", async () => {
+test("CENSO GLOBAL: 1905 pontos, 45 unknown, 11 arquivos convertidos", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
 
   // TOTAL e invariante do lote: converter troca a FONTE do ponto (regex -> AST),
   // nunca a existencia dele. "Nenhum ponto perdido" e medido aqui.
-  assert.equal(inv.total, 1906, "converter nao pode criar nem sumir com ponto")
+  // O total cai quando o arquivo convertido tinha FALSO POSITIVO do regex — e
+  // so nesse caso. `scripts/clean-pkg.mjs:28` e `console.error(...)`, e o
+  // extrator regex contava DOIS pontos na mesma linha: `28:cli_render` (o
+  // `error(` de dentro casa o padrao de helper) e `28:console`. Medido em
+  // worktree limpo do commit anterior, antes de converter. O AST ve UMA chamada.
+  //
+  // 1906 -> 1905: um falso positivo a menos. Nenhum ponto REAL sumiu — e a
+  // distincao entre as duas coisas e justamente o que esta asercao guarda.
+  assert.equal(inv.total, 1905, "converter nao pode sumir com ponto REAL; falso positivo do regex pode cair")
 
   // Medicao em movimento: cai a cada arquivo reconciliado. 54 -> 53 com qa.js;
   // 53 -> 52 com secrets.js.
@@ -209,8 +217,11 @@ test("CENSO GLOBAL: 1906 pontos, 48 unknown, 9 arquivos convertidos", async () =
   // regex via 1. O arquivo so fechou com TRES coisas juntas — C-3 (tabela
   // congelada), C-4(b) (`console.log(renderFeedbackMarkdown(...))`) e a prova
   // publica de `visual --json` cobrindo dez dos onze pontos de maquina.
-  assert.equal(inv.unknown, 48, "lote JS 6/14: visual.js (cinco subcomandos de `--json` + texto renderizado) saiu para 0")
-  assert.equal(inv.jsRegistry.convertedFiles.length, 9)
+  //
+  // 48 -> 45 com os dois scripts de lifecycle (C-5, lote JS 7 e 8/14): dois
+  // unknown em `sync-qg-version.mjs` e um em `clean-pkg.mjs`.
+  assert.equal(inv.unknown, 45, "C-5: scripts que o npm roda sozinho (`version`/`prepack`) sairam para 0")
+  assert.equal(inv.jsRegistry.convertedFiles.length, 11)
   assert.equal(inv.blocked, false)
 
   // A relacao que sustenta o numero: nenhum convertido guarda unknown.

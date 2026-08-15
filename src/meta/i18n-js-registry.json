@@ -1,5 +1,7 @@
 {
   "convertedFiles": [
+    "scripts/clean-pkg.mjs",
+    "scripts/sync-qg-version.mjs",
     "src/cli/create.js",
     "src/cli/index.js",
     "src/commands/init.js",
@@ -11,6 +13,77 @@
     "src/index.js"
   ],
   "files": {
+    "scripts/clean-pkg.mjs": {
+      "entries": [
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.error",
+          "calleePath": "console.error",
+          "canonicalName": "error",
+          "column": 1,
+          "line": 28,
+          "provenance": {
+            "ids": [
+              "removed"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "console-lifecycle-diagnostic",
+          "sink": null
+        }
+      ],
+      "fileHash": "sha256:b2d4fc60079509d71bd1aa7858eed90a3e2fb5e0f728c66f838cd5d232c91c65"
+    },
+    "scripts/sync-qg-version.mjs": {
+      "entries": [
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "process.stderr.write",
+          "calleePath": "process.stderr.write",
+          "canonicalName": "write",
+          "column": 5,
+          "line": 35,
+          "provenance": {
+            "ids": [
+              "r",
+              "version",
+              "r",
+              "changed"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "stream-lifecycle-diagnostic",
+          "sink": "stderr"
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "process.stderr.write",
+          "calleePath": "process.stderr.write",
+          "canonicalName": "write",
+          "column": 5,
+          "line": 37,
+          "provenance": {
+            "ids": [
+              "e",
+              "message"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "stream-lifecycle-diagnostic",
+          "sink": "stderr"
+        }
+      ],
+      "fileHash": "sha256:d6e5c6d7efa32db11df4ff5f780d023d00708db0318df901176b569e8bc65454"
+    },
     "src/cli/create.js": {
       "entries": [
         {

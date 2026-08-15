@@ -2451,6 +2451,22 @@ export const JS_RULES = Object.freeze([
      * sem ponto proprio. Fechar isso e mudar o modelo de medicao da Fase 1B, nao
      * classificar melhor um callsite.
      */
+    /**
+     * DIAGNOSTICO DE LIFECYCLE — `console.error` em script que o npm dispara.
+     *
+     * Par da regra `stream-lifecycle-diagnostic` em SINK_RULES: sao o MESMO
+     * fato visto por canais diferentes (`console.error` nao tem sink;
+     * `process.stderr.write` tem), e `classifyPoint` escolhe a lista por
+     * `p.sink`. Manter uma so deixaria metade dos pontos de fora — e as duas
+     * compartilham `ehDiagnosticoDeLifecycle`, entao as portas nao podem divergir.
+     */
+    id: "console-lifecycle-diagnostic",
+    when: (p, ctx) => p.consoleIsRuntimeGlobal === true && ehDiagnosticoDeLifecycle(p, ctx),
+    audience: "public_diagnostic",
+    trigger: "lifecycle_diagnostic",
+    reason: "frase emitida por script que o npm executa sozinho no ciclo de versao/empacotamento: quem versiona ou publica le esta saida, e ela e do produto",
+  },
+  {
     id: "console-project-rendered-text",
     when: (p) => p.callee === "console.log"
       && p.consoleIsRuntimeGlobal === true
@@ -2526,6 +2542,68 @@ const alvosDeBin = (repoRoot) => {
     return new Set(vals.filter((v) => typeof v === "string").map((v) => norm(v).replace(/^\.\//, "")))
   } catch { return new Set() }
 }
+
+/**
+ * O arquivo e rodado por um LIFECYCLE do npm?
+ *
+ * `scripts/clean-pkg.mjs` e `scripts/sync-qg-version.mjs` nao sao comandos da
+ * CLI e nao estao no `DISPATCH` — nenhuma regra de superficie de comando os
+ * alcancava, e por isso os tres pontos deles ficavam `unknown`. Mas eles nao sao
+ * ferramenta solta: o npm os executa SOZINHO em `npm version` (`version`) e em
+ * `npm pack`/`npm publish` (`prepack`). Quem roda qualquer um desses le a saida,
+ * e ela e do produto.
+ *
+ * DERIVADO DO MANIFESTO, como `ehEntrypointDeBin`: o que torna o script parte do
+ * ciclo e o package.json cita-lo numa chave de lifecycle. Se amanha parar de
+ * citar, a classificacao muda sozinha. Nome do arquivo e diretorio nao decidem
+ * nada aqui.
+ *
+ * LISTA FECHADA de lifecycles, e curta de proposito. `scripts.test` ou
+ * `scripts.lint` NAO entram: sao conveniencia de desenvolvimento, invocadas a
+ * mao, e a saida delas nao acompanha o produto. O que entra e o que o npm dispara
+ * por conta propria ao versionar, empacotar ou publicar.
+ */
+const LIFECYCLES_DO_NPM = Object.freeze(new Set([
+  "preversion", "version", "postversion",
+  "prepare", "prepack", "postpack",
+  "prepublishOnly", "prepublish", "publish", "postpublish",
+]))
+
+/** `node scripts/x.mjs --flag` -> `scripts/x.mjs`. Sem regex de nome de arquivo. */
+const REFERENCIA_A_SCRIPT = /(?:^|[\s"'])((?:\.\/)?(?:scripts|tools)\/[\w./-]+\.(?:mjs|cjs|js))/g
+
+const scriptsDeLifecycle = (repoRoot) => {
+  try {
+    const pkg = JSON.parse(readFileSync(`${norm(repoRoot).replace(/\/+$/, "")}/package.json`, "utf8"))
+    const alvos = new Set()
+    for (const [nome, cmd] of Object.entries(pkg.scripts ?? {})) {
+      if (!LIFECYCLES_DO_NPM.has(nome)) continue
+      for (const m of String(cmd).matchAll(REFERENCIA_A_SCRIPT)) alvos.add(norm(m[1]).replace(/^\.\//, ""))
+    }
+    return alvos
+  } catch { return new Set() }
+}
+
+const ehScriptDeLifecycle = (arquivo, repoRoot) => {
+  if (!repoRoot) return false
+  const chave = chaveCanonica(arquivo, repoRoot)
+  return Boolean(chave) && scriptsDeLifecycle(repoRoot).has(chave)
+}
+
+/**
+ * FRASE, e so frase. `opaque` e `serializer` NAO entram: um payload emitido por
+ * script de lifecycle continua sendo pergunta em aberto, e transformar "quem
+ * emitiu" em licenca para classificar qualquer forma seria trocar evidencia
+ * estrutural por identidade de arquivo — o erro que `render-module-literal-output`
+ * documenta.
+ */
+const FORMAS_DE_FRASE = new Set(["text_literal", "text"])
+
+/** FRASE humana emitida por script de lifecycle, fora de guarda de maquina. */
+const ehDiagnosticoDeLifecycle = (p, ctx) => FORMAS_DE_FRASE.has(p.argForm)
+  && p.underMachineGuard !== true
+  && p.underDebugGuard !== true
+  && ehScriptDeLifecycle(p.file, ctx.repoRoot)
 
 const ehEntrypointDeBin = (arquivo, repoRoot) => {
   if (!repoRoot) return false
@@ -2653,6 +2731,19 @@ export const SINK_RULES = Object.freeze([
     audience: "machine_protocol",
     trigger: "structural_serializer",
     reason: "documento JSON completo no ramo de maquina, com consumidor declarado para o comando: serializado em tempo de autoria, mas payload de contrato igual",
+  },
+  {
+    /**
+     * Par de `console-lifecycle-diagnostic`, para o canal com sink.
+     * `sync-qg-version.mjs` escreve em `process.stderr` e `clean-pkg.mjs` usa
+     * `console.error`; e o mesmo fato, e as duas regras compartilham
+     * `ehDiagnosticoDeLifecycle` justamente para nao divergirem.
+     */
+    id: "stream-lifecycle-diagnostic",
+    when: (p, ctx) => ehDiagnosticoDeLifecycle(p, ctx),
+    audience: "public_diagnostic",
+    trigger: "lifecycle_diagnostic",
+    reason: "frase emitida em stream por script que o npm executa sozinho no ciclo de versao/empacotamento: canal lido por quem versiona ou publica",
   },
   {
     id: "stream-terminal-control",

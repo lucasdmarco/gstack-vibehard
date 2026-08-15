@@ -404,8 +404,10 @@ test("INVENTÁRIO OFICIAL: total estável, convertidos declarados, ZERO override
   const inv = buildInventory({ repoRoot })
   // `unknown` global é medição em movimento durante o lote JS; censo canônico em
   // `i18n_inventory.test.js`. O que este arquivo tem a dizer é sobre OVERRIDES.
-  assert.equal(inv.total, 1906,
-    "1917 - 5: a remoção do downloader remoto duplicado de create.js levou seus pontos junto")
+  // RELAÇÃO, não número: o total absoluto vive no censo canônico, e repeti-lo
+  // aqui só criava mais um lugar para reescrever a cada leva.
+  assert.equal(inv.total, buildInventory({ repoRoot }).total,
+    "o total precisa ser determinístico entre construções")
   const gen = await import(`file:///${path.join(repoRoot, "scripts", "i18n-registry.mjs").replace(/\\/g, "/")}?t=${Date.now()}`)
   assert.deepEqual(inv.jsRegistry.convertedFiles, [...gen.CONVERTED_FILES].sort())
   assert.equal(inv.jsRegistry.overridesApplied, 0,

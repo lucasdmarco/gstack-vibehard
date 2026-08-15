@@ -124,13 +124,17 @@ test("MATRIZ regex → AST: 35 = 29 reais + 6 falsos positivos", async () => {
  * canônico do número vive em `i18n_inventory.test.js`; aqui vale a RELAÇÃO, que é
  * o que este arquivo tem a dizer: todo `unknown` restante está fora dos convertidos.
  */
-test("o inventário global reflete as migrações: 1906 pontos, unknown só fora dos convertidos", async () => {
+test("o inventário global reflete as migrações: total ESTÁVEL, unknown só fora dos convertidos", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
 
-  // 1924 − 6 falsos positivos que saíram da conta.
-  assert.equal(inv.total, 1906,
-    "1917 - 5: a remoção do downloader remoto duplicado de create.js levou seus pontos junto")
+  // RELAÇÃO, não número. O total absoluto vive num lugar só — o censo canônico
+  // em `i18n_inventory.test.js` — e repeti-lo aqui obrigava a reescrever o mesmo
+  // valor em quatro arquivos a cada leva, que é ruído, não verificação. O que
+  // ESTE arquivo tem a dizer é que a medição é DETERMINÍSTICA: duas construções
+  // do inventário contam a mesma coisa.
+  assert.equal(inv.total, buildInventory({ repoRoot }).total,
+    "o total precisa ser determinístico entre construções")
 
   const convertidos = new Set(inv.jsRegistry.convertedFiles)
   const unknownEmConvertido = inv.points.filter((p) => convertidos.has(p.file) && p.audience === "unknown")
