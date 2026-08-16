@@ -25,6 +25,7 @@ import { readFileSync, writeFileSync } from "fs"
 import { createHash } from "crypto"
 import path from "path"
 import { analyzeFile, createAnalyzer, argumentProvenance } from "./lib/i18n-js-ast.mjs"
+import { distributedPythonFiles } from "../src/meta/i18n-inventory.js"
 
 export const REGISTRY_SCHEMA = "gstack.i18n-js-registry.v1"
 export const OVERRIDES_SCHEMA = "gstack.i18n-js-overrides.v1"
@@ -224,15 +225,29 @@ export function canonicalizarConvertidos(arquivos, root) {
     .sort((a, b) => a.rel.localeCompare(b.rel))
 }
 
+/**
+ * Origens que o inventario CONTA, entregues ao engine.
+ *
+ * A direcao do import importa e e a unica que funciona: este gerador e
+ * build-time e pode ler o modulo de runtime; o inverso (o inventario importar o
+ * engine) traria TypeScript para producao, que e o motivo de o registry
+ * existir. Aqui a fronteira Python e apenas LIDA como dado.
+ *
+ * Sem esta injecao, `countedOrigins` fica vazio no engine e nenhum ponto pode
+ * sair da claim alegando "ja contado noutro lugar" — fail-closed.
+ */
+const origensContadas = (root) => new Set(distributedPythonFiles(root).keys())
+
 export function buildRegistry(arquivos, opcoes = {}) {
   const root = opcoes.root ?? process.cwd()
   const alvos = canonicalizarConvertidos(arquivos, root)
   const analyzer = alvos.length > 0 ? createAnalyzer(alvos.map((a) => a.abs)) : null
+  const ctx = { repoRoot: root, countedOrigins: opcoes.countedOrigins ?? origensContadas(root) }
 
   const files = {}
   for (const { rel, abs } of alvos) {
     files[rel] = {
-      entries: analyzeFile(abs, analyzer, { repoRoot: root }).map((p) => entrada(p, root)).sort(porPosicao),
+      entries: analyzeFile(abs, analyzer, ctx).map((p) => entrada(p, root)).sort(porPosicao),
       fileHash: hashConteudo(readFileSync(abs, "utf8")),
     }
   }

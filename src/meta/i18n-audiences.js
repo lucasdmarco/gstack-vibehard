@@ -31,9 +31,15 @@ export const AUDIENCES = Object.freeze([
   // como `corrupt` o registry LEGÍTIMO do primeiro arquivo convertido — dois
   // componentes corretos isoladamente, contrato quebrado entre eles.
   "public_interactive",      // pergunta que o usuário lê e responde — entra, inglês
-  "render_primitive",        // console.* DENTRO da primitiva que implementa o canal:
-                             // o texto vem do chamador, a função só decora. Contar
-                             // como público duplicaria a mesma mensagem no inventário.
+  "render_primitive",        // o texto vem de OUTRO lugar, que já foi contado: contar
+                             // aqui duplicaria a mesma mensagem no inventário. DUAS
+                             // formas, mesmo critério — console.* dentro da primitiva
+                             // que implementa o canal (a função só decora, o texto é do
+                             // chamador); e repasse cru da saída de um artefato do
+                             // próprio pacote cujas frases já têm ponto próprio, onde a
+                             // fronteira atravessada é de PROCESSO e não de função. A
+                             // segunda só vale enquanto a origem estiver mesmo no censo
+                             // — ver `stream-counted-subprocess-origin`.
   "external_passthrough",    // bytes de subprocesso externo, encaminhados sem transformação
   "generated_app_copy",      // texto do app do usuário — segue o idioma do projeto
   "generated_dev_surface",   // mensagem técnica no projeto gerado — entra, inglês

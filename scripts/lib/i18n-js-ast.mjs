@@ -22,6 +22,7 @@
  */
 import ts from "typescript"
 import { readFileSync } from "fs"
+import path from "path"
 
 export const JS_AST_SCHEMA = "gstack.i18n-js-ast.v1"
 
@@ -3107,6 +3108,98 @@ export function origemDeRepasse(arg, ctx, campo = null, prof = 0) {
   return caso ? caso[1](arg, ctx, campo, prof, origemDeRepasse) : REPASSE_AUSENTE
 }
 
+// ── Origem CONTADA de subprocesso do proprio pacote ─────────────────────────
+
+/**
+ * O arquivo do PROJETO cuja saida este ponto encaminha, quando esse arquivo ja
+ * e contado pelo inventario. `null` no resto.
+ *
+ * ASSIMETRIA DELIBERADA em relacao a `origemDeRepasse`, e ela e o coracao desta
+ * capacidade. Aquela prova cadeia de valor byte a byte porque serve a uma
+ * EXCLUSAO perigosa: `external_passthrough` diz "ninguem e dono deste texto", e
+ * errar apaga frases da claim. Aqui a exclusao e de outra natureza — diz "este
+ * texto E nosso e ja esta contado NA ORIGEM" —, e o risco de errar e contar
+ * duas vezes ou perder um ponto cuja origem nao esta, de fato, contada. Por
+ * isso a porta decisiva nao e a cadeia: e a pergunta, feita ao inventario, de
+ * se aquele artefato entra no censo.
+ *
+ * O que a cadeia precisa provar continua sendo estrutural: que o argumento
+ * chega a uma funcao DESTE arquivo que dispara um artefato do proprio modulo.
+ * Nao basta "ha um spawn no arquivo" — precisa ser a funcao que o argumento
+ * alcanca.
+ */
+const ALCANCE_POR_FORMA = [
+  [(n) => ts.isPropertyAccessExpression(n), (n, ctx, prof, rec) => rec(n.expression, ctx, prof + 1)],
+  [(n) => ts.isIdentifier(n), (n, ctx, prof, rec) => {
+    const init = inicializadorDeConstLocal(n, ctx)
+    return init ? rec(init, ctx, prof + 1) : null
+  }],
+  [(n) => ts.isCallExpression(n), (n, ctx) => funcaoLocalDoCallee(n, ctx)],
+]
+
+/** Funcao local que a cadeia do argumento alcanca, ou `null`. */
+function funcaoAlcancadaPeloArgumento(arg, ctx, prof = 0) {
+  if (!arg || prof > LIMITE_REPASSE) return null
+  const caso = ALCANCE_POR_FORMA.find(([forma]) => forma(arg))
+  return caso ? caso[1](arg, ctx, prof, funcaoAlcancadaPeloArgumento) : null
+}
+
+/**
+ * Chamadas de subprocesso DENTRO da funcao.
+ *
+ * Sem filtro por `ARTEFATO_PROJETO` aqui, e de proposito: `candidatosDeArtefato`
+ * exige que algum argumento resolva ESTATICAMENTE com a ancora do modulo, o que
+ * e estritamente mais forte do que o veredito `project` (existencial). A porta
+ * extra nunca podia recusar nada sozinha — o mutation control mostrou que
+ * remove-la nao quebrava teste algum.
+ */
+const spawnsEm = (fn, ctx) => {
+  const achados = []
+  percorrerNos(fn, (n) => {
+    const s = chamadaDeSubprocesso(n, ctx.checker)
+    if (s) achados.push(s)
+  })
+  return achados
+}
+
+const elementosOuProprio = (n) => (ts.isArrayLiteralExpression(n) ? [...n.elements] : [n])
+
+/**
+ * As DUAS leituras possiveis da ancora do modulo, e por que ambas entram.
+ *
+ * `<self>` marca "a posicao deste arquivo", mas a cadeia que produziu a marca
+ * pode ter passado por `dirname(fileURLToPath(import.meta.url))` (o DIRETORIO)
+ * ou por `fileURLToPath(import.meta.url)` (o ARQUIVO), e `segmentosDeCaminho`
+ * achata a chamada sem guardar qual foi. Em vez de adivinhar, as duas leituras
+ * viram candidatos — e quem desempata e a pergunta seguinte: so uma delas cai
+ * num arquivo que o inventario conta. Ambiguidade explicita e limitada, nunca
+ * palpite.
+ */
+const candidatosDeArtefato = (spawn, ctx) => {
+  const saida = []
+  for (const arg of spawn.arguments.flatMap(elementosOuProprio)) {
+    const segs = segmentosDeCaminho(arg, ctx)
+    if (!segs?.includes(ANCORA_DO_MODULO)) continue
+    const resto = segs.filter((s) => s !== ANCORA_DO_MODULO)
+    for (const base of [path.dirname(ctx.sf.fileName), ctx.sf.fileName]) {
+      saida.push(relativoAoRepo(norm(path.resolve(base, ...resto)), ctx.repoRoot))
+    }
+  }
+  return saida
+}
+
+/** Ha argumento, checker e ALGUMA origem contada para consultar. */
+const podeConsultarOrigens = (arg, ctx) =>
+  Boolean(arg) && Boolean(ctx?.checker) && ctx.countedOrigins?.size > 0
+
+export function origemContadaDeSubprocesso(arg, ctx) {
+  const fn = podeConsultarOrigens(arg, ctx) ? funcaoAlcancadaPeloArgumento(arg, ctx) : null
+  if (!fn) return null
+  return spawnsEm(fn, ctx)
+    .flatMap((s) => candidatosDeArtefato(s, ctx))
+    .find((c) => ctx.countedOrigins.has(c)) ?? null
+}
+
 export const SINK_RULES = Object.freeze([
   {
     // Guarda POSITIVA. `requiresDebugEnv` ja garante que `!DEBUG` e
@@ -3193,6 +3286,40 @@ export const SINK_RULES = Object.freeze([
      *
      * O zero de hoje e portanto MEDIDO, e nao mais "inalcancavel por design".
      */
+    /**
+     * REPASSE DE SUBPROCESSO DO PROPRIO PACOTE, com a origem JA CONTADA.
+     *
+     * `context.js:249/260/278/280` encaminham, sem uma moldura sequer, o stdout
+     * de `src/context-docs/py/context_db.py`. Aquele arquivo viaja no pacote e
+     * imprime prosa escrita pelo GStack — e desde a fatia da fronteira Python
+     * ele tem PONTOS PROPRIOS no inventario, com as frases contadas na origem.
+     *
+     * Contar de novo AQUI duplicaria as mesmas mensagens: e exatamente o
+     * criterio de `render_primitive` ("a string vem de outro lugar, que ja foi
+     * contado"), agora atravessando a fronteira de PROCESSO em vez da de funcao.
+     *
+     * A PORTA DECISIVA E A ULTIMA, e ela nao e sintatica: `subprocessOrigin` so
+     * e preenchido quando o artefato resolvido esta no conjunto de origens que o
+     * inventario CONTA. Sem a injecao de `countedOrigins` o campo e `null` e o
+     * ponto continua `unknown` — fail-closed por construcao. E o "somente
+     * porque a origem passou a ser contada" escrito como codigo: se aquele
+     * arquivo sair da fronteira, estes quatro pontos voltam para a fila em vez
+     * de sumirem da claim.
+     *
+     * `argForm === "opaque"` continua exigido: assim que o GStack escreve uma
+     * moldura em volta, a frase e dele e o ponto e da claim, por mais que o dado
+     * venha do subprocesso. Fora do ramo de maquina, porque payload
+     * encaminhado sob `--json` e outra pergunta (contrato, nao duplicata).
+     */
+    id: "stream-counted-subprocess-origin",
+    when: (p) => typeof p.subprocessOrigin === "string"
+      && p.argForm === "opaque"
+      && p.underMachineGuard !== true,
+    audience: "render_primitive",
+    trigger: "counted_subprocess_origin",
+    reason: "encaminha, sem moldura nenhuma, a saida de um artefato do proprio pacote cujas frases JA sao contadas no inventario, na origem. Nao e unidade traduzivel aqui: conta-la de novo duplicaria a mesma mensagem. A origem e nomeada em `subprocessOrigin`, e a regra so vale enquanto aquele arquivo estiver de fato no censo",
+  },
+  {
     id: "stream-external-passthrough",
     when: (p) => p.byteOrigin === ARTEFATO_EXTERNO
       && p.argForm === "opaque"
@@ -3391,6 +3518,20 @@ export function canonicalNameOf(checker, idNode) {
   return nomeDaDeclaracao(sym) ?? sym.getName() ?? null
 }
 
+/**
+ * Contexto de resolucao do arquivo: mesmo grafo de declaracoes locais da 3.1a,
+ * entao a identidade de no ja esta conferida.
+ */
+const contextoDeResolucao = (a, sf, ctx) => ({
+  checker: a.checker, sf, decls: declaracoesDeFuncao(sf), cache: new Map(), emCurso: new Set(),
+  // Usado por `origemDeTextoRenderizado` para relativizar o caminho da origem.
+  repoRoot: ctx.repoRoot,
+  // Origens Python que o inventario CONTA. Vazio por default, e de proposito:
+  // sem a injecao do gerador nenhum ponto pode sair da claim por "ja contado
+  // noutro lugar". Fail-closed.
+  countedOrigins: ctx.countedOrigins ?? new Set(),
+})
+
 export function analyzeFile(filePath, analyzer = null, ctx = {}) {
   const a = analyzer || createAnalyzer([filePath])
   const sf = a.program.getSourceFile(filePath)
@@ -3407,11 +3548,7 @@ export function analyzeFile(filePath, analyzer = null, ctx = {}) {
     entrypointsPorComando(a.program, a.checker).get(norm(filePath)))
   // Contexto de resolucao para wrappers transparentes (3.1c): mesmo grafo de
   // declaracoes locais da 3.1a, entao a identidade de no ja esta conferida.
-  const ctxAst = {
-    checker: a.checker, sf, decls: declaracoesDeFuncao(sf), cache: new Map(), emCurso: new Set(),
-    // Usado por `origemDeTextoRenderizado` para relativizar o caminho da origem.
-    repoRoot: ctx.repoRoot,
-  }
+  const ctxAst = contextoDeResolucao(a, sf, ctx)
   // Valor abstrato de cada parametro, propagado SO a partir dos handlers do
   // DISPATCH que vivem neste arquivo (3.1b.1).
   const receptores = propagarDoEntrypoint(ctxAst, canonicas ?? [])
@@ -3474,6 +3611,9 @@ export function analyzeFile(filePath, analyzer = null, ctx = {}) {
       // `external`, `unresolved` ou `none`. So `external` classifica — as outras
       // tres deixam o ponto onde estava, que e o que fecha a porta.
       byteOrigin: origemDeRepasse(arg0, ctxAst),
+      // Arquivo do pacote, JA CONTADO no inventario, cuja saida este ponto
+      // encaminha. Nomeia a origem em vez de so afirmar que existe.
+      subprocessOrigin: origemContadaDeSubprocesso(arg0, ctxAst),
       argKind: arg0 ? ts.SyntaxKind[arg0.kind] : "none",
       // Forma ESTRUTURAL do argumento — o que permite decidir sobre um
       // `process.*.write` sem apelar para a identidade do arquivo.
