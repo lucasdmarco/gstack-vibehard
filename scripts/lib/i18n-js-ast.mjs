@@ -2931,23 +2931,17 @@ function expressoesDeRetorno(fn) {
 /**
  * Funcao top-level DESTE arquivo para a qual o callee resolve, ou `null`.
  *
- * Arrow entra aqui e NAO em `isFunctionLike`: aquele predicado governa o grafo
- * de alcance e o reconhecimento de wrapper, e alarga-lo mexeria na
- * classificacao de pontos que ninguem reviu. O helper de uma linha
- * (`const asStr = (x) => …`) e a forma dominante do repositorio, e sem ele a
- * cadeia pararia por uma lacuna acidental — escondendo onde ela REALMENTE para.
+ * `funcaoDaDeclaracao` ja cobre o helper de uma linha
+ * (`const asStr = (x) => …`), que e a forma dominante do repositorio, porque
+ * `isFunctionLike` inclui arrow. Houve aqui, por uma leva, um par de helpers
+ * duplicando exatamente isso — escritos sobre a leitura errada de uma definicao
+ * quebrada em duas linhas, e com um comentario afirmando o contrario do que o
+ * codigo faz.
  */
-const ehFuncaoOuArrow = (n) => isFunctionLike(n) || ts.isArrowFunction(n)
-
-const funcaoOuArrowDaDeclaracao = (d) => {
-  if (ehFuncaoOuArrow(d)) return d
-  return ts.isVariableDeclaration(d) && d.initializer && ehFuncaoOuArrow(d.initializer) ? d.initializer : null
-}
-
 const funcaoLocalDoCallee = (node, ctx) => {
   if (!ts.isIdentifier(node.expression)) return null
   const d = declaracaoResolvida(ctx.checker, node.expression, ctx.sf)
-  return d ? funcaoOuArrowDaDeclaracao(d) : null
+  return d ? funcaoDaDeclaracao(d) : null
 }
 
 /** Inicializador do campo pendente num literal de objeto, ou `null`. */
