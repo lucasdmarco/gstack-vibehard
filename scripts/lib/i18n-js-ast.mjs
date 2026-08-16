@@ -1530,21 +1530,45 @@ const MACHINE_FLAG = /^(?:--)?(?:json|as_?json|machine)$/i
  * cada forma nova. A tabela mantem cada caso legivel isoladamente e o
  * caminhamento em um lugar so.
  */
-const FLAG_POR_FORMA = [
-  [ts.isIdentifier, (e) => MACHINE_FLAG.test(e.text)],
-  [ts.isStringLiteral, (e) => MACHINE_FLAG.test(e.text)],
-  [ts.isPropertyAccessExpression, (e) => ts.isIdentifier(e.name) && MACHINE_FLAG.test(e.name.text)],
-  [ts.isPrefixUnaryExpression, (e, rec) => rec(e.operand)],
+/**
+ * POLARIDADE, e nao so presenca: `+1` quando a condicao e verdadeira COM a flag
+ * ligada, `-1` quando e verdadeira com a flag DESLIGADA, `0` quando nao fala da
+ * flag.
+ *
+ * A versao anterior devolvia booleano, e por isso `if (!json) …` era lido como
+ * "guarda de maquina" — marcando o ramo THEN, que e justamente o HUMANO, como
+ * ramo de maquina. Medido: 11 pontos de FRASE em quatro arquivos ja convertidos
+ * carregavam `underMachineGuard: true` sendo texto que o usuario le. Nenhum
+ * estava mal classificado (todos fecham por `render-via-canonical-helper`, que
+ * nao consulta a guarda), mas o FATO estava errado — e `ehFraseHumana`,
+ * `console-blank-line`, `ehDiagnosticoDeLifecycle` e `modoDoPonto` consultam.
+ * Era um falso positivo esperando uma regra passar por perto.
+ *
+ * `if (!json) A else B` tem o efeito inverso e igualmente real: B roda no modo
+ * de maquina, e sem polaridade ficava fora — e o caso de
+ * `runtime-supervisor.js:278`.
+ */
+const casaFlag = (texto) => (MACHINE_FLAG.test(texto) ? 1 : 0)
+
+const POLARIDADE_POR_FORMA = [
+  [ts.isIdentifier, (e) => casaFlag(e.text)],
+  [ts.isStringLiteral, (e) => casaFlag(e.text)],
+  [ts.isPropertyAccessExpression, (e) => (ts.isIdentifier(e.name) ? casaFlag(e.name.text) : 0)],
+  [ts.isPrefixUnaryExpression, (e, rec) =>
+    (e.operator === ts.SyntaxKind.ExclamationToken ? -rec(e.operand) : rec(e.operand))],
   [ts.isParenthesizedExpression, (e, rec) => rec(e.expression)],
+  // Primeiro operando que fala da flag decide — mesma leitura de curto-circuito
+  // que a versao booleana ja tinha.
   [ts.isBinaryExpression, (e, rec) => rec(e.left) || rec(e.right)],
-  [ts.isCallExpression, (e, rec) => e.arguments.some(rec)],
+  // `args.includes("--json")` — o argumento e que carrega a flag.
+  [ts.isCallExpression, (e, rec) => e.arguments.map(rec).find(Boolean) ?? 0],
 ]
 
-/** A condicao menciona explicitamente a flag de saida de maquina? */
-function mencionaFlagDeMaquina(expr) {
-  if (!expr) return false
-  const caso = FLAG_POR_FORMA.find(([ehForma]) => ehForma(expr))
-  return caso ? Boolean(caso[1](expr, mencionaFlagDeMaquina)) : false
+/** `+1`, `-1` ou `0`. Ver a nota de polaridade acima. */
+function polaridadeDaFlagDeMaquina(expr) {
+  if (!expr) return 0
+  const caso = POLARIDADE_POR_FORMA.find(([ehForma]) => ehForma(expr))
+  return caso ? caso[1](expr, polaridadeDaFlagDeMaquina) : 0
 }
 
 /** `filho` esta contido em `alvo` por POSICAO na arvore? */
@@ -1573,18 +1597,25 @@ export function underDebugGuard(node) {
 }
 
 /**
- * O ponto esta no ramo de MODO MAQUINA (`if (json) …`)?
+ * O ponto esta no ramo que roda em MODO MAQUINA?
  *
- * Mesma disciplina de `underDebugGuard`: para na fronteira da funcao, porque uma
- * condicao fora dela nao controla este ponto, e olha SO o ramo `then` — no `else`
- * de `if (json)` estamos justamente no caminho humano.
+ * Mesma disciplina de `underDebugGuard` quanto ao escopo: para na fronteira da
+ * funcao, porque uma condicao fora dela nao controla este ponto.
+ *
+ * O que muda e QUAL ramo conta, e quem decide isso e a POLARIDADE da condicao:
+ * com `if (json)` e o `then`; com `if (!json)` e o `else`. Olhar sempre o `then`
+ * marcava como ramo de maquina justamente o caminho humano de todo
+ * `if (!json) …`.
  */
+/** O ramo que roda com a flag LIGADA, dada a polaridade da condicao. */
+const ramoDeMaquina = (no, polaridade) => (polaridade > 0 ? no.thenStatement : no.elseStatement)
+
 export function underMachineGuard(node) {
   for (let p = node.parent; p; p = p.parent) {
     if (isFunctionLike(p)) break
     if (!ts.isIfStatement(p)) continue
-    if (!mencionaFlagDeMaquina(p.expression)) continue
-    if (contains(p.thenStatement, node)) return true
+    const polaridade = polaridadeDaFlagDeMaquina(p.expression)
+    if (polaridade !== 0 && contains(ramoDeMaquina(p, polaridade), node)) return true
   }
   return false
 }
