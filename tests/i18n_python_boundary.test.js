@@ -193,21 +193,16 @@ test("PORTA: teste, fixture, cache e venv nao entram, mesmo publicados", async (
 // ── Efeito no censo e no registro de consumidores ──────────────────────────
 
 /**
- * A classificacao segue a ESPECIE da raiz.
- *
- * `stdout-hook-protocol` diz, com todas as letras, que "stdout de hook e o canal
- * do protocolo com o harness". Aplicar isso a um subprocesso de CLI afirmaria
- * contrato de maquina sobre a saida que o usuario le. `cli_subprocess` ainda nao
- * tem regras proprias: os pontos dele nascem `unknown`, que e o estado honesto
- * de uma pergunta que esta fatia levantou e a proxima responde.
+ * A FRONTEIRA ENTREGA PONTOS, e a especie decide quem os classifica. O que cada
+ * ponto vira e assunto de tests/i18n_python_cli_rules.test.js; aqui a pergunta e
+ * se eles chegaram, e por qual raiz.
  */
-test("os pontos do indexer entram, e os de prosa ficam `unknown` — nao viram protocolo", async () => {
-  const { buildInventory } = await imp()
+test("os 19 pontos do indexer entram no inventario pela raiz de CLI", async () => {
+  const { buildInventory, distributedPythonFiles } = await imp()
   const pts = buildInventory({ repoRoot }).points.filter((p) => p.file.endsWith("context_db.py"))
   assert.equal(pts.length, 19, "12 print + 6 json + 1 stderr")
-  const prosa = pts.filter((p) => p.sink === "print")
-  assert.equal(prosa.length, 12)
-  for (const p of prosa) assert.equal(p.audience, "unknown", `:${p.line} nao pode ser classificado sem regra`)
+  assert.equal(pts.filter((p) => p.sink === "print").length, 12)
+  assert.equal(distributedPythonFiles(repoRoot).get("src/context-docs/py/context_db.py").kind, "cli_subprocess")
 })
 
 /**
@@ -225,11 +220,24 @@ test("consumidor de `machine_protocol` e ancorado: hook nao adota o indexer", as
 
   const semAncoraDoHook = MACHINE_PROTOCOL_CONSUMERS.filter((c) => c !== doHook)
   const orfaos = inv.points.filter((p) => p.file.endsWith("context_db.py") && p.audience === "machine_protocol")
-  assert.equal(orfaos.length, 6)
+  assert.equal(orfaos.length, 10, "6 pelo sink `json` + 4 pelo `print` de serializacao pura")
   assert.equal(machineProtocolAudit({ points: orfaos }, semAncoraDoHook).ok, true,
-    "os seis precisam ter declaracao PROPRIA, e nao herdada")
-  assert.equal(machineProtocolAudit({ points: orfaos }, [doHook]).ok, false,
-    "e a declaracao do hook, sozinha, NAO pode cobri-los")
+    "os dez precisam ter declaracao PROPRIA, e nao herdada")
+  // O SUBCONJUNTO DE MESMO SINK e o que discrimina, e so ele. Confrontar a
+  // declaracao do hook com os dez pontos deixava o teste passar por acidente: os
+  // quatro de sink `print` ja escapam por canal, e o veredito `false` vinha
+  // dali, nao da ancora. O mutation control mostrou — apagar a ancora nao
+  // quebrava nada.
+  const mesmoSink = orfaos.filter((p) => p.sink === doHook.sink)
+  assert.equal(mesmoSink.length, 6)
+  assert.equal(machineProtocolAudit({ points: mesmoSink }, [doHook]).ok, false,
+    "mesmo canal, arquivo diferente: a declaracao do hook NAO pode cobrir o indexer")
+
+  // E o inverso, que nomeia o que a ancora impede: sem `file`, a mesma
+  // declaracao adota o indexer so por coincidencia de canal.
+  const semAncora = { ...doHook, file: undefined }
+  assert.equal(machineProtocolAudit({ points: mesmoSink }, [semAncora]).ok, true,
+    "sem `file`, a declaracao do hook cobre por canal e adota arquivo que nao descreve")
 })
 
 /**

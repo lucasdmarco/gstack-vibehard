@@ -347,13 +347,100 @@ const HOOK_RULES = Object.freeze([
   },
 ])
 
-export function classifyHookPoint(ctx = {}) {
-  const regra = HOOK_RULES.find((r) => r.when(ctx))
+/**
+ * Regras do Python de SUBPROCESSO DE CLI — espécie `cli_subprocess`.
+ *
+ * Lista separada de `HOOK_RULES` porque a pergunta é outra, e a diferença está
+ * escrita na própria regra de hook: "stdout de hook é o canal do protocolo com o
+ * harness". Aqui não há harness nenhum. Quem executa é o GStack, e quem lê o
+ * stdout é o usuário — `context.js` captura a saída do indexer e a encaminha
+ * crua (`context.js:249/260/278/280`) ou a reparseia (`explainJson`).
+ *
+ * A CONSEQUÊNCIA DISSO É A REGRA `cli-stdout-surface`: em subprocesso de CLI, o
+ * stdout é superfície de leitura por padrão, não protocolo. É o inverso exato do
+ * hook, e reusar a lista de lá teria afirmado contrato de máquina sobre as
+ * frases que o usuário lê no terminal.
+ *
+ * O que ainda é protocolo continua sendo, mas por evidência ESTRUTURAL: o
+ * payload é uma serialização e não há ramo humano na mesma chamada.
+ */
+const PY_SERIALIZADOR = /\bjson\.dumps\s*\(/
+// Expressão condicional de Python (`a if cond else b`) na própria chamada: há
+// DOIS payloads possíveis, e um deles é a frase.
+const PY_CONDICIONAL = /\bif\b[^\n]*\belse\b/
+
+const CLI_RULES = Object.freeze([
+  {
+    id: "cli-debug-flag",
+    when: ({ guardedByDebug }) => guardedByDebug,
+    audience: "internal_debug", trigger: "debug_flag",
+    reason: "exige ativação explícita de depuração — fora do fluxo padrão",
+  },
+  {
+    id: "cli-control-char-only",
+    when: ({ payloadIsControlChar }) => payloadIsControlChar,
+    audience: "terminal_control", trigger: "terminal_bell",
+    reason: "payload é byte de controle do terminal — não existe idioma a migrar",
+  },
+  {
+    id: "cli-json-sink",
+    when: ({ sink }) => sink === "json",
+    audience: "machine_protocol", trigger: "structural_serializer",
+    reason: "sink é serialização — contrato de máquina por construção; o consumidor fica declarado e ANCORADO no arquivo, nunca herdado do canal de hook",
+  },
+  {
+    /**
+     * `print(json.dumps(x))` — a serialização É a linha inteira.
+     *
+     * A ausência de condicional é porta, e não detalhe: `print(json.dumps(out)
+     * if args.json else f"Indexados …")` emite payload OU uma frase em
+     * português, conforme a flag. Tratar as duas formas igual tiraria da claim
+     * uma frase que o usuário lê metade das vezes.
+     */
+    id: "cli-stdout-serialized",
+    when: ({ sink, payloadIsSerialized }) => sink === "print" && payloadIsSerialized,
+    audience: "machine_protocol", trigger: "structural_serializer",
+    reason: "a chamada inteira é `print(json.dumps(...))`, sem ramo humano: o stdout daquele subcomando é UM documento de contrato",
+  },
+  {
+    id: "cli-stdout-surface",
+    when: ({ sink }) => sink === "print",
+    audience: "public_diagnostic", trigger: "cli_subprocess_stdout",
+    reason: "stdout de subprocesso do próprio GStack é superfície de leitura: o processo pai captura e encaminha ao terminal do usuário. O inverso do hook, onde stdout é protocolo — e é por isso que as duas espécies não compartilham lista de regras",
+  },
+  {
+    id: "cli-stderr-prefixed",
+    when: ({ sink, channelPrefixed }) => sink === "stderr" && channelPrefixed,
+    audience: "public_diagnostic", trigger: "normal_flow",
+    reason: "stderr com prefixo de canal ([graphify]/…) é a superfície de aviso do usuário no fluxo normal",
+  },
+  {
+    id: "cli-stderr-failure",
+    when: ({ sink, insideExceptHandler }) => sink === "stderr" && insideExceptHandler,
+    audience: "public_diagnostic", trigger: "subprocess_failure",
+    reason: "stderr em tratamento de exceção aparece ao usuário depois da falha",
+  },
+])
+
+const aplicarRegras = (regras, ctx) => {
+  const regra = regras.find((r) => r.when(ctx))
   if (!regra) return { audience: "unknown", trigger: null, rule: null }
   return { audience: regra.audience, trigger: regra.trigger, rule: regra.id }
 }
 
-export const hookRules = () => HOOK_RULES.map(({ id, audience, trigger, reason, risk }) => ({ id, audience, trigger, reason, ...(risk ? { risk } : {}) }))
+export function classifyHookPoint(ctx = {}) {
+  return aplicarRegras(HOOK_RULES, ctx)
+}
+
+export function classifyCliSubprocessPoint(ctx = {}) {
+  return aplicarRegras(CLI_RULES, ctx)
+}
+
+const semCorpo = ({ id, audience, trigger, reason, risk }) =>
+  ({ id, audience, trigger, reason, ...(risk ? { risk } : {}) })
+
+export const hookRules = () => HOOK_RULES.map(semCorpo)
+export const cliSubprocessRules = () => CLI_RULES.map(semCorpo)
 
 /**
  * `machine_protocol` só é legítimo com CONSUMIDOR real provado — parser identificado,
@@ -385,6 +472,24 @@ export const MACHINE_PROTOCOL_CONSUMERS = Object.freeze([
     consumer: "src/commands/context.js — `runIndexer` captura o stdout e o encaminha ou reparseia (`explainJson`)",
     contract: "sob `--json`, cada subcomando do indexer emite UM documento JSON em stdout",
     evidence: "tests/i18n_python_boundary.test.js — a fronteira prova o spawn; tests/test_context_db.py exercita index/search/related por subprocesso real",
+  },
+  {
+    // MESMA emissão, contada duas vezes pelo scanner: a linha casa o padrão de
+    // `print` E o de serialização. É a dívida de MEDIÇÃO já registrada do lado
+    // JS — onde o padrão de helper casa dentro da chamada de console —, e não um
+    // segundo contrato. A declaração existe porque o ponto de `print` também sai
+    // `machine_protocol` e o audit cobra consumidor de todo ponto que sai assim
+    // — o que ele NÃO pode aceitar é que a declaração do hook cubra este arquivo.
+    //
+    // E NÃO É TEORIA: a primeira versão deste comentário escrevia as chamadas
+    // por extenso e o próprio scanner contou TRÊS pontos de emissão dentro dele,
+    // inflando o censo em 3. Comentário deste módulo não pode citar sintaxe de
+    // sink literal.
+    file: "src/context-docs/py/context_db.py",
+    sink: "print",
+    consumer: "src/commands/context.js — mesmo consumidor do sink `json`; a linha é `print(json.dumps(...))` e o scanner a conta por dois canais",
+    contract: "sob `--json`, o stdout do subcomando é UM documento JSON",
+    evidence: "tests/i18n_python_cli_rules.test.js — só a chamada SEM ramo condicional é aceita como payload; a forma ternária fica na claim",
   },
   {
     sink: "stdout",
@@ -555,6 +660,10 @@ function pythonContext(text, line) {
     payloadIsControlChar: CONTROL_ONLY.test(chamada),
     emitsStructuredToken: STRUCTURED_TOKEN.test(chamada),
     channelPrefixed: CHANNEL_PREFIX.test(chamada),
+    // Serialização SEM ramo humano na mesma chamada. As duas condições juntas:
+    // `print(json.dumps(x))` é payload; `print(json.dumps(x) if f else "frase")`
+    // é payload OU frase, e a frase pertence à claim.
+    payloadIsSerialized: PY_SERIALIZADOR.test(chamada) && !PY_CONDICIONAL.test(chamada),
   }
 }
 
@@ -705,13 +814,12 @@ function arquivosPublicados(repoRoot, ext) {
  * `HOOK_RULES` descreve hook: a regra `stdout-hook-protocol` diz, com todas as
  * letras, que "stdout de hook é o canal do protocolo com o harness". Aplicá-la a
  * um subprocesso de CLI afirmaria contrato de máquina sobre a saída que o
- * usuário lê — por isso a espécie escolhe o classificador, e `cli_subprocess`
- * ainda NÃO tem regras: todo ponto dele nasce `unknown`, que é o estado honesto
- * de uma pergunta que esta fatia levantou e a próxima responde.
+ * usuário lê. Em `CLI_RULES` o stdout é o inverso — superfície de leitura por
+ * padrão —, e é justamente por isso que as duas listas não podem ser uma só.
  */
 const CLASSIFICADOR_POR_ESPECIE = {
   harness_hook: (ctx) => classifyHookPoint(ctx),
-  cli_subprocess: () => ({ audience: "unknown", trigger: null, rule: null }),
+  cli_subprocess: (ctx) => classifyCliSubprocessPoint(ctx),
 }
 
 const collectPyPoints = (repoRoot) => [...distributedPythonFiles(repoRoot)].flatMap(([rel, raiz]) => {
