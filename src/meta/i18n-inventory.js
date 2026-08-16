@@ -365,10 +365,26 @@ export const hookRules = () => HOOK_RULES.map(({ id, audience, trigger, reason, 
  */
 export const MACHINE_PROTOCOL_CONSUMERS = Object.freeze([
   {
+    // ANCORADA EM `hooks/` desde que a fronteira Python passou a incluir
+    // subprocesso de CLI. Sem a âncora, esta declaração — que fala de PROTOCOLO
+    // DE HOOK — passaria a cobrir os `json.dumps` de `context_db.py`, cujo
+    // consumidor é outro. A cobertura acidental é o que este registro existe
+    // para impedir; deixá-la valer aqui seria o registro se autoenganando.
+    file: "hooks/",
     sink: "json",
     consumer: "harness (Claude Code / Codex) via protocolo de hook",
     contract: "objeto JSON em stdout com decisão do hook (block/allow + reason)",
     evidence: "tests/test_stop_output_guard_rbac.py — subprocess real do hook, parseia a decisão",
+  },
+  {
+    // Python de CLI, e não de hook: quem lê é o próprio GStack, no processo pai.
+    // A prova de que este arquivo é alcançado — e por quem — está na fronteira
+    // (`PYTHON_RUNTIME_ROOTS`), derivada com o provador de origem de C-4(a).
+    file: "src/context-docs/py/context_db.py",
+    sink: "json",
+    consumer: "src/commands/context.js — `runIndexer` captura o stdout e o encaminha ou reparseia (`explainJson`)",
+    contract: "sob `--json`, cada subcomando do indexer emite UM documento JSON em stdout",
+    evidence: "tests/i18n_python_boundary.test.js — a fronteira prova o spawn; tests/test_context_db.py exercita index/search/related por subprocesso real",
   },
   {
     sink: "stdout",
@@ -455,7 +471,18 @@ const REQUIRE_CONSUMER = new Set(["machine_protocol"])
  * declaração real, um a um. Ancorar os hooks em `hooks/` antes disso só trocaria a
  * cobertura acidental por um gate vermelho de 130 achados sem consumidor declarado.
  */
-const cobre = (c, p) => c.sink === p.sink && (!c.file || c.file === p.file)
+/**
+ * `file` terminado em `/` é PREFIXO de diretório; sem barra, arquivo exato.
+ *
+ * A forma de prefixo entrou com a fronteira Python: a declaração dos hooks
+ * precisava dizer "os hooks, e só eles" sem enumerar dezesseis arquivos, e
+ * enumerar teria a mesma doença da lista manual — envelhece calada quando um
+ * hook novo aparece.
+ */
+const cobreArquivo = (c, p) => !c.file
+  || (c.file.endsWith("/") ? p.file.startsWith(c.file) : c.file === p.file)
+
+const cobre = (c, p) => c.sink === p.sink && cobreArquivo(c, p)
 
 export function machineProtocolAudit(inventory, consumers = MACHINE_PROTOCOL_CONSUMERS) {
   const semConsumidor = inventory.points
@@ -562,9 +589,137 @@ const collectJsPoints = (repoRoot, runtimeScripts, registry = null) => {
   }
 }
 
-const collectPyPoints = (repoRoot) => walkFiles(join(repoRoot, "hooks"), [".py"]).flatMap((f) => {
-  const text = readSafe(f)
-  return scanFile(f, repoRoot, SINKS_PY).map((p) => ({ ...p, ...classifyHookPoint({ sink: p.sink, ...pythonContext(text, p.line) }) }))
+// ── Fronteira do inventário Python ──────────────────────────────────────────
+//
+// ACHADO QUE ABRIU ESTA FATIA (C-4(a)). `context.js:249/260/278/280` repassam,
+// sem uma moldura sequer, o stdout de `src/context-docs/py/context_db.py`. O
+// provador de origem mostrou que aquele artefato NÃO é ferramenta de terceiros:
+// é script do próprio pacote, e ele imprime prosa escrita pelo GStack
+// ("(sem resultados)", "Entidade '…' não encontrada."). Só que o inventário
+// varria `hooks/` e mais nada — as frases não eram contadas em lugar nenhum.
+//
+// A fronteira antiga era um caminho literal (`hooks`), sem uma linha explicando
+// por quê. Substituí-la por outro caminho literal repetiria o erro num arquivo
+// a mais. O que decide é o critério, e ele tem DUAS condições:
+//
+//   1. DISTRIBUÍDO   — o arquivo viaja no pacote (`package.json#files`). Tirar
+//                      o diretório dali tira o arquivo da fronteira, sem que
+//                      ninguém precise lembrar de editar este módulo;
+//   2. ALCANÇÁVEL    — há execução REAL declarada, com evidência nomeada. Sem
+//                      esta condição a fronteira engoliria os 40 `.py` do
+//                      manifesto — 361 pontos, quase todos de script de skill
+//                      que a CLI nunca dispara. Medido, não estimado.
+//
+// É a mesma regra de ouro nº 1 do topo deste módulo, aplicada ao Python:
+// escopo é DERIVADO de execução, nunca de lista de caminhos.
+
+/** Diretórios que nunca são superfície do produto, em qualquer raiz. */
+const PY_SEGMENTOS_EXCLUIDOS = new Set([
+  "__pycache__", ".venv", "venv", "site-packages", "tests", "test", "fixtures", "__fixtures__",
+])
+
+/** Arquivo de teste por CONVENÇÃO de nome — a que o pytest usa para descobrir. */
+const PY_ARQUIVO_DE_TESTE = /^(?:test_.*|.*_test|conftest)\.py$/
+
+/** Caminho relativo com barras normais — a forma canônica de todo `file` daqui. */
+const norm = (p) => String(p).split(sep).join("/")
+
+const ehPythonDeProduto = (rel) => {
+  const partes = rel.split("/")
+  if (partes.some((s) => PY_SEGMENTOS_EXCLUIDOS.has(s))) return false
+  return !PY_ARQUIVO_DE_TESTE.test(partes[partes.length - 1])
+}
+
+/**
+ * RAÍZES DE EXECUÇÃO do Python, cada uma com a evidência que a sustenta.
+ *
+ * Declarada e versionada, no mesmo espírito de `MACHINE_PROTOCOL_CONSUMERS`:
+ * quem entra precisa dizer QUEM executa e ONDE isso está provado. O teste de
+ * fronteira confere as duas coisas contra o repositório real e, sobretudo, faz
+ * o controle de DERIVA — nenhum outro `.py` distribuído pode ser disparado por
+ * `src/` sem estar aqui.
+ */
+export const PYTHON_RUNTIME_ROOTS = Object.freeze([
+  Object.freeze({
+    path: "hooks",
+    kind: "harness_hook",
+    runner: "harness (Claude Code / Codex / OpenCode) via configuração de hook instalada",
+    evidence: "src/installer/install.js copia `hooks/hooks/*.py` e registra os eventos; tests/test_stop_sandbox.py roda o hook por subprocesso real",
+  }),
+  Object.freeze({
+    path: "src/context-docs/py/context_db.py",
+    kind: "cli_subprocess",
+    runner: "src/commands/context.js — `context index|search|related|explain|status`",
+    evidence: "tests/i18n_python_boundary.test.js prova, com o provador de origem de C-4(a), que o spawn de context.js resolve para ESTE arquivo",
+  }),
+])
+
+/**
+ * Os arquivos `.py` da fronteira, com o `kind` da raiz que os alcança.
+ *
+ * Interseção das duas condições: a raiz é declarada E o arquivo está dentro do
+ * que o manifesto publica. Uma raiz que aponte para fora do pacote não rende
+ * arquivo nenhum — e é isso que faz a condição 1 ser porta, não decoração.
+ */
+export function distributedPythonFiles(repoRoot = process.cwd()) {
+  const publicados = arquivosPublicados(repoRoot, ".py")
+  const saida = new Map()
+  for (const raiz of PYTHON_RUNTIME_ROOTS) {
+    for (const rel of arquivosDaRaiz(repoRoot, raiz.path)) {
+      if (publicados.has(rel) && ehPythonDeProduto(rel) && !saida.has(rel)) saida.set(rel, raiz)
+    }
+  }
+  return saida
+}
+
+/** `.py` sob a raiz declarada — arquivo único ou diretório inteiro. */
+function arquivosDaRaiz(repoRoot, raiz) {
+  const abs = join(repoRoot, raiz)
+  const st = statSafe(abs)
+  if (!st) return []
+  if (st.isFile()) return raiz.endsWith(".py") ? [norm(relative(repoRoot, abs))] : []
+  return walkFiles(abs, [".py"]).map((f) => norm(relative(repoRoot, f)))
+}
+
+/**
+ * O que o manifesto PUBLICA, com a extensão pedida.
+ *
+ * `package.json#files` é a única fonte: é ela que decide o que sai no tarball, e
+ * portanto o que pode chegar à máquina de alguém. Uma entrada que não existe em
+ * disco simplesmente não contribui — o manifesto pode citar caminho futuro.
+ */
+function arquivosPublicados(repoRoot, ext) {
+  const pkg = JSON.parse(readSafe(join(repoRoot, "package.json")) || "{}")
+  const saida = new Set()
+  for (const entrada of pkg.files || []) {
+    for (const rel of arquivosDaRaiz(repoRoot, String(entrada).replace(/\/$/, ""))) {
+      if (rel.endsWith(ext)) saida.add(rel)
+    }
+  }
+  return saida
+}
+
+/**
+ * Classificador por espécie de raiz.
+ *
+ * `HOOK_RULES` descreve hook: a regra `stdout-hook-protocol` diz, com todas as
+ * letras, que "stdout de hook é o canal do protocolo com o harness". Aplicá-la a
+ * um subprocesso de CLI afirmaria contrato de máquina sobre a saída que o
+ * usuário lê — por isso a espécie escolhe o classificador, e `cli_subprocess`
+ * ainda NÃO tem regras: todo ponto dele nasce `unknown`, que é o estado honesto
+ * de uma pergunta que esta fatia levantou e a próxima responde.
+ */
+const CLASSIFICADOR_POR_ESPECIE = {
+  harness_hook: (ctx) => classifyHookPoint(ctx),
+  cli_subprocess: () => ({ audience: "unknown", trigger: null, rule: null }),
+}
+
+const collectPyPoints = (repoRoot) => [...distributedPythonFiles(repoRoot)].flatMap(([rel, raiz]) => {
+  const abs = join(repoRoot, rel)
+  const text = readSafe(abs)
+  const classificar = CLASSIFICADOR_POR_ESPECIE[raiz.kind]
+  return scanFile(abs, repoRoot, SINKS_PY)
+    .map((p) => ({ ...p, ...classificar({ sink: p.sink, ...pythonContext(text, p.line) }) }))
 })
 
 // O registry só REFINA o que a análise de canal deixou `unknown`. Nunca sobrescreve uma

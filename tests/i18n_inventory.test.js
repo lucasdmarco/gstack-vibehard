@@ -179,7 +179,7 @@ test("validateRegistry recusa script que NÃO é alcançado pelo runtime (não p
  *
  * ATUALIZE AQUI, e so aqui, a cada arquivo reconciliado no lote JS.
  */
-test("CENSO GLOBAL: 1905 pontos, 45 unknown, 11 arquivos convertidos", async () => {
+test("CENSO GLOBAL: 1924 pontos, 58 unknown, 11 arquivos convertidos", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
 
@@ -193,7 +193,16 @@ test("CENSO GLOBAL: 1905 pontos, 45 unknown, 11 arquivos convertidos", async () 
   //
   // 1906 -> 1905: um falso positivo a menos. Nenhum ponto REAL sumiu — e a
   // distincao entre as duas coisas e justamente o que esta asercao guarda.
-  assert.equal(inv.total, 1905, "converter nao pode sumir com ponto REAL; falso positivo do regex pode cair")
+  //
+  // 1905 -> 1924: DESCOBERTA DE COBERTURA, e o unico salto para cima ate aqui.
+  // A fronteira do inventario Python deixou de ser o caminho literal `hooks/` e
+  // passou a ser derivada (distribuido no pacote E alcancado por execucao real).
+  // Entraram os 19 pontos de `src/context-docs/py/context_db.py`, que o
+  // `context.js` dispara e cuja saida ele repassa crua — prosa escrita pelo
+  // GStack que nao era contada em lugar nenhum. Subir aqui NAO e regressao: e o
+  // censo passando a medir o que sempre existiu. Ver
+  // tests/i18n_python_boundary.test.js.
+  assert.equal(inv.total, 1924, "converter nao pode sumir com ponto REAL; ampliar a fronteira medida pode somar")
 
   // Medicao em movimento: cai a cada arquivo reconciliado. 54 -> 53 com qa.js;
   // 53 -> 52 com secrets.js.
@@ -220,7 +229,13 @@ test("CENSO GLOBAL: 1905 pontos, 45 unknown, 11 arquivos convertidos", async () 
   //
   // 48 -> 45 com os dois scripts de lifecycle (C-5, lote JS 7 e 8/14): dois
   // unknown em `sync-qg-version.mjs` e um em `clean-pkg.mjs`.
-  assert.equal(inv.unknown, 45, "C-5: scripts que o npm roda sozinho (`version`/`prepack`) sairam para 0")
+  //
+  // 45 -> 58 com a fronteira Python derivada: os 12 `print` de prosa e o
+  // `sys.stderr.write` do indexer nascem `unknown` porque `cli_subprocess` ainda
+  // nao tem regras — a especie da raiz escolhe o classificador, e as regras de
+  // hook falam de protocolo com o harness, que nao e o caso aqui. Os 6
+  // `json.dumps` ja saem `machine_protocol`, com consumidor ANCORADO proprio.
+  assert.equal(inv.unknown, 58, "fronteira Python derivada: 13 pontos do indexer entram na fila")
   assert.equal(inv.jsRegistry.convertedFiles.length, 11)
   assert.equal(inv.blocked, false)
 
