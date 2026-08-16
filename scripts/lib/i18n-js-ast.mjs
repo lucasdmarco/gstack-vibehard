@@ -1588,6 +1588,90 @@ export function underMachineGuard(node) {
   return false
 }
 
+/**
+ * GUARDA DE MAQUINA HERDADA — o ponto vive num helper cujos chamadores estao
+ * TODOS sob `if (json)`.
+ *
+ * `underMachineGuard` para na fronteira da funcao, e com razao: uma condicao
+ * fora dela nao controla o no. So que isso deixa de fora a forma mais comum de
+ * emissor de payload no repositorio — o helper de uma linha:
+ *
+ *   const ctxJson = (obj) => process.stdout.write(JSON.stringify(obj) + "\n")
+ *
+ * Nenhuma guarda envolve aquela escrita. As cinco chamadas de `ctxJson` em
+ * `context.js` e que estao sob `if (json)`, e uma delas so indiretamente (via
+ * `explainJson`, que por sua vez e chamada sob a guarda). O ponto NAO e ambiguo:
+ * ele nunca roda fora do modo de maquina.
+ *
+ * UNIVERSAL, e a mesma disciplina de `coberturaAncorada`: TODO chamador precisa
+ * estar sob guarda. Um unico callsite fora dela e um caminho em que o helper
+ * escreve no modo humano, e ai a heranca seria mentira.
+ *
+ * DUAS PORTAS FECHAM A PROVA quando os chamadores nao sao exaustivos:
+ *
+ *   - funcao usada como VALOR (callback, export, atribuicao) — quem recebeu a
+ *     referencia chama de onde quiser, e os callsites visiveis deixam de esgotar
+ *     os chamadores. `ehUsadaComoValor` ja existia para o mesmo problema em
+ *     `resolverReceptor`;
+ *   - ZERO callsites — nao ha o que ser universal sobre. Vacuidade nao e prova.
+ *
+ * `<anon>` tambem para: uma funcao sem nome nao tem callsite pesquisavel.
+ *
+ * ESCOPO DELIBERADAMENTE ESTREITO. Esta fatia consome a heranca APENAS em
+ * `modoDoPonto`, para escolher qual declaracao de consumidor cobre o ponto.
+ * Estende-la as regras de frase (`ehFraseHumana`, `console-blank-line`) mudaria
+ * a classificacao de arquivos ja reconciliados, e isso e decisao de quem for
+ * reconcilia-los — nao efeito colateral desta.
+ */
+const LIMITE_HERANCA = 8
+
+/**
+ * Funcao de TOPO que contem o ponto — a unica cujos callsites sao pesquisaveis.
+ *
+ * Nao ha porta contra `<anon>` aqui: `ancestry` usa aquele rotulo justamente
+ * para o que nao tem nome, e `decls` so indexa declaracoes de topo nomeadas, de
+ * modo que a busca por ele nunca acha nada. Uma porta que jamais pode recusar
+ * sozinha e decoracao — o mutation control mostrou que remove-la nao quebrava
+ * teste algum.
+ */
+const nomeDaFuncaoDeTopo = (node) => {
+  const { functions } = ancestry(node)
+  return functions[functions.length - 1] ?? null
+}
+
+/**
+ * Chamadores visiveis E exaustivos, ou `null` quando nao se pode afirmar.
+ *
+ * TRES formas de os callsites deste arquivo NAO esgotarem os chamadores, e a
+ * primeira foi encontrada pelo controle negativo, nao pela leitura: uma funcao
+ * EXPORTADA e chamavel de qualquer modulo, e nenhuma dessas chamadas aparece
+ * aqui. `ehUsadaComoValor` nao a pega — ali o identificador esta na posicao de
+ * declaracao, nao de referencia.
+ */
+const chamadoresExaustivos = (nome, ctx) => {
+  const declarada = ctx.decls?.get(nome)
+  if (!declarada || ehExportada(declarada)) return null
+  if (ehUsadaComoValor(ctx.sf, nome, ctx.checker, ctx.decls)) return null
+  const chamadas = callsitesDe(ctx.sf, nome, ctx.checker, ctx.decls)
+  return chamadas.length > 0 ? chamadas : null
+}
+
+const chamadaSobGuarda = (c, ctx, prof, vistos) =>
+  underMachineGuard(c) || underInheritedMachineGuard(c, ctx, prof + 1, vistos)
+
+/** Nome a investigar, ou `null` quando o contexto/profundidade nao permitem. */
+const alvoDaHeranca = (node, ctx, prof) =>
+  (ctx?.checker && prof <= LIMITE_HERANCA ? nomeDaFuncaoDeTopo(node) : null)
+
+export function underInheritedMachineGuard(node, ctx, prof = 0, vistos = new Set()) {
+  const nome = alvoDaHeranca(node, ctx, prof)
+  if (!nome || vistos.has(nome)) return false
+  const chamadas = chamadoresExaustivos(nome, ctx)
+  if (!chamadas) return false
+  const adiante = new Set(vistos).add(nome)
+  return chamadas.every((c) => chamadaSobGuarda(c, ctx, prof, adiante))
+}
+
 // ── Superficie publica de VERSAO (`--version`) ───────────────────────────────
 
 /**
@@ -2641,7 +2725,17 @@ const provaDeVersaoDeclarada = (p, ctx) => {
  * e uma prova de `--json` nao fala sobre ele.
  */
 export const MODO_JSON = "--json"
-const modoDoPonto = (p) => (p.underMachineGuard === true ? MODO_JSON : null)
+
+/**
+ * O modo aceita as DUAS formas de guarda, e a herdada entrou com `context.js`.
+ *
+ * `ctxJson` la e um helper de uma linha: nenhuma guarda envolve a escrita, e as
+ * cinco chamadas dele e que estao sob `if (json)`. Exigir so a guarda DIRETA
+ * dava modo `null` para um ponto que nunca roda no modo humano — e nenhuma
+ * declaracao de consumidor podia cobri-lo sem mentir sobre qual ramo ela prova.
+ */
+const modoDoPonto = (p) =>
+  (p.underMachineGuard === true || p.underInheritedMachineGuard === true ? MODO_JSON : null)
 
 /**
  * ANCORA FINA para modulo COMPARTILHADO: arquivo + comando + modo.
@@ -3344,6 +3438,10 @@ export function analyzeFile(filePath, analyzer = null, ctx = {}) {
       ...ancestry(node),
       underDebugGuard: underDebugGuard(node),
       underMachineGuard: underMachineGuard(node),
+      // Fato SEPARADO de `underMachineGuard`, e nunca fundido com ele: a guarda
+      // direta descreve o no, esta descreve os chamadores. So `modoDoPonto` a
+      // consome — ver a nota de escopo em `underInheritedMachineGuard`.
+      underInheritedMachineGuard: underInheritedMachineGuard(node, ctxAst),
       // Ramo `then` de um `if` de flag de versao derivado de argv, e argumento
       // que E o valor cru do manifesto. Dois fatos SEPARADOS de proposito: cada
       // um falha por um motivo diferente, e junta-los esconderia qual porta
