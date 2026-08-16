@@ -89,6 +89,14 @@ export const CONVERTED_FILES = Object.freeze([
   // `stream-lifecycle-diagnostic`.
   "scripts/sync-qg-version.mjs",
   "scripts/clean-pkg.mjs",
+  // Lote JS, arquivo 9/14. Foi o arquivo que abriu a fatia inteira: os quatro
+  // repasses (`:249/:260/:278/:280`) pareciam `external_passthrough` e NAO SAO —
+  // o subprocesso deles e `src/context-docs/py/context_db.py`, que viaja no
+  // pacote. Fecharam por `stream-counted-subprocess-origin`, e SO porque aquele
+  // arquivo passou a ser contado no inventario. O residual `:50` (`ctxJson`) e o
+  // unico ponto de maquina, servindo os cinco caminhos de `--json`: fechou com a
+  // guarda HERDADA mais a prova publica em tests/context_json_contract.test.js.
+  "src/commands/context.js",
 ])
 
 const norm = (p) => String(p).replace(/\\/g, "/")

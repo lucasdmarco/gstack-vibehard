@@ -548,6 +548,18 @@ export const MACHINE_PROTOCOL_CONSUMERS = Object.freeze([
     // Lote JS 6/14. Âncora por arquivo é EXATA: só o comando `visual` alcança
     // `visual.js`. Os onze pontos vivem em cinco subcomandos do mesmo par
     // (comando, modo); a distinção fina vive na camada do AST.
+    // Lote JS 9/14. UM ponto (`ctxJson`, context.js:50) serve os CINCO caminhos
+    // de `--json` do arquivo, e nenhuma guarda envolve a escrita — quem está sob
+    // `if (json)` são os chamadores. O ponto só é `machine_protocol` por causa
+    // da guarda HERDADA; sem ela nenhuma declaração podia cobri-lo sem afirmar
+    // prova sobre o ramo humano.
+    file: "src/commands/context.js",
+    sink: "process.stdout.write",
+    consumer: "consumidor de máquina do `context … --json` — search, related, explain e scout, cada chamada um documento JSON único",
+    contract: "sob `--json`, stdout é UM documento: recusa de `ctxFail` (`{error:\"missing query|missing entity|missing topic|no_index|…\"}`), recusa de `scoutError` (`{ok:false,error}`), relatório do scout ou o payload de decisão/explain. A saída humana fica nos ramos `else`",
+    evidence: "tests/context_json_contract.test.js — subprocess real em sandbox: as quatro recusas de `ctxFail`, os dois ramos de `scoutError` e o relatório completo do scout, com stdout puro, payload fora do stderr e dois controles negativos do ramo sem `--json`. NÃO exercita `decisionContext` nem `explainJson`, que exigem índice real e escrevem pelo MESMO ponto — lacuna declarada",
+  },
+  {
     file: "src/commands/visual.js",
     sink: "process.stdout.write",
     consumer: "consumidor de máquina do `visual --json` — doctor, detect, explain, check, hooks e context, cada ramo um documento JSON único",

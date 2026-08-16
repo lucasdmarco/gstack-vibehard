@@ -2249,6 +2249,24 @@ export const MACHINE_PROTOCOL_CONSUMERS = Object.freeze({
       }),
     ]),
   }),
+  /**
+   * UM UNICO ponto de maquina serve os CINCO caminhos de `--json` do arquivo.
+   *
+   * `ctxJson` (`context.js:50`) e o helper que todos usam, e a guarda mora nos
+   * chamadores — o ponto so ganha modo `--json` pela heranca
+   * (`underInheritedMachineGuard`). Sem ela, nenhuma declaracao podia cobri-lo
+   * sem afirmar prova sobre o ramo humano.
+   */
+  "src/commands/context.js": Object.freeze({
+    commands: Object.freeze([
+      Object.freeze({
+        command: "context",
+        mode: "--json",
+        consumer: "context_json_contract",
+        evidence: "tests/context_json_contract.test.js — subprocesso real em sandbox: as quatro recusas de `ctxFail` (missing query/entity/topic e no_index), os dois ramos de `scoutError` (pergunta vazia e recusa do backend remoto) e o relatorio completo de `scout --json`; stdout puro e payload fora do stderr em todos, mais dois controles negativos do ramo sem `--json`. NAO exercita `decisionContext` nem `explainJson`, que exigem indice real e escrevem pelo MESMO ponto — lacuna declarada",
+      }),
+    ]),
+  }),
   "src/commands/secrets.js": Object.freeze({
     commands: Object.freeze([
       Object.freeze({

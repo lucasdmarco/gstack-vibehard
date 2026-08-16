@@ -179,7 +179,7 @@ test("validateRegistry recusa script que NÃO é alcançado pelo runtime (não p
  *
  * ATUALIZE AQUI, e so aqui, a cada arquivo reconciliado no lote JS.
  */
-test("CENSO GLOBAL: 1924 pontos, 45 unknown, 11 arquivos convertidos", async () => {
+test("CENSO GLOBAL: 1924 pontos, 41 unknown, 12 arquivos convertidos", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
 
@@ -235,8 +235,14 @@ test("CENSO GLOBAL: 1924 pontos, 45 unknown, 11 arquivos convertidos", async () 
   // regras da especie `cli_subprocess` no lugar, os 19 saem classificados e a
   // fila volta ao tamanho anterior. O saldo da leva e o que importa: +19 de
   // COBERTURA, 0 de divida.
-  assert.equal(inv.unknown, 45, "a fronteira nova cresceu a medicao sem crescer a fila")
-  assert.equal(inv.jsRegistry.convertedFiles.length, 11)
+  //
+  // 45 -> 41 com context.js (lote JS 9/14). Os quatro repasses fecharam por
+  // `stream-counted-subprocess-origin` -- e SO porque o indexer passou a ser
+  // contado --, e o residual `:50` (`ctxJson`) pela guarda HERDADA mais a prova
+  // publica de `context --json`. O delta e -4 e nao -5 pela troca de regua de
+  // sempre: o regex media 4 unknown no arquivo, o AST media 5.
+  assert.equal(inv.unknown, 41, "context.js fechou: os quatro repasses mais o helper de `--json`")
+  assert.equal(inv.jsRegistry.convertedFiles.length, 12)
   assert.equal(inv.blocked, false)
 
   // A relacao que sustenta o numero: nenhum convertido guarda unknown.
