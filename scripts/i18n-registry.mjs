@@ -89,6 +89,14 @@ export const CONVERTED_FILES = Object.freeze([
   // `stream-lifecycle-diagnostic`.
   "scripts/sync-qg-version.mjs",
   "scripts/clean-pkg.mjs",
+  // Lote JS, arquivo 9/14. Fechou com DUAS coisas, e a ordem importa: primeiro a
+  // prova publica de `research --json` (quatro dos cinco pontos de maquina por
+  // subprocesso real; `emitCancelled` exige TTY e e lacuna declarada), depois as
+  // 15 decisoes de provenance — 14 de moldura literal e uma de origem ancorada.
+  // A de origem so foi possivel porque `emitNotebookLm` ganhou assinatura
+  // generica: sem ela o parametro do callback e `any` e `p.message` nao resolve
+  // para declaracao nenhuma.
+  "src/commands/research.js",
 ])
 
 /**

@@ -179,7 +179,7 @@ test("validateRegistry recusa script que NÃO é alcançado pelo runtime (não p
  *
  * ATUALIZE AQUI, e so aqui, a cada arquivo reconciliado no lote JS.
  */
-test("CENSO GLOBAL: 1924 pontos, 45 unknown, 11 arquivos convertidos", async () => {
+test("CENSO GLOBAL: 1924 pontos, 44 unknown, 12 arquivos convertidos", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
 
@@ -243,8 +243,13 @@ test("CENSO GLOBAL: 1924 pontos, 45 unknown, 11 arquivos convertidos", async () 
   // o vocabulario atual. Meia conversao valida some com a divida. Ver o
   // comentario em `scripts/i18n-registry.mjs` e
   // tests/i18n_context_conversion_blocked.test.js.
-  assert.equal(inv.unknown, 45, "a fronteira Python cresceu a medicao sem crescer a fila")
-  assert.equal(inv.jsRegistry.convertedFiles.length, 11)
+  //
+  // 45 -> 44 com research.js (lote JS 9/14). Delta -1 e nao -5 pela troca de
+  // regua de sempre: o regex media 1 unknown no arquivo, o AST media 5. Fechou
+  // com a prova publica de `research --json` MAIS as 15 decisoes de provenance
+  // -- e desta vez a segunda metade foi medida ANTES de declarar convertido.
+  assert.equal(inv.unknown, 44, "research.js fechou: prova de `--json` e as 15 decisoes de provenance")
+  assert.equal(inv.jsRegistry.convertedFiles.length, 12)
   assert.equal(inv.blocked, false)
 
   // A relacao que sustenta o numero: nenhum convertido guarda unknown.

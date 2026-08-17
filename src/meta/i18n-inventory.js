@@ -560,6 +560,16 @@ export const MACHINE_PROTOCOL_CONSUMERS = Object.freeze([
     evidence: "tests/context_json_contract.test.js — subprocess real em sandbox: as quatro recusas de `ctxFail`, os dois ramos de `scoutError` e o relatório completo do scout, com stdout puro, payload fora do stderr e dois controles negativos do ramo sem `--json`. NÃO exercita `decisionContext` nem `explainJson`, que exigem índice real e escrevem pelo MESMO ponto — lacuna declarada",
   },
   {
+    // Lote JS 9/14. CINCO pontos de máquina, um por família de subcomando — não
+    // há helper único aqui. `emitCancelled` fica declarado como lacuna: exige
+    // TTY respondendo NÃO ao confirm, e sem TTY o fluxo para antes.
+    file: "src/commands/research.js",
+    sink: "process.stdout.write",
+    consumer: "consumidor de máquina do `research … --json` — skills audit, notebooklm e validate, cada chamada um documento JSON único",
+    contract: "sob `--json`, stdout é UM documento: recusa por consentimento de rede (`{error:\"needs_confirmation\",hint}`), auditoria read-only (`gstack.external-skills-audit.v1`, com `guardrails`), payload do conector (`gstack.notebooklm-adapter.v1`) ou revisão epistêmica (`gstack.epistemic-review.v1`). A saída humana fica nos ramos `else`",
+    evidence: "tests/research_json_contract.test.js — subprocess real em sandbox: `notebooklm doctor` e `connect`, a recusa de `skills audit --repo` sem `--yes`, a auditoria de `skills audit --path` com guardrails e a revisão de `validate`; stdout puro, payload fora do stderr e dois controles negativos do ramo sem `--json`. NÃO cobre `emitCancelled` (research.js:129), alcançável só com TTY — lacuna declarada, não presumida",
+  },
+  {
     file: "src/commands/visual.js",
     sink: "process.stdout.write",
     consumer: "consumidor de máquina do `visual --json` — doctor, detect, explain, check, hooks e context, cada ramo um documento JSON único",

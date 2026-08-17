@@ -1373,6 +1373,254 @@
       "reason": "A moldura traduz-se inteira, inclusive a enumeração dos artefatos ('__pycache__/.pyc/.pyo'), que é literal deste callsite. `removed` é uma CONTAGEM de arquivos apagados — número não tem idioma.",
       "owner": "certificação RC PRD51 (Fase 1B)",
       "evidence": "scripts/clean-pkg.mjs:26-28 — `walk(process.cwd())` incrementa `removed`; a saída vai por `console.error` DE PROPÓSITO (comentário na linha 27: não contaminar `npm pack --json`), e roda no lifecycle `prepack`."
+    },
+    {
+      "file": "src/commands/research.js",
+      "line": 67,
+      "column": 27,
+      "expectedFileHash": "sha256:57fddc26a14d07467a032bc21daa4037a0dc372ded029a2536bb404d228d5503",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "dir"
+      ],
+      "reason": "A moldura 'research: --path não existe: ' é mensagem do produto e deve ser traduzida. `dir` é o caminho de sistema de arquivos que o usuário digitou em `--path`: traduzi-lo quebraria a correspondência com o que ele escreveu, e o valor precisa aparecer verbatim para que ele reconheça o próprio argumento.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/research.js:67 — ramo de recusa de `resolveLocalPath`, quando o diretório informado não existe. Exercitado indiretamente por tests/external_skills_audit.test.js."
+    },
+    {
+      "file": "src/commands/research.js",
+      "line": 76,
+      "column": 3,
+      "expectedFileHash": "sha256:57fddc26a14d07467a032bc21daa4037a0dc372ded029a2536bb404d228d5503",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "r",
+        "stderr",
+        "trim",
+        "r",
+        "error"
+      ],
+      "reason": "A moldura 'research: clone falhou (…)' é do produto. O valor interpolado NÃO é nosso: é o stderr do `git clone` ou, quando ele nem chega a rodar, a mensagem de erro do spawn. Traduzir texto do git — ou do sistema operacional — descolaria o diagnóstico da ferramenta que realmente falhou, e é justamente esse texto que o usuário vai procurar.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/research.js:76 — ramo de falha do clone do mirror em `ensureMirror`. O fallback `|| r.error` cobre o caso em que o processo nem inicia."
+    },
+    {
+      "file": "src/commands/research.js",
+      "line": 91,
+      "column": 29,
+      "expectedFileHash": "sha256:57fddc26a14d07467a032bc21daa4037a0dc372ded029a2536bb404d228d5503",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "fetch",
+        "stderr",
+        "trim",
+        "fetch",
+        "error"
+      ],
+      "reason": "Mesmo par do clone, um estágio adiante: a moldura 'research: refresh do mirror falhou (…)' é do produto e o interpolado é o stderr do `git fetch` no mirror já existente. São dois pontos separados porque falham por motivos diferentes — criar o mirror e atualizá-lo —, e o usuário precisa distinguir qual dos dois quebrou.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/research.js:91 — ramo de falha do refresh em `ensureMirror`, quando o mirror já existe em disco."
+    },
+    {
+      "file": "src/commands/research.js",
+      "line": 114,
+      "column": 3,
+      "expectedFileHash": "sha256:57fddc26a14d07467a032bc21daa4037a0dc372ded029a2536bb404d228d5503",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "audit",
+        "provenance",
+        "auditedFiles"
+      ],
+      "reason": "A moldura 'skills externas — … arquivos (read-only)' é do produto, e o '(read-only)' é parte da promessa que o comando faz. O interpolado é uma CONTAGEM inteira produzida pelo próprio auditor: número não tem idioma a traduzir.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/research.js:114 — cabeçalho do relatório humano de `skills audit`. O mesmo número sai no payload de máquina como `provenance.auditedFiles`, provado em tests/research_json_contract.test.js."
+    },
+    {
+      "file": "src/commands/research.js",
+      "line": 115,
+      "column": 3,
+      "expectedFileHash": "sha256:57fddc26a14d07467a032bc21daa4037a0dc372ded029a2536bb404d228d5503",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "audit",
+        "provenance",
+        "source",
+        "audit",
+        "provenance",
+        "commit"
+      ],
+      "reason": "A moldura ('  fonte: ', ' · commit ') é do produto. Os dois valores NÃO são: `source` é o caminho ou a URL que o usuário passou, e `commit` é um SHA do git. OS DOIS FALLBACKS SÃO LITERAIS NOSSOS e entram na moldura traduzível: '(local)' quando não há origem remota e '?' quando o commit não foi resolvido — o primeiro é uma palavra a traduzir, o segundo é um glifo sem idioma.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/research.js:115 — linha de procedência do relatório. Os mesmos campos saem no payload como `provenance.source` e `provenance.commit`."
+    },
+    {
+      "file": "src/commands/research.js",
+      "line": 116,
+      "column": 3,
+      "expectedFileHash": "sha256:57fddc26a14d07467a032bc21daa4037a0dc372ded029a2536bb404d228d5503",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "c",
+        "adopt"
+      ],
+      "reason": "O interpolado é uma contagem inteira. A moldura é o rótulo 'adopt', e ele NÃO deve ser traduzido: `adopt`/`adapt`/`avoid` são as chaves do contrato de máquina do auditor de skills, e o relatório humano usa exatamente as mesmas palavras para que quem lê o terminal e quem lê o JSON estejam falando da mesma categoria. Traduzir o rótulo separaria as duas superfícies.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/research.js:116 — a categoria `adopt` do payload `gstack.external-skills-audit.v1`, cujo contrato está provado em tests/research_json_contract.test.js."
+    },
+    {
+      "file": "src/commands/research.js",
+      "line": 117,
+      "column": 3,
+      "expectedFileHash": "sha256:57fddc26a14d07467a032bc21daa4037a0dc372ded029a2536bb404d228d5503",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "c",
+        "adapt"
+      ],
+      "reason": "Igual a `adopt` quanto ao rótulo — chave do contrato de máquina, não traduzir —, mas aqui há prosa a mais: '(rever/mapear antes de usar)' é orientação do produto e DEVE ser traduzida. O interpolado segue sendo uma contagem inteira.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/research.js:117 — a categoria `adapt` do mesmo payload, com a instrução que a distingue de `adopt`."
+    },
+    {
+      "file": "src/commands/research.js",
+      "line": 118,
+      "column": 20,
+      "expectedFileHash": "sha256:57fddc26a14d07467a032bc21daa4037a0dc372ded029a2536bb404d228d5503",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "c",
+        "avoid"
+      ],
+      "reason": "Mesmo rótulo-contrato das duas anteriores, e a parte mais longa da moldura é a que mais importa traduzir: '(destrutivo/exec-remoto/secret/install — nunca adotar sem revisão)' é o aviso de segurança do produto, e é ele que impede alguém de adotar uma skill perigosa. O interpolado é contagem inteira.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/research.js:118 — só emitido quando `c.avoid > 0`; a categoria `avoid` do payload de auditoria."
+    },
+    {
+      "file": "src/commands/research.js",
+      "line": 119,
+      "column": 3,
+      "expectedFileHash": "sha256:57fddc26a14d07467a032bc21daa4037a0dc372ded029a2536bb404d228d5503",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "dir"
+      ],
+      "reason": "A moldura 'nada executado/instalado · JSON: ' é a garantia que o comando dá, e é texto do produto. O interpolado é o diretório auditado. ATENÇÃO ao que NÃO é traduzível na própria moldura: 'external-audit.json' é NOME DE ARQUIVO em disco — traduzi-lo apontaria o usuário para um arquivo que não existe.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/research.js:119 — rodapé do relatório de `skills audit`, onde o caminho do artefato é informado."
+    },
+    {
+      "file": "src/commands/research.js",
+      "line": 140,
+      "column": 57,
+      "expectedFileHash": "sha256:57fddc26a14d07467a032bc21daa4037a0dc372ded029a2536bb404d228d5503",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "url"
+      ],
+      "reason": "A moldura 'Vai clonar/atualizar via rede (read-only, hooks desabilitados): ' é o aviso de EFEITO DE REDE que precede o consentimento, e é texto do produto que deve ser traduzido — é dele que depende o usuário entender o que vai acontecer. O interpolado é a URL que ele mesmo passou em `--repo`.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/research.js:140 — ramo humano do consentimento de rede; o ramo de máquina correspondente é a recusa `needs_confirmation`, provada em tests/research_json_contract.test.js."
+    },
+    {
+      "file": "src/commands/research.js",
+      "line": 207,
+      "column": 5,
+      "expectedFileHash": "sha256:57fddc26a14d07467a032bc21daa4037a0dc372ded029a2536bb404d228d5503",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "p",
+        "status"
+      ],
+      "reason": "A moldura '— conector experimental, cloud, não-oficial' é advertência do produto sobre a natureza do conector, e deve ser traduzida. O interpolado é o `status` do adaptador NotebookLM: um token de estado do contrato de máquina (`not_configured` e afins), não uma frase.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/research.js:207 — ramo humano de `notebooklm doctor`. O mesmo `status` sai no payload, provado em tests/research_json_contract.test.js."
+    },
+    {
+      "file": "src/commands/research.js",
+      "line": 213,
+      "column": 83,
+      "expectedFileHash": "sha256:57fddc26a14d07467a032bc21daa4037a0dc372ded029a2536bb404d228d5503",
+      "strategy": "translate_at_value_origin",
+      "translationSite": "value_origin",
+      "interpolations": [
+        "p",
+        "message"
+      ],
+      "reason": "NÃO há moldura literal: o template é `  ${p.message}`, cujos literais são só indentação. E o valor É linguístico — a frase 'Conexão com NotebookLM exige um passo interativo real (login/consentimento) — não pode ser automatizado nem escondido por --yes.' é prosa do produto, redigida no módulo do conector. Nenhuma das outras estratégias serve: não há frame a traduzir, e declarar a frase como glyph/identifier/control seria falso. A tradução é devida na ORIGEM; este callsite apenas renderiza.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/research.js:213 — `emitNotebookLm(r, json, (p) => { …; warn(`  ${p.message}`) })`. O checker resolve `message` para UMA declaração (src/tools/notebooklm.js:20:5), StringLiteral de frase, provado em tests/i18n_value_origin_resolution.test.js. A resolução só existe porque `emitNotebookLm` declara assinatura genérica (`@template P`); o mesmo teste traz o controle negativo do mecanismo, com a forma SEM assinatura devolvendo zero declarações.",
+      "values": {
+        "p": {
+          "id": "p",
+          "sourceKind": "project_module_literal",
+          "origin": {
+            "file": "src/tools/notebooklm.js",
+            "line": 20,
+            "column": 5,
+            "expectedFileHash": "sha256:0ade4527c31689f7cde3c2390b34dd8f4e78357a94535f6f82fbb73a1143c537"
+          },
+          "reason": "Portador da frase: `p` é o payload de `notebookLmConnect()` repassado pelo emissor ao renderizador humano; não é a frase, mas é por ele que ela chega ao sink.",
+          "owner": "certificação RC PRD51 (Fase 1B)",
+          "evidence": "src/tools/notebooklm.js:20:5 — a propriedade `message` do objeto que `notebookLmConnect` retorna."
+        },
+        "message": {
+          "id": "message",
+          "sourceKind": "project_module_literal",
+          "origin": {
+            "file": "src/tools/notebooklm.js",
+            "line": 20,
+            "column": 5,
+            "expectedFileHash": "sha256:0ade4527c31689f7cde3c2390b34dd8f4e78357a94535f6f82fbb73a1143c537"
+          },
+          "reason": "A frase em si. É prosa do produto — explica por que a conexão não pode ser automatizada — e deve ser traduzida ali, uma vez, e não em cada lugar que a imprima.",
+          "owner": "certificação RC PRD51 (Fase 1B)",
+          "evidence": "src/tools/notebooklm.js:20:5 — StringLiteral 'Conexão com NotebookLM exige um passo interativo real (login/consentimento) — não pode ser automatizado nem escondido por --yes.'"
+        }
+      }
+    },
+    {
+      "file": "src/commands/research.js",
+      "line": 221,
+      "column": 81,
+      "expectedFileHash": "sha256:57fddc26a14d07467a032bc21daa4037a0dc372ded029a2536bb404d228d5503",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "p",
+        "status",
+        "p",
+        "category"
+      ],
+      "reason": "A moldura é curta e mesmo assim é do produto: o rótulo 'status: ' e os parênteses que separam a categoria. Os DOIS interpolados são tokens do contrato de máquina do conector — `status` é o estado da consulta e `category` é a classe da falha (`auth` e afins) —, e traduzi-los descolaria o terminal do payload que o mesmo comando emite sob `--json`.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/research.js:221 — ramo humano de `notebooklm query`; os dois campos vêm de `classifyNotebookLMFailure`."
+    },
+    {
+      "file": "src/commands/research.js",
+      "line": 234,
+      "column": 18,
+      "expectedFileHash": "sha256:57fddc26a14d07467a032bc21daa4037a0dc372ded029a2536bb404d228d5503",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "resultPath"
+      ],
+      "reason": "A moldura 'research notebooklm import: não consegui ler/parsear ' é diagnóstico do produto e deve ser traduzida. O interpolado é o caminho do arquivo de resultado que o usuário indicou — precisa sair verbatim para que ele confira o próprio argumento.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/research.js:234 — ramo de falha de leitura/parse em `notebookLmImportCmd`, que também marca `process.exitCode = 1`."
+    },
+    {
+      "file": "src/commands/research.js",
+      "line": 311,
+      "column": 3,
+      "expectedFileHash": "sha256:57fddc26a14d07467a032bc21daa4037a0dc372ded029a2536bb404d228d5503",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "resolved",
+        "level"
+      ],
+      "reason": "A moldura é o cabeçalho 'research validate — ', texto do produto. O interpolado é o NÍVEL epistêmico resolvido (`grounded` e afins): token do contrato de revisão, que aparece igual no payload de máquina e por isso não se traduz.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/research.js:311 — cabeçalho do relatório humano de `research validate`. O mesmo `level` sai no payload `gstack.epistemic-review.v1`, provado em tests/research_json_contract.test.js."
     }
   ]
 }
