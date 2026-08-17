@@ -71,6 +71,53 @@ try {
   catch { bad("doctor --json não é JSON puro") }
   try { call(["install", "--audit-only"]); ok("install --audit-only roda (read-only)") }
   catch (e) { bad(`install --audit-only falhou: ${(e.message || "").slice(0, 80)}`) }
+
+  // 4) FATIA 7 — o inventário i18n sobrevive à instalação, e o TypeScript não vem junto.
+  //
+  // O engine de AST (`scripts/lib/i18n-js-ast.mjs`) importa `typescript`, que é
+  // devDependency, e VIAJA no tarball porque `files` inclui `scripts/`. Isso é
+  // aceitável enquanto nada em runtime o carregar — o registry é JSON inerte, e o
+  // runtime lê dado, nunca AST. Aqui essa promessa deixa de ser comentário.
+  const temTs = existsSync(join(proj, "node_modules", "typescript"))
+    || existsSync(join(installedDir, "node_modules", "typescript"))
+  if (temTs) bad("TypeScript foi instalado junto — devDependency vazou para o consumidor")
+  else ok("TypeScript AUSENTE na instalação (devDependency não vaza)")
+
+  // CONTROLE POSITIVO da ausência: sem ele, "nada carrega o engine" seria
+  // verdade vazia — poderia ser que o engine carregasse e o `typescript`
+  // estivesse lá. Carregá-lo de propósito PRECISA falhar.
+  const engine = join(installedDir, "scripts", "lib", "i18n-js-ast.mjs").replaceAll("\\", "/")
+  let carregou = false
+  try {
+    node(["--input-type=module", "-e", `await import("file:///${engine}")`], { cwd: proj })
+    carregou = true
+  } catch (e) {
+    const msg = `${e.stderr || ""}${e.message || ""}`
+    if (/ERR_MODULE_NOT_FOUND|Cannot find package 'typescript'/.test(msg)) {
+      ok("controle positivo: carregar o engine de AST FALHA por falta de typescript")
+    } else bad(`engine falhou por outro motivo: ${msg.slice(0, 120)}`)
+  }
+  if (carregou) bad("o engine de AST carregou sem typescript — a separação build/runtime não é real")
+
+  // O inventário, pela URL CANÔNICA do módulo instalado: sem `?t=` de
+  // cache-busting, que é truque de teste e esconderia um módulo que só funciona
+  // quando reimportado. É assim que um consumidor o carregaria.
+  const inv = join(installedDir, "src", "meta", "i18n-inventory.js").replaceAll("\\", "/")
+  try {
+    const saida = node(["--input-type=module", "-e", `
+      const m = await import("file:///${inv}")
+      const r = m.buildInventory({ repoRoot: ${JSON.stringify(installedDir.replaceAll("\\", "/"))} })
+      process.stdout.write(JSON.stringify({
+        total: r.points.length, registry: r.jsRegistry.status, ok: r.jsRegistry.ok,
+      }))
+    `], { cwd: proj })
+    const r = JSON.parse(saida)
+    if (r.total > 0 && r.ok === true && r.registry === "fresh") {
+      ok(`inventário instalado funciona: ${r.total} pontos, registry ${r.registry}`)
+    } else bad(`inventário instalado degradado: ${saida}`)
+  } catch (e) {
+    bad(`inventário não roda instalado: ${((e.stderr || e.message) || "").slice(0, 160)}`)
+  }
 } catch (e) {
   bad(`erro fatal: ${e.message}`)
 } finally {

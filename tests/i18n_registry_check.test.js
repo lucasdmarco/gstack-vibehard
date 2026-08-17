@@ -145,6 +145,30 @@ test("o check escreve e RELÊ o arquivo — não compara só a string em memóri
 
 // ── O contrato público: os dois comandos existem e são distintos ───────────
 
+/**
+ * FATIA 7 — a prova de instalação vive em `scripts/test-pack.mjs`, que o CI roda.
+ * Ela é EXECUTÁVEL (empacota, instala, importa), e não pode ser reduzida a um
+ * comentário sem que algo quebre. Este guard é o que garante isso.
+ *
+ * O controle positivo é a parte que não pode sumir: sem ele, "nada em runtime
+ * carrega o engine de AST" seria verdade vazia — poderia ser que carregasse e o
+ * `typescript` estivesse instalado junto.
+ */
+test("FATIA 7: a prova de pack declara a ausência de TypeScript e o controle positivo", () => {
+  const pack = readFileSync(path.join(repoRoot, "scripts", "test-pack.mjs"), "utf-8")
+  assert.match(pack, /node_modules", "typescript"/,
+    "a prova precisa conferir que a devDependency não vaza para o consumidor")
+  assert.match(pack, /controle positivo/,
+    "carregar o engine de propósito precisa FALHAR, senão a ausência é vacuosa")
+  assert.match(pack, /i18n-inventory\.js/,
+    "o inventário precisa rodar INSTALADO, não só na árvore-fonte")
+  assert.equal(/i18n-inventory\.js["'`]\s*\)?\s*\+?\s*[`"']?\?t=/.test(pack), false,
+    "importar por URL canônica: `?t=` é truque de teste e esconderia módulo que só funciona reimportado")
+
+  const ci = readFileSync(path.join(repoRoot, ".github", "workflows", "test.yml"), "utf-8")
+  assert.match(ci, /npm run test:pack/, "a prova de pack precisa rodar em CI")
+})
+
 test("`generate` e `check` são scripts npm distintos, e o CI usa o `check`", () => {
   const pkg = JSON.parse(readFileSync(path.join(repoRoot, "package.json"), "utf-8"))
   assert.equal(pkg.scripts["i18n:registry:generate"], "node scripts/i18n-registry.mjs")
