@@ -809,6 +809,71 @@ const problemaFormaOverride = (ov, i) => {
   return null
 }
 
+/**
+ * REVISÃO HUMANA ANCORADA — quando NENHUMA regra estrutural pode decidir.
+ *
+ * Existe por um caso concreto: `runtime-supervisor.js:346`. O valor impresso é o
+ * log do processo supervisionado, mas a cadeia é
+ *
+ *   followLog → readTail(logPath) → readSync(fd, buffer, …)
+ *              → buffer.subarray(…).toString(…) → write(…)
+ *
+ * e o `readSync` preenche o buffer por EFEITO COLATERAL: o retorno não guarda
+ * vínculo sintático com a leitura. O checker não resolve, e não deve fingir que
+ * resolveu.
+ *
+ * O QUE ESTES CAMPOS IMPEDEM é a decisão se disfarçar de derivação. Ela precisa
+ * DIZER que a resolução estrutural falhou (`structuralResolution`) e em que se
+ * apoia (`decisionBasis`). Sem isso, um override anônimo seria indistinguível de
+ * uma classificação automática ao revisar o JSON.
+ *
+ * `expectedIds` fecha a última fresta: a decisão declara os identificadores
+ * interpolados que ela julgou, e diverge se o callsite ganhar um. Junto com
+ * `expectedFileHash` — que cobre o arquivo inteiro, e portanto também `readTail`
+ * e `followLog` —, qualquer mudança na cadeia invalida a decisão.
+ *
+ * NÃO cria regra genérica para Buffer, para `toString()`, para funções chamadas
+ * `readTail` nem para parâmetros passados a `write`: vale para UMA âncora.
+ */
+export const DECISION_BASES = Object.freeze(["anchored_human_review"])
+
+/**
+ * Só `unresolved` é honesto aqui: se o checker tivesse resolvido, a decisão
+ * humana não seria necessária, e declarar `resolved` seria reivindicar uma
+ * derivação que não houve.
+ */
+export const STRUCTURAL_RESOLUTIONS = Object.freeze(["unresolved"])
+
+const mesmaLista = (a, b) => {
+  const x = [...a].sort()
+  const y = [...b].sort()
+  return x.length === y.length && x.every((v, i) => v === y[i])
+}
+
+/** Os três campos são um bloco: ou nenhum, ou todos válidos. */
+const semRevisaoAncorada = (ov) => ov.decisionBasis === undefined
+  && ov.structuralResolution === undefined
+  && ov.expectedIds === undefined
+
+const problemaRevisaoAncorada = (ov, i) => {
+  if (semRevisaoAncorada(ov)) return null
+  if (!DECISION_BASES.includes(ov.decisionBasis)) {
+    return `override #${i}: \`decisionBasis\` inválido: ${JSON.stringify(ov.decisionBasis)}`
+  }
+  if (!STRUCTURAL_RESOLUTIONS.includes(ov.structuralResolution)) {
+    return `override #${i}: \`structuralResolution\` deve ser ${JSON.stringify(STRUCTURAL_RESOLUTIONS[0])} — decisão humana não reivindica derivação`
+  }
+  return Array.isArray(ov.expectedIds) ? null : `override #${i}: \`expectedIds\` ausente ou não é lista`
+}
+
+/** Os identificadores julgados batem com os que o gerador extraiu? */
+const problemaIdsDoOverride = (ov, i, entrada) => {
+  if (ov.expectedIds === undefined) return null
+  const gerado = entrada.provenance?.ids ?? []
+  if (mesmaLista(ov.expectedIds, gerado)) return null
+  return `override #${i}: \`expectedIds\` diverge do gerado (decidido=${JSON.stringify([...ov.expectedIds].sort())}, gerado=${JSON.stringify([...gerado].sort())})`
+}
+
 /** O override aponta para algo que EXISTE, com o conteúdo que ele julgou? */
 const problemaReferencia = (ov, i, registry) => {
   const alvo = registry.files[ov.file]
@@ -817,16 +882,16 @@ const problemaReferencia = (ov, i, registry) => {
   if (ov.expectedFileHash !== alvo.fileHash) {
     return `override #${i}: \`expectedFileHash\` não confere com o registry — o arquivo mudou desde a decisão`
   }
-  if (!alvo.entries.some((e) => e.line === ov.line && e.column === ov.column)) {
-    return `override #${i}: nenhum callsite em ${ov.file}:${ov.line}:${ov.column}`
-  }
-  return null
+  const entrada = alvo.entries.find((e) => e.line === ov.line && e.column === ov.column)
+  if (!entrada) return `override #${i}: nenhum callsite em ${ov.file}:${ov.line}:${ov.column}`
+  return problemaIdsDoOverride(ov, i, entrada)
 }
 
 const problemaOverride = (ov, i, registry) => {
   if (!ehObjeto(ov)) return `override #${i} não é objeto (${JSON.stringify(ov)})`
   return problemaCamposOverride(ov, i)
     || problemaFormaOverride(ov, i)
+    || problemaRevisaoAncorada(ov, i)
     || problemaReferencia(ov, i, registry)
 }
 

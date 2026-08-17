@@ -180,6 +180,46 @@ export function mostrar(caminho, opts = {}) {
 `, t), "unresolved")
 })
 
+// ── As portas da regra, exercitadas onde são decidíveis ───────────────────
+
+/**
+ * O MUTATION CONTROL MOSTROU o que os fixtures não alcançam: nenhum ponto real
+ * chega com `parameterOrigin: file_read` E moldura textual, ou dentro do ramo de
+ * máquina — a cadeia simplesmente não produz essas combinações hoje. Sem
+ * exercitar o predicado direto, remover qualquer das duas portas não quebraria
+ * teste algum, e elas viram decoração.
+ */
+const predicado = async () => {
+  const { SINK_RULES } = await eng()
+  return SINK_RULES.find((r) => r.id === "stream-supervised-process-log").when
+}
+
+const sintetico = (extra) => ({
+  parameterOrigin: "file_read", argForm: "opaque", underMachineGuard: false, ...extra,
+})
+
+test("PORTA: origem de arquivo, forma opaca e fora de máquina ⇒ a regra concede", async () => {
+  assert.equal((await predicado())(sintetico({})), true)
+})
+
+test("PORTA: moldura do projeto recusa — a frase passa a ser nossa", async () => {
+  const when = await predicado()
+  for (const forma of ["text", "text_literal", "interpolation_only", "serializer"]) {
+    assert.equal(when(sintetico({ argForm: forma })), false, `${forma} não pode virar conteúdo do usuário`)
+  }
+})
+
+test("PORTA: no ramo de máquina o repasse é outra pergunta", async () => {
+  assert.equal((await predicado())(sintetico({ underMachineGuard: true })), false)
+})
+
+test("PORTA: qualquer origem que não seja `file_read` recusa", async () => {
+  const when = await predicado()
+  for (const o of ["mixed", "unresolved", "none"]) {
+    assert.equal(when(sintetico({ parameterOrigin: o })), false, `origem ${o} não concede`)
+  }
+})
+
 // ── Ancorado no repositório real ───────────────────────────────────────────
 
 test("REPO: `logsCommand` resolve para leitura de arquivo; `followLog` NÃO", async () => {

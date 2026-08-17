@@ -3742,6 +3742,32 @@ export const SINK_RULES = Object.freeze([
     reason: "encaminha, sem moldura nenhuma, a saida de um artefato do proprio pacote cujas frases JA sao contadas no inventario, na origem. Nao e unidade traduzivel aqui: conta-la de novo duplicaria a mesma mensagem. A origem e nomeada em `subprocessOrigin`, e a regra so vale enquanto aquele arquivo estiver de fato no censo",
   },
   {
+    /**
+     * CONTEUDO DE ARQUIVO REPASSADO VERBATIM — `logsCommand`.
+     *
+     * `runtime-supervisor.js:389` imprime o log do processo SUPERVISIONADO: o
+     * `dev` do projeto do usuario. O valor chega pelo parametro do seam de
+     * escrita, e a cadeia inteira e visivel — `readFileSync(target.log)` no
+     * callsite, sem uma moldura do GStack em volta.
+     *
+     * TRES portas: origem convergente em leitura de arquivo NAO ancorada no
+     * proprio pacote (`origemDoParametro`, com convergencia universal entre
+     * callsites); nenhum literal no argumento; e fora do ramo de maquina. Se o
+     * GStack escrever uma palavra em volta, a frase e dele e o ponto volta para a
+     * claim.
+     *
+     * `user_content` e nao `public_diagnostic`: o texto e do processo do usuario,
+     * e traduzi-lo alteraria o log que ele foi ler.
+     */
+    id: "stream-supervised-process-log",
+    when: (p) => p.parameterOrigin === ORIGEM_ARQUIVO
+      && p.argForm === "opaque"
+      && p.underMachineGuard !== true,
+    audience: "user_content",
+    trigger: "file_content_passthrough",
+    reason: "conteudo de arquivo lido em runtime e repassado sem moldura: e a saida do processo supervisionado, nao texto do produto. A origem e provada por convergencia universal dos callsites do parametro, e a leitura nao pode estar ancorada no proprio pacote",
+  },
+  {
     id: "stream-external-passthrough",
     when: (p) => p.byteOrigin === ARTEFATO_EXTERNO
       && p.argForm === "opaque"
