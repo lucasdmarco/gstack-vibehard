@@ -109,9 +109,20 @@ export function resolveBinding(checker, node, currentFile) {
 const temNomeProprio = (n) => (ts.isFunctionDeclaration(n) || ts.isMethodDeclaration(n)) && Boolean(n.name)
 const nomeDeVariavel = (p) => (p && ts.isVariableDeclaration(p) && ts.isIdentifier(p.name) ? p.name.text : null)
 
+/**
+ * Funcao que E o valor de uma propriedade tem NOME: a chave.
+ *
+ * `{ "session.created": async () => … }` nao e um arrow anonimo — quem o invoca
+ * o encontra por aquela chave, exatamente como um handler do `DISPATCH`. Trata-lo
+ * como `<anon>` fazia `alcancavelDaqui` derruba-lo por uma razao que nao e a
+ * dele: aquela guarda existe contra callback passado adiante
+ * (`lista.forEach(() => …)`), onde quem roda depende de quem recebeu.
+ */
+const nomeDePropriedade = (p) => (p && ts.isPropertyAssignment(p) ? nomeEstaticoDaProp(p) : null)
+
 const funcName = (n) => {
   if (temNomeProprio(n)) return n.name.text
-  return nomeDeVariavel(n.parent) ?? "<anon>"
+  return nomeDeVariavel(n.parent) ?? nomeDePropriedade(n.parent) ?? "<anon>"
 }
 
 const isFunctionLike = (n) => ts.isFunctionDeclaration(n) || ts.isFunctionExpression(n)
@@ -624,10 +635,88 @@ const comandosQueAlcancam = (cadeia, alcancePorComando) => [...alcancePorComando
  * Declaracoes-raiz por arquivo: `{ "<arquivo>": Set<nomeDaFuncao> }`.
  * Projecao de `entrypointsPorComando` — mesma derivacao, comando descartado.
  */
-export function entrypointsCanonicos(program, checker) {
+// ── Entrypoint de PLUGIN (tabela de handlers de evento) ─────────────────────
+
+/**
+ * Nem todo entrypoint canonico do produto e o `DISPATCH` da CLI.
+ *
+ * `src/plugins/opencode/gstack-session.js` nao tem comando: o OpenCode importa
+ * o modulo, chama a fabrica exportada e recebe uma TABELA DE HANDLERS DE EVENTO
+ * (`session.created`, `session.deleted`). E o mesmo papel do `DISPATCH` — a
+ * borda por onde o host entra no nosso codigo —, so que a chave e um evento e
+ * nao um subcomando.
+ *
+ * Sem isto, tres `console.warn` com moldura INTERPOLADA ficam `unknown` para
+ * sempre: `ehFraseHumana` exige entrypoint canonico provado para a forma `text`,
+ * e com razao (a alternativa, "export qualquer serve", foi o que classificou uma
+ * query SQL como saida do CLI).
+ *
+ * DUAS PORTAS, e a segunda existe para a declaracao nao poder mentir:
+ *
+ *   1. o arquivo esta DECLARADO aqui, com host e evidencia — que o modulo seja
+ *      carregado por um harness e fato de instalacao, nao algo derivavel do
+ *      proprio arquivo;
+ *   2. a FORMA se confirma no codigo: o export nomeado existe, e uma funcao, e o
+ *      que ela devolve e um literal de objeto cujos valores sao todos funcoes.
+ *      Se o arquivo deixar de ser uma tabela de handlers, a declaracao para de
+ *      valer sozinha.
+ */
+export const PLUGIN_ENTRYPOINTS = Object.freeze({
+  "src/plugins/opencode/gstack-session.js": Object.freeze({
+    host: "opencode",
+    export: "GstackSession",
+    evidence: "src/installer/install.js instala o plugin no OpenCode, que importa o modulo e chama a fabrica exportada; a tabela devolvida e assinada por evento de sessao. Forma conferida em tests/i18n_js_ast_plugin_entrypoint.test.js",
+  }),
+})
+
+const ehEntradaDeHandler = (p) => ts.isPropertyAssignment(p) && isFunctionLike(p.initializer)
+
+/**
+ * A funcao devolve uma tabela de handlers?
+ *
+ * TODOS os literais de objeto devolvidos precisam ser tabela — mas o VAZIO nao
+ * conta como tabela nem desqualifica: `GstackSession` tem `return {}` na
+ * primeira linha, o kill switch que desliga o plugin. Procurar "o primeiro
+ * literal de objeto" achava justamente esse e reprovava o arquivo inteiro.
+ */
+const ehTabelaDeHandlers = (fn) => {
+  // `semParenteses` porque a forma concisa — `async () => ({ … })` — devolve uma
+  // ParenthesizedExpression, e nao o literal. Sem desembrulhar, TODA fabrica
+  // escrita assim reprovava; pior, os controles negativos passavam pelo motivo
+  // errado, e o mutation control foi quem mostrou.
+  const retornos = (fn ? expressoesDeRetorno(fn) : null)
+    ?.map(semParenteses).filter((r) => ts.isObjectLiteralExpression(r))
+  if (!retornos || retornos.length === 0) return false
+  const naoVazios = retornos.filter((r) => r.properties.length > 0)
+  return naoVazios.length > 0 && naoVazios.every((r) => r.properties.every(ehEntradaDeHandler))
+}
+
+/** Declaracao top-level exportada com aquele nome, ou `null`. */
+const exportNomeado = (sf, nome) => {
+  const fn = declaracoesDeFuncao(sf).get(nome)
+  return fn && ehExportada(fn) ? fn : null
+}
+
+/**
+ * Raizes de plugin do arquivo — vazio quando a declaracao nao existe ou quando a
+ * forma nao se confirma. Ausencia de prova, nunca permissao.
+ */
+export function raizesDePlugin(sf, repoRoot) {
+  const chave = chaveCanonica(sf.fileName, repoRoot)
+  const declarado = chave ? PLUGIN_ENTRYPOINTS[chave] : null
+  if (!declarado) return []
+  const fn = exportNomeado(sf, declarado.export)
+  return fn && ehTabelaDeHandlers(fn) ? [declarado.export] : []
+}
+
+export function entrypointsCanonicos(program, checker, repoRoot = null) {
   const porArquivo = new Map()
   for (const [arquivo, entradas] of entrypointsPorComando(program, checker)) {
     porArquivo.set(arquivo, new Set(entradas.map((e) => e.handler)))
+  }
+  for (const sf of program.getSourceFiles()) {
+    const raizes = raizesDePlugin(sf, repoRoot)
+    if (raizes.length > 0) porArquivo.set(norm(sf.fileName), new Set(raizes))
   }
   return porArquivo
 }
@@ -3604,7 +3693,7 @@ export function analyzeFile(filePath, analyzer = null, ctx = {}) {
   // Calculado UMA vez por arquivo: o grafo e do modulo, nao do ponto.
   const alcance = alcancaveisDeExport(a.checker, sf)
   // Raizes DERIVADAS do DISPATCH real; vazio quando nao provado.
-  const canonicas = entrypointsCanonicos(a.program, a.checker).get(norm(filePath)) ?? null
+  const canonicas = entrypointsCanonicos(a.program, a.checker, ctx.repoRoot).get(norm(filePath)) ?? null
   const alcanceCanonico = canonicas ? alcancaveisDeExport(a.checker, sf, canonicas) : { alcancadas: new Set() }
   // Alcance POR COMANDO, nao pela uniao dos handlers: e o que permite dizer que
   // um ponto pertence a `dev` e nao a `logs` dentro do mesmo arquivo.
