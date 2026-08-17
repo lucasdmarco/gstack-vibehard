@@ -21,8 +21,9 @@
  * trabalho da Fatia 5. Gerar hoje o registry dos 332 arquivos cristalizaria
  * ~1784 classificacoes sem reconciliacao alguma.
  */
-import { readFileSync, writeFileSync } from "fs"
+import { readFileSync, writeFileSync, mkdtempSync, rmSync, existsSync } from "fs"
 import { createHash } from "crypto"
+import { tmpdir } from "os"
 import path from "path"
 import { analyzeFile, createAnalyzer, argumentProvenance } from "./lib/i18n-js-ast.mjs"
 import { distributedPythonFiles } from "../src/meta/i18n-inventory.js"
@@ -356,15 +357,84 @@ export const OVERRIDES_PATH = "src/meta/i18n-js-overrides.json"
 export function gerarArquivo(opcoes = {}) {
   const root = opcoes.root ?? process.cwd()
   const registry = buildRegistry(opcoes.files ?? CONVERTED_FILES, { root })
-  const destino = path.join(root, opcoes.out ?? REGISTRY_PATH)
+  // `resolve` e nao `join`: o check passa um destino ABSOLUTO em diretorio
+  // temporario, e `join` o concatenaria ao root produzindo um caminho invalido.
+  const destino = path.resolve(root, opcoes.out ?? REGISTRY_PATH)
   writeFileSync(destino, serializar(registry))
   return { destino, registry }
+}
+
+/**
+ * CHECK — o artefato commitado e o que este gerador produz HOJE?
+ *
+ * Regenera num diretorio TEMPORARIO e compara com o de disco. Escrever de
+ * verdade, e nao so serializar em memoria, e o que faz o check exercitar o mesmo
+ * caminho de `gerarArquivo` -- um bug que so aparecesse na escrita passaria
+ * despercebido por uma comparacao puramente em memoria.
+ *
+ * FINS DE LINHA sao normalizados antes de comparar, pela mesma razao ja escrita
+ * em `hashConteudo`: com `core.autocrlf` no Windows o mesmo commit produz bytes
+ * diferentes do Linux, e reprovar por isso seria acusar staleness onde houve
+ * checkout. O resultado DISTINGUE os dois casos em vez de escolher um: conteudo
+ * divergente e `stale`; so os fins de linha e `line_endings`, que nao reprova.
+ */
+export function verificarArquivo(opcoes = {}) {
+  const root = opcoes.root ?? process.cwd()
+  const destino = path.resolve(root, opcoes.out ?? REGISTRY_PATH)
+  const tmp = mkdtempSync(path.join(tmpdir(), "i18n-registry-check-"))
+  try {
+    const { destino: gerado } = gerarArquivo({ ...opcoes, root, out: path.join(tmp, "registry.json") })
+    const novo = readFileSync(gerado)
+    if (!existsSync(destino)) {
+      return { ok: false, reason: "missing", path: norm(destino), detail: "o registry commitado nao existe" }
+    }
+    const antigo = readFileSync(destino)
+    if (antigo.equals(novo)) return { ok: true, reason: null, path: norm(destino), detail: null }
+
+    const semCr = (b) => b.toString("utf8").replace(/\r\n/g, "\n")
+    if (semCr(antigo) === semCr(novo)) {
+      return {
+        ok: true, reason: "line_endings", path: norm(destino),
+        detail: "conteudo identico; so os fins de linha diferem, o que e artefato de checkout e nao staleness",
+      }
+    }
+    return {
+      ok: false, reason: "stale", path: norm(destino),
+      detail: primeiraDivergencia(semCr(antigo), semCr(novo)),
+    }
+  } finally {
+    rmSync(tmp, { recursive: true, force: true })
+  }
+}
+
+/** Primeira linha divergente, com numero — erro estruturado, nao "difere". */
+function primeiraDivergencia(a, b) {
+  const la = a.split("\n")
+  const lb = b.split("\n")
+  for (let i = 0; i < Math.max(la.length, lb.length); i++) {
+    if (la[i] === lb[i]) continue
+    return `linha ${i + 1}\n  commitado: ${JSON.stringify(la[i] ?? "<ausente>")}\n  gerado:    ${JSON.stringify(lb[i] ?? "<ausente>")}`
+  }
+  return `tamanhos diferentes: commitado ${la.length} linha(s), gerado ${lb.length}`
 }
 
 const executadoDiretamente = process.argv[1]
   && norm(process.argv[1]).endsWith("scripts/i18n-registry.mjs")
 
-if (executadoDiretamente) {
+if (executadoDiretamente && process.argv.includes("--check")) {
+  const r = verificarArquivo()
+  if (r.ok) {
+    process.stdout.write(`i18n-registry: ${r.path} esta fresco${r.reason ? ` (${r.reason})` : ""}\n`)
+  } else {
+    // stderr + exit != 0: o CI precisa REPROVAR, e a mensagem precisa dizer o
+    // que fazer. Um check que so imprime e um check que ninguem obedece.
+    process.stderr.write(
+      `i18n-registry: ${r.path} esta ${r.reason.toUpperCase()}\n${r.detail}\n`
+      + "  rode `npm run i18n:registry:generate` e commite o resultado\n",
+    )
+    process.exit(1)
+  }
+} else if (executadoDiretamente) {
   const { destino, registry } = gerarArquivo()
   const total = Object.values(registry.files).reduce((n, f) => n + f.entries.length, 0)
   process.stdout.write(

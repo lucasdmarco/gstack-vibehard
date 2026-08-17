@@ -125,6 +125,16 @@ jobs:
         run: npm run typecheck
       - name: Syntaxcheck (node --check em todo o src — separado do typecheck)
         run: npm run syntaxcheck
+      # PRD51 Fase 1B / Fatia 6: o registry é 100% GERADO, e um artefato gerado
+      # que ninguém confere vira mentira commitada — o runtime passaria a ler
+      # classificações que o código-fonte já não produz.
+      #
+      # `check` e NUNCA `generate`: o CI precisa REPROVAR quem esqueceu de
+      # regenerar, não consertar por baixo. Um CI que regenera esconde
+      # exatamente o erro que este passo existe para pegar, e ainda produziria
+      # um build cujo artefato difere do commit que o originou.
+      - name: i18n registry fresco (regenera em tmp e compara com o commitado)
+        run: npm run i18n:registry:check
 
   # PRD51 S51.10.2 (§51.10, "pacote TGZ passa clean-machine E2E nos três sistemas"):
   # o `test:pack` — que prova o TARBALL real, e pegaria p.ex. o strip do .gitignore pelo

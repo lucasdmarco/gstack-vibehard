@@ -28,6 +28,8 @@
     "test:cleanmachine": "node scripts/clean-machine-pack.mjs",
     "test:py": "node scripts/test-py.mjs",
     "lint": "node scripts/lint.mjs",
+    "i18n:registry:generate": "node scripts/i18n-registry.mjs",
+    "i18n:registry:check": "node scripts/i18n-registry.mjs --check",
     "lint:commands": "node scripts/command-lint.mjs",
     "lint:manuals": "node scripts/manual-lint.mjs",
     "docs:bands": "node scripts/capability-bands.mjs",
