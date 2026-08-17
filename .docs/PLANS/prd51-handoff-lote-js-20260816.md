@@ -11,8 +11,14 @@ Sucede `.docs/PLANS/prd51-handoff-lote-js-20260815.md`.
 | | início | fim |
 |---|---|---|
 | total | 1905 | **1924** |
-| unknown | 45 | **41** |
-| convertidos | 11 | **12** |
+| unknown | 45 | **45** |
+| convertidos | 11 | **11** |
+| `unresolvedProvenance` | 0 | **0** |
+
+**CORREÇÃO** — uma versão anterior deste handoff registrou `41 unknown / 12
+convertidos`. Estava errado: `src/commands/context.js` chegou a `unknown: 0` e
+foi declarado convertido, mas isso levou `unresolvedProvenance` de 0 para 28. A
+conversão foi **revertida** em `010de6e`. Ver "A lição da leva", abaixo.
 
 **O total subiu 19, e isso é DESCOBERTA DE COBERTURA, não regressão.** A
 fronteira do inventário Python deixou de ser o caminho literal `hooks/` e passou
@@ -28,7 +34,9 @@ não cresceu.
 4. `087e3d5` — remove duplicata de `funcaoDaDeclaracao` (correção de comentário falso)
 5. `413a5b4` — guarda de máquina HERDADA por chamador universal
 6. `af23844` — repasse de subprocesso do pacote com origem já contada
-7. `b759983` — converte `src/commands/context.js` (lote JS 9/14)
+7. `b759983` — converte `src/commands/context.js` — **REVERTIDO**
+8. `ad84cf2` — polaridade da guarda de máquina (`if (!json)` invertia os ramos)
+9. `010de6e` — **reverte** a conversão de `context.js`: quebrou a invariante de provenance
 
 ## C-4(a) — a audiência é alcançável, e mede ZERO
 
@@ -60,9 +68,42 @@ mesmo commit em que for escrito.
 `CLI_RULES` é lista SEPARADA de `HOOK_RULES` porque em hook o stdout é protocolo
 e em subprocesso de CLI é superfície de leitura — o inverso exato.
 
-## Os 41 unknown restantes
+## A lição da leva — `unknown: 0` NÃO é suficiente para converter
 
-### JS (14 pontos, 5 arquivos)
+Converter um arquivo exige **duas** coisas, e a segunda foi esquecida:
+
+1. `unknown: 0` no arquivo;
+2. **decisão de provenance declarada** para cada ponto interpolado `in_scope`.
+
+`context.js` cumpria (1) e tinha 28 pontos pendentes em (2). Declarar convertido
+levou `unresolvedProvenance` de 0 para 28 — invariante central violada em master
+por algumas horas.
+
+Dos 28: **27** admitem `translate_literal_frame_preserve_interpolations` sem
+esforço. **1 não admite decisão honesta nenhuma** com o vocabulário atual —
+`context.js:201` interpola 120 caracteres de `d.evidence`, trecho dos
+**documentos indexados do usuário**. `kind` é `no_local_frame`, e as duas
+estratégias possíveis para esse kind mentem no único campo conferível:
+`preserve_nonlinguistic_dynamic_values` exigiria chamar prosa do usuário de
+`glyph`/`identifier`/`control`; `translate_at_value_origin` exigiria ancorar num
+literal de módulo do projeto, que não existe.
+
+**DECISÃO ARQUITETURAL PENDENTE (a única desta leva)**: como o vocabulário
+descreve *"valor linguístico que pertence ao USUÁRIO, renderizado no canal
+humano"*. Enquanto não existir, `context.js` fica fora de `convertedFiles`.
+Registrado em `tests/i18n_context_conversion_blocked.test.js`.
+
+**Antes de declarar qualquer arquivo convertido, medir `unresolvedProvenance`
+antes e depois.**
+
+## Os 45 unknown restantes
+
+### JS (18 pontos, 6 arquivos — `context.js` voltou para a lista)
+
+`context.js` 249/260/278/280 seguem `unknown` no extrator regex. Pelo AST eles
+fecham; o que bloqueia é a provenance, não a audiência.
+
+### JS do lote (14 pontos, 5 arquivos)
 
 | arquivo | pontos | bloqueio |
 |---|---|---|
