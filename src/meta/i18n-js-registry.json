@@ -11,6 +11,7 @@
     "src/commands/qa.js",
     "src/commands/research.js",
     "src/commands/secrets.js",
+    "src/commands/task-run.js",
     "src/commands/visual.js",
     "src/index.js",
     "src/plugins/opencode/gstack-session.js"
@@ -6486,6 +6487,237 @@
         }
       ],
       "fileHash": "sha256:85c4844c99c01dda21a8c8a72e4faf20fbd428f0319301a30ef67ac5f202e7b8"
+    },
+    "src/commands/task-run.js": {
+      "entries": [
+        {
+          "audience": "machine_protocol",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "process.stdout.write",
+          "calleePath": "process.stdout.write",
+          "canonicalName": "write",
+          "column": 17,
+          "line": 43,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "stream-json-document-literal",
+          "sink": "stdout"
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "error",
+          "calleePath": "error",
+          "canonicalName": "error",
+          "column": 5,
+          "line": 44,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "error",
+          "calleePath": "error",
+          "canonicalName": "error",
+          "column": 28,
+          "line": 51,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "error",
+          "calleePath": "error",
+          "canonicalName": "error",
+          "column": 27,
+          "line": 53,
+          "provenance": {
+            "ids": [
+              "tracked",
+              "join"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "warn",
+          "calleePath": "warn",
+          "canonicalName": "warn",
+          "column": 17,
+          "line": 54,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "machine_protocol",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "process.stdout.write",
+          "calleePath": "process.stdout.write",
+          "canonicalName": "write",
+          "column": 15,
+          "line": 97,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "stream-json-protocol",
+          "sink": "stdout"
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "section",
+          "calleePath": "section",
+          "canonicalName": "section",
+          "column": 3,
+          "line": 98,
+          "provenance": {
+            "ids": [
+              "plan",
+              "id"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "success",
+          "calleePath": "success",
+          "canonicalName": "success",
+          "column": 37,
+          "line": 99,
+          "provenance": {
+            "ids": [
+              "id"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "warn",
+          "calleePath": "warn",
+          "canonicalName": "warn",
+          "column": 36,
+          "line": 100,
+          "provenance": {
+            "ids": [
+              "r",
+              "stepId",
+              "r",
+              "reason"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 36,
+          "line": 101,
+          "provenance": {
+            "ids": [
+              "id"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "error",
+          "calleePath": "error",
+          "canonicalName": "error",
+          "column": 23,
+          "line": 102,
+          "provenance": {
+            "ids": [
+              "result",
+              "handoff",
+              "reason"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 104,
+          "provenance": {
+            "ids": [
+              "branches",
+              "join"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        }
+      ],
+      "fileHash": "sha256:935312a20976d05c0da1913a8dccd17ec3b0b66f1aacd12e738a8572675550b1"
     },
     "src/commands/visual.js": {
       "entries": [

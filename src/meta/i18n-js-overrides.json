@@ -2145,6 +2145,105 @@
       "reason": "A moldura 'gstack-session: erro ao executar stop.py: ' é do produto e nomeia o artefato que falhou. O interpolado é a exceção do `execFileSync` do hook Python — pode ser erro de spawn, timeout ou saída não-zero, e o texto vem do sistema operacional ou do próprio Python. É exatamente o que quem depura o fim de sessão vai procurar.",
       "owner": "certificação RC PRD51 (Fase 1B)",
       "evidence": "src/plugins/opencode/gstack-session.js:93 — `catch` do handler `session.deleted`, em torno do spawn de `stop.py`. Este é o ponto que só fecha porque o handler é nomeado pela CHAVE da tabela, e não `<anon>`."
+    },
+    {
+      "file": "src/commands/task-run.js",
+      "line": 53,
+      "column": 27,
+      "expectedFileHash": "sha256:935312a20976d05c0da1913a8dccd17ec3b0b66f1aacd12e738a8572675550b1",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "tracked",
+        "join"
+      ],
+      "reason": "A moldura é um AVISO DE SEGURANÇA e a parte mais importante a traduzir: explica que há `.env` rastreado no git, que o loop NÃO vai rodar, e o porquê (o segredo iria para a worktree). O interpolado é a lista de caminhos de arquivo que o `git ls-files` devolveu — nomes em disco, que o usuário precisa ver verbatim para saber o que remover.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/task-run.js:53 — guarda que roda ANTES de qualquer worktree, alimentada por `checkTrackedSecrets`. Coberta por tests/delegate_worktree.test.js no lado do detector."
+    },
+    {
+      "file": "src/commands/task-run.js",
+      "line": 98,
+      "column": 3,
+      "expectedFileHash": "sha256:935312a20976d05c0da1913a8dccd17ec3b0b66f1aacd12e738a8572675550b1",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "plan",
+        "id"
+      ],
+      "reason": "A moldura é o cabeçalho 'task run — ' do relatório humano. O interpolado é o ID do plano, gerado pelo próprio GStack e usado como nome de diretório em `.gstack/tasks/<id>` e como prefixo dos branches: é identificador, não prosa.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/task-run.js:98 — cabeçalho do ramo humano, logo após o `if (json)` que emite o payload."
+    },
+    {
+      "file": "src/commands/task-run.js",
+      "line": 99,
+      "column": 37,
+      "expectedFileHash": "sha256:935312a20976d05c0da1913a8dccd17ec3b0b66f1aacd12e738a8572675550b1",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "id"
+      ],
+      "reason": "A moldura é ' ✓ ' e ': aceito'. 'aceito' é o vocabulário de RESULTADO do loop, e o mesmo termo aparece no payload como a lista `accepted` — traduzi-lo separaria o terminal do JSON que o mesmo comando emite. O interpolado é o ID do passo.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/task-run.js:99 — uma linha por passo aceito; o par de máquina é `accepted` no payload, provado em tests/task_run_json_contract.test.js."
+    },
+    {
+      "file": "src/commands/task-run.js",
+      "line": 100,
+      "column": 36,
+      "expectedFileHash": "sha256:935312a20976d05c0da1913a8dccd17ec3b0b66f1aacd12e738a8572675550b1",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "r",
+        "stepId",
+        "r",
+        "reason"
+      ],
+      "reason": "Mesma família da anterior: 'rejeitado' espelha a lista `rejected` do payload. Os DOIS interpolados são identificadores do contrato — `stepId` é o passo e `reason` é o código da rejeição (`apply_failed` e afins), que o consumidor de máquina recebe igual.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/task-run.js:100 — uma linha por passo rejeitado; `reason` vem do próprio loop, não de texto redigido aqui."
+    },
+    {
+      "file": "src/commands/task-run.js",
+      "line": 101,
+      "column": 36,
+      "expectedFileHash": "sha256:935312a20976d05c0da1913a8dccd17ec3b0b66f1aacd12e738a8572675550b1",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "id"
+      ],
+      "reason": "A moldura ' • ' e ': pulado (replay/journal)' explica POR QUE o passo não rodou — é a parte que evita o usuário achar que algo se perdeu. 'replay/journal' nomeia dois mecanismos do produto e traduz junto com a frase. O interpolado é o ID do passo.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/task-run.js:101 — passos já concluídos em execução anterior, lidos do journal do plano."
+    },
+    {
+      "file": "src/commands/task-run.js",
+      "line": 102,
+      "column": 23,
+      "expectedFileHash": "sha256:935312a20976d05c0da1913a8dccd17ec3b0b66f1aacd12e738a8572675550b1",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "result",
+        "handoff",
+        "reason"
+      ],
+      "reason": "A moldura é a instrução de RETOMADA: diz que houve handoff, que o usuário deve revisar, e que rodar `task run` de novo pula os passos já aceitos. É texto do produto e precisa ser traduzido inteiro. O interpolado é o motivo do handoff, código produzido pelo circuit breaker do loop.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/task-run.js:102 — só emitido quando o loop devolve `handoff`; o mesmo motivo sai no payload em `handoff.reason`."
+    },
+    {
+      "file": "src/commands/task-run.js",
+      "line": 104,
+      "column": 3,
+      "expectedFileHash": "sha256:935312a20976d05c0da1913a8dccd17ec3b0b66f1aacd12e738a8572675550b1",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "branches",
+        "join"
+      ],
+      "reason": "A moldura carrega a garantia mais importante do comando: 'Branches prontos pra merge (SEM auto-merge)' — é ela que diz ao usuário que nada foi mergeado por conta própria. O interpolado é a lista de nomes de branch, com fallback literal '(nenhum)' que também é nosso e entra na moldura traduzível.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/task-run.js:104 — rodapé do relatório humano; a mesma lista sai no payload como `branches`, provada em tests/task_run_json_contract.test.js."
     }
   ]
 }

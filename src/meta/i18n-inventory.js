@@ -560,6 +560,17 @@ export const MACHINE_PROTOCOL_CONSUMERS = Object.freeze([
     evidence: "tests/context_json_contract.test.js — subprocess real em sandbox: as quatro recusas de `ctxFail`, os dois ramos de `scoutError` e o relatório completo do scout, com stdout puro, payload fora do stderr e dois controles negativos do ramo sem `--json`. NÃO exercita `decisionContext` nem `explainJson`, que exigem índice real e escrevem pelo MESMO ponto — lacuna declarada",
   },
   {
+    // Lote JS 12/14. Declaração FILE-SCOPED: o arquivo tem um export e serve um
+    // subcomando (`task run`). O handler do DISPATCH vive em `task.js`, que
+    // reexporta — a aresta cross-módulo não é modelada, e declarar por comando
+    // seria declarar uma rota que a derivação não prova.
+    file: "src/commands/task-run.js",
+    sink: "process.stdout.write",
+    consumer: "consumidor de máquina do `task run --json` — recusa e resultado do loop, cada chamada um documento único",
+    contract: "sob `--json`, stdout é UM documento: a recusa `{error:\"plan_not_found\"}` quando não há plano, ou o resultado do loop (`planId`, `status`, `accepted`/`rejected`/`skipped`, `handoff`, `iterations`, `branches`). A saída humana fica no ramo seguinte",
+    evidence: "tests/task_run_json_contract.test.js — subprocess real em repo git de verdade: a recusa (task-run.js:43) e o resultado completo do loop (:97), com stdout puro, payload fora do stderr e dois controles negativos (ramo humano e a guarda de `--yes`)",
+  },
+  {
     // Lote JS 9/14. CINCO pontos de máquina, um por família de subcomando — não
     // há helper único aqui. `emitCancelled` fica declarado como lacuna: exige
     // TTY respondendo NÃO ao confirm, e sem TTY o fluxo para antes.

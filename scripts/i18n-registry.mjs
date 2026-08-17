@@ -110,6 +110,12 @@ export const CONVERTED_FILES = Object.freeze([
   // entrypoint de plugin; `:93` depende tambem de o handler ser nomeado pela
   // CHAVE da tabela, e nao `<anon>`.
   "src/plugins/opencode/gstack-session.js",
+  // Lote JS, arquivo 12/14. ZERO capacidade nova: os dois pontos de maquina
+  // fecham com declaracao FILE-SCOPED de consumidor, exata porque o arquivo tem
+  // um export e serve um subcomando. A ancora fina nao se aplica — o handler do
+  // DISPATCH vive em `task.js`, que reexporta, e a aresta cross-modulo nao e
+  // modelada pelo grafo.
+  "src/commands/task-run.js",
 ])
 
 /**

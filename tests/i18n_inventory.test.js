@@ -179,7 +179,7 @@ test("validateRegistry recusa script que NÃO é alcançado pelo runtime (não p
  *
  * ATUALIZE AQUI, e so aqui, a cada arquivo reconciliado no lote JS.
  */
-test("CENSO GLOBAL: 1920 pontos, 36 unknown, 14 arquivos convertidos", async () => {
+test("CENSO GLOBAL: 1920 pontos, 35 unknown, 15 arquivos convertidos", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
 
@@ -260,8 +260,13 @@ test("CENSO GLOBAL: 1920 pontos, 36 unknown, 14 arquivos convertidos", async () 
   // junto: o regex media 8 pontos onde o AST ve 4 -- os quatro extras sao falso
   // positivo do padrao de helper dentro de `console.warn(`. Nenhum ponto REAL
   // sumiu, e a distincao entre as duas coisas e o que esta asercao guarda.
-  assert.equal(inv.unknown, 36, "plugin do OpenCode fechou pela capacidade de entrypoint de plugin")
-  assert.equal(inv.jsRegistry.convertedFiles.length, 14)
+  //
+  // 36 -> 35 com task-run.js (lote JS 12/14). Delta -1 pela troca de regua: o
+  // regex media 1 unknown, o AST media 2 -- e os DOIS fecharam com declaracao
+  // FILE-SCOPED de consumidor, sem capacidade nova. Total inalterado: regex e
+  // AST veem 12 pontos aqui, sem falso positivo a cair.
+  assert.equal(inv.unknown, 35, "task-run.js fechou com consumidor file-scoped e prova publica")
+  assert.equal(inv.jsRegistry.convertedFiles.length, 15)
   assert.equal(inv.blocked, false)
 
   // A relacao que sustenta o numero: nenhum convertido guarda unknown.

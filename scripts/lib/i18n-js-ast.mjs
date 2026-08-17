@@ -2290,6 +2290,17 @@ export const MACHINE_PROTOCOL_CONSUMERS = Object.freeze({
     proof: "tests/json_purity_contract.test.js — `create amostra --dry-run --json` na lista SUCESSO",
   }),
   /**
+   * FILE-SCOPED, e por exatidao e nao por conveniencia: o arquivo tem UM export
+   * e serve UM subcomando (`task run`). A ancora fina nao se aplica aqui — o
+   * handler do DISPATCH vive em `task.js`, que reexporta, e a aresta
+   * cross-modulo nao e modelada pelo grafo. `commands` sai vazio, e declarar por
+   * comando seria declarar uma rota que a derivacao nao prova.
+   */
+  "src/commands/task-run.js": Object.freeze({
+    consumer: "task_run_json_contract",
+    proof: "tests/task_run_json_contract.test.js — subprocesso real em repo git de verdade: a recusa `plan_not_found` (:43) e o resultado completo do loop (:97), com stdout puro, payload fora do stderr e dois controles negativos (ramo humano e a guarda de `--yes`)",
+  }),
+  /**
    * `qa --json` — forma ANCORADA (arquivo + comando + modo).
    *
    * `qa.js` e alcancado so pelo comando `qa`, entao a forma file-scoped tambem
