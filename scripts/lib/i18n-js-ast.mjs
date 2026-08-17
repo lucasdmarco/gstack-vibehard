@@ -2428,6 +2428,28 @@ export const MACHINE_PROTOCOL_CONSUMERS = Object.freeze({
       }),
     ]),
   }),
+  /**
+   * DOIS consumidores no MESMO arquivo, provados SEPARADAMENTE. `dev` sobe
+   * processo e `stop` encerra; declarar um cobrindo o outro seria cobertura
+   * acidental — e a ancora e UNIVERSAL, entao cada comando precisa da sua prova.
+   * `logs` e `open` alcancam o arquivo e NAO tem ponto de maquina.
+   */
+  "src/commands/runtime-supervisor.js": Object.freeze({
+    commands: Object.freeze([
+      Object.freeze({
+        command: "dev",
+        mode: "--json",
+        consumer: "runtime_supervisor_json_contract",
+        evidence: "tests/runtime_supervisor_json_contract.test.js — `dev --json` por subprocesso em workspace/HOME/TEMP descartaveis, subindo um servico fixture marcado por runId: stdout puro, `services[]` com pid/porta/status/url/log, log contido no sandbox, e o state em disco conferido contra o payload",
+      }),
+      Object.freeze({
+        command: "stop",
+        mode: "--json",
+        consumer: "runtime_supervisor_json_contract",
+        evidence: "tests/runtime_supervisor_json_contract.test.js — `stop --json` no mesmo cenario: encerra SOMENTE os PIDs capturados do state que o `dev` gravou no sandbox, reporta `stopped`/`stillAlive`/`cleared`, e ha prova de EFEITO SEMANTICO (o processo esta morto depois). Nenhum processo preexistente da maquina e observado, adotado ou encerrado",
+      }),
+    ]),
+  }),
   "src/commands/secrets.js": Object.freeze({
     commands: Object.freeze([
       Object.freeze({
