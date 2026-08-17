@@ -179,7 +179,7 @@ test("validateRegistry recusa script que NÃO é alcançado pelo runtime (não p
  *
  * ATUALIZE AQUI, e so aqui, a cada arquivo reconciliado no lote JS.
  */
-test("CENSO GLOBAL: 1907 pontos, 11 unknown, 25 arquivos convertidos", async () => {
+test("CENSO GLOBAL: 1907 pontos, 5 unknown, 25 arquivos convertidos", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
 
@@ -290,7 +290,15 @@ test("CENSO GLOBAL: 1907 pontos, 11 unknown, 25 arquivos convertidos", async () 
   // enxergam. Fecharam por duas regras novas, e a divisao entre elas e a prova:
   // 16 por `generated-dev-console` e um so, `app.log.error(err)`, por
   // `generated-framework-logger`. Os 11 restantes sao TODOS Python dos hooks.
-  assert.equal(inv.unknown, 11, "lotes JS e TypeScript fechados: o resto e Python")
+  //
+  // 11 -> 5 com a fatia dos hooks. Delta -6, e o que NAO fechou e o achado:
+  // `before_shell.py` e `gc.py` sao COPIADOS pelo instalador (`codex.js` copia
+  // todo `.py` do diretorio) e NENHUM harness os registra em evento algum. Sem
+  // consumidor, chamar o stdout deles de protocolo seria afirmar contrato que
+  // ninguem fala, entao os 5 pontos ficam `unknown` e BLOQUEIAM a Fase 1B --
+  // que e o efeito correto, e o oposto de entrarem calados na claim. Ver
+  // tests/i18n_hook_rules.test.js, que guarda o achado como asercao.
+  assert.equal(inv.unknown, 5, "so os hooks orfaos seguem abertos, por falta de consumidor")
   assert.equal(inv.jsRegistry.convertedFiles.length, 25)
   assert.equal(inv.blocked, false)
 

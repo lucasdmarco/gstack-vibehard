@@ -334,6 +334,46 @@ const HOOK_RULES = Object.freeze([
     reason: "fora do fluxo padrão e exige ativação explícita de depuração",
   },
   {
+    /**
+     * `print(json.dumps(...))` num hook — o MESMO canal de `stdout-hook-protocol`,
+     * por outra sintaxe.
+     *
+     * O extrator dá sinks diferentes a `sys.stdout.write(...)` (`stdout`) e a
+     * `print(...)` (`print`), e a regra de cima só cobria o primeiro. Um hook
+     * escreve seu documento de decisão com `print` na esmagadora maioria dos
+     * casos, então a lacuna deixava aberto justamente o caminho normal.
+     *
+     * NÃO é `sink === "print"` sozinho, e a diferença é o que separa esta regra
+     * de classificar por diretório: `print` num hook também serve para relatório
+     * humano, e o que prova contrato de máquina é o PAYLOAD ser uma serialização
+     * sem ramo humano na mesma chamada — o mesmo critério, e o mesmo fato, que
+     * `cli-stdout-serialized` usa do outro lado da fronteira.
+     *
+     * POSIÇÃO: depois de `debug-flag`, espelhando `CLI_RULES`. Sob ativação de
+     * depuração a resposta mais informativa é `internal_debug`, e serializar não
+     * traz a chamada de volta ao fluxo padrão.
+     *
+     * A TERCEIRA PORTA — `consumerDeclared` — é a que faz esta regra recusar, e
+     * ela existe por um achado desta fatia: `before_shell.py` e `gc.py` são
+     * COPIADOS pelo instalador e NENHUM harness os registra em evento algum;
+     * nada no repositório parseia o stdout deles. Chamar aquilo de protocolo
+     * seria afirmar um contrato sem ninguém do outro lado — que é exatamente o
+     * que `machineProtocolAudit` existe para impedir.
+     *
+     * A dependência é ASSUMIDA e não escondida: aqui a auditoria deixa de ser
+     * independente desta regra em particular, porque "isto é protocolo" É a
+     * afirmação de que alguém o consome. Ela continua independente onde importa
+     * — sinks JS, o sink `json` e a espécie `cli_subprocess` não passam por
+     * aqui. E o efeito é fail-closed: sem consumidor declarado o ponto fica
+     * `unknown` e bloqueia a fase, em vez de entrar mudo na claim.
+     */
+    id: "hook-stdout-serialized",
+    when: ({ sink, payloadIsSerialized, consumerDeclared }) =>
+      sink === "print" && payloadIsSerialized && consumerDeclared,
+    audience: "machine_protocol", trigger: "hook_protocol",
+    reason: "`print(json.dumps(...))` sem ramo humano: o stdout do hook é o canal do protocolo com o harness, e a chamada inteira é UM documento de contrato. As frases que viajam DENTRO do documento são dívida de Fase 2, não superfície deste ponto",
+  },
+  {
     id: "channel-prefixed-diagnostic",
     when: ({ sink, channelPrefixed }) => sink === "stderr" && channelPrefixed,
     audience: "public_diagnostic", trigger: "normal_flow",
@@ -344,6 +384,33 @@ const HOOK_RULES = Object.freeze([
     when: ({ sink, insideExceptHandler }) => sink === "stderr" && insideExceptHandler,
     audience: "public_diagnostic", trigger: "hook_failure",
     reason: "stderr em tratamento de exceção aparece ao usuário após falha",
+  },
+  {
+    /**
+     * RELATÓRIO NO TERMINAL: stderr, fluxo normal, payload que é uma FRASE.
+     *
+     * ÚLTIMA da lista de propósito, e a posição é a regra: ela só decide o que
+     * sobrou depois de todas as guardas. Se a linha estivesse sob depuração,
+     * sob env de teste, num handler de crash, num ramo de bloqueio, num
+     * `except`, ou trouxesse prefixo de canal, byte de controle ou token
+     * estruturado, a resposta já teria saído acima — e cada uma dessas
+     * respostas é diferente desta.
+     *
+     * NÃO é "stderr vira público por default", e a diferença tem nome:
+     * `payloadIsStringLiteral`. Sem ele o ponto continua `unknown`, que é o que
+     * acontece quando o payload é uma expressão ou um nome que o resolvedor
+     * local não fecha. O fato é sobre a FORMA do argumento — existe ali uma
+     * frase, e não um documento —, jamais sobre o que a frase diz; classificar
+     * por conteúdo é o erro que esta fase inteira recusa.
+     *
+     * `public_diagnostic` é IN_SCOPE, e essa é a direção segura: a mensagem
+     * entra na claim e vira dívida declarada. O caminho anterior a deixava sair
+     * calada — e as duas linhas que a regra fecha estão, hoje, em PT-BR.
+     */
+    id: "stderr-normal-flow-report",
+    when: ({ sink, payloadIsStringLiteral }) => sink === "stderr" && payloadIsStringLiteral,
+    audience: "public_diagnostic", trigger: "normal_flow",
+    reason: "escrita de frase em stderr no fluxo normal, depois de excluídas todas as guardas: é relatório que o usuário lê no terminal, e entra na claim",
   },
 ])
 
@@ -462,6 +529,37 @@ export const MACHINE_PROTOCOL_CONSUMERS = Object.freeze([
     consumer: "harness (Claude Code / Codex) via protocolo de hook",
     contract: "objeto JSON em stdout com decisão do hook (block/allow + reason)",
     evidence: "tests/test_stop_output_guard_rbac.py — subprocess real do hook, parseia a decisão",
+  },
+  {
+    /**
+     * ANCORADAS POR ARQUIVO, e nunca em `hooks/`, porque a pergunta "quem lê
+     * este stdout" tem resposta DIFERENTE por hook — e em dois deles a resposta
+     * é NENHUM. `before_shell.py` e `gc.py` são copiados pelo instalador
+     * (`codex.js:29` copia todo `.py` do diretório) e não aparecem em nenhuma
+     * tabela de registro: `claude.js` registra 5 eventos e `codex.js` 4, e nem
+     * um nem outro os cita. Nada no repositório spawna qualquer um dos dois nem
+     * parseia sua saída. Um prefixo `hooks/` aqui teria dado alvará justamente
+     * aos dois pontos que não podem tê-lo.
+     */
+    file: "hooks/hooks/qg.py",
+    sink: "print",
+    consumer: "src/project-plan/verify-runner.js:294 executa `qg.py --path . --level 1` por subprocesso; o contrato JSON é parseado em tests/test_qg_fail_closed.py",
+    contract: "documento JSON único em stdout com `pass`, `issues` e `blocking_severity_count`; exit code espelha o veredito",
+    evidence: "tests/test_qg_fail_closed.py — subprocess real do hook seguido de `json.loads(r.stdout)`, inclusive no caminho fail-closed",
+  },
+  {
+    file: "hooks/hooks/post_sprint.py",
+    sink: "print",
+    consumer: "src/commands/sprint.js:77 — `JSON.parse(result)` sobre o stdout do subprocesso, e cada campo do documento vira uma linha do relatório",
+    contract: "documento JSON único em stdout com `graphify`, `gbrain`, `mom`, `chronicle` e `roi`",
+    evidence: "src/commands/sprint.js:71-91 — `execFileSync` do hook e leitura dos campos declarados; o ramo bloqueado pelo Porteiro emite um envelope com `blocked: true`",
+  },
+  {
+    file: "hooks/hooks/post_tool_use_review.py",
+    sink: "print",
+    consumer: "harness (Claude Code) — `src/harness/claude.js:109` registra o hook no evento `PostToolUse` com matcher `Write|Edit`",
+    contract: "documento JSON único em stdout, advisory (`level: \"advisory\"`): observa e roteia a checagem incremental, e NUNCA desfaz a ação",
+    evidence: "tests/test_post_tool_review.py — subprocess real do hook seguido de `json.loads(p.stdout)`; tests/hooks_registration.test.js cobre o registro do evento",
   },
   {
     // Python de CLI, e não de hook: quem lê é o próprio GStack, no processo pai.
@@ -698,11 +796,97 @@ function enclosingConditions(linhas, line) {
   return envolventes.join("\n")
 }
 
-function pythonContext(text, line) {
+/**
+ * PAYLOAD ATRÁS DE VARIÁVEL — `print(output)`, `sys.stderr.write(roi_summary)`.
+ *
+ * Duas escritas reais dos hooks montam o payload numa linha e o emitem noutra, e
+ * o extrator, que só olha a chamada, não via NADA nelas: nem serialização nem
+ * literal. Ficavam `unknown` por limitação da medida, e não por dúvida honesta.
+ *
+ * A resolução é local e conservadora: o corpo da função que contém a chamada,
+ * delimitado por indentação como em `enclosingConditions` — janela de linhas não
+ * é escopo. Se QUALQUER atribuição àquele nome no corpo contradiz as outras, o
+ * payload continua indefinido, porque aí a linha emite uma coisa ou outra
+ * conforme o caminho.
+ */
+const PAYLOAD_VARIAVEL = /^\s*(?:print|sys\.(?:stdout|stderr)\.write)\s*\(\s*([A-Za-z_]\w*)\s*\)\s*$/
+/** Primeiro argumento é literal de string — inclusive `f""`, `r""`, `b""`. */
+const PALAVRA_LITERAL = /(?:print|sys\.(?:stdout|stderr)\.write)\s*\(\s*[rbuf]{0,2}["']/
+const ATRIBUICAO_LITERAL = /^\s*=\s*\(?\s*(?:[rbuf]{0,2}["']|$)/
+
+/** Índice do `def`/`class` que contém a linha (1-based), ou `-1`. */
+function indiceDaFuncao(linhas, line) {
+  let nivel = indentOf(linhas[line - 1] || "")
+  for (let i = line - 2; i >= 0; i--) {
+    if (!dedents(linhas[i], nivel)) continue
+    if (isTopLevelDef(linhas[i])) return i
+    nivel = indentOf(linhas[i])
+  }
+  return -1
+}
+
+/**
+ * Fim do bloco aberto em `i` — primeira linha COM conteúdo cuja indentação não
+ * passa da do cabeçalho. Linha em branco não fecha bloco em Python.
+ */
+const fimDoBloco = (linhas, i) => {
+  const base = indentOf(linhas[i])
+  let fim = i + 1
+  while (fim < linhas.length && !dedents(linhas[fim], base + 1)) fim += 1
+  return fim
+}
+
+/** Corpo da função que contém a linha (1-based), por indentação. */
+function enclosingFunctionBody(linhas, line) {
+  const i = indiceDaFuncao(linhas, line)
+  return i < 0 ? linhas : linhas.slice(i, fimDoBloco(linhas, i))
+}
+
+/**
+ * Atribuições a `nome` no corpo, cada uma com as linhas de continuação.
+ *
+ * A continuação é porta e não detalhe: `roi_summary = (` não diz nada sozinha —
+ * o valor vem nas linhas indentadas abaixo. Sem juntá-las, uma atribuição
+ * multilinha seria lida como indefinida.
+ */
+function atribuicoesDe(corpo, nome) {
+  const alvo = new RegExp(`^\\s*${nome}\\s*=[^=]`)
+  const blocos = []
+  for (let i = 0; i < corpo.length; i++) {
+    if (!alvo.test(corpo[i])) continue
+    const base = indentOf(corpo[i])
+    let fim = i + 1
+    while (fim < corpo.length && corpo[fim].trim() && indentOf(corpo[fim]) > base) fim += 1
+    blocos.push({ bloco: corpo.slice(i, fim).join("\n"), resto: corpo[i].slice(corpo[i].indexOf("=")) })
+  }
+  return blocos
+}
+
+/** Forma do payload: `serialized`, `literal` ou `null` quando não se decide. */
+function payloadDaVariavel(linhas, line, chamada) {
+  const m = chamada.split("\n")[0].match(PAYLOAD_VARIAVEL)
+  if (!m) return null
+  const atrib = atribuicoesDe(enclosingFunctionBody(linhas, line), m[1])
+  if (atrib.length === 0) return null
+  const serial = atrib.every((a) => PY_SERIALIZADOR.test(a.bloco) && !PY_CONDICIONAL.test(a.bloco))
+  if (serial) return "serialized"
+  const literal = atrib.every((a) => ATRIBUICAO_LITERAL.test(a.resto) && !PY_SERIALIZADOR.test(a.bloco))
+  return literal ? "literal" : null
+}
+
+/**
+ * EXPORTADA PARA PROVA. Os fatos de payload têm portas — unanimidade das
+ * atribuições, continuação multilinha, escopo da função — que o repositório real
+ * não exercita, porque os dois casos que existem são unânimes e locais. O
+ * mutation control mostrou: sem fixture sintética, remover qualquer uma das três
+ * não quebrava teste algum.
+ */
+export function pythonContext(text, line) {
   const linhas = text.split("\n")
   const envolventes = enclosingConditions(linhas, line)
   // A chamada pode abrir em `write(` e continuar na linha seguinte.
   const chamada = linhas.slice(line - 1, line + 2).join("\n")
+  const daVariavel = payloadDaVariavel(linhas, line, chamada)
   const funcao = linhas.slice(Math.max(0, line - 25), line).join("\n")
   return {
     guardedByDebug: DEBUG_GUARD.test(envolventes),
@@ -716,7 +900,15 @@ function pythonContext(text, line) {
     // Serialização SEM ramo humano na mesma chamada. As duas condições juntas:
     // `print(json.dumps(x))` é payload; `print(json.dumps(x) if f else "frase")`
     // é payload OU frase, e a frase pertence à claim.
-    payloadIsSerialized: PY_SERIALIZADOR.test(chamada) && !PY_CONDICIONAL.test(chamada),
+    //
+    // O `||` alcança a forma indireta `print(output)`, e só quando TODAS as
+    // atribuições àquele nome, no corpo da função, são serialização.
+    payloadIsSerialized: (PY_SERIALIZADOR.test(chamada) && !PY_CONDICIONAL.test(chamada))
+      || daVariavel === "serialized",
+    // FORMA do payload, nunca conteúdo: o argumento é um literal de string, seja
+    // escrito na própria chamada ou montado num nome local. Não diz o que a
+    // frase significa — diz que ali existe uma frase, e não um documento.
+    payloadIsStringLiteral: PALAVRA_LITERAL.test(chamada) || daVariavel === "literal",
   }
 }
 
@@ -875,12 +1067,26 @@ const CLASSIFICADOR_POR_ESPECIE = {
   cli_subprocess: (ctx) => classifyCliSubprocessPoint(ctx),
 }
 
+/** Há consumidor DECLARADO e ancorado para este arquivo e este sink? */
+const consumidorDeclarado = (p, consumers = MACHINE_PROTOCOL_CONSUMERS) =>
+  consumers.some((c) => cobre(c, p))
+
 const collectPyPoints = (repoRoot) => [...distributedPythonFiles(repoRoot)].flatMap(([rel, raiz]) => {
   const abs = join(repoRoot, rel)
   const text = readSafe(abs)
   const classificar = CLASSIFICADOR_POR_ESPECIE[raiz.kind]
   return scanFile(abs, repoRoot, SINKS_PY)
-    .map((p) => ({ ...p, ...classificar({ sink: p.sink, ...pythonContext(text, p.line) }) }))
+    .map((p) => ({
+      ...p,
+      ...classificar({
+        sink: p.sink,
+        // Fato do REGISTRO, não da linha, e por isso entra aqui e não em
+        // `pythonContext`: aquele descreve o código, este descreve quem fala do
+        // outro lado do canal. Ver a nota de `hook-stdout-serialized`.
+        consumerDeclared: consumidorDeclarado(p),
+        ...pythonContext(text, p.line),
+      }),
+    }))
 })
 
 // O registry só REFINA o que a análise de canal deixou `unknown`. Nunca sobrescreve uma

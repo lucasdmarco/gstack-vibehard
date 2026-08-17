@@ -150,3 +150,292 @@ test("a fatia NÃO fecha o inventário: o gate global segue bloqueando", async (
   assert.ok(inv.unknown > 0, "outros arquivos ainda têm unknown")
   assert.equal(phase1Gate(inv).ok, false, "fechar uma fatia nunca encerra a Fase 1")
 })
+
+
+// ── Fatia dos hooks restantes: stdout serializado e relatório em stderr ─────
+
+/**
+ * O extrator dá sinks DIFERENTES a duas escritas no MESMO canal:
+ * `sys.stdout.write(...)` vira `stdout` e `print(...)` vira `print`. A regra
+ * `stdout-hook-protocol` só cobria o primeiro, e um hook escreve seu documento
+ * de decisão com `print` quase sempre — a lacuna deixava aberto justamente o
+ * caminho normal.
+ *
+ * A correção NÃO é dizer que `print` em hook é protocolo. Isso seria classificar
+ * pelo diretório, que é o que a auditoria destes pontos proibia. São TRÊS
+ * portas: o canal, o payload ser serialização sem ramo humano, e existir
+ * CONSUMIDOR DECLARADO — a terceira nasceu de um achado desta fatia.
+ */
+test("POSITIVO: `print(json.dumps(...))` com consumidor declarado ⇒ machine_protocol", async () => {
+  const { classifyHookPoint } = await imp()
+  const r = classifyHookPoint({ sink: "print", payloadIsSerialized: true, consumerDeclared: true })
+  assert.equal(r.audience, "machine_protocol")
+  assert.equal(r.rule, "hook-stdout-serialized")
+})
+
+test("NEGATIVO: `print` sem payload serializado NÃO vira protocolo por ser hook", async () => {
+  const { classifyHookPoint } = await imp()
+  const r = classifyHookPoint({ sink: "print", consumerDeclared: true })
+  assert.equal(r.audience, "unknown",
+    "`print` em hook também é relatório humano — o canal não decide sozinho")
+  assert.equal(r.rule, null)
+})
+
+/**
+ * A PORTA DO CONSUMIDOR, e o achado que a criou: `before_shell.py` e `gc.py` são
+ * COPIADOS pelo instalador e NENHUM harness os registra em evento algum. Sem
+ * alguém do outro lado, chamar aquilo de protocolo seria afirmar um contrato que
+ * ninguém fala.
+ */
+test("NEGATIVO: sem consumidor declarado, stdout serializado NÃO é protocolo", async () => {
+  const { classifyHookPoint } = await imp()
+  const r = classifyHookPoint({ sink: "print", payloadIsSerialized: true })
+  assert.equal(r.audience, "unknown")
+  assert.equal(r.rule, null)
+})
+
+test("PRECEDÊNCIA: ativação de depuração continua ganhando de serialização", async () => {
+  const { classifyHookPoint } = await imp()
+  const r = classifyHookPoint({
+    sink: "print", payloadIsSerialized: true, consumerDeclared: true, guardedByDebug: true,
+  })
+  assert.equal(r.audience, "internal_debug",
+    "serializar não traz a chamada de volta ao fluxo padrão")
+})
+
+// ── Payload atrás de variável ──────────────────────────────────────────────
+
+/**
+ * `print(output)` e `sys.stderr.write(roi_summary)` — duas escritas reais dos
+ * hooks montam o payload numa linha e o emitem noutra. O extrator, que só olha a
+ * chamada, não via NADA nelas: ficavam `unknown` por limitação da medida, e não
+ * por dúvida honesta.
+ */
+test("REPO: `print(output)` resolve até a serialização e fecha como protocolo", async () => {
+  const { buildInventory } = await imp()
+  const p = buildInventory({ repoRoot }).points
+    .find((x) => x.file.endsWith("post_sprint.py") && x.line === 367)
+  assert.equal(p.audience, "machine_protocol")
+  assert.equal(p.rule, "hook-stdout-serialized",
+    "as DUAS atribuições de `output` no corpo (linhas 356 e 361) são serialização")
+})
+
+test("REPO: `sys.stderr.write(roi_summary)` resolve até a frase e entra na claim", async () => {
+  const { buildInventory } = await imp()
+  const p = buildInventory({ repoRoot }).points
+    .find((x) => x.file.endsWith("post_sprint.py") && x.line === 378)
+  assert.equal(p.audience, "public_diagnostic")
+  assert.equal(p.rule, "stderr-normal-flow-report")
+})
+
+/**
+ * A porta da FORMA. Sem fato de payload não há decisão, e o ponto continua
+ * `unknown` — jamais "interno" por default, que é a regra mais antiga desta fase.
+ */
+test("NEGATIVO: sem forma de payload conhecida, nada decide", async () => {
+  const { classifyHookPoint } = await imp()
+  assert.equal(classifyHookPoint({ sink: "print", consumerDeclared: true }).rule, null)
+  assert.equal(classifyHookPoint({ sink: "stderr" }).rule, null)
+})
+
+// ── Relatório em stderr no fluxo normal ────────────────────────────────────
+
+test("POSITIVO: frase em stderr, fora de toda guarda, é superfície de leitura", async () => {
+  const { classifyHookPoint } = await imp()
+  const r = classifyHookPoint({ sink: "stderr", payloadIsStringLiteral: true })
+  assert.equal(r.audience, "public_diagnostic")
+  assert.equal(r.rule, "stderr-normal-flow-report")
+})
+
+/**
+ * A REGRA É A ÚLTIMA DA LISTA, e a posição faz parte dela: só decide o que
+ * sobrou. Cada guarda acima responde OUTRA coisa sobre a mesma linha, e vê-las
+ * ganharem é o que impede esta de virar "stderr é público por default".
+ */
+for (const [guarda, ctx, esperado] of [
+  ["depuração", { guardedByDebug: true }, "internal_debug"],
+  ["ramo de bloqueio", { securityBranch: true }, "public_security_decision"],
+  ["handler de crash", { inCrashHandler: true }, "public_diagnostic"],
+  ["byte de controle", { payloadIsControlChar: true }, "terminal_control"],
+  ["env de teste", { envGuarded: true, emitsStructuredToken: true }, "test_observability"],
+]) {
+  test(`PRECEDÊNCIA: ${guarda} decide antes do relatório de fluxo normal`, async () => {
+    const { classifyHookPoint } = await imp()
+    const r = classifyHookPoint({ sink: "stderr", payloadIsStringLiteral: true, ...ctx })
+    assert.equal(r.audience, esperado)
+    assert.notEqual(r.rule, "stderr-normal-flow-report")
+  })
+}
+
+// ── Ancorado no repositório real ───────────────────────────────────────────
+
+test("REPO: os 4 documentos com consumidor provado fecham por esta regra", async () => {
+  const { buildInventory } = await imp()
+  const porRegra = buildInventory({ repoRoot }).points
+    .filter((p) => p.rule === "hook-stdout-serialized")
+  assert.deepEqual(porRegra.map((p) => `${p.file}:${p.line}`).sort(), [
+    "hooks/hooks/post_sprint.py:327",
+    "hooks/hooks/post_sprint.py:367",
+    "hooks/hooks/post_tool_use_review.py:111",
+    "hooks/hooks/qg.py:87",
+  ])
+})
+
+/**
+ * O ACHADO, guardado como asserção para não virar nota de rodapé: dois hooks são
+ * distribuídos e nunca registrados. Enquanto for assim, os pontos deles ficam
+ * `unknown` e BLOQUEIAM a Fase 1B — que é o efeito correto, e o oposto de
+ * entrarem calados na claim.
+ *
+ * Se alguém registrar qualquer um dos dois, ou removê-lo, este teste é quem
+ * avisa que a decisão pendente foi tomada.
+ */
+test("REPO: `before_shell.py` e `gc.py` são distribuídos e NUNCA registrados", async () => {
+  const { readFileSync } = await import("node:fs")
+  const claude = readFileSync(path.join(repoRoot, "src/harness/claude.js"), "utf-8")
+  const codex = readFileSync(path.join(repoRoot, "src/harness/codex.js"), "utf-8")
+  for (const orfao of ["before_shell.py", "gc.py"]) {
+    assert.equal(claude.includes(orfao), false, `${orfao} apareceu no registro do Claude Code`)
+    assert.equal(codex.includes(orfao), false, `${orfao} apareceu no registro do Codex`)
+  }
+  // Copiados assim mesmo: `codex.js` copia TODO `.py` do diretório de hooks.
+  assert.match(codex, /readdirSync\(HOOKS_SOURCE\)/,
+    "é a cópia em bloco que os distribui sem registrá-los")
+})
+
+test("REPO: os 5 pontos dos hooks órfãos seguem `unknown` — fail-closed, não silêncio", async () => {
+  const { buildInventory } = await imp()
+  const abertos = buildInventory({ repoRoot }).points.filter((p) => p.audience === "unknown")
+  assert.deepEqual(abertos.map((p) => `${p.file}:${p.line}`).sort(), [
+    "hooks/hooks/before_shell.py:44",
+    "hooks/hooks/gc.py:183",
+    "hooks/hooks/gc.py:189",
+    "hooks/hooks/gc.py:195",
+    "hooks/hooks/gc.py:272",
+  ])
+})
+
+/**
+ * DÍVIDA DA FASE 2, declarada e não disfarçada: o documento é contrato de
+ * máquina, mas frases em PT-BR viajam DENTRO dele como valores — e a linha de
+ * stderr que acabou de entrar na claim está em português. Classificar o ponto é
+ * sobre o CANAL, e nunca uma alegação de que o conteúdo já está em inglês.
+ */
+test("REPO: as frases PT-BR seguem em aberto — dívida da Fase 2", async () => {
+  const { readFileSync } = await import("node:fs")
+  const gc = readFileSync(path.join(repoRoot, "hooks/hooks/gc.py"), "utf-8").split(/\r?\n/)
+  assert.match(gc[181], /Uso: python gc\.py/, "linha 182 monta o valor que a 183 serializa")
+  const ps = readFileSync(path.join(repoRoot, "hooks/hooks/post_sprint.py"), "utf-8").split(/\r?\n/)
+  assert.match(ps[372], /Tokens salvos/, "linha 373 compõe o relatório que a 378 escreve")
+})
+
+// ── As portas da resolução de variável, em fixture ─────────────────────────
+
+/**
+ * O repositório real exercita só o caminho feliz: as duas variáveis que existem
+ * são unânimes, montadas na mesma função e detectáveis na primeira linha. O
+ * mutation control cobrou o resto — sem estas fixtures, trocar `every` por
+ * `some`, não juntar a continuação multilinha ou varrer o arquivo inteiro em vez
+ * do corpo da função não quebrava teste algum.
+ */
+const ctxDe = async (linhas, alvo) => {
+  const { pythonContext } = await imp()
+  return pythonContext(linhas.join("\n"), alvo)
+}
+
+test("PORTA: uma atribuição divergente derruba a serialização inteira", async () => {
+  const c = await ctxDe([
+    "def main():",
+    "    if erro:",
+    "        out = json.dumps(a)",
+    "    else:",
+    '        out = "falhou de vez"',
+    "    print(out)",
+  ], 6)
+  assert.equal(c.payloadIsSerialized, false,
+    "a linha emite documento OU frase conforme o caminho — indefinido é a resposta honesta")
+  assert.equal(c.payloadIsStringLiteral, false, "e também não é frase, pelo mesmo motivo")
+})
+
+test("PORTA: uma atribuição divergente derruba a frase inteira", async () => {
+  const c = await ctxDe([
+    "def main():",
+    '    msg = "relatorio"',
+    "    if x:",
+    "        msg = compute(y)",
+    "    sys.stderr.write(msg)",
+  ], 5)
+  assert.equal(c.payloadIsStringLiteral, false,
+    "`compute(y)` pode devolver qualquer coisa — a unanimidade é o que dá a resposta")
+})
+
+/**
+ * A CONTINUAÇÃO É PORTA. `out = (` não diz nada sozinha: o valor vem nas linhas
+ * indentadas abaixo. Sem juntá-las, uma serialização multilinha passaria por
+ * frase — que é o erro mais caro possível aqui, porque tiraria um documento de
+ * máquina para dentro da claim.
+ */
+test("PORTA: atribuição multilinha é lida inteira, não só a primeira linha", async () => {
+  const serial = await ctxDe([
+    "def main():",
+    "    out = (",
+    "        json.dumps(payload)",
+    "    )",
+    "    print(out)",
+  ], 5)
+  assert.equal(serial.payloadIsSerialized, true)
+  assert.equal(serial.payloadIsStringLiteral, false,
+    "`out = (` sozinha parece frase; a continuação é quem revela o documento")
+
+  const frase = await ctxDe([
+    "def main():",
+    "    out = (",
+    '        f"linha um"',
+    '        f"linha dois"',
+    "    )",
+    "    sys.stderr.write(out)",
+  ], 6)
+  assert.equal(frase.payloadIsStringLiteral, true)
+  assert.equal(frase.payloadIsSerialized, false)
+})
+
+/**
+ * O ESCOPO É A FUNÇÃO, e não o arquivo. Um nome homônimo noutra função é outro
+ * valor — varrer o arquivo inteiro faria a atribuição de um vizinho decidir esta
+ * linha, que é a mesma classe de erro que a janela de 6 linhas cometeu na 1ª
+ * versão de `enclosingConditions`.
+ */
+test("PORTA: homônimo em OUTRA função não decide esta linha", async () => {
+  const c = await ctxDe([
+    "def outra():",
+    "    out = json.dumps(a)",
+    "",
+    "def main():",
+    '    out = "relatorio humano"',
+    "    print(out)",
+  ], 6)
+  assert.equal(c.payloadIsSerialized, false,
+    "a serialização mora na função vizinha e não alcança esta chamada")
+  assert.equal(c.payloadIsStringLiteral, true)
+})
+
+test("PORTA: sem atribuição alguma no corpo, o payload fica indefinido", async () => {
+  const c = await ctxDe([
+    "def main(out):",
+    "    print(out)",
+  ], 2)
+  assert.equal(c.payloadIsSerialized, false, "parâmetro: quem chama decide, e isso não está aqui")
+  assert.equal(c.payloadIsStringLiteral, false)
+})
+
+/**
+ * A forma INDIRETA não pode alargar a forma DIRETA: `print(json.dumps(x) if f
+ * else "frase")` continua recusado, e agora com o resolvedor de variável ligado.
+ */
+test("PORTA: o ramo condicional na própria chamada segue recusado", async () => {
+  const c = await ctxDe([
+    "def main():",
+    '    print(json.dumps(out) if args.json else "Indexados 3 documentos")',
+  ], 2)
+  assert.equal(c.payloadIsSerialized, false)
+})
