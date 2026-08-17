@@ -290,11 +290,11 @@ test("REPO: os 4 documentos com consumidor provado fecham por esta regra", async
  * Se alguém registrar qualquer um dos dois, ou removê-lo, este teste é quem
  * avisa que a decisão pendente foi tomada.
  */
-test("REPO: `before_shell.py` e `gc.py` são distribuídos e NUNCA registrados", async () => {
+test("REPO: `gc.py` é distribuído e NUNCA registrado em evento", async () => {
   const { readFileSync } = await import("node:fs")
   const claude = readFileSync(path.join(repoRoot, "src/harness/claude.js"), "utf-8")
   const codex = readFileSync(path.join(repoRoot, "src/harness/codex.js"), "utf-8")
-  for (const orfao of ["before_shell.py", "gc.py"]) {
+  for (const orfao of ["gc.py"]) {
     assert.equal(claude.includes(orfao), false, `${orfao} apareceu no registro do Claude Code`)
     assert.equal(codex.includes(orfao), false, `${orfao} apareceu no registro do Codex`)
   }
@@ -303,16 +303,15 @@ test("REPO: `before_shell.py` e `gc.py` são distribuídos e NUNCA registrados",
     "é a cópia em bloco que os distribui sem registrá-los")
 })
 
-test("REPO: os 5 pontos dos hooks órfãos seguem `unknown` — fail-closed, não silêncio", async () => {
+test("REPO: os 4 pontos de `gc.py` seguem `unknown` — fail-closed, não silêncio", async () => {
   const { buildInventory } = await imp()
   const abertos = buildInventory({ repoRoot }).points.filter((p) => p.audience === "unknown")
   assert.deepEqual(abertos.map((p) => `${p.file}:${p.line}`).sort(), [
-    "hooks/hooks/before_shell.py:44",
     "hooks/hooks/gc.py:183",
     "hooks/hooks/gc.py:189",
     "hooks/hooks/gc.py:195",
     "hooks/hooks/gc.py:272",
-  ])
+  ], "`before_shell.py` saiu por remoção; `gc.py` espera contrato executável")
 })
 
 /**

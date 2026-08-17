@@ -179,7 +179,7 @@ test("validateRegistry recusa script que NÃO é alcançado pelo runtime (não p
  *
  * ATUALIZE AQUI, e so aqui, a cada arquivo reconciliado no lote JS.
  */
-test("CENSO GLOBAL: 1907 pontos, 5 unknown, 25 arquivos convertidos", async () => {
+test("CENSO GLOBAL: 1905 pontos, 4 unknown, 25 arquivos convertidos", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
 
@@ -210,7 +210,14 @@ test("CENSO GLOBAL: 1907 pontos, 5 unknown, 25 arquivos convertidos", async () =
   // `success(res, …)`, que e helper de RESPOSTA HTTP e nao de render --
   // `health.ts` e `users.ts` ficam com ZERO ponto, e por isso entram na lista de
   // convertidos: fora dela, o regex seguiria imputando pontos que nao existem.
-  assert.equal(inv.total, 1907, "converter nao pode sumir com ponto REAL; falso positivo do regex pode cair")
+  //
+  // 1907 -> 1905: REMOCAO de `before_shell.py`, hook distribuido que nenhum
+  // harness registrava e cuja unica capacidade -- bloquear pipe-to-shell -- ja
+  // existia viva em `pre_tool_use_security.py`. Caem 2 pontos de UMA emissao: o
+  // scanner contava `:44` duas vezes (`print` e `json`), a mesma dupla contagem
+  // ja documentada em `context_db.py`. Aqui o total cai porque a SUPERFICIE
+  // sumiu de verdade, e nao por falso positivo.
+  assert.equal(inv.total, 1905, "converter nao pode sumir com ponto REAL; falso positivo do regex pode cair")
 
   // Medicao em movimento: cai a cada arquivo reconciliado. 54 -> 53 com qa.js;
   // 53 -> 52 com secrets.js.
@@ -298,7 +305,9 @@ test("CENSO GLOBAL: 1907 pontos, 5 unknown, 25 arquivos convertidos", async () =
   // ninguem fala, entao os 5 pontos ficam `unknown` e BLOQUEIAM a Fase 1B --
   // que e o efeito correto, e o oposto de entrarem calados na claim. Ver
   // tests/i18n_hook_rules.test.js, que guarda o achado como asercao.
-  assert.equal(inv.unknown, 5, "so os hooks orfaos seguem abertos, por falta de consumidor")
+  //
+  // 5 -> 4 com a remocao do hook orfao. Os 4 restantes sao de `gc.py`.
+  assert.equal(inv.unknown, 4, "so `gc.py` segue aberto, por falta de contrato executavel")
   assert.equal(inv.jsRegistry.convertedFiles.length, 25)
   assert.equal(inv.blocked, false)
 
