@@ -89,15 +89,44 @@ export const CONVERTED_FILES = Object.freeze([
   // `stream-lifecycle-diagnostic`.
   "scripts/sync-qg-version.mjs",
   "scripts/clean-pkg.mjs",
-  // Lote JS, arquivo 9/14. Foi o arquivo que abriu a fatia inteira: os quatro
-  // repasses (`:249/:260/:278/:280`) pareciam `external_passthrough` e NAO SAO —
-  // o subprocesso deles e `src/context-docs/py/context_db.py`, que viaja no
-  // pacote. Fecharam por `stream-counted-subprocess-origin`, e SO porque aquele
-  // arquivo passou a ser contado no inventario. O residual `:50` (`ctxJson`) e o
-  // unico ponto de maquina, servindo os cinco caminhos de `--json`: fechou com a
-  // guarda HERDADA mais a prova publica em tests/context_json_contract.test.js.
-  "src/commands/context.js",
 ])
+
+/**
+ * `src/commands/context.js` — CONVERSAO REVERTIDA, e o motivo esta em UM ponto.
+ *
+ * O arquivo chegou a `unknown: 0` (os quatro repasses por
+ * `stream-counted-subprocess-origin`, o `:50` pela guarda herdada mais a prova
+ * publica de `context --json`) e ficou algumas horas em `convertedFiles`. Foi
+ * ERRADO, e a medicao mostrou: converter levou `unresolvedProvenance` de 0 para
+ * 28. Chegar a `unknown: 0` e condicao necessaria, nao suficiente — cada ponto
+ * interpolado in_scope tambem precisa de decisao de provenance declarada.
+ *
+ * 27 dos 28 admitem `translate_literal_frame_preserve_interpolations` sem
+ * esforco: sao frases com moldura literal e dados de runtime dentro.
+ *
+ * O 28o NAO admite decisao honesta com o vocabulario de hoje. `context.js:201`
+ * e `info` de uma moldura que so tem espacos, interpolando um trecho de 120
+ * caracteres de `d.evidence` — texto extraido dos DOCUMENTOS INDEXADOS DO
+ * USUARIO. `kind` e `no_local_frame`, e as duas estrategias possiveis para esse
+ * kind mentem, cada uma no campo que o revisor consegue conferir:
+ *
+ *   preserve_nonlinguistic_dynamic_values  exigiria declarar aquele trecho como
+ *                                          `glyph`/`identifier`/`control` — e e
+ *                                          prosa;
+ *   translate_at_value_origin              exigiria ancorar a origem num literal
+ *                                          de modulo do projeto, com hash. Nao
+ *                                          existe: o texto nasce em runtime, do
+ *                                          arquivo do usuario. Ja provado em
+ *                                          tests/i18n_value_origin_resolution.test.js.
+ *
+ * O que falta e uma DECISAO ARQUITETURAL, nao mais uma capacidade: como o
+ * vocabulario descreve "valor linguistico que pertence ao USUARIO, renderizado
+ * no canal humano". Enquanto ela nao existir, o arquivo fica fora — meia
+ * conversao valida e pior que conversao nenhuma, porque some com a divida.
+ *
+ * As capacidades da leva seguem entregues e provadas; o que sai e so a
+ * declaracao de conversao. Ver tests/i18n_context_conversion_blocked.test.js.
+ */
 
 const norm = (p) => String(p).replace(/\\/g, "/")
 

@@ -179,7 +179,7 @@ test("validateRegistry recusa script que NÃO é alcançado pelo runtime (não p
  *
  * ATUALIZE AQUI, e so aqui, a cada arquivo reconciliado no lote JS.
  */
-test("CENSO GLOBAL: 1924 pontos, 41 unknown, 12 arquivos convertidos", async () => {
+test("CENSO GLOBAL: 1924 pontos, 45 unknown, 11 arquivos convertidos", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
 
@@ -236,13 +236,15 @@ test("CENSO GLOBAL: 1924 pontos, 41 unknown, 12 arquivos convertidos", async () 
   // fila volta ao tamanho anterior. O saldo da leva e o que importa: +19 de
   // COBERTURA, 0 de divida.
   //
-  // 45 -> 41 com context.js (lote JS 9/14). Os quatro repasses fecharam por
-  // `stream-counted-subprocess-origin` -- e SO porque o indexer passou a ser
-  // contado --, e o residual `:50` (`ctxJson`) pela guarda HERDADA mais a prova
-  // publica de `context --json`. O delta e -4 e nao -5 pela troca de regua de
-  // sempre: o regex media 4 unknown no arquivo, o AST media 5.
-  assert.equal(inv.unknown, 41, "context.js fechou: os quatro repasses mais o helper de `--json`")
-  assert.equal(inv.jsRegistry.convertedFiles.length, 12)
+  // 45 -> 41 -> 45: `context.js` chegou a `unknown: 0` e a conversao foi
+  // REVERTIDA no mesmo dia. Chegar a zero unknown e necessario, nao suficiente:
+  // converter levou `unresolvedProvenance` de 0 para 28, e um daqueles 28
+  // (`:201`, um trecho de documento do USUARIO) nao admite decisao honesta com
+  // o vocabulario atual. Meia conversao valida some com a divida. Ver o
+  // comentario em `scripts/i18n-registry.mjs` e
+  // tests/i18n_context_conversion_blocked.test.js.
+  assert.equal(inv.unknown, 45, "a fronteira Python cresceu a medicao sem crescer a fila")
+  assert.equal(inv.jsRegistry.convertedFiles.length, 11)
   assert.equal(inv.blocked, false)
 
   // A relacao que sustenta o numero: nenhum convertido guarda unknown.
