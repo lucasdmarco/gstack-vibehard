@@ -179,7 +179,7 @@ test("validateRegistry recusa script que NÃO é alcançado pelo runtime (não p
  *
  * ATUALIZE AQUI, e so aqui, a cada arquivo reconciliado no lote JS.
  */
-test("CENSO GLOBAL: 1920 pontos, 35 unknown, 15 arquivos convertidos", async () => {
+test("CENSO GLOBAL: 1916 pontos, 30 unknown, 16 arquivos convertidos", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
 
@@ -202,7 +202,7 @@ test("CENSO GLOBAL: 1920 pontos, 35 unknown, 15 arquivos convertidos", async () 
   // GStack que nao era contada em lugar nenhum. Subir aqui NAO e regressao: e o
   // censo passando a medir o que sempre existiu. Ver
   // tests/i18n_python_boundary.test.js.
-  assert.equal(inv.total, 1920, "converter nao pode sumir com ponto REAL; falso positivo do regex pode cair")
+  assert.equal(inv.total, 1916, "converter nao pode sumir com ponto REAL; falso positivo do regex pode cair")
 
   // Medicao em movimento: cai a cada arquivo reconciliado. 54 -> 53 com qa.js;
   // 53 -> 52 com secrets.js.
@@ -265,8 +265,14 @@ test("CENSO GLOBAL: 1920 pontos, 35 unknown, 15 arquivos convertidos", async () 
   // regex media 1 unknown, o AST media 2 -- e os DOIS fecharam com declaracao
   // FILE-SCOPED de consumidor, sem capacidade nova. Total inalterado: regex e
   // AST veem 12 pontos aqui, sem falso positivo a cair.
-  assert.equal(inv.unknown, 35, "task-run.js fechou com consumidor file-scoped e prova publica")
-  assert.equal(inv.jsRegistry.convertedFiles.length, 15)
+  //
+  // 35 -> 30 com install.js (lote JS 13/14). Delta -5 e o TOTAL cai 4: o regex
+  // media 197 pontos onde o AST ve 193 -- quatro falsos positivos do padrao de
+  // helper. Fechou com a capacidade de helper por tabela (`:359`) mais a prova
+  // publica de `install --audit-only --json` (`:475`), e 39 decisoes auditadas
+  // por callsite.
+  assert.equal(inv.unknown, 30, "install.js fechou: helper por tabela, preflight READ-ONLY e 39 decisoes")
+  assert.equal(inv.jsRegistry.convertedFiles.length, 16)
   assert.equal(inv.blocked, false)
 
   // A relacao que sustenta o numero: nenhum convertido guarda unknown.

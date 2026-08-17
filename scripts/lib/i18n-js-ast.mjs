@@ -2413,6 +2413,21 @@ export const MACHINE_PROTOCOL_CONSUMERS = Object.freeze({
       }),
     ]),
   }),
+  /**
+   * UM ponto de maquina (`:475`), e ele e o preflight READ-ONLY. A ancora e fina
+   * porque `install` e um comando so — e a prova roda em HOME/TEMP/XDG/APPDATA
+   * descartaveis, com a arvore inteira comparada antes e depois.
+   */
+  "src/installer/install.js": Object.freeze({
+    commands: Object.freeze([
+      Object.freeze({
+        command: "install",
+        mode: "--json",
+        consumer: "install_json_contract",
+        evidence: "tests/install_json_contract.test.js — `install --audit-only --json` por subprocesso em ambiente inteiramente descartavel (HOME/USERPROFILE/TMPDIR/XDG/APPDATA/LOCALAPPDATA), com stdout puro, schema `gstack.install-audit.v1`, exit 0, e a asercao central: ZERO escrita na arvore do sandbox, nos dois ramos. Ha controle provando que a troca de HOME pegou (o impacto aponta para DENTRO do sandbox)",
+      }),
+    ]),
+  }),
   "src/commands/secrets.js": Object.freeze({
     commands: Object.freeze([
       Object.freeze({

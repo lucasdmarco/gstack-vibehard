@@ -560,6 +560,16 @@ export const MACHINE_PROTOCOL_CONSUMERS = Object.freeze([
     evidence: "tests/context_json_contract.test.js — subprocess real em sandbox: as quatro recusas de `ctxFail`, os dois ramos de `scoutError` e o relatório completo do scout, com stdout puro, payload fora do stderr e dois controles negativos do ramo sem `--json`. NÃO exercita `decisionContext` nem `explainJson`, que exigem índice real e escrevem pelo MESMO ponto — lacuna declarada",
   },
   {
+    // Lote JS 13/14. UM ponto de máquina, e ele é o preflight READ-ONLY. A prova
+    // roda em ambiente inteiramente descartável e afere ZERO escrita — não
+    // "escreveu só onde podia".
+    file: "src/installer/install.js",
+    sink: "process.stdout.write",
+    consumer: "consumidor de máquina do `install --audit-only --json` — preflight de impacto, degradações previstas e supply chain, num documento único",
+    contract: "sob `--audit-only --json`, stdout é UM documento `gstack.install-audit.v1` com `readOnly: true`, `impact` por categoria, `predictedDegradations` e `supplyChain`. READ-ONLY por construção (P0.3): sem `--save-report` nada é gravado",
+    evidence: "tests/install_json_contract.test.js — subprocess em HOME/USERPROFILE/TMPDIR/XDG/APPDATA/LOCALAPPDATA descartáveis, com stdout puro, schema conferido, exit 0, árvore do sandbox comparada antes/depois (zero escrita nos dois ramos) e controle provando que a troca de HOME pegou",
+  },
+  {
     // Lote JS 12/14. Declaração FILE-SCOPED: o arquivo tem um export e serve um
     // subcomando (`task run`). O handler do DISPATCH vive em `task.js`, que
     // reexporta — a aresta cross-módulo não é modelada, e declarar por comando

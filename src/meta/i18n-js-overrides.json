@@ -2244,6 +2244,576 @@
       "reason": "A moldura carrega a garantia mais importante do comando: 'Branches prontos pra merge (SEM auto-merge)' — é ela que diz ao usuário que nada foi mergeado por conta própria. O interpolado é a lista de nomes de branch, com fallback literal '(nenhum)' que também é nosso e entra na moldura traduzível.",
       "owner": "certificação RC PRD51 (Fase 1B)",
       "evidence": "src/commands/task-run.js:104 — rodapé do relatório humano; a mesma lista sai no payload como `branches`, provada em tests/task_run_json_contract.test.js."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 59,
+      "column": 26,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "label",
+        "policy",
+        "reason",
+        "url"
+      ],
+      "reason": "A moldura é uma RECUSA DE SEGURANÇA e traduz inteira: diz que o download remoto NÃO foi executado e manda instalar à mão. Três interpolados, três naturezas — `label` é o nome da ferramenta, `policy.reason` é o código da política que barrou, e `url` é um ENDEREÇO. Traduzir qualquer um quebraria a ação manual que a própria frase instrui.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:59 — `safeDownloadAndRun`, ramo em que a política de supply chain nega o download."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 63,
+      "column": 29,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "label"
+      ],
+      "reason": "A moldura 'download falhou' é o diagnóstico do produto. O interpolado é só o rótulo da ferramenta, e ele identifica QUAL download falhou num fluxo que baixa várias.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:63 — mesmo `safeDownloadAndRun`, quando o arquivo temporário nem chega a existir."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 65,
+      "column": 32,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "label",
+        "content",
+        "length"
+      ],
+      "reason": "Distinto do anterior de propósito: aqui o download ACONTECEU e veio pequeno demais para ser válido. A moldura explica isso; o interpolado é uma CONTAGEM de bytes, sem idioma, e é a evidência de que o conteúdo é lixo.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:65 — guarda de tamanho mínimo antes de executar qualquer coisa baixada."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 71,
+      "column": 5,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "label",
+        "e",
+        "message"
+      ],
+      "reason": "A moldura nomeia o estágio ('falha no download/execucao segura'). O interpolado é a mensagem da exceção — vem do sistema de arquivos, da rede ou do processo executado, nunca de nós.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:71 — `catch` externo de `safeDownloadAndRun`."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 114,
+      "column": 17,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "e",
+        "message"
+      ],
+      "reason": "A moldura é o rótulo '(bun global)', que diz POR ONDE o gbrain foi tentado. O interpolado é o erro do `bun`. São pontos separados por ferramenta porque cada uma falha por motivo próprio e a degradação é rastreada individualmente.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:114 — instalação opcional do gbrain; alimenta `trackDegraded`."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 144,
+      "column": 17,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "e",
+        "message"
+      ],
+      "reason": "Mesma família, outra ferramenta e outro gerenciador: '(uv tool graphifyy)' diz que a tentativa foi via `uv`. O interpolado é o erro do `uv`.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:144 — instalação opcional do graphify."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 155,
+      "column": 17,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "e",
+        "message"
+      ],
+      "reason": "Idem para o ECC, com o nome do pacote publicado entre parênteses ('ecc-universal') — identificador, não prosa. O interpolado é o erro do instalador.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:155 — instalação opcional do ECC."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 168,
+      "column": 17,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "e",
+        "message"
+      ],
+      "reason": "A moldura acrescenta INSTRUÇÃO DE RECUPERAÇÃO, e é ela que mais importa traduzir; o comando `pip install pytest` fica literal, porque é o que o usuário vai digitar. O interpolado é o erro do pip.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:168 — instalação do pytest, dependência de teste dos hooks Python."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 229,
+      "column": 17,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "e",
+        "message"
+      ],
+      "reason": "A moldura nomeia o passo ('falha ao instalar chromium') e a linha seguinte dá a instrução manual. O interpolado é o erro do próprio Playwright, que costuma trazer detalhe de plataforma.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:229 — download do browser do Playwright, o passo mais pesado da instalação."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 234,
+      "column": 15,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "e",
+        "message"
+      ],
+      "reason": "Rótulo '(brew)' identifica o gerenciador tentado no macOS. O interpolado é o erro do brew.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:234 — instalação opcional do MOM."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 292,
+      "column": 3,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "vaultDir"
+      ],
+      "reason": "A moldura 'Vault global em: ' é do produto. O interpolado é um CAMINHO em disco, e sai verbatim para o usuário poder abri-lo.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:292 — criação do vault global do Obsidian."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 387,
+      "column": 5,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "hooks",
+        "length",
+        "target",
+        "dir"
+      ],
+      "reason": "A moldura diz o que aconteceu e acrescenta '(manifest-owned)', que é a garantia de propriedade dos artefatos. Os interpolados são de naturezas diferentes: uma CONTAGEM de hooks e um CAMINHO de diretório.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:387 — refresh dos hooks Python para um diretório de harness."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 464,
+      "column": 5,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "reportPath"
+      ],
+      "reason": "A moldura carrega a promessa central de `--save-report`: que o relatório é o ÚNICO efeito colateral. O interpolado é o caminho do arquivo gravado.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:464 — só emitido com `--save-report`; a ausência dele é o que tests/install_json_contract.test.js prova como zero escrita."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 734,
+      "column": 5,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "templateSource"
+      ],
+      "reason": "A moldura é um COMANDO DE SHELL para copiar e colar. Não há o que traduzir nela: `cp -r` e o destino de exemplo fazem parte do comando. O interpolado é o caminho de origem dos templates.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:734 — dica de uso impressa ao fim da instalação dos templates."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 444,
+      "column": 5,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "c",
+        "label",
+        "c",
+        "optional"
+      ],
+      "reason": "A moldura é ' (opcional)' e os dois-pontos. `c.label` é o nome da categoria de impacto, redigido no registro de impacto — prosa do produto que mora noutro módulo e é traduzida lá. O '(opcional)' É nosso e traduz aqui.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:444 — cabeçalho de categoria em `printAuditImpact`."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 445,
+      "column": 31,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "it",
+        "action",
+        "it",
+        "path"
+      ],
+      "reason": "A moldura são colchetes e um marcador. Os interpolados são o CÓDIGO da ação (`create`/`update`/`skip`) e o CAMINHO afetado — o código é o mesmo que sai no payload `--json`, e traduzi-lo separaria terminal e automação.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:445 — uma linha por item; os mesmos campos aparecem em `impact[].items` do payload, provado em tests/install_json_contract.test.js."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 454,
+      "column": 71,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "c",
+        "id",
+        "c",
+        "detail"
+      ],
+      "reason": "A moldura é ' ✗ ' e os dois-pontos. `c.id` é o identificador do check de supply chain e `c.detail` é o texto do próprio check — ambos vêm daquele relatório, não daqui.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:454 — apenas os checks com status crítico do preflight."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 465,
+      "column": 17,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "e",
+        "message"
+      ],
+      "reason": "A moldura 'Não consegui salvar o relatório: ' é do produto. O interpolado é o erro de escrita em disco (permissão, caminho, espaço) — texto do sistema operacional.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:465 — `catch` da gravação com `--save-report`."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 552,
+      "column": 30,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "p",
+        "component",
+        "p",
+        "needs"
+      ],
+      "reason": "A moldura é ' ✗ ' e 'toolchain ausente'. Os interpolados são o nome do componente e a lista de toolchains que faltam — identificadores de ferramenta (`bun`, `uv`), não prosa.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:552 — degradações PREVISTAS antes de instalar; as mesmas saem em `predictedDegradations` do payload."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 573,
+      "column": 27,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "c",
+        "label",
+        "c",
+        "optional",
+        "c",
+        "items",
+        "length"
+      ],
+      "reason": "Mesma estrutura de 444, num resumo mais curto: acrescenta a CONTAGEM e o sufixo 'item(ns)', que é nosso. Ponto separado porque é outro momento do fluxo — o resumo que antecede o consentimento, não o relatório de audit.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:573 — resumo de impacto exibido antes de pedir confirmação."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 514,
+      "column": 3,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "harnesses",
+        "map",
+        "h",
+        "h",
+        "label",
+        "join"
+      ],
+      "reason": "A moldura 'Harnesses detectados: ' é do produto. O interpolado é a lista de RÓTULOS de harness (Claude Code, Codex, OpenCode) — nomes próprios de produtos de terceiros, que não se traduzem.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:514 — resultado da detecção, antes de instalar."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 627,
+      "column": 42,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "h",
+        "label"
+      ],
+      "reason": "A moldura explica um estado que confunde: já instalado, e os artefatos gerenciados SERÃO atualizados. É o que evita o usuário achar que nada aconteceu. O interpolado é o nome do harness.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:627 — item da lista de harnesses já instalados."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 628,
+      "column": 10,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "h",
+        "label"
+      ],
+      "reason": "Par do anterior para o outro estado ('disponivel'). Ponto separado porque a decisão do usuário muda conforme o estado, e as duas frases precisam ser distinguíveis na tradução.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:628 — item da lista de harnesses ainda não instalados."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 681,
+      "column": 3,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "selected",
+        "join"
+      ],
+      "reason": "A moldura 'Harnesses selecionados: ' é do produto; o interpolado é a lista de IDs escolhidos — identificadores que o usuário pode repetir em `--harness`.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:681 — confirmação do subconjunto escolhido."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 778,
+      "column": 5,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "harnessId",
+        "h",
+        "instructionFile"
+      ],
+      "reason": "A moldura 'integracao instrucional escrita em ' descreve a NATUREZA da integração — instrucional, não executável —, e isso importa traduzir. Os interpolados são o ID do harness e o CAMINHO do arquivo de instrução.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:778 — harness que tem convenção de arquivo de instrução."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 780,
+      "column": 5,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "harnessId"
+      ],
+      "reason": "A moldura diz o que NÃO acontece: detectado, mas sem convenção de instrução global, logo apenas detecção. É a frase que impede o usuário de esperar um arquivo que não será criado. O interpolado é o ID do harness.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:780 — par do anterior, para harness sem convenção."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 793,
+      "column": 5,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "harnessId"
+      ],
+      "reason": "Cabeçalho de seção 'Configurando …'. O interpolado é o ID do harness.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:793 — início da configuração de um harness."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 796,
+      "column": 7,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "harnessId"
+      ],
+      "reason": "Confirmação 'configurado'. Ponto separado do cabeçalho porque marca o FIM bem-sucedido, e é o que o usuário procura ao conferir o resultado.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:796 — sucesso da configuração de um harness."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 797,
+      "column": 69,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "harnessId",
+        "e",
+        "message"
+      ],
+      "reason": "A moldura 'Falha ao configurar ' é do produto; os interpolados são o ID e a mensagem da exceção, que pode vir de escrita em disco ou de parse da config do harness. O mesmo texto vai para `report.errors` e reaparece no relatório final.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:797 — `catch` da configuração de um harness."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 637,
+      "column": 14,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "n"
+      ],
+      "reason": "A moldura carrega a garantia mais importante da linha: 'config .json/.jsonc intocada' — é ela que diz ao usuário que o arquivo dele não foi reescrito. O interpolado é uma contagem de plugins.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:637 — atualização dos plugins gerenciados do OpenCode."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 710,
+      "column": 3,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "scripts",
+        "length"
+      ],
+      "reason": "A moldura nomeia o destino (`~/.agents/scripts/`), que é CAMINHO literal e não se traduz. O interpolado é a contagem de scripts copiados.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:710 — cópia dos scripts de agente."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 727,
+      "column": 3,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "skillDirs",
+        "length"
+      ],
+      "reason": "Mesma forma, outro artefato e outro destino (`~/.agents/skills/`). Ponto separado porque scripts e skills são instalações distintas e podem falhar de forma independente.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:727 — instalação das skills."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 767,
+      "column": 3,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "dv",
+        "written",
+        "length",
+        "dv",
+        "policyLayers",
+        "join"
+      ],
+      "reason": "A moldura nomeia o diretório `.devin/` e o conceito 'policy'. Os interpolados são uma contagem e a CADEIA de camadas de política unida por '←' — nomes de camada são identificadores do modelo de policy, não prosa.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:767 — escrita da integração do Devin."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 768,
+      "column": 26,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "dv",
+        "skipped",
+        "join"
+      ],
+      "reason": "A moldura 'preservado(s)' é a garantia de que arquivos existentes NÃO foram sobrescritos — a informação mais importante da linha. O interpolado é a lista de nomes preservados.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:768 — só emitido quando há arquivos do Devin preservados."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 837,
+      "column": 3,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "attempt",
+        "reason"
+      ],
+      "reason": "A moldura é uma degradação HONESTA: o app não foi instalado, o vault markdown segue funcional, e há o comando manual (que fica literal). O interpolado é o motivo da tentativa falha, produzido pelo próprio instalador — código de razão, não frase.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:837 — instalação opcional do app Obsidian."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 844,
+      "column": 3,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "chosen"
+      ],
+      "reason": "A moldura declara as DUAS propriedades da configuração: read-only e indexado via `context index` (comando literal). O interpolado é o caminho do vault escolhido.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:844 — gravação do default global do Obsidian."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 851,
+      "column": 42,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "getGlobalObsidianDefault"
+      ],
+      "reason": "A moldura 'ja configurado (default global): ' é do produto. O interpolado é o caminho já configurado, lido na hora — mesmo valor da linha 844, noutro ramo: aqui NADA foi escrito, e as duas frases precisam ser distinguíveis.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:851 — ramo idempotente, quando o default já existe."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 872,
+      "column": 30,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "id",
+        "harnessStateLine",
+        "id",
+        "plan"
+      ],
+      "reason": "A moldura são apenas os dois-pontos e a indentação. Os interpolados são o ID do harness e a linha de estado montada por `harnessStateLine` — texto do produto que mora naquela função e é traduzido lá, não aqui.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:872 — quadro final de estado por harness."
+    },
+    {
+      "file": "src/installer/install.js",
+      "line": 884,
+      "column": 38,
+      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "d",
+        "component",
+        "d",
+        "reason"
+      ],
+      "reason": "A moldura é ' ✗ ' e os dois-pontos. Os interpolados são o componente degradado e a razão registrada por `trackDegraded` — que é, na origem, a mensagem da ferramenta externa que falhou. Ponto distinto do 552: lá as degradações eram PREVISTAS, aqui são as que de fato ocorreram.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/installer/install.js:884 — resumo de degradações no relatório final."
     }
   ]
 }

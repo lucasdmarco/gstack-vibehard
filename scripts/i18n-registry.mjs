@@ -116,6 +116,12 @@ export const CONVERTED_FILES = Object.freeze([
   // DISPATCH vive em `task.js`, que reexporta, e a aresta cross-modulo nao e
   // modelada pelo grafo.
   "src/commands/task-run.js",
+  // Lote JS, arquivo 13/14. O maior volume de decisoes do lote (39), auditadas
+  // por callsite: erro de ferramenta externa, caminho em disco, URL, ID de
+  // harness, contagem e prosa do produto sao coisas diferentes e cada uma tem
+  // razao propria. O unico ponto de maquina (`:475`) e o preflight READ-ONLY,
+  // provado em ambiente descartavel com ZERO escrita.
+  "src/installer/install.js",
 ])
 
 /**
