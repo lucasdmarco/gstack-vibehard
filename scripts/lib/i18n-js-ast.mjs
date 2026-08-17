@@ -23,6 +23,7 @@
 import ts from "typescript"
 import { readFileSync } from "fs"
 import path from "path"
+import { isBuiltin } from "node:module"
 
 export const JS_AST_SCHEMA = "gstack.i18n-js-ast.v1"
 
@@ -2519,6 +2520,79 @@ const ehRaizDeTemplate = (arquivo, repoRoot) => {
   return Boolean(chave) && TEMPLATE_ROOTS.some((r) => chave.startsWith(`${r.path}/`))
 }
 
+/**
+ * LOGGER DE FRAMEWORK — `app.log.error(err)`, com `app = Fastify({logger:true})`.
+ *
+ * Nao e `console`, e por isso `generated-dev-console` nao o alcanca; e tambem nao
+ * e um modulo local do template, que poderia renderizar qualquer coisa. O que
+ * torna a resposta decidivel e a CADEIA, inteira e estatica dentro do arquivo:
+ * o receptor nasce de uma chamada a simbolo IMPORTADO DE PACOTE, e o metodo e de
+ * log. Um logger de pacote de terceiros escreve no log do servidor, nao na tela
+ * de quem usa o app.
+ *
+ * Nao ha decisao ancorada aqui de proposito: `anchored_human_review` existe para
+ * limitacao do motor — o caso do `Buffer` que atravessa parametro —, e registrar
+ * `structuralResolution: unresolved` para uma cadeia que RESOLVE seria falso.
+ */
+const METODOS_DE_LOG = new Set(["log", "warn", "error", "info", "debug", "trace", "fatal"])
+
+/** Pacote de terceiros: nem relativo, nem absoluto, nem builtin do Node. */
+const ehPacoteDeTerceiros = (spec) => Boolean(spec)
+  && !spec.startsWith(".") && !spec.startsWith("/") && !spec.startsWith("node:")
+  && !isBuiltin(spec)
+
+/** Base de `a.b.c` — o identificador do inicio da cadeia, ou `null`. */
+const baseDoAcesso = (n) => {
+  let atual = n
+  let passos = 0
+  while (ts.isPropertyAccessExpression(atual) && passos < LIMITE_CAMINHO) {
+    atual = atual.expression
+    passos += 1
+  }
+  return ts.isIdentifier(atual) ? atual : null
+}
+
+/**
+ * Pacote que produziu o receptor de uma chamada de log, ou `null`.
+ *
+ * Cada porta recusa por um motivo diferente, e nenhuma e dispensavel: metodo que
+ * nao e de log nao descreve emissao; receptor sem base identificavel nao tem
+ * cadeia; `let`/`var` deixam o inicializador de descrever o valor lido no
+ * callsite; declaracao fora deste arquivo sai do escopo da prova local; e um
+ * inicializador que nao seja chamada a simbolo importado de PACOTE pode ser
+ * qualquer objeto do proprio template.
+ */
+/** Receptor de uma chamada de METODO DE LOG, ou `null`. */
+const receptorDeLog = (node) => {
+  if (!ts.isCallExpression(node) || !ts.isPropertyAccessExpression(node.expression)) return null
+  const acesso = node.expression
+  return METODOS_DE_LOG.has(acesso.name.text) ? acesso.expression : null
+}
+
+/**
+ * Chamada que PRODUZIU o valor de um identificador, ou `null`.
+ *
+ * `inicializadorDeConstLocal` ja e tres portas: declarado NESTE arquivo, `const`
+ * (um `let` reatribuivel nao descreveria o valor lido no callsite) e com
+ * inicializador. Reusado em vez de reescrito — a fatia C-3 provou que duplicar
+ * criterio produz divergencia silenciosa. `Fastify(...)` e `new Logger(...)` sao
+ * a mesma prova: a forma da chamada nao muda quem produziu o valor.
+ */
+const chamadaQueProduziu = (id, ctx) => {
+  const init = inicializadorDeConstLocal(id, ctx)
+  if (!init) return null
+  return ts.isCallExpression(init) || ts.isNewExpression(init) ? init : null
+}
+
+const pacoteDoLoggerDoReceptor = (node, ctx) => {
+  const receptor = receptorDeLog(node)
+  const base = receptor ? baseDoAcesso(receptor) : null
+  const chamada = base ? chamadaQueProduziu(base, ctx) : null
+  const d = chamada ? declaracaoDoCallee(chamada, ctx.checker) : null
+  const spec = d ? especificadorDoImport(d) : null
+  return ehPacoteDeTerceiros(spec) ? spec : null
+}
+
 export const JS_RULES = Object.freeze([
   {
     id: "debug-guarded",
@@ -2766,6 +2840,20 @@ export const JS_RULES = Object.freeze([
     audience: "generated_dev_surface",
     trigger: "generated_console",
     reason: "`console.*` em codigo que o `create` copia para o projeto do usuario: superficie de log do servidor ou do terminal de desenvolvimento, nunca copy que o usuario final le. Entra na claim como mensagem tecnica do projeto gerado, e nao como diagnostico do GStack",
+  },
+  {
+    /**
+     * O MESMO canal, por outra porta: `app.log.error(err)` do Fastify.
+     *
+     * Separada de `generated-dev-console` porque a prova e outra — nao ha global
+     * do runtime aqui, ha uma cadeia local ate um import de PACOTE. Fundir as
+     * duas esconderia qual delas fechou o ponto.
+     */
+    id: "generated-framework-logger",
+    when: (p, ctx) => ehRaizDeTemplate(p.file, ctx.repoRoot) && p.loggerPackage !== null,
+    audience: "generated_dev_surface",
+    trigger: "generated_framework_logger",
+    reason: "logger de pacote de terceiros, em codigo que o `create` copia para o projeto do usuario: escreve no log do servidor que o usuario passa a manter, nao na tela de quem usa o app. O argumento e o erro do runtime, sem frase nossa",
   },
   {
     id: "command-human-branch",
@@ -4119,6 +4207,11 @@ export function analyzeFile(filePath, analyzer = null, ctx = {}) {
       // decide pela DECLARACAO (lib `.d.ts` ou nenhuma = runtime; declarado no
       // projeto = sombreado), que e a pergunta certa.
       consoleIsRuntimeGlobal: ehEmissaoDeConsole(node, ctxAst.checker),
+      // Pacote de terceiros que PRODUZIU o receptor de uma chamada de log
+      // (`app.log.error`, com `app = Fastify(...)`), ou `null`. Fato separado de
+      // `consoleIsRuntimeGlobal`: aquele descreve o global do runtime, este a
+      // cadeia local ate um import de pacote.
+      loggerPackage: pacoteDoLoggerDoReceptor(node, ctxAst),
       // Funcao top-level que contem o ponto (ultima da cadeia de ancestralidade).
       reachableFromExport: alcancavelDaqui(ancestry(node).functions, alcance),
       // Criterio ESTRITO: so handler do DISPATCH conta como origem.

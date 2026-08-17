@@ -125,6 +125,85 @@ export function h() { console.error('nada') }
     "um objeto local com o mesmo nome não escreve no canal do runtime")
 })
 
+// ── O logger de framework: `app.log.error(err)` ────────────────────────────
+
+/**
+ * O MESMO canal por outra porta. `app.log.error(err)` não é `console`, e o
+ * módulo não é local — é uma cadeia inteiramente estática dentro do arquivo até
+ * um import de PACOTE. Um logger de terceiros escreve no log do servidor, não na
+ * tela de quem usa o app.
+ *
+ * NÃO foi fechado por decisão ancorada de propósito: `anchored_human_review`
+ * existe para limitação do motor, e declarar `structuralResolution: unresolved`
+ * para uma cadeia que resolve seria falso.
+ */
+const FASTIFY = `import Fastify from 'fastify'
+const app = Fastify({ logger: true })
+export function h(e: unknown) { app.log.error(e) }
+`
+const trocando = (corpo, de, para) => corpo.replace(de, para)
+
+test("POSITIVO: logger de pacote em template é superfície do projeto gerado", async (t) => {
+  const [p] = await pontos(FASTIFY, t)
+  assert.equal(p.loggerPackage, "fastify")
+  assert.equal(p.audience, "generated_dev_surface")
+  assert.equal(p.rule, "generated-framework-logger")
+})
+
+test("POSITIVO: vale sem o nível intermediário — `const logger = pino()`", async (t) => {
+  const [p] = await pontos(`import pino from 'pino'
+const logger = pino()
+export function h(e: unknown) { logger.error(e) }
+`, t)
+  assert.equal(p.rule, "generated-framework-logger",
+    "a prova é a cadeia até o pacote, não o formato `x.y.metodo`")
+})
+
+/**
+ * As quatro portas da CADEIA. Cada uma recusa por um motivo diferente, e o
+ * resultado de todas é `unknown` — o estado certo quando a origem do canal não
+ * ficou provada.
+ */
+for (const [nome, corpo, porque] of [
+  ["`let` no lugar de `const`", trocando(FASTIFY, "const app", "let app"),
+    "reatribuível: o inicializador deixa de descrever o valor lido no callsite"],
+  ["módulo RELATIVO do próprio template", `import { makeApp } from './app'
+const app = makeApp()
+export function h(e: unknown) { app.log.error(e) }
+`, "um módulo local do template pode ser qualquer coisa, inclusive render"],
+  ["builtin do Node", `import { createServer } from 'node:http'
+const s = createServer()
+export function h(e: unknown) { s.log.error(e) }
+`, "builtin não é framework de terceiros"],
+  ["receptor que não nasce de chamada", `import { cfg } from 'x'
+const app = cfg
+export function h(e: unknown) { app.log.error(e) }
+`, "sem chamada não há prova de quem produziu o valor"],
+]) {
+  test(`NEGATIVO: ${nome} não fecha o logger de framework`, async (t) => {
+    const [p] = await pontos(corpo, t)
+    assert.equal(p.loggerPackage, null, porque)
+    assert.equal(p.audience, "unknown")
+  })
+}
+
+/**
+ * A PORTA DO MÉTODO. `success` é coletado pelo extrator e NÃO é método de log —
+ * é o que impede a regra de valer para qualquer chamada num objeto de pacote.
+ */
+test("NEGATIVO: método que não é de log não descreve emissão", async (t) => {
+  const [p] = await pontos(trocando(FASTIFY, "app.log.error", "app.log.success"), t)
+  assert.equal(p.loggerPackage, null)
+  assert.notEqual(p.rule, "generated-framework-logger")
+})
+
+test("NEGATIVO: logger de framework FORA da raiz de template não é código gerado", async (t) => {
+  const [p] = await pontos(FASTIFY, t, { dentro: false })
+  assert.equal(p.loggerPackage, "fastify", "o fato do canal continua verdadeiro")
+  assert.notEqual(p.audience, "generated_dev_surface",
+    "mas fora do template a mensagem é nossa, e a audiência é outra pergunta")
+})
+
 // ── Ancorado no repositório real ───────────────────────────────────────────
 
 /**
@@ -159,9 +238,12 @@ test("REPO: os 16 pontos de console dos templates fecham como projeto gerado", a
   }
 
   // O 17o ponto é `app.log.error(err)` — logger do framework, NÃO console.
-  // Continua fora desta regra, por decisão de escopo dela.
+  // Fecha pela outra regra, e é isso que zera o TypeScript.
   const fora = todos.filter((p) => !String(p.callee).startsWith("console."))
   assert.deepEqual(fora.map((p) => p.calleePath), ["error"])
+  assert.equal(fora[0].rule, "generated-framework-logger")
+  assert.equal(todos.filter((p) => p.audience === "unknown").length, 0,
+    "os 17 pontos de template fecham: nenhum TypeScript aberto")
 })
 
 /**
