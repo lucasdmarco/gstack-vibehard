@@ -560,6 +560,16 @@ export const MACHINE_PROTOCOL_CONSUMERS = Object.freeze([
     evidence: "tests/context_json_contract.test.js — subprocess real em sandbox: as quatro recusas de `ctxFail`, os dois ramos de `scoutError` e o relatório completo do scout, com stdout puro, payload fora do stderr e dois controles negativos do ramo sem `--json`. NÃO exercita `decisionContext` nem `explainJson`, que exigem índice real e escrevem pelo MESMO ponto — lacuna declarada",
   },
   {
+    // Lote JS 14/14. DOIS consumidores no mesmo arquivo, provados SEPARADAMENTE:
+    // `dev` sobe processo, `stop` encerra. A âncora é universal, e `logs`/`open`
+    // alcançam o arquivo sem ponto de máquina.
+    file: "src/commands/runtime-supervisor.js",
+    sink: "process.stdout.write",
+    consumer: "consumidor de máquina do `dev --json` e do `stop --json` — estado dos serviços e resultado do encerramento",
+    contract: "sob `--json`, stdout é UM documento: `{services:[{name,pid,port,status,url,log,startedAt,command}]}` para `dev`, e `{stopped,stillAlive,cleared,exitCode}` para `stop`. A saída humana fica nos ramos `else`",
+    evidence: "tests/runtime_supervisor_json_contract.test.js — subprocess em workspace/HOME/TEMP descartáveis, com serviço fixture marcado por runId: payload conferido contra o state em disco, `stop` encerrando SOMENTE os PIDs capturados do cenário, prova de efeito semântico (processo morto), isolamento do HOME e controles do ramo humano. Nenhum processo preexistente da máquina é observado, adotado ou encerrado",
+  },
+  {
     // Lote JS 13/14. UM ponto de máquina, e ele é o preflight READ-ONLY. A prova
     // roda em ambiente inteiramente descartável e afere ZERO escrita — não
     // "escreveu só onde podia".

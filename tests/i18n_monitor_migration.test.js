@@ -117,8 +117,8 @@ test("nenhuma decisão ou override é aplicado fora dos arquivos convertidos", (
   for (const ov of o.overrides ?? []) {
     assert.ok(convertidos.has(ov.file), `override em arquivo não convertido: ${ov.file}`)
   }
-  assert.equal((o.overrides ?? []).length, 1,
-    "override de audiência é exceção: o único existente veio de decisão arquitetural, não de contagem")
+  assert.equal((o.overrides ?? []).length, 2,
+    "override de audiencia e excecao: os dois existentes vieram de decisao arquitetural, nao de contagem")
 })
 
 // ── Sete controles negativos ────────────────────────────────────────────────

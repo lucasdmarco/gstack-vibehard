@@ -122,6 +122,12 @@ export const CONVERTED_FILES = Object.freeze([
   // razao propria. O unico ponto de maquina (`:475`) e o preflight READ-ONLY,
   // provado em ambiente descartavel com ZERO escrita.
   "src/installer/install.js",
+  // Lote JS, arquivo 14/14 — FECHA O LOTE. Dois consumidores publicos provados
+  // SEPARADAMENTE (`dev` e `stop`), porque a ancora e universal. Os dois seams de
+  // escrita fecham por caminhos diferentes: `:389` estruturalmente
+  // (`origemDoParametro` → `file_read`) e `:346` por decisao ancorada, porque o
+  // `readSync` preenche o buffer por efeito colateral.
+  "src/commands/runtime-supervisor.js",
 ])
 
 /**

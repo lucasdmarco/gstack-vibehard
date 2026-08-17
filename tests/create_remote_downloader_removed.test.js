@@ -42,8 +42,16 @@ test("`create.js` não define mais nenhum downloader remoto", () => {
  * dia alguém importar essas funções de `create.js`, este teste é quem avisa —
  * antes, a ausência de chamador era invisível.
  */
+/**
+ * `:!*.json` exclui os REGISTROS DE DECISÃO (`i18n-js-*.json`), e a distinção é
+ * a que este teste sempre quis fazer: CITAR uma função pelo nome, numa evidência
+ * de decisão de i18n, não é CONSUMI-LA. As decisões nomeiam o callsite de
+ * propósito — é isso que as torna auditáveis —, e sem esta exclusão o guarda
+ * reprovaria a documentação em vez de um consumidor real.
+ */
 test("nenhum consumidor no repositório referenciava a cópia de `create.js`", () => {
-  const saida = execFileSync("git", ["grep", "-n", "-E", REMOVIDOS.join("|"), "--", "src", "scripts", "bin"],
+  const saida = execFileSync("git",
+    ["grep", "-n", "-E", REMOVIDOS.join("|"), "--", "src", "scripts", "bin", ":!*.json"],
     { cwd: repoRoot, encoding: "utf-8" })
   const linhas = saida.split("\n").filter(Boolean)
 

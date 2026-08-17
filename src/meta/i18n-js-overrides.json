@@ -51,6 +51,19 @@
       "reason": "O valor impresso é um trecho do documento INDEXADO DO USUÁRIO, e a moldura são seis espaços — não há uma palavra do GStack na linha. `public_diagnostic` afirmaria que a mensagem é do produto e a colocaria na claim English-first, o que mandaria traduzir a citação que o usuário pediu para ver. A audiência é a decisão de canal e precisa vir antes da estratégia de provenance.",
       "owner": "certificação RC PRD51 (Fase 1B)",
       "evidence": "Cadeia provada em `src/context-docs/py/context_db.py:450` — `\"evidence\": (r[\"content\"] or \"\").strip()[:280]`, lido de `chunks.content` (índice populado dos documentos do usuário) — até `src/commands/context.js:201`, sem literal linguístico do projeto no caminho. Contraste no mesmo arquivo Python: `:540` é literal NOSSO e segue `public_diagnostic` na origem."
+    },
+    {
+      "file": "src/commands/runtime-supervisor.js",
+      "line": 346,
+      "column": 39,
+      "audience": "user_content",
+      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "expectedIds": [],
+      "structuralResolution": "unresolved",
+      "decisionBasis": "anchored_human_review",
+      "reason": "O valor impresso é conteúdo VERBATIM do log do processo supervisionado — o `dev` do projeto do usuário —, e não texto produzido pelo GStack. A cadeia comprovada é `followLog → readTail(logPath) → readSync(fd, buffer, …) → buffer.subarray(…).toString(…) → write(…)`: os dois extremos são certos (o `readSync` lê o arquivo apontado por `logPath`, e o `write` imprime o resultado sem uma moldura), mas o meio NÃO é resolvível por cadeia de valor — `readSync` preenche o buffer por EFEITO COLATERAL e o retorno não guarda vínculo sintático com a leitura. Essa é uma limitação de aliasing do engine, e não uma dúvida sobre o conteúdo. `public_diagnostic` afirmaria que a mensagem é do produto e mandaria traduzir o log que o usuário foi ler.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/runtime-supervisor.js:336-343 (`readTail`, com `readSync` preenchendo o buffer) e :345-346 (o seam `const write = opts.write || ((s) => process.stdout.write(s))`, chamado em :358 com `readTail(...)`). O ponto irmão `:389` fecha ESTRUTURALMENTE pela mesma semântica, via `origemDoParametro` → `file_read` (`readFileSync(target.log)`), e serve de controle positivo de que a leitura direta É resolvível — o que isola a limitação a este callsite. Contrato e controles negativos em tests/i18n_anchored_human_review.test.js; a resolução estrutural de `:389` e a NÃO-resolução de `:346` estão fixadas em tests/i18n_js_ast_parameter_origin.test.js."
     }
   ],
   "provenanceDecisions": [
@@ -2814,6 +2827,319 @@
       "reason": "A moldura é ' ✗ ' e os dois-pontos. Os interpolados são o componente degradado e a razão registrada por `trackDegraded` — que é, na origem, a mensagem da ferramenta externa que falhou. Ponto distinto do 552: lá as degradações eram PREVISTAS, aqui são as que de fato ocorreram.",
       "owner": "certificação RC PRD51 (Fase 1B)",
       "evidence": "src/installer/install.js:884 — resumo de degradações no relatório final."
+    },
+    {
+      "file": "src/commands/runtime-supervisor.js",
+      "line": 53,
+      "column": 3,
+      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "ws",
+        "description"
+      ],
+      "reason": "A moldura 'Sem runtime executável aqui — ' é o diagnóstico do produto. O interpolado é a DESCRIÇÃO do workspace classificado, prosa redigida em `src/runtime/workspace.js` — texto nosso que mora noutro módulo e é traduzido lá, não aqui.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/runtime-supervisor.js:53 — `explainNoManifest`, quando `classifyWorkspace` não acha runtime."
+    },
+    {
+      "file": "src/commands/runtime-supervisor.js",
+      "line": 59,
+      "column": 29,
+      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "a"
+      ],
+      "reason": "A moldura é só o marcador de item. O interpolado é uma AÇÃO SUGERIDA, também redigida em `workspace.js` junto com a classificação — mesma origem da linha 53 e mesmo destino de tradução.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/runtime-supervisor.js:59 — lista de ações do diagnóstico de workspace."
+    },
+    {
+      "file": "src/commands/runtime-supervisor.js",
+      "line": 68,
+      "column": 39,
+      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "v",
+        "at",
+        "v",
+        "reason"
+      ],
+      "reason": "A moldura é ' ✗ ' e os dois-pontos. Os interpolados são o LOCAL da violação no manifest (`at`, um caminho de campo) e o código do motivo, ambos produzidos por `evaluateManifestExec` — identificadores da política, não prosa.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/runtime-supervisor.js:68 — violações da política de execução, no caminho de `dev`."
+    },
+    {
+      "file": "src/commands/runtime-supervisor.js",
+      "line": 71,
+      "column": 5,
+      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "verdict",
+        "digest",
+        "slice"
+      ],
+      "reason": "A moldura é INSTRUÇÃO DE APROVAÇÃO e traduz inteira, menos o comando literal `gstack_vibehard dev --trust`, que o usuário vai digitar. O interpolado é um prefixo de DIGEST — 12 caracteres hexadecimais, sem idioma.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/runtime-supervisor.js:71 — como aprovar o manifest depois de uma violação."
+    },
+    {
+      "file": "src/commands/runtime-supervisor.js",
+      "line": 83,
+      "column": 3,
+      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "scope",
+        "schemaVersion",
+        "scope",
+        "declaredNotExecuted",
+        "join"
+      ],
+      "reason": "A moldura carrega o aviso central: itens DECLARADOS mas NÃO executados. Os interpolados são a versão do schema (número) e a lista de nomes de serviço declarados — identificadores do manifest do usuário.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/runtime-supervisor.js:83 — escopo de execução do manifest v2."
+    },
+    {
+      "file": "src/commands/runtime-supervisor.js",
+      "line": 89,
+      "column": 43,
+      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "e"
+      ],
+      "reason": "A moldura é só ' ✗ '. O interpolado é cada mensagem de erro de validação do manifest, redigida em `src/runtime/manifest.js` — texto nosso, traduzido na origem.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/runtime-supervisor.js:89 — erros de `validateManifestForVersion`, antes de subir qualquer coisa."
+    },
+    {
+      "file": "src/commands/runtime-supervisor.js",
+      "line": 101,
+      "column": 41,
+      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "v",
+        "at",
+        "v",
+        "reason"
+      ],
+      "reason": "Mesma forma da linha 68, e ponto SEPARADO de propósito: este é o caminho de `dev --trust` (aprovação explícita), não o de execução normal. As duas frases precisam ser distinguíveis para quem lê o terminal decidir se aprova.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/runtime-supervisor.js:101 — violações exibidas durante a aprovação do manifest."
+    },
+    {
+      "file": "src/commands/runtime-supervisor.js",
+      "line": 105,
+      "column": 3,
+      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "verdict",
+        "digest",
+        "slice"
+      ],
+      "reason": "A moldura 'Manifest aprovado e confiado' registra a decisão de confiança — é a frase que o usuário vai procurar depois. O interpolado é o mesmo prefixo de digest da linha 71, aqui como recibo do que foi aprovado.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/runtime-supervisor.js:105 — sucesso de `dev --trust`."
+    },
+    {
+      "file": "src/commands/runtime-supervisor.js",
+      "line": 120,
+      "column": 36,
+      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "r",
+        "name",
+        "r",
+        "status"
+      ],
+      "reason": "A moldura explica um efeito colateral que confunde: para subir de novo, o antigo foi PARADO. Os interpolados são o nome do serviço e o código de status do encerramento — os mesmos que saem no payload de `stop`.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/runtime-supervisor.js:120 — reinício, no ramo humano de `dev`."
+    },
+    {
+      "file": "src/commands/runtime-supervisor.js",
+      "line": 130,
+      "column": 5,
+      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "alive",
+        "map",
+        "s",
+        "s",
+        "name",
+        "s",
+        "pid",
+        "join"
+      ],
+      "reason": "A moldura 'Já há runtime ativo: ' é a recusa que evita subir duas vezes. O interpolado é a lista de serviços vivos com seus PIDs — nome de serviço e número, nada traduzível. O rótulo 'pid' fica literal: é o mesmo termo do payload.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/runtime-supervisor.js:130 — guarda contra runtime duplicado, provada em tests/runtime_supervisor_json_contract.test.js pelo lado de máquina."
+    },
+    {
+      "file": "src/commands/runtime-supervisor.js",
+      "line": 163,
+      "column": 14,
+      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "p",
+        "name",
+        "detail"
+      ],
+      "reason": "A moldura ' ✗ … falhou ao iniciar — ' é o diagnóstico do produto. Os interpolados são o nome do serviço e o DETALHE do erro de spawn, que vem do sistema operacional (ENOENT, permissão) — traduzi-lo esconderia a causa real.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/runtime-supervisor.js:163 — falha ao subir um serviço, no ramo humano."
+    },
+    {
+      "file": "src/commands/runtime-supervisor.js",
+      "line": 175,
+      "column": 14,
+      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "p",
+        "name",
+        "child",
+        "pid",
+        "p",
+        "port",
+        "p",
+        "port",
+        "p",
+        "command"
+      ],
+      "reason": "A moldura são o marcador, os parênteses de 'pid', o dois-pontos da porta e o travessão. Quatro interpolados, todos identificadores ou números: nome do serviço, PID, porta e a LINHA DE COMANDO que subiu — esta última precisa sair verbatim para o usuário reconhecer o que está rodando.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/runtime-supervisor.js:175 — serviço iniciado com sucesso; os mesmos campos saem em `services[]` de `dev --json`."
+    },
+    {
+      "file": "src/commands/runtime-supervisor.js",
+      "line": 206,
+      "column": 70,
+      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "web",
+        "url"
+      ],
+      "reason": "A moldura 'Preview aberto: ' é do produto. O interpolado é a URL local do serviço — endereço, não texto.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/runtime-supervisor.js:206 — `dev --open`, depois de abrir o navegador."
+    },
+    {
+      "file": "src/commands/runtime-supervisor.js",
+      "line": 289,
+      "column": 3,
+      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "outcome",
+        "unresolved",
+        "map",
+        "u",
+        "u",
+        "name",
+        "u",
+        "status",
+        "join"
+      ],
+      "reason": "A moldura ' ⚠ não encerrado(s): ' é o aviso de que o `stop` NÃO conseguiu tudo — e a linha seguinte diz que o state foi preservado para retry. Os interpolados são pares nome:status, identificadores do resultado do encerramento.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/runtime-supervisor.js:289 — `renderStopUnresolved`; o mesmo conjunto sai em `stillAlive`/`unresolved` do payload."
+    },
+    {
+      "file": "src/commands/runtime-supervisor.js",
+      "line": 295,
+      "column": 34,
+      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "opts",
+        "waitTimeoutMs",
+        "outcome",
+        "stillAlive",
+        "join"
+      ],
+      "reason": "A moldura explica um estado TRANSITÓRIO: os PIDs ainda estão finalizando após o timeout, o que não é o mesmo que falha. Os interpolados são a duração em milissegundos e a lista de PIDs — número e números.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/runtime-supervisor.js:295 — `renderStop`, quando processos demoram a sair."
+    },
+    {
+      "file": "src/commands/runtime-supervisor.js",
+      "line": 383,
+      "column": 33,
+      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "svc"
+      ],
+      "reason": "A moldura instrui a recuperação ('Rode `gstack_vibehard dev` primeiro'), com o comando literal. O interpolado é o nome do serviço que o usuário pediu, com o fallback literal '(primeiro serviço)' — que É nosso e entra na moldura traduzível.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/runtime-supervisor.js:383 — `logs` sem arquivo de log correspondente."
+    },
+    {
+      "file": "src/commands/runtime-supervisor.js",
+      "line": 384,
+      "column": 3,
+      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "target",
+        "name"
+      ],
+      "reason": "Cabeçalho 'logs — '. O interpolado é o nome do serviço, identificador do manifest.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/runtime-supervisor.js:384 — cabeçalho de `logsCommand`, imediatamente antes do repasse do conteúdo do log."
+    },
+    {
+      "file": "src/commands/runtime-supervisor.js",
+      "line": 391,
+      "column": 3,
+      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "target",
+        "log"
+      ],
+      "reason": "A moldura explica o modo `--follow` e como sair dele (Ctrl+C) — instrução de uso que traduz inteira. O interpolado é o CAMINHO do arquivo de log sendo seguido.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/runtime-supervisor.js:391 — aviso de que o `--follow` está ativo."
+    },
+    {
+      "file": "src/commands/runtime-supervisor.js",
+      "line": 401,
+      "column": 22,
+      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "web",
+        "url"
+      ],
+      "reason": "Ramo de SUCESSO de `open`: 'Aberto: ' mais a URL local. O interpolado é endereço.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/runtime-supervisor.js:401 — `openCommand`, quando o navegador abriu."
+    },
+    {
+      "file": "src/commands/runtime-supervisor.js",
+      "line": 401,
+      "column": 54,
+      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "web",
+        "url"
+      ],
+      "reason": "Ramo de FALHA da mesma linha, e ponto separado porque a moldura é outra e mais importante: diz que o navegador não abriu E dá a URL para o usuário abrir à mão. Mesmo interpolado, propósito oposto.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/runtime-supervisor.js:401 — `openCommand`, quando o navegador não abriu."
     }
   ]
 }

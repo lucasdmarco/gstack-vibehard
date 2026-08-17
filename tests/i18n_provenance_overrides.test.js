@@ -418,7 +418,11 @@ test("INVENTÁRIO OFICIAL: total estável, convertidos declarados, override EXCE
   // continue igual a aplicado.
   const overrides = JSON.parse(
     readFileSync(path.join(repoRoot, "src/meta/i18n-js-overrides.json"), "utf8")).overrides
-  assert.equal(overrides.length, 1)
+  // DOIS overrides, e os dois sao a mesma pergunta em contextos diferentes: de
+  // quem e o conteudo. `context.js:201` (documento indexado do usuario) e
+  // `runtime-supervisor.js:346` (log do processo supervisionado). Nenhuma regra
+  // estrutural pode responder isso sozinha, e por isso sao decisao humana.
+  assert.equal(overrides.length, 2)
   assert.equal(inv.jsRegistry.overridesApplied, overrides.length,
     "todo override declarado é aplicado — o invariante vale nos dois lados")
 })

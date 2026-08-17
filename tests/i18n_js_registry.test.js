@@ -462,13 +462,27 @@ test("o overrides commitado e EXCEPCIONAL e traz o contrato de cada override", a
   // usuario, e nenhuma regra estrutural pode decidir de QUEM e o conteudo. O
   // numero e pequeno de proposito — se crescer sem cerimonia, o mecanismo virou
   // atalho.
-  assert.equal(o.overrides.length, 1, "override e excecao, e cada um precisa de razao propria")
-  const [ov] = o.overrides
-  assert.equal(ov.file, "src/commands/context.js")
-  assert.equal(ov.audience, "user_content")
-  for (const campo of ["reason", "owner", "evidence", "expectedFileHash", "line", "column"]) {
-    assert.ok(ov[campo] !== undefined && String(ov[campo]).trim() !== "", `o override precisa declarar \`${campo}\``)
+  assert.equal(o.overrides.length, 2, "override e excecao, e cada um precisa de razao propria")
+
+  // Os DOIS sao a mesma pergunta em contextos diferentes — de quem e o conteudo
+  // — e nenhuma regra estrutural pode responde-la sozinha:
+  //   context.js:201             trecho de documento INDEXADO do usuario
+  //   runtime-supervisor.js:346  log do processo SUPERVISIONADO
+  assert.deepEqual(o.overrides.map((x) => x.file).sort(),
+    ["src/commands/context.js", "src/commands/runtime-supervisor.js"])
+
+  for (const ov of o.overrides) {
+    assert.equal(ov.audience, "user_content", "os dois excluem da claim pela mesma razao: o texto nao e nosso")
+    for (const campo of ["reason", "owner", "evidence", "expectedFileHash", "line", "column"]) {
+      assert.ok(ov[campo] !== undefined && String(ov[campo]).trim() !== "", `o override precisa declarar \`${campo}\``)
+    }
   }
+
+  // O de `runtime-supervisor.js` declara que a resolucao ESTRUTURAL falhou — e
+  // e isso que o separa de uma classificacao automatica ao ler o JSON.
+  const doSupervisor = o.overrides.find((x) => x.file === "src/commands/runtime-supervisor.js")
+  assert.equal(doSupervisor.structuralResolution, "unresolved")
+  assert.equal(doSupervisor.decisionBasis, "anchored_human_review")
   const doc = o.$comment.join(" ")
   for (const campo of ["file", "line", "column", "reason", "owner", "evidence", "expectedFileHash"]) {
     assert.ok(doc.includes(campo), `o contrato precisa citar \`${campo}\``)

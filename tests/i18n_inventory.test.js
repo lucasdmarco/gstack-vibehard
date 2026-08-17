@@ -179,7 +179,7 @@ test("validateRegistry recusa script que NÃO é alcançado pelo runtime (não p
  *
  * ATUALIZE AQUI, e so aqui, a cada arquivo reconciliado no lote JS.
  */
-test("CENSO GLOBAL: 1916 pontos, 30 unknown, 16 arquivos convertidos", async () => {
+test("CENSO GLOBAL: 1916 pontos, 27 unknown, 17 arquivos convertidos", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
 
@@ -271,8 +271,13 @@ test("CENSO GLOBAL: 1916 pontos, 30 unknown, 16 arquivos convertidos", async () 
   // helper. Fechou com a capacidade de helper por tabela (`:359`) mais a prova
   // publica de `install --audit-only --json` (`:475`), e 39 decisoes auditadas
   // por callsite.
-  assert.equal(inv.unknown, 30, "install.js fechou: helper por tabela, preflight READ-ONLY e 39 decisoes")
-  assert.equal(inv.jsRegistry.convertedFiles.length, 16)
+  //
+  // 30 -> 27 com runtime-supervisor.js (lote JS 14/14). FECHA O LOTE JS: os 27
+  // restantes sao TODOS fora de JS -- 16 em templates TS e 11 em hooks Python.
+  // O delta e -3 e nao -6 pela troca de regua: o regex media 3 unknown, o AST
+  // media 6. Total inalterado (42 pontos nos dois extratores).
+  assert.equal(inv.unknown, 27, "lote JS fechado: nenhum unknown em .js/.mjs/.cjs")
+  assert.equal(inv.jsRegistry.convertedFiles.length, 17)
   assert.equal(inv.blocked, false)
 
   // A relacao que sustenta o numero: nenhum convertido guarda unknown.
