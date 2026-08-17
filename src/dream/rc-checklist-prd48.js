@@ -63,6 +63,39 @@ export const PRD48_RC_ITEMS = Object.freeze([
     fixAuthorized: false,
     title: "Exit code inconsistente sob `--json`: erro sai 0 em parte dos comandos — automação não distingue falha pelo status do processo",
     proof: null,
+    /**
+     * DOIS ACHADOS DA MESMA FAMÍLIA, encontrados ao escrever as provas públicas
+     * de `context --json` e `research --json` na Fase 1B do PRD51.
+     *
+     * Ficam AQUI e não em item próprio porque a pergunta de fundo é a mesma que
+     * este P1 já registra e ainda não tem resposta: qual é o contrato de um
+     * comando sob `--json` quando a chamada está errada. Abrir item novo daria
+     * aparência de três problemas independentes.
+     *
+     * NENHUM foi corrigido: mudar parsing de argumento ou o canal de erro é
+     * mudança de comportamento público, e não classificação de mensagem. Os dois
+     * estão FIXADOS por teste no estado observado, sem afirmar que estão certos —
+     * para que a correção futura seja deliberada e visível, e não efeito
+     * colateral silencioso.
+     */
+    relatedFindings: [
+      {
+        id: "P1.CLI-JSON-EXIT-CODE.a",
+        title: "`context <sub> --json` consome a própria flag como argumento posicional",
+        evidence: "src/commands/context.js lê o posicional como `args[1]` cru (ctxSearch:242, ctxRelated:254, ctxExplain:271, ctxScout:217). Com `context search --json` o termo de busca vira a string `\"--json\"`, e `context scout --json` responde como se a flag fosse a pergunta — provado em tests/context_json_contract.test.js",
+        impact: "os ramos de recusa por omissão (`missing query`, `missing entity`, `missing topic`, `pergunta obrigatória`) são INALCANÇÁVEIS: só um argumento vazio explícito chega neles. Um consumidor que chame `context search --json` recebe resultado de uma busca pelo literal `--json`, não um erro",
+        fixAuthorized: false,
+        pinnedBy: "tests/context_json_contract.test.js — fixa o comportamento ATUAL, declarando que não é o desejado",
+      },
+      {
+        id: "P1.CLI-JSON-EXIT-CODE.b",
+        title: "Erros de USO de `research` ignoram `--json` e respondem em prosa ANSI",
+        evidence: "src/commands/research.js emite os erros de uso pelo canal humano mesmo sob `--json`: `research validate --json` sem claim e `research skills audit --json` sem `--path`/`--repo` escrevem texto colorido em vez de documento — provado em tests/research_json_contract.test.js",
+        impact: "quem chama errado com `--json` recebe texto com escapes ANSI onde esperava um documento; o consumidor de máquina não tem como distinguir erro de uso de payload malformado",
+        fixAuthorized: false,
+        pinnedBy: "tests/research_json_contract.test.js — fixa o comportamento ATUAL, declarando que não é o desejado",
+      },
+    ],
   },
   // BLOQUEANTE DE SEGURANÇA DO RC (decisão humana, certificação 2026-08-02).
   // Este item sozinho impede publicação.
