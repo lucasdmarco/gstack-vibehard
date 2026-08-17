@@ -446,9 +446,17 @@ test("o registry commitado declara o que foi reconciliado, com entradas reais", 
   assert.deepEqual(r.convertedFiles, [...CONVERTED_FILES].sort(),
     "o artefato commitado declara exatamente o que a fonte única declara")
   assert.deepEqual(Object.keys(r.files).sort(), r.convertedFiles)
-  // Vale para TODO declarado, não só o primeiro: declarar sem entradas é anúncio vazio.
+  // Vale para TODO declarado, não só o primeiro: o que prova que a conversão foi
+  // FEITA é o `fileHash`, porque ele só existe se o gerador leu o arquivo. Exigir
+  // `entries.length > 0` era mais estrito que o contrato do próprio gerador, que
+  // documenta arquivo com ZERO pontos entrando com `entries: []` — e o caso real
+  // apareceu no lote TypeScript: `health.ts` e `users.ts` não têm um único ponto
+  // de mensagem, e mantê-los fora da lista só fazia o extrator regex seguir
+  // imputando a eles 5 pontos inexistentes.
   for (const f of r.convertedFiles) {
-    assert.ok(r.files[f].entries.length > 0, `${f} declarado sem entradas seria anúncio vazio`)
+    assert.match(r.files[f].fileHash ?? "", /^sha256:[0-9a-f]{64}$/,
+      `${f} declarado sem hash seria anúncio vazio`)
+    assert.ok(Array.isArray(r.files[f].entries), `${f} precisa declarar entradas, ainda que vazias`)
   }
 })
 

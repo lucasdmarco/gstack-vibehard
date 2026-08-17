@@ -260,6 +260,83 @@ test("REPO: `error.ts:61` deixa de ser diagnóstico público do GStack", async (
     "a mensagem é do app do usuário, e colocá-la na claim do GStack seria reivindicar texto alheio")
 })
 
+// ── Provenance dos pontos convertidos ──────────────────────────────────────
+
+/**
+ * A LIÇÃO DO `context.js`, aplicada antes e não depois: `unknown: 0` é condição
+ * NECESSÁRIA, não suficiente. Cada ponto interpolado in_scope precisa de decisão
+ * de provenance DECLARADA, ou o arquivo entra na lista de convertidos afirmando
+ * uma cobertura que não tem.
+ */
+const decisoesDoTemplate = () => {
+  const doc = JSON.parse(readFileSync(path.join(repoRoot, "src", "meta", "i18n-js-overrides.json"), "utf-8"))
+  return doc.provenanceDecisions.filter((d) => d.file.startsWith(`${RAIZ}/`))
+}
+
+const entradasDoTemplate = () => {
+  const reg = JSON.parse(readFileSync(path.join(repoRoot, "src", "meta", "i18n-js-registry.json"), "utf-8"))
+  return Object.entries(reg.files)
+    .filter(([f]) => f.startsWith(`${RAIZ}/`))
+    .flatMap(([f, e]) => e.entries.map((x) => ({ ...x, file: f, fileHash: e.fileHash })))
+}
+
+test("PROVENANCE: cada ponto interpolado tem decisão própria, ancorada em linha e coluna", () => {
+  const interpolados = entradasDoTemplate().filter((e) => e.provenance.kind === "interpolated")
+  const decisoes = decisoesDoTemplate()
+  assert.equal(interpolados.length, 8)
+  assert.equal(decisoes.length, 8, "uma decisão por callsite — nenhuma cobre duas linhas")
+
+  for (const e of interpolados) {
+    const d = decisoes.find((x) => x.file === e.file && x.line === e.line && x.column === e.column)
+    assert.ok(d, `sem decisão para ${e.file}:${e.line}:${e.column}`)
+    assert.deepEqual(d.interpolations, e.provenance.ids,
+      "as interpolações declaradas precisam ser as que o motor mediu")
+    assert.equal(d.expectedFileHash, e.fileHash,
+      "o hash âncora precisa ser o do arquivo real: se o fonte mudar, a decisão cai")
+    assert.equal(d.strategy, "translate_literal_frame_preserve_interpolations")
+  }
+})
+
+/**
+ * Nenhuma decisão pode ser cópia de outra. Duas variantes do mesmo banner
+ * (Express, Fastify, Hono) parecem a mesma coisa e NÃO são: arquivos distintos,
+ * hashes distintos, e no caso do Hono a porta vem do callback de `serve()` — a
+ * efetivamente aberta, não a pedida.
+ */
+test("PROVENANCE: nenhuma razão é reaproveitada entre callsites", () => {
+  const razoes = decisoesDoTemplate().map((d) => d.reason)
+  assert.equal(new Set(razoes).size, razoes.length, "razão repetida é decisão por template")
+  for (const d of decisoesDoTemplate()) {
+    assert.ok(d.reason.length > 120, `razão curta demais em ${d.file}:${d.line}`)
+    assert.ok(d.owner && d.evidence, "toda decisão precisa de dono e evidência")
+  }
+})
+
+test("PROVENANCE: os arquivos convertidos não deixam ponto in_scope sem decisão", async () => {
+  const inv = await import(`${pathToFileURL(path.join(repoRoot, "src", "meta", "i18n-inventory.js"))}?t=${Date.now()}`)
+  const r = inv.buildInventory({ repoRoot })
+  assert.equal(r.provenance.ok, true)
+  assert.equal(r.provenance.count, 0, "provenance não resolvida em arquivo convertido")
+  assert.equal(r.provenance.missingProvenance, 0)
+  assert.equal(r.byAudience.generated_dev_surface, 17)
+})
+
+/**
+ * O EFEITO MEDIDO no censo, e por que ele CAI. Converter troca o extrator regex
+ * pelo AST nestes arquivos, e o regex contava 9 pontos a mais que não existem:
+ * 4 duplas contagens de `console.error` e 5 `success(res, …)`, que é helper de
+ * resposta HTTP. Queda de total aqui é correção de medida, não entrega.
+ */
+test("CENSO: `health.ts` e `users.ts` entram com ZERO pontos — e é por isso que entram", () => {
+  const arquivos = new Set(entradasDoTemplate().map((e) => e.file))
+  const reg = JSON.parse(readFileSync(path.join(repoRoot, "src", "meta", "i18n-js-registry.json"), "utf-8"))
+  for (const vazio of [`${RAIZ}/apps/api/src/routes/health.ts`, `${RAIZ}/apps/api/src/routes/users.ts`]) {
+    assert.ok(reg.convertedFiles.includes(vazio), `${vazio} precisa estar convertido`)
+    assert.equal(arquivos.has(vazio), false, "e precisa continuar sem ponto algum")
+  }
+  assert.equal(entradasDoTemplate().length, 17)
+})
+
 test("REPO: nenhum arquivo já convertido muda de classificação", async () => {
   const { buildRegistry, serializar, CONVERTED_FILES } = await import(
     pathToFileURL(path.join(repoRoot, "scripts", "i18n-registry.mjs")).href

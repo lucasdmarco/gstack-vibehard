@@ -179,7 +179,7 @@ test("validateRegistry recusa script que NÃO é alcançado pelo runtime (não p
  *
  * ATUALIZE AQUI, e so aqui, a cada arquivo reconciliado no lote JS.
  */
-test("CENSO GLOBAL: 1916 pontos, 27 unknown, 17 arquivos convertidos", async () => {
+test("CENSO GLOBAL: 1907 pontos, 11 unknown, 25 arquivos convertidos", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
 
@@ -202,7 +202,15 @@ test("CENSO GLOBAL: 1916 pontos, 27 unknown, 17 arquivos convertidos", async () 
   // GStack que nao era contada em lugar nenhum. Subir aqui NAO e regressao: e o
   // censo passando a medir o que sempre existiu. Ver
   // tests/i18n_python_boundary.test.js.
-  assert.equal(inv.total, 1916, "converter nao pode sumir com ponto REAL; falso positivo do regex pode cair")
+  //
+  // 1916 -> 1907: LOTE TYPESCRIPT, a maior queda de falso positivo ate aqui. O
+  // regex contava 26 pontos nos 8 arquivos do template onde o AST ve 17. Os 9
+  // extras sao de dois tipos, ambos ja conhecidos: 4 duplas contagens de
+  // `console.error` (o `error(` de dentro casa o padrao de helper) e 5
+  // `success(res, …)`, que e helper de RESPOSTA HTTP e nao de render --
+  // `health.ts` e `users.ts` ficam com ZERO ponto, e por isso entram na lista de
+  // convertidos: fora dela, o regex seguiria imputando pontos que nao existem.
+  assert.equal(inv.total, 1907, "converter nao pode sumir com ponto REAL; falso positivo do regex pode cair")
 
   // Medicao em movimento: cai a cada arquivo reconciliado. 54 -> 53 com qa.js;
   // 53 -> 52 com secrets.js.
@@ -276,8 +284,14 @@ test("CENSO GLOBAL: 1916 pontos, 27 unknown, 17 arquivos convertidos", async () 
   // restantes sao TODOS fora de JS -- 16 em templates TS e 11 em hooks Python.
   // O delta e -3 e nao -6 pela troca de regua: o regex media 3 unknown, o AST
   // media 6. Total inalterado (42 pontos nos dois extratores).
-  assert.equal(inv.unknown, 27, "lote JS fechado: nenhum unknown em .js/.mjs/.cjs")
-  assert.equal(inv.jsRegistry.convertedFiles.length, 17)
+  //
+  // 27 -> 11 com o lote TYPESCRIPT. Delta -16, e desta vez regex e AST veem o
+  // MESMO numero de unknown: os 16 sao `console.*` que os dois extratores
+  // enxergam. Fecharam por duas regras novas, e a divisao entre elas e a prova:
+  // 16 por `generated-dev-console` e um so, `app.log.error(err)`, por
+  // `generated-framework-logger`. Os 11 restantes sao TODOS Python dos hooks.
+  assert.equal(inv.unknown, 11, "lotes JS e TypeScript fechados: o resto e Python")
+  assert.equal(inv.jsRegistry.convertedFiles.length, 25)
   assert.equal(inv.blocked, false)
 
   // A relacao que sustenta o numero: nenhum convertido guarda unknown.

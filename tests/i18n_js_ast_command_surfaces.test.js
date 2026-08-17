@@ -368,9 +368,23 @@ test("converter é ato declarado — nenhuma capacidade converte arquivo por efe
   const r = JSON.parse(readFileSync(path.join(repoRoot, "src", "meta", "i18n-js-registry.json"), "utf8"))
   assert.deepEqual([...CONVERTED_FILES].sort(), r.convertedFiles,
     "a lista declarada e o artefato commitado são a mesma coisa vista de dois ângulos")
+  // O que prova que a conversão FOI FEITA é o `fileHash`: ele só existe porque o
+  // gerador leu o arquivo do disco. Exigir `entries.length > 0` era mais estrito
+  // que o contrato do próprio gerador, que documenta arquivo com ZERO pontos
+  // entrando com `entries: []` — e a distinção que interessa ("migrado sem
+  // saída" vs "esquecido pelo gerador") já é feita pelo hash mais a invariante
+  // `convertedFiles === keys(files)`, que recusa chave ausente dos dois lados.
+  //
+  // O caso real que expôs isso: `health.ts` e `users.ts` do template não têm um
+  // único ponto de mensagem. Deixá-los FORA da lista era o pior dos dois mundos,
+  // porque o extrator regex seguia imputando a eles 5 pontos inexistentes.
   for (const f of r.convertedFiles) {
-    assert.ok(r.files[f].entries.length > 0, `${f} declarado sem entradas seria conversão anunciada e não feita`)
+    assert.match(r.files[f].fileHash ?? "", /^sha256:[0-9a-f]{64}$/,
+      `${f} declarado sem hash seria conversão anunciada e não feita`)
+    assert.ok(Array.isArray(r.files[f].entries), `${f} precisa declarar suas entradas, ainda que vazias`)
   }
+  assert.ok(r.convertedFiles.some((f) => r.files[f].entries.length > 0),
+    "um registry inteiro sem entradas seria gerador quebrado, não conversão")
 })
 
 test("o registro de consumidores só admite entrada com prova apontável", async () => {

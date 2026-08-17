@@ -16,7 +16,15 @@
     "src/commands/visual.js",
     "src/index.js",
     "src/installer/install.js",
-    "src/plugins/opencode/gstack-session.js"
+    "src/plugins/opencode/gstack-session.js",
+    "templates/templates/fullstack-monorepo/apps/api-fastify/src/index.ts",
+    "templates/templates/fullstack-monorepo/apps/api-hono/src/index.ts",
+    "templates/templates/fullstack-monorepo/apps/api/src/index.ts",
+    "templates/templates/fullstack-monorepo/apps/api/src/middleware/error.ts",
+    "templates/templates/fullstack-monorepo/apps/api/src/routes/health.ts",
+    "templates/templates/fullstack-monorepo/apps/api/src/routes/users.ts",
+    "templates/templates/fullstack-monorepo/packages/db-turso/src/seed.ts",
+    "templates/templates/fullstack-monorepo/packages/db/src/seed.ts"
   ],
   "files": {
     "scripts/clean-pkg.mjs": {
@@ -12251,6 +12259,357 @@
         }
       ],
       "fileHash": "sha256:b0ecc73d73c19e5754a12e089b61817d6b922870fd544b1999caab210775e1f4"
+    },
+    "templates/templates/fullstack-monorepo/apps/api-fastify/src/index.ts": {
+      "entries": [
+        {
+          "audience": "generated_dev_surface",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "error",
+          "calleePath": "error",
+          "canonicalName": "error",
+          "column": 3,
+          "line": 37,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "generated-framework-logger",
+          "sink": null
+        },
+        {
+          "audience": "generated_dev_surface",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 48,
+          "provenance": {
+            "ids": [
+              "port"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "generated-dev-console",
+          "sink": null
+        },
+        {
+          "audience": "generated_dev_surface",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 49,
+          "provenance": {
+            "ids": [
+              "port"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "generated-dev-console",
+          "sink": null
+        }
+      ],
+      "fileHash": "sha256:6b64bd0710bd3e89109496555324e9e0fb1f27957df45d90f261ffc0d668e495"
+    },
+    "templates/templates/fullstack-monorepo/apps/api-hono/src/index.ts": {
+      "entries": [
+        {
+          "audience": "generated_dev_surface",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.error",
+          "calleePath": "console.error",
+          "canonicalName": "error",
+          "column": 3,
+          "line": 18,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "generated-dev-console",
+          "sink": null
+        },
+        {
+          "audience": "generated_dev_surface",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 26,
+          "provenance": {
+            "ids": [
+              "info",
+              "port"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "generated-dev-console",
+          "sink": null
+        },
+        {
+          "audience": "generated_dev_surface",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 27,
+          "provenance": {
+            "ids": [
+              "info",
+              "port"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "generated-dev-console",
+          "sink": null
+        }
+      ],
+      "fileHash": "sha256:f53e449a330a6298ea062211c9b39886468223b3793982bddd73dadf723e3f4d"
+    },
+    "templates/templates/fullstack-monorepo/apps/api/src/index.ts": {
+      "entries": [
+        {
+          "audience": "generated_dev_surface",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 24,
+          "provenance": {
+            "ids": [
+              "port"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "generated-dev-console",
+          "sink": null
+        },
+        {
+          "audience": "generated_dev_surface",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 25,
+          "provenance": {
+            "ids": [
+              "port"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "generated-dev-console",
+          "sink": null
+        }
+      ],
+      "fileHash": "sha256:c2c8f65d140830e691b812feb94cf1d1ffe1df4f71f8273f281fa51ce9592c53"
+    },
+    "templates/templates/fullstack-monorepo/apps/api/src/middleware/error.ts": {
+      "entries": [
+        {
+          "audience": "generated_dev_surface",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.error",
+          "calleePath": "console.error",
+          "canonicalName": "error",
+          "column": 3,
+          "line": 61,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "generated-dev-console",
+          "sink": null
+        }
+      ],
+      "fileHash": "sha256:6c01070b9583fe4b326043b741d8d487d5f67091190b05248f96fff97679028a"
+    },
+    "templates/templates/fullstack-monorepo/apps/api/src/routes/health.ts": {
+      "entries": [],
+      "fileHash": "sha256:38b39561cb4cbf4c73e38d2d9c6727eaf66f3e9f52af6519db587c59716f3291"
+    },
+    "templates/templates/fullstack-monorepo/apps/api/src/routes/users.ts": {
+      "entries": [],
+      "fileHash": "sha256:909e372d8082f654e3847aa1088b3a40757a43875a7fc670c7435fac8aa93f94"
+    },
+    "templates/templates/fullstack-monorepo/packages/db-turso/src/seed.ts": {
+      "entries": [
+        {
+          "audience": "generated_dev_surface",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 7,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "generated-dev-console",
+          "sink": null
+        },
+        {
+          "audience": "generated_dev_surface",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 18,
+          "provenance": {
+            "ids": [
+              "user",
+              "id",
+              "user",
+              "email"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "generated-dev-console",
+          "sink": null
+        },
+        {
+          "audience": "generated_dev_surface",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 19,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "generated-dev-console",
+          "sink": null
+        },
+        {
+          "audience": "generated_dev_surface",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.error",
+          "calleePath": "console.error",
+          "canonicalName": "error",
+          "column": 3,
+          "line": 24,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "generated-dev-console",
+          "sink": null
+        }
+      ],
+      "fileHash": "sha256:7f49649f68f5f3bf6d37ed77c35f09587ad98637fa8286ec79dbbd784fdf7c21"
+    },
+    "templates/templates/fullstack-monorepo/packages/db/src/seed.ts": {
+      "entries": [
+        {
+          "audience": "generated_dev_surface",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 6,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "generated-dev-console",
+          "sink": null
+        },
+        {
+          "audience": "generated_dev_surface",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 13,
+          "provenance": {
+            "ids": [
+              "user",
+              "id",
+              "user",
+              "email"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "generated-dev-console",
+          "sink": null
+        },
+        {
+          "audience": "generated_dev_surface",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.log",
+          "calleePath": "console.log",
+          "canonicalName": "log",
+          "column": 3,
+          "line": 14,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "generated-dev-console",
+          "sink": null
+        },
+        {
+          "audience": "generated_dev_surface",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.error",
+          "calleePath": "console.error",
+          "canonicalName": "error",
+          "column": 3,
+          "line": 19,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "generated-dev-console",
+          "sink": null
+        }
+      ],
+      "fileHash": "sha256:aed670c36cc302446e5a3e0782a20abdd96229f0b81e371a5991ad807a1ac8b6"
     }
   },
   "schema": "gstack.i18n-js-registry.v1"

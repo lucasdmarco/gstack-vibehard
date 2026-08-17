@@ -44,6 +44,9 @@ export const OVERRIDES_SCHEMA = "gstack.i18n-js-overrides.v1"
  *
  * Nenhum ponto real foi perdido: 35 do regex = 29 reais + 6 falsos.
  */
+/** Raiz que `TEMPLATE_ROOTS` declara e o `create` copia. Escrita uma vez so. */
+const TEMPLATE_FULLSTACK = "templates/templates/fullstack-monorepo"
+
 export const CONVERTED_FILES = Object.freeze([
   "src/cli/index.js", "src/commands/monitor.js", "src/cli/create.js",
   // Lote JS, arquivo 1/14. Os dois pontos de maquina (`qa.js:29` e `qa.js:44`)
@@ -128,6 +131,26 @@ export const CONVERTED_FILES = Object.freeze([
   // (`origemDoParametro` → `file_read`) e `:346` por decisao ancorada, porque o
   // `readSync` preenche o buffer por efeito colateral.
   "src/commands/runtime-supervisor.js",
+  // LOTE TYPESCRIPT — os 8 arquivos do template `fullstack-monorepo`, e o unico
+  // codigo desta lista que NAO e produto nosso rodando: o `create` o copia para
+  // dentro do projeto do usuario. Por isso a audiencia e `generated_dev_surface`
+  // e nao `public_diagnostic` — a mensagem e do app que o usuario passa a manter.
+  //
+  // A conversao DERRUBA o total do censo em 9, e isso e correcao de medida e nao
+  // entrega: o extrator regex contava 26 pontos onde o AST enxerga 17. Os 9
+  // extras eram 4 duplas contagens de `console.error` e 5 `success(res, …)`, que
+  // e helper de RESPOSTA HTTP e nao de render.
+  //
+  // `health.ts` e `users.ts` entram com ZERO pontos, e e por isso que entram:
+  // fora da lista, o regex continuaria imputando a eles 5 pontos que nao existem.
+  `${TEMPLATE_FULLSTACK}/apps/api/src/index.ts`,
+  `${TEMPLATE_FULLSTACK}/apps/api/src/middleware/error.ts`,
+  `${TEMPLATE_FULLSTACK}/apps/api/src/routes/health.ts`,
+  `${TEMPLATE_FULLSTACK}/apps/api/src/routes/users.ts`,
+  `${TEMPLATE_FULLSTACK}/apps/api-fastify/src/index.ts`,
+  `${TEMPLATE_FULLSTACK}/apps/api-hono/src/index.ts`,
+  `${TEMPLATE_FULLSTACK}/packages/db/src/seed.ts`,
+  `${TEMPLATE_FULLSTACK}/packages/db-turso/src/seed.ts`,
 ])
 
 /**

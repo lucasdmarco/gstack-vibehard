@@ -3140,6 +3140,118 @@
       "reason": "Ramo de FALHA da mesma linha, e ponto separado porque a moldura é outra e mais importante: diz que o navegador não abriu E dá a URL para o usuário abrir à mão. Mesmo interpolado, propósito oposto.",
       "owner": "certificação RC PRD51 (Fase 1B)",
       "evidence": "src/commands/runtime-supervisor.js:401 — `openCommand`, quando o navegador não abriu."
+    },
+    {
+      "file": "templates/templates/fullstack-monorepo/apps/api/src/index.ts",
+      "line": 24,
+      "column": 3,
+      "expectedFileHash": "sha256:c2c8f65d140830e691b812feb94cf1d1ffe1df4f71f8273f281fa51ce9592c53",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "port"
+      ],
+      "reason": "Banner de subida do servidor Express do projeto gerado. `port` e o NUMERO da porta TCP em que o servidor subiu. Nao e frase: e um inteiro que o desenvolvedor copia para o navegador, e traduzi-lo nao tem sentido nem definicao. A moldura literal em volta e a superficie de log do projeto gerado e entra na claim em ingles. A URL `http://localhost:` faz parte da moldura porque e endereco, nao prosa: reescreve-la mudaria o endereco que o desenvolvedor abre.",
+      "owner": "lucas",
+      "evidence": "tests/i18n_js_ast_generated_template.test.js — prova a classificacao dos 17 pontos de template e, na secao de provenance, que cada um dos 8 pontos interpolados tem decisao propria e que nenhuma interpolacao declarada e frase"
+    },
+    {
+      "file": "templates/templates/fullstack-monorepo/apps/api/src/index.ts",
+      "line": 25,
+      "column": 3,
+      "expectedFileHash": "sha256:c2c8f65d140830e691b812feb94cf1d1ffe1df4f71f8273f281fa51ce9592c53",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "port"
+      ],
+      "reason": "Segunda linha do mesmo banner, e uma DECISAO PROPRIA e nao repeticao da anterior: aqui o valor interpolado compoe o caminho de um documento OpenAPI (`/api/openapi.json`), consumido por ferramenta e nao lido como texto. `port` e o NUMERO da porta TCP em que o servidor subiu. Nao e frase: e um inteiro que o desenvolvedor copia para o navegador, e traduzi-lo nao tem sentido nem definicao. A moldura literal em volta e a superficie de log do projeto gerado e entra na claim em ingles.",
+      "owner": "lucas",
+      "evidence": "tests/i18n_js_ast_generated_template.test.js — prova a classificacao dos 17 pontos de template e, na secao de provenance, que cada um dos 8 pontos interpolados tem decisao propria e que nenhuma interpolacao declarada e frase"
+    },
+    {
+      "file": "templates/templates/fullstack-monorepo/apps/api-fastify/src/index.ts",
+      "line": 48,
+      "column": 3,
+      "expectedFileHash": "sha256:6b64bd0710bd3e89109496555324e9e0fb1f27957df45d90f261ffc0d668e495",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "port"
+      ],
+      "reason": "Banner de subida da variante Fastify. Arquivo e template DIFERENTES do Express, com hash proprio: uma decisao nao cobre a outra, e um deles pode mudar sozinho. `port` e o NUMERO da porta TCP em que o servidor subiu. Nao e frase: e um inteiro que o desenvolvedor copia para o navegador, e traduzi-lo nao tem sentido nem definicao. A moldura literal em volta e a superficie de log do projeto gerado e entra na claim em ingles.",
+      "owner": "lucas",
+      "evidence": "tests/i18n_js_ast_generated_template.test.js — prova a classificacao dos 17 pontos de template e, na secao de provenance, que cada um dos 8 pontos interpolados tem decisao propria e que nenhuma interpolacao declarada e frase"
+    },
+    {
+      "file": "templates/templates/fullstack-monorepo/apps/api-fastify/src/index.ts",
+      "line": 49,
+      "column": 3,
+      "expectedFileHash": "sha256:6b64bd0710bd3e89109496555324e9e0fb1f27957df45d90f261ffc0d668e495",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "port"
+      ],
+      "reason": "Linha de documentacao da variante Fastify (`/api/docs`), servida pelo Swagger UI. O valor interpolado compoe um endereco navegavel. `port` e o NUMERO da porta TCP em que o servidor subiu. Nao e frase: e um inteiro que o desenvolvedor copia para o navegador, e traduzi-lo nao tem sentido nem definicao. A moldura literal em volta e a superficie de log do projeto gerado e entra na claim em ingles.",
+      "owner": "lucas",
+      "evidence": "tests/i18n_js_ast_generated_template.test.js — prova a classificacao dos 17 pontos de template e, na secao de provenance, que cada um dos 8 pontos interpolados tem decisao propria e que nenhuma interpolacao declarada e frase"
+    },
+    {
+      "file": "templates/templates/fullstack-monorepo/apps/api-hono/src/index.ts",
+      "line": 26,
+      "column": 3,
+      "expectedFileHash": "sha256:f53e449a330a6298ea062211c9b39886468223b3793982bddd73dadf723e3f4d",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "info",
+        "port"
+      ],
+      "reason": "Banner de subida da variante Hono. As DUAS interpolacoes sao um unico acesso `info.port`, e a origem e outra das anteriores: `info` e o objeto que o callback de `serve()` recebe do proprio runtime, entao a porta e a EFETIVAMENTE aberta e nao a pedida. Continua sendo um inteiro de runtime, nao frase.",
+      "owner": "lucas",
+      "evidence": "tests/i18n_js_ast_generated_template.test.js — prova a classificacao dos 17 pontos de template e, na secao de provenance, que cada um dos 8 pontos interpolados tem decisao propria e que nenhuma interpolacao declarada e frase"
+    },
+    {
+      "file": "templates/templates/fullstack-monorepo/apps/api-hono/src/index.ts",
+      "line": 27,
+      "column": 3,
+      "expectedFileHash": "sha256:f53e449a330a6298ea062211c9b39886468223b3793982bddd73dadf723e3f4d",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "info",
+        "port"
+      ],
+      "reason": "Linha do documento OpenAPI da variante Hono, com a mesma origem `info.port` do callback de `serve()`. O valor entra na composicao de uma URL consumida por ferramenta.",
+      "owner": "lucas",
+      "evidence": "tests/i18n_js_ast_generated_template.test.js — prova a classificacao dos 17 pontos de template e, na secao de provenance, que cada um dos 8 pontos interpolados tem decisao propria e que nenhuma interpolacao declarada e frase"
+    },
+    {
+      "file": "templates/templates/fullstack-monorepo/packages/db/src/seed.ts",
+      "line": 13,
+      "column": 3,
+      "expectedFileHash": "sha256:aed670c36cc302446e5a3e0782a20abdd96229f0b81e371a5991ad807a1ac8b6",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "user",
+        "id",
+        "user",
+        "email"
+      ],
+      "reason": "Confirmacao do seed do Postgres. As quatro entradas sao dois acessos: `user.id` e `user.email`, ambos vindos do `RETURNING` do INSERT — sao DADOS DE LINHA do banco, nao texto nosso. O id e identificador opaco e o email e endereco: traduzir qualquer um produziria um valor que nao existe no banco. A moldura 'Created user:' e os parenteses sao a parte linguistica e entram na claim em ingles.",
+      "owner": "lucas",
+      "evidence": "tests/i18n_js_ast_generated_template.test.js — prova a classificacao dos 17 pontos de template e, na secao de provenance, que cada um dos 8 pontos interpolados tem decisao propria e que nenhuma interpolacao declarada e frase"
+    },
+    {
+      "file": "templates/templates/fullstack-monorepo/packages/db-turso/src/seed.ts",
+      "line": 18,
+      "column": 3,
+      "expectedFileHash": "sha256:7f49649f68f5f3bf6d37ed77c35f09587ad98637fa8286ec79dbbd784fdf7c21",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "user",
+        "id",
+        "user",
+        "email"
+      ],
+      "reason": "Confirmacao do seed do Turso. Mesma forma do seed do Postgres, arquivo e hash DIFERENTES, e a origem do `id` tambem: aqui ele e um `randomUUID()` gerado no proprio seed, e nao um serial do banco. Continua identificador opaco, e `user.email` continua endereco vindo do `RETURNING`.",
+      "owner": "lucas",
+      "evidence": "tests/i18n_js_ast_generated_template.test.js — prova a classificacao dos 17 pontos de template e, na secao de provenance, que cada um dos 8 pontos interpolados tem decisao propria e que nenhuma interpolacao declarada e frase"
     }
   ]
 }
