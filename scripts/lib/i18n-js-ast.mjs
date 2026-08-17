@@ -2298,6 +2298,21 @@ export const MACHINE_PROTOCOL_CONSUMERS = Object.freeze({
       }),
     ]),
   }),
+  /**
+   * CINCO pontos de maquina, um por familia de subcomando — nao ha helper unico
+   * aqui, cada um vive numa funcao diferente. Um deles (`emitCancelled`) exige
+   * TTY e fica declarado como lacuna na propria evidencia.
+   */
+  "src/commands/research.js": Object.freeze({
+    commands: Object.freeze([
+      Object.freeze({
+        command: "research",
+        mode: "--json",
+        consumer: "research_json_contract",
+        evidence: "tests/research_json_contract.test.js — subprocesso real em sandbox: `notebooklm doctor` e `connect` (:198), a recusa por consentimento de `skills audit --repo` sem `--yes` (:134), a auditoria read-only de `skills audit --path` com guardrails no payload (:168) e a revisao epistemica de `validate` (:310); stdout puro e payload fora do stderr em todos, mais dois controles negativos do ramo sem `--json`. NAO cobre `emitCancelled` (:129), alcancavel so com TTY respondendo NAO ao confirm — lacuna declarada",
+      }),
+    ]),
+  }),
   "src/commands/secrets.js": Object.freeze({
     commands: Object.freeze([
       Object.freeze({
