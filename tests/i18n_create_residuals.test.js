@@ -191,9 +191,13 @@ test("REAL: `create.js` chega a unknown ZERO, sem override algum", async () => {
   for (const p of pts) porAud[p.audience] = (porAud[p.audience] ?? 0) + 1
   assert.deepEqual(porAud, { render_primitive: 4, public_diagnostic: 85, machine_protocol: 1, terminal_control: 1 })
 
+  // O repositório passou a ter UM override — `context.js:201`, conteúdo do
+  // usuário. Ele não toca `create.js`, e é isso que este arquivo afirma: os 91
+  // pontos daqui foram classificados pelo AST, sem decisão humana de audiência.
   const overrides = JSON.parse(
     (await import("node:fs")).readFileSync(path.join(repoRoot, "src/meta/i18n-js-overrides.json"), "utf8")).overrides
-  assert.deepEqual(overrides ?? [], [], "nenhuma classificação precisou de decisão humana por âncora")
+  assert.deepEqual((overrides ?? []).filter((o) => o.file === "src/cli/create.js"), [],
+    "nenhuma classificação DESTE arquivo precisou de decisão humana por âncora")
 })
 
 test("REAL: nenhum ponto público foi rebaixado para fora do escopo", async () => {

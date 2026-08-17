@@ -112,7 +112,13 @@ test("nenhuma decisão ou override é aplicado fora dos arquivos convertidos", (
   for (const d of o.provenanceDecisions) {
     assert.ok(convertidos.has(d.file), `decisão em arquivo não convertido: ${d.file}`)
   }
-  assert.deepEqual(o.overrides ?? [], [], "nenhum override de audiência foi criado para cumprir contagem")
+  // O ÚNICO override do repositório também precisa apontar para arquivo
+  // convertido — a regra vale para os dois mecanismos, e não só para decisões.
+  for (const ov of o.overrides ?? []) {
+    assert.ok(convertidos.has(ov.file), `override em arquivo não convertido: ${ov.file}`)
+  }
+  assert.equal((o.overrides ?? []).length, 1,
+    "override de audiência é exceção: o único existente veio de decisão arquitetural, não de contagem")
 })
 
 // ── Sete controles negativos ────────────────────────────────────────────────

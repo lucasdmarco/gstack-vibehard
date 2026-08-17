@@ -179,7 +179,7 @@ test("validateRegistry recusa script que NÃO é alcançado pelo runtime (não p
  *
  * ATUALIZE AQUI, e so aqui, a cada arquivo reconciliado no lote JS.
  */
-test("CENSO GLOBAL: 1924 pontos, 44 unknown, 12 arquivos convertidos", async () => {
+test("CENSO GLOBAL: 1924 pontos, 40 unknown, 13 arquivos convertidos", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
 
@@ -248,8 +248,15 @@ test("CENSO GLOBAL: 1924 pontos, 44 unknown, 12 arquivos convertidos", async () 
   // regua de sempre: o regex media 1 unknown no arquivo, o AST media 5. Fechou
   // com a prova publica de `research --json` MAIS as 15 decisoes de provenance
   // -- e desta vez a segunda metade foi medida ANTES de declarar convertido.
-  assert.equal(inv.unknown, 44, "research.js fechou: prova de `--json` e as 15 decisoes de provenance")
-  assert.equal(inv.jsRegistry.convertedFiles.length, 12)
+  //
+  // 44 -> 40 com a RECONVERSAO de context.js (lote JS 10/14). A primeira
+  // tentativa foi revertida por levar `unresolvedProvenance` de 0 a 28; agora as
+  // 28 decisoes existem -- 27 de moldura literal e uma de
+  // `preserve_user_content_verbatim` para `:201`, o trecho de documento do
+  // usuario. O delta e -4 e nao -5 pela troca de regua: o regex media 4 unknown
+  // no arquivo, o AST media 5.
+  assert.equal(inv.unknown, 40, "context.js reconvertido, agora com a provenance inteira declarada")
+  assert.equal(inv.jsRegistry.convertedFiles.length, 13)
   assert.equal(inv.blocked, false)
 
   // A relacao que sustenta o numero: nenhum convertido guarda unknown.

@@ -452,11 +452,23 @@ test("o registry commitado declara o que foi reconciliado, com entradas reais", 
   }
 })
 
-test("o overrides commitado esta vazio e traz o contrato de cada override", async () => {
+test("o overrides commitado e EXCEPCIONAL e traz o contrato de cada override", async () => {
   const { OVERRIDES_PATH, OVERRIDES_SCHEMA } = await gen()
   const o = JSON.parse(readFileSync(path.join(repoRoot, OVERRIDES_PATH), "utf8"))
   assert.equal(o.schema, OVERRIDES_SCHEMA)
-  assert.deepEqual(o.overrides, [])
+
+  // Ficou vazio durante todo o lote, e o primeiro so entrou quando uma decisao
+  // ARQUITETURAL o exigiu: `context.js:201` imprime um trecho de documento do
+  // usuario, e nenhuma regra estrutural pode decidir de QUEM e o conteudo. O
+  // numero e pequeno de proposito — se crescer sem cerimonia, o mecanismo virou
+  // atalho.
+  assert.equal(o.overrides.length, 1, "override e excecao, e cada um precisa de razao propria")
+  const [ov] = o.overrides
+  assert.equal(ov.file, "src/commands/context.js")
+  assert.equal(ov.audience, "user_content")
+  for (const campo of ["reason", "owner", "evidence", "expectedFileHash", "line", "column"]) {
+    assert.ok(ov[campo] !== undefined && String(ov[campo]).trim() !== "", `o override precisa declarar \`${campo}\``)
+  }
   const doc = o.$comment.join(" ")
   for (const campo of ["file", "line", "column", "reason", "owner", "evidence", "expectedFileHash"]) {
     assert.ok(doc.includes(campo), `o contrato precisa citar \`${campo}\``)

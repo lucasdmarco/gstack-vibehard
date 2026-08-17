@@ -195,18 +195,20 @@ test("a decisão NÃO reclassifica: a mensagem continua pública e in_scope", as
   assert.equal(p.provenance.resolved, false, "o dado bruto segue dizendo que é interpolado")
 })
 
-test("nenhum OVERRIDE foi necessário — e o invariante declarado===aplicado vale", async () => {
+test("nenhum override toca ESTES arquivos — e declarado===aplicado vale", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
   const overrides = lerJson("src/meta/i18n-js-overrides.json").overrides
 
-  // Registro honesto: o AST classificou os 29 pontos sem ajuda humana. Criar um
-  // override artificial só para exercitar o mecanismo mudaria a classificação de
-  // um ponto sem razão real.
-  assert.deepEqual(overrides, [], "nenhum ponto exigiu decisão humana de audiência, em nenhum dos dois arquivos")
-  assert.equal(inv.jsRegistry.overridesApplied, 0)
+  // Registro honesto: o AST classificou os 29 pontos destes dois arquivos sem
+  // ajuda humana, e continua assim. O repositório passou a ter UM override — em
+  // `context.js:201`, conteúdo do usuário —, e ele não encosta aqui. Afirmar
+  // "zero no repositório" deixou de ser verdade; afirmar "zero AQUI" é o que
+  // este arquivo sempre teve a dizer.
+  assert.deepEqual(overrides.filter((o) => o.file === ALVO), [],
+    "nenhum ponto destes arquivos exigiu decisão humana de audiência")
   assert.equal(inv.jsRegistry.overridesApplied, overrides.length,
-    "o invariante vale nos dois lados, inclusive em zero")
+    "o invariante vale nos dois lados: todo override declarado é aplicado")
 })
 
 // ── Gate ─────────────────────────────────────────────────────────────────────

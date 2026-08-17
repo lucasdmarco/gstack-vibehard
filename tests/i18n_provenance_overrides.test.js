@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs"
+import { mkdtempSync, writeFileSync, mkdirSync, readFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -399,7 +399,7 @@ test("P2: `overridesApplied` conta pela PROPRIEDADE `override`, não pelo texto 
 
 // ── Estado oficial ───────────────────────────────────────────────────────────
 
-test("INVENTÁRIO OFICIAL: total estável, convertidos declarados, ZERO override de audiência", async () => {
+test("INVENTÁRIO OFICIAL: total estável, convertidos declarados, override EXCEPCIONAL", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
   // `unknown` global é medição em movimento durante o lote JS; censo canônico em
@@ -410,6 +410,15 @@ test("INVENTÁRIO OFICIAL: total estável, convertidos declarados, ZERO override
     "o total precisa ser determinístico entre construções")
   const gen = await import(`file:///${path.join(repoRoot, "scripts", "i18n-registry.mjs").replace(/\\/g, "/")}?t=${Date.now()}`)
   assert.deepEqual(inv.jsRegistry.convertedFiles, [...gen.CONVERTED_FILES].sort())
-  assert.equal(inv.jsRegistry.overridesApplied, 0,
-    "nenhum override de AUDIÊNCIA foi necessário em nenhum dos dois arquivos — o AST classificou sem ajuda humana; o que houve foram decisões de PROVENANCE, que são outra coisa")
+  // Durante todo o lote foi ZERO: o AST classificou sem ajuda humana, e as
+  // decisões de PROVENANCE são outra coisa. O primeiro override só entrou quando
+  // uma decisão ARQUITETURAL o exigiu — `context.js:201` imprime um trecho de
+  // documento do usuário, e nenhuma regra estrutural pode decidir de QUEM é o
+  // conteúdo. O que este teste guarda é que ele seja EXCEÇÃO e que declarado
+  // continue igual a aplicado.
+  const overrides = JSON.parse(
+    readFileSync(path.join(repoRoot, "src/meta/i18n-js-overrides.json"), "utf8")).overrides
+  assert.equal(overrides.length, 1)
+  assert.equal(inv.jsRegistry.overridesApplied, overrides.length,
+    "todo override declarado é aplicado — o invariante vale nos dois lados")
 })

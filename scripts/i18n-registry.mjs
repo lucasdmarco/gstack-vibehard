@@ -97,6 +97,13 @@ export const CONVERTED_FILES = Object.freeze([
   // generica: sem ela o parametro do callback e `any` e `p.message` nao resolve
   // para declaracao nenhuma.
   "src/commands/research.js",
+  // Lote JS, arquivo 10/14. RECONVERTIDO. A primeira tentativa foi revertida por
+  // levar `unresolvedProvenance` de 0 a 28 — `unknown: 0` e necessario e nao
+  // suficiente. Agora as 28 decisoes existem, escritas uma a uma: 27 de moldura
+  // literal e UMA de `preserve_user_content_verbatim`, a estrategia aprovada
+  // depois que a auditoria mostrou que `:201` (trecho de documento indexado do
+  // usuario) nao cabia em nenhuma das tres anteriores sem mentir.
+  "src/commands/context.js",
 ])
 
 /**

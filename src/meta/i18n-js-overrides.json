@@ -41,7 +41,18 @@
     "sobrescrever `resolved` apagaria a evidencia de que o argumento e interpolado e faria",
     "a decisao humana parecer analise automatica."
   ],
-  "overrides": [],
+  "overrides": [
+    {
+      "file": "src/commands/context.js",
+      "line": 201,
+      "column": 5,
+      "audience": "user_content",
+      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "reason": "O valor impresso é um trecho do documento INDEXADO DO USUÁRIO, e a moldura são seis espaços — não há uma palavra do GStack na linha. `public_diagnostic` afirmaria que a mensagem é do produto e a colocaria na claim English-first, o que mandaria traduzir a citação que o usuário pediu para ver. A audiência é a decisão de canal e precisa vir antes da estratégia de provenance.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "Cadeia provada em `src/context-docs/py/context_db.py:450` — `\"evidence\": (r[\"content\"] or \"\").strip()[:280]`, lido de `chunks.content` (índice populado dos documentos do usuário) — até `src/commands/context.js:201`, sem literal linguístico do projeto no caminho. Contraste no mesmo arquivo Python: `:540` é literal NOSSO e segue `public_diagnostic` na origem."
+    }
+  ],
   "provenanceDecisions": [
     {
       "file": "src/cli/index.js",
@@ -1621,6 +1632,474 @@
       "reason": "A moldura é o cabeçalho 'research validate — ', texto do produto. O interpolado é o NÍVEL epistêmico resolvido (`grounded` e afins): token do contrato de revisão, que aparece igual no payload de máquina e por isso não se traduz.",
       "owner": "certificação RC PRD51 (Fase 1B)",
       "evidence": "src/commands/research.js:311 — cabeçalho do relatório humano de `research validate`. O mesmo `level` sai no payload `gstack.epistemic-review.v1`, provado em tests/research_json_contract.test.js."
+    },
+    {
+      "file": "src/commands/context.js",
+      "line": 63,
+      "column": 3,
+      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "chosen"
+      ],
+      "reason": "A moldura 'Obsidian configurado (read-only): ' é do produto, e o '(read-only)' é a garantia que o comando dá. `chosen` é o caminho do vault que o usuário escolheu no prompt interativo: sai verbatim para que ele reconheça o próprio diretório.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/context.js:63 — ramo de sucesso de `initObsidianInteractive`, após `chooseObsidian`."
+    },
+    {
+      "file": "src/commands/context.js",
+      "line": 69,
+      "column": 68,
+      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "globalDefault"
+      ],
+      "reason": "Mesma moldura de leitura, outro caminho de decisão: aqui o vault NÃO foi escolhido agora, foi herdado do default global. A frase 'Obsidian herdado do default global: … (read-only)' é do produto; `globalDefault` é o caminho já configurado na máquina do usuário.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/context.js:69 — ramo em que `getGlobalObsidianDefault()` responde antes de perguntar."
+    },
+    {
+      "file": "src/commands/context.js",
+      "line": 81,
+      "column": 3,
+      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "Object",
+        "values",
+        "DOC_SOURCES",
+        "join"
+      ],
+      "reason": "A moldura 'Diretórios de docs prontos: ' é do produto. O interpolado é a lista de diretórios de `DOC_SOURCES` — NOMES DE PASTA em disco (`docs/adr`, `docs/prd`…), não prosa: traduzi-los apontaria para pastas que não existem.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/context.js:81 — fim de `ctxInit`, depois de `ensureDocDirs` criar as pastas."
+    },
+    {
+      "file": "src/commands/context.js",
+      "line": 89,
+      "column": 21,
+      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "parts",
+        "join"
+      ],
+      "reason": "A moldura '  por fonte: ' é do produto. O interpolado é a lista `chave=contagem` das fontes do índice, montada em `renderBySource` a partir do payload do indexer: as chaves (`adr`, `prd`, `research`…) são o vocabulário de `source` do contrato, e os valores são números.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/context.js:89 — `renderBySource`, alimentado por `by_source` do `status --json` do indexer."
+    },
+    {
+      "file": "src/commands/context.js",
+      "line": 96,
+      "column": 18,
+      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "r",
+        "stdout",
+        "trim"
+      ],
+      "reason": "A moldura 'índice: ' é do produto. O interpolado é o stdout CRU do indexer, usado só quando a resposta não parseia como JSON — é o caminho de degradação honesta. O texto ali é do subprocesso, e reescrevê-lo esconderia o diagnóstico real de quem precisa depurar o índice.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/context.js:96 — ramo `if (!s)` de `statusDb`, quando `safeParse` falha."
+    },
+    {
+      "file": "src/commands/context.js",
+      "line": 97,
+      "column": 3,
+      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "s",
+        "documents",
+        "s",
+        "chunks",
+        "s",
+        "entities",
+        "s",
+        "edges",
+        "s",
+        "fts_enabled"
+      ],
+      "reason": "A moldura é o rótulo 'índice: ' e os nomes de campo `documents=`, `chunks=`, `entities=`, `edges=`, `fts=`. Os nomes NÃO se traduzem: são as chaves do payload `status --json` do indexer, e o relatório humano as repete para que terminal e JSON falem a mesma língua. Os interpolados são contagens; o último é o par de tokens `on`/`LIKE`, que nomeia o modo de busca do SQLite.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/context.js:97 — linha de status do índice, derivada do payload do indexer."
+    },
+    {
+      "file": "src/commands/context.js",
+      "line": 112,
+      "column": 73,
+      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "e",
+        "message"
+      ],
+      "reason": "A moldura 'context.json ilegível: ' é do produto. O interpolado é `e.message` de um `JSON.parse` que falhou — texto do runtime do Node, frequentemente com posição do caractere. Traduzi-lo descolaria a mensagem do que o motor realmente reportou.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/context.js:112 — `catch` da leitura de `.gstack/context.json`."
+    },
+    {
+      "file": "src/commands/context.js",
+      "line": 114,
+      "column": 3,
+      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "injectMode",
+        "reg"
+      ],
+      "reason": "A moldura é o rótulo 'injectMode: '. O interpolado é o modo de injeção configurado (`summary-only` e afins): token do registro de contexto, que aparece igual no arquivo de configuração — traduzi-lo faria o usuário procurar por um valor que não pode escrever.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/context.js:114 — `ctxStatus`, lendo `sessionStart.injectMode` de `.gstack/context.json`."
+    },
+    {
+      "file": "src/commands/context.js",
+      "line": 115,
+      "column": 3,
+      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "c",
+        "adr",
+        "c",
+        "prd",
+        "c",
+        "plans",
+        "c",
+        "research",
+        "c",
+        "total"
+      ],
+      "reason": "A moldura são os rótulos 'ADR: ', 'PRD: ', 'plans: ', 'research: ' e 'total: '. Os quatro primeiros são NOMES DAS FONTES do registro de docs — o mesmo vocabulário de `DOC_SOURCES` e dos diretórios em disco —, e por isso não se traduzem; 'total' é rótulo comum e traduz. Os cinco interpolados são contagens.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/context.js:115 — `ctxStatus`, com as contagens de `countDocs`."
+    },
+    {
+      "file": "src/commands/context.js",
+      "line": 138,
+      "column": 12,
+      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "obs"
+      ],
+      "reason": "A moldura 'Obsidian indexado (read-only): ' é do produto e repete a garantia de leitura. `obs` é o caminho do vault, informado pelo usuário.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/context.js:138 — `ctxIndex`, quando a fonte opcional Obsidian está configurada."
+    },
+    {
+      "file": "src/commands/context.js",
+      "line": 139,
+      "column": 14,
+      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "gpath"
+      ],
+      "reason": "A moldura 'Graphify bridge: ' nomeia a ponte de topologia de código. `gpath` é o caminho do artefato do Graphify encontrado por auto-detecção — caminho em disco, não prosa.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/context.js:139 — `ctxIndex`, quando `findGraphifyOutput` acha a saída do Graphify."
+    },
+    {
+      "file": "src/commands/context.js",
+      "line": 144,
+      "column": 28,
+      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "folder"
+      ],
+      "reason": "A moldura 'Pasta não existe: … (registrada mesmo assim; será ignorada até existir)' é o produto explicando um comportamento tolerante — e é a parte que mais importa traduzir, porque é ela que evita o usuário achar que o comando falhou. `folder` é o caminho que ele passou.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/context.js:144 — `ctxObsidian`, registro de um vault que ainda não existe em disco."
+    },
+    {
+      "file": "src/commands/context.js",
+      "line": 146,
+      "column": 3,
+      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "folder"
+      ],
+      "reason": "Par do anterior no caminho feliz: 'Obsidian registrado (read-only, opt-in): ' declara as DUAS propriedades da integração — só leitura e adesão explícita — e ambas devem ser traduzidas. `folder` segue sendo o caminho do usuário.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/context.js:146 — `ctxObsidian`, confirmação do registro."
+    },
+    {
+      "file": "src/commands/context.js",
+      "line": 151,
+      "column": 3,
+      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "action"
+      ],
+      "reason": "A moldura é o cabeçalho 'context obsidian '. O interpolado é o SUBCOMANDO que o usuário digitou (`set`, `status`…): eco do argumento dele, e traduzir um subcomando o tornaria não digitável.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/context.js:151 — cabeçalho de `ctxObsidian`, com `action || \"\"`."
+    },
+    {
+      "file": "src/commands/context.js",
+      "line": 186,
+      "column": 3,
+      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "q"
+      ],
+      "reason": "A moldura é o cabeçalho 'context scout — '. O interpolado é a PERGUNTA que o usuário escreveu: conteúdo dele, ecoado para que ele confira o que foi buscado.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/context.js:186 — cabeçalho de `renderScout`."
+    },
+    {
+      "file": "src/commands/context.js",
+      "line": 188,
+      "column": 3,
+      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "report",
+        "keywords",
+        "join",
+        "report",
+        "backendsUsed",
+        "join"
+      ],
+      "reason": "A moldura são os rótulos '  keywords: ' e ' · backends: '. Os interpolados são as palavras-chave extraídas da pergunta DO USUÁRIO e os nomes dos backends usados (`scan` e afins) — os primeiros são conteúdo dele, os segundos são identificadores do contrato do scout.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/context.js:188 — `renderScout`, resumo do que o explorador considerou."
+    },
+    {
+      "file": "src/commands/context.js",
+      "line": 189,
+      "column": 35,
+      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "r",
+        "file",
+        "r",
+        "lineStart",
+        "r",
+        "lineStart",
+        "r",
+        "lineEnd",
+        "r",
+        "reason",
+        "r",
+        "confidence",
+        "toFixed",
+        "r",
+        "backend"
+      ],
+      "reason": "A moldura é só pontuação e separadores (':', '-', ' — ', parênteses e vírgula). Os interpolados são caminho de arquivo, números de linha, o motivo do hit (texto derivado do documento indexado do usuário), a confiança formatada e o nome do backend. Nada ali é frase redigida por nós.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/context.js:189 — uma linha por resultado em `renderScout`."
+    },
+    {
+      "file": "src/commands/context.js",
+      "line": 191,
+      "column": 3,
+      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "report",
+        "tokensAvoided",
+        "estimate"
+      ],
+      "reason": "A moldura '  tokens evitados (estimativa): ~' é do produto, e o '(estimativa)' junto do '~' é a HONESTIDADE da medida — o scout estima por heurística, não mede tokenizer. Traduzir a ressalva importa; o interpolado é um número.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/context.js:191 — `renderScout`; o mesmo número sai no payload como `tokensAvoided.estimate`."
+    },
+    {
+      "file": "src/commands/context.js",
+      "line": 192,
+      "column": 3,
+      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "scoutRouting",
+        "report"
+      ],
+      "reason": "A moldura '  roteamento: ' é o rótulo. O interpolado é a string de roteamento montada por `scoutRouting`, composta de tier, modelo e fallback — todos identificadores da política de modelo (`cheap`, `local_deterministic`), não prosa.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/context.js:192 — `renderScout`, a partir de `resolveModel(cwd, \"explore\")`."
+    },
+    {
+      "file": "src/commands/context.js",
+      "line": 198,
+      "column": 3,
+      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "out",
+        "query"
+      ],
+      "reason": "A moldura é o cabeçalho 'context scout — decision_context: ', e 'decision_context' NÃO se traduz: é o valor do `--mode` que o usuário digita. O interpolado é a pergunta dele.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/context.js:198 — cabeçalho de `renderDecisions`."
+    },
+    {
+      "file": "src/commands/context.js",
+      "line": 200,
+      "column": 5,
+      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "d",
+        "file",
+        "d",
+        "lineStart",
+        "d",
+        "lineEnd",
+        "d",
+        "decision",
+        "d",
+        "backend"
+      ],
+      "reason": "A moldura é só pontuação (':', '-', ' · ', parênteses). Os interpolados são caminho, linhas, o TÍTULO da decisão encontrada — que vem do heading do documento do usuário — e o backend. Diferente da linha 201, aqui o valor é curto e cabe na mesma leitura: nenhum literal nosso é acrescentado.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/context.js:200 — cabeçalho de cada decisão em `renderDecisions`; o par da linha 201, que carrega a evidência."
+    },
+    {
+      "file": "src/commands/context.js",
+      "line": 204,
+      "column": 3,
+      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "out",
+        "tokenAccounting",
+        "isEstimate",
+        "out",
+        "tokenAccounting",
+        "estimatedTokens"
+      ],
+      "reason": "A moldura '  tokens (estimativa=…): ~' é do produto e carrega a mesma ressalva de honestidade da linha 191. Os interpolados são um booleano e um número.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/context.js:204 — rodapé de `renderDecisions`."
+    },
+    {
+      "file": "src/commands/context.js",
+      "line": 245,
+      "column": 14,
+      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "orEmpty",
+        "q"
+      ],
+      "reason": "A moldura é o cabeçalho 'context search — '. O interpolado é o termo que o usuário buscou, com `orEmpty` evitando 'undefined' na tela. Este ponto vive no ramo HUMANO de `if (!json)`.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/context.js:245 — cabeçalho de `ctxSearch`, fora do modo de máquina."
+    },
+    {
+      "file": "src/commands/context.js",
+      "line": 250,
+      "column": 51,
+      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "r",
+        "error"
+      ],
+      "reason": "A moldura 'Busca falhou: ' é do produto. O interpolado é o stderr do indexer Python, repassado como diagnóstico: é o texto da ferramenta que falhou, e reescrevê-lo esconderia a causa real.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/context.js:250 — ramo de falha de `ctxSearch`, no caminho humano de `ctxFail`."
+    },
+    {
+      "file": "src/commands/context.js",
+      "line": 256,
+      "column": 14,
+      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "orEmpty",
+        "ent"
+      ],
+      "reason": "Par do cabeçalho de busca, para o outro subcomando: 'context related — ' é do produto e o interpolado é a ENTIDADE que o usuário pediu.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/context.js:256 — cabeçalho de `ctxRelated`, no ramo humano."
+    },
+    {
+      "file": "src/commands/context.js",
+      "line": 261,
+      "column": 52,
+      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "r",
+        "error"
+      ],
+      "reason": "A moldura 'Falha: ' é do produto — mais curta que a da busca, e igualmente traduzível. O interpolado é o stderr do indexer.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/context.js:261 — ramo de falha de `ctxRelated`."
+    },
+    {
+      "file": "src/commands/context.js",
+      "line": 276,
+      "column": 3,
+      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "topic"
+      ],
+      "reason": "A moldura é o cabeçalho 'context explain — '. O interpolado é o tópico que o usuário pediu para explicar.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/commands/context.js:276 — cabeçalho de `ctxExplain`, no ramo humano."
+    },
+    {
+      "file": "src/commands/context.js",
+      "line": 201,
+      "column": 5,
+      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "strategy": "preserve_user_content_verbatim",
+      "interpolations": [
+        "String",
+        "d",
+        "evidence",
+        "slice"
+      ],
+      "reason": "NÃO há moldura: os literais do template são seis espaços de indentação. O valor É prosa — e é do USUÁRIO: um trecho de até 280 caracteres do conteúdo que ele mesmo indexou, devolvido por `context scout --mode decision_context`. Nenhuma das outras três estratégias descreve isso sem mentir: não há frame a traduzir; declarar prosa como `glyph`/`identifier`/`control` seria falso; e não existe literal do projeto a ancorar, porque o texto nasce em runtime do arquivo do usuário. Não se traduz aqui nem em lugar nenhum.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "Cadeia completa e verificável: `src/context-docs/py/context_db.py:450` monta `evidence` como `(r[\"content\"] or \"\").strip()[:280]`, onde `r[\"content\"]` é a coluna `chunks.content` do índice SQLite — nenhum literal linguístico do projeto entra no valor (só o fallback vazio, `strip` e o corte). O payload sai por stdout do subprocesso, é reparseado em `decisionContext` e chega a `renderDecisions`, que imprime `d.evidence` com moldura só de espaços. Contraste provado no mesmo arquivo: `context_db.py:540` (`\"(sem resultados)\"`) É literal do produto e segue contado como `public_diagnostic` na origem — ver tests/i18n_python_cli_rules.test.js.",
+      "values": {
+        "String": {
+          "id": "String",
+          "sourceKind": "indexed_user_document",
+          "boundary": "subprocess_stdout",
+          "reason": "Coerção total para texto do valor do usuário. Não introduz linguagem: `String(x || \"\")` só garante que o corte a seguir opere sobre string.",
+          "owner": "certificação RC PRD51 (Fase 1B)",
+          "evidence": "src/commands/context.js:201 — `String(d.evidence || \"\")`; o único literal é a string vazia do fallback."
+        },
+        "d": {
+          "id": "d",
+          "sourceKind": "indexed_user_document",
+          "boundary": "subprocess_stdout",
+          "reason": "Portador: `d` é um elemento de `out.results`, e `out` é o documento JSON que o indexer devolveu por stdout. Não é o texto, mas é por ele que o texto do usuário chega ao sink.",
+          "owner": "certificação RC PRD51 (Fase 1B)",
+          "evidence": "src/commands/context.js:207-213 — `const out = safeParse(r.stdout)`, com `r = runIndexer([\"decision\", …, \"--json\"])`."
+        },
+        "evidence": {
+          "id": "evidence",
+          "sourceKind": "indexed_user_document",
+          "boundary": "subprocess_stdout",
+          "reason": "O trecho em si — conteúdo do documento do usuário. É o valor que a estratégia existe para preservar: traduzi-lo alteraria a citação que o usuário pediu para ver.",
+          "owner": "certificação RC PRD51 (Fase 1B)",
+          "evidence": "src/context-docs/py/context_db.py:450 — `\"evidence\": (r[\"content\"] or \"\").strip()[:280]`, lido da coluna `chunks.content`."
+        },
+        "slice": {
+          "id": "slice",
+          "sourceKind": "indexed_user_document",
+          "boundary": "subprocess_stdout",
+          "reason": "Corte em 120 caracteres. Transformação de TAMANHO, não de linguagem: não acrescenta nem altera palavra alguma do conteúdo do usuário.",
+          "owner": "certificação RC PRD51 (Fase 1B)",
+          "evidence": "src/commands/context.js:201 — `.slice(0, 120)` aplicado ao texto já coagido."
+        }
+      }
     }
   ]
 }
