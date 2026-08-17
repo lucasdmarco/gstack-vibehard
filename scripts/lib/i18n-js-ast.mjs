@@ -2497,6 +2497,28 @@ const ehFraseHumana = (p) => p.underMachineGuard !== true && (
  * a exposicao e dele. `external_passthrough` exige subprocesso externo
  * identificado e bytes encaminhados sem transformacao.
  */
+/**
+ * RAIZES DE TEMPLATE — o que o `create` COPIA para dentro do projeto do usuario.
+ *
+ * Declarada e versionada, com evidencia, pelo mesmo motivo de
+ * `PYTHON_RUNTIME_ROOTS`: que um diretorio seja copiado para o projeto do usuario
+ * e fato do PRODUTO, e nao algo derivavel do prefixo do caminho. Usar
+ * `templates/` como criterio seria classificar por diretorio — exatamente o que
+ * a auditoria destes pontos exigia nao fazer.
+ */
+export const TEMPLATE_ROOTS = Object.freeze([
+  Object.freeze({
+    path: "templates/templates/fullstack-monorepo",
+    template: "fullstack-monorepo",
+    evidence: "src/cli/create.js:1653 — `copyRecursive(join(projectRoot, \"templates\", \"templates\", \"fullstack-monorepo\"), projectDir)`; conferido contra o fonte real em tests/i18n_js_ast_generated_template.test.js",
+  }),
+])
+
+const ehRaizDeTemplate = (arquivo, repoRoot) => {
+  const chave = chaveCanonica(arquivo, repoRoot)
+  return Boolean(chave) && TEMPLATE_ROOTS.some((r) => chave.startsWith(`${r.path}/`))
+}
+
 export const JS_RULES = Object.freeze([
   {
     id: "debug-guarded",
@@ -2711,6 +2733,39 @@ export const JS_RULES = Object.freeze([
     audience: "public_diagnostic",
     trigger: "proved_receiver",
     reason: "receptor com origem canonica provada por avaliacao abstrata a partir do entrypoint do DISPATCH",
+  },
+  {
+    /**
+     * CODIGO GERADO — a mensagem nao e do GStack, e do app do usuario.
+     *
+     * `templates/**` nao e produto nosso rodando: e o que o `create` COPIA para
+     * dentro do projeto do usuario. Um `console.error('Unhandled error:', err)`
+     * ali nao e diagnostico publico do GStack — e a superficie de log do servidor
+     * que o usuario passa a manter.
+     *
+     * SEM ESTA REGRA a classificacao fica ERRADA, e nao apenas ausente:
+     * `command-human-branch` alcanca `error.ts:61` (console global, exportado,
+     * frase literal) e devolve `public_diagnostic`, colocando na claim
+     * English-first uma mensagem que pertence ao codigo gerado.
+     *
+     * DUAS portas, e a segunda e o que separa DEV SURFACE de COPY DO APP:
+     *
+     *   1. o arquivo esta sob uma raiz de template DECLARADA — que o `create`
+     *      copie aquele diretorio e fato do produto, verificado no teste contra
+     *      `copyRecursive` real, e nao inferido do prefixo do caminho;
+     *   2. a emissao e `console.*` do runtime. Console nao chega a tela do
+     *      usuario final: vai para o log do servidor ou para o terminal de quem
+     *      desenvolve. Copy do app — texto que o usuario final le — chega por
+     *      renderizacao ou corpo de resposta, e NAO casa aqui: continua `unknown`,
+     *      que e o estado certo para uma pergunta que exige outra prova.
+     */
+    id: "generated-dev-console",
+    when: (p, ctx) => ehRaizDeTemplate(p.file, ctx.repoRoot)
+      && p.consoleIsRuntimeGlobal === true
+      && String(p.callee).startsWith("console."),
+    audience: "generated_dev_surface",
+    trigger: "generated_console",
+    reason: "`console.*` em codigo que o `create` copia para o projeto do usuario: superficie de log do servidor ou do terminal de desenvolvimento, nunca copy que o usuario final le. Entra na claim como mensagem tecnica do projeto gerado, e nao como diagnostico do GStack",
   },
   {
     id: "command-human-branch",
