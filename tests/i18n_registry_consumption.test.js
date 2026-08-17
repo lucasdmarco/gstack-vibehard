@@ -746,7 +746,7 @@ test("o loader NÃO importa TypeScript nem o engine AST", async () => {
 
 // ── Estado oficial preservado ────────────────────────────────────────────────
 
-test("INVENTÁRIO OFICIAL: registry fresco, convertidos declarados, gate ainda bloqueando", async () => {
+test("INVENTÁRIO OFICIAL: registry fresco, convertidos declarados, gate APROVANDO", async () => {
   const { buildInventory, phase1Gate } = await imp()
   const inv = buildInventory({ repoRoot })
   assert.equal(inv.blocked, false)
@@ -757,6 +757,6 @@ test("INVENTÁRIO OFICIAL: registry fresco, convertidos declarados, gate ainda b
   // `i18n_inventory.test.js`.
   const gen = await import(`file:///${path.join(repoRoot, "scripts", "i18n-registry.mjs").replace(/\\/g, "/")}?t=${Date.now()}`)
   assert.deepEqual(inv.jsRegistry.convertedFiles, [...gen.CONVERTED_FILES].sort())
-  assert.ok(inv.unknown > 0, "o lote JS não terminou")
-  assert.equal(phase1Gate(inv).ok, false, "pendências ainda bloqueiam a Fase 1")
+  assert.equal(inv.unknown, 0, "todos os lotes terminaram")
+  assert.equal(phase1Gate(inv).ok, true, "sem pendência, a Fase 1 encerra")
 })

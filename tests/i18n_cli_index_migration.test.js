@@ -213,19 +213,23 @@ test("nenhum override toca ESTES arquivos — e declarado===aplicado vale", asyn
 
 // ── Gate ─────────────────────────────────────────────────────────────────────
 
-test("o gate segue reprovando pelos unknown restantes, NÃO por provenance", async () => {
+/**
+ * O gate APROVA — e as duas condições continuam separadas, que é o que este
+ * teste sempre teve a dizer. Durante todo o lote ele reprovava por `unknown` com
+ * `provenanceOk: true`; agora que `unknown` zerou, a provenance segue sendo
+ * afirmada por si, e não herdada da contagem.
+ */
+test("o gate APROVA — e provenance continua condição própria, não consequência", async () => {
   const { buildInventory, phase1Gate } = await imp()
   const inv = buildInventory({ repoRoot })
   const g = phase1Gate(inv)
 
-  assert.equal(g.ok, false)
-  // A CAUSA é o que este teste guarda; o número cai a cada arquivo do lote e o
-  // censo canônico dele está em `i18n_inventory.test.js`.
-  assert.ok(g.unknown > 0, "ainda há ponto sem classificação — o lote não terminou")
+  assert.equal(g.ok, true)
+  assert.equal(g.unknown, 0)
   assert.equal(g.unknown, inv.unknown)
-  assert.equal(g.provenanceOk, true, "as pendências dos arquivos migrados foram decididas")
+  assert.equal(g.provenanceOk, true)
   assert.equal(g.unresolvedProvenance, 0)
-  assert.match(g.reason, new RegExp(`${g.unknown} ponto`))
+  assert.equal(g.reason, null, "sem pendência não há razão a declarar")
 })
 
 test("o registry commitado é EXATAMENTE o que o gerador emite (sem edição manual)", async () => {

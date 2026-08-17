@@ -37,7 +37,9 @@ test("os hooks continuam contados — a fronteira nova nao pode perder cobertura
   const { distributedPythonFiles } = await imp()
   const fronteira = distributedPythonFiles(repoRoot)
   const hooks = [...fronteira.keys()].filter((f) => f.startsWith("hooks/"))
-  assert.ok(hooks.length >= 16, `esperado o conjunto inteiro de hooks, veio ${hooks.length}`)
+  // 16 -> 15 com a remocao de `before_shell.py`, hook distribuido que nenhum
+  // harness registrava. A fronteira encolheu porque a SUPERFICIE encolheu.
+  assert.ok(hooks.length >= 15, `esperado o conjunto inteiro de hooks, veio ${hooks.length}`)
   assert.ok(hooks.includes("hooks/hooks/stop.py"))
   for (const f of hooks) assert.equal(fronteira.get(f).kind, "harness_hook")
 })
@@ -61,7 +63,7 @@ test("`context_db.py` entra, e como subprocesso de CLI — nao como hook", async
 test("Python distribuido mas NAO alcancado pelo runtime fica de fora", async () => {
   const { distributedPythonFiles } = await imp()
   const fronteira = distributedPythonFiles(repoRoot)
-  assert.equal(fronteira.size, 17, "16 hooks + 1 subprocesso de CLI")
+  assert.equal(fronteira.size, 16, "15 hooks + 1 subprocesso de CLI")
   for (const f of fronteira.keys()) {
     assert.ok(!f.startsWith("agents/"), `script de skill nao e disparado pela CLI: ${f}`)
     assert.ok(!f.startsWith("scripts/"), `ferramenta de mantenedor nao entra: ${f}`)

@@ -548,6 +548,24 @@ export const MACHINE_PROTOCOL_CONSUMERS = Object.freeze([
     evidence: "tests/test_qg_fail_closed.py — subprocess real do hook seguido de `json.loads(r.stdout)`, inclusive no caminho fail-closed",
   },
   {
+    /**
+     * O ÚNICO consumidor que não é evento de harness nem chamada de código JS —
+     * e por isso foi o último a fechar. `gc.py` é declarado pelo produto na
+     * chave `quality_gate.gstack_check` de `.gstack/config.json`, que três
+     * produtores escrevem em todo projeto criado.
+     *
+     * Registrá-lo em PreToolUse/PostToolUse/Stop só para zerar o inventário
+     * teria sido inventar comportamento. O que o legitima é o contrato ser
+     * EXECUTÁVEL: `src/meta/gstack-check-contract.js` resolve o caminho a partir
+     * da configuração gerada e valida a saída, e a prova roda o processo real.
+     */
+    file: "hooks/hooks/gc.py",
+    sink: "print",
+    consumer: "`quality_gate.gstack_check` de `.gstack/config.json` — escrito por `init.js:134`, `setup-gstack.sh:26` e `setup-gstack.ps1:81`; resolvido e validado por `src/meta/gstack-check-contract.js`",
+    contract: "gstack.quality-gate.gstack-check.v1 — stdout é UM documento JSON, em duas formas: sucesso com 10 campos e exit 0, ou `{error}` com exit != 0",
+    evidence: "tests/gstack_check_contract.test.js — `init` REAL gera a config, o caminho sai dela (nunca escrito à mão), e `gc.py` roda como processo em HOME descartável; a forma de erro é provada separadamente",
+  },
+  {
     file: "hooks/hooks/post_sprint.py",
     sink: "print",
     consumer: "src/commands/sprint.js:77 — `JSON.parse(result)` sobre o stdout do subprocesso, e cada campo do documento vira uma linha do relatório",

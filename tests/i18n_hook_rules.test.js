@@ -144,11 +144,19 @@ test("FATIA FECHADA: stop.py tem ZERO unknown, e cada ponto carrega a regra que 
   for (const p of pontos) assert.ok(p.audience, `${p.file}:${p.line} classificado`)
 })
 
-test("a fatia NÃO fecha o inventário: o gate global segue bloqueando", async () => {
+/**
+ * Durante todo o programa este teste dizia que fechar UMA fatia nunca encerra a
+ * Fase 1 — e estava certo em cada leva. Os hooks foram a ÚLTIMA, e agora a
+ * afirmação inverte de lado: o gate global aprova.
+ *
+ * O que ele guarda não mudou: que o gate é GLOBAL, e não a soma de fatias
+ * declaradas fechadas. Ele continua lendo o inventário inteiro.
+ */
+test("a fatia dos hooks era a ÚLTIMA: o gate global aprova", async () => {
   const { buildInventory, phase1Gate } = await imp()
   const inv = buildInventory({ repoRoot })
-  assert.ok(inv.unknown > 0, "outros arquivos ainda têm unknown")
-  assert.equal(phase1Gate(inv).ok, false, "fechar uma fatia nunca encerra a Fase 1")
+  assert.equal(inv.unknown, 0, "nenhum arquivo, de nenhuma linguagem, segue sem audiência")
+  assert.equal(phase1Gate(inv).ok, true)
 })
 
 
@@ -269,11 +277,18 @@ for (const [guarda, ctx, esperado] of [
 
 // ── Ancorado no repositório real ───────────────────────────────────────────
 
-test("REPO: os 4 documentos com consumidor provado fecham por esta regra", async () => {
+test("REPO: os 8 documentos com consumidor provado fecham por esta regra", async () => {
   const { buildInventory } = await imp()
   const porRegra = buildInventory({ repoRoot }).points
     .filter((p) => p.rule === "hook-stdout-serialized")
   assert.deepEqual(porRegra.map((p) => `${p.file}:${p.line}`).sort(), [
+    // Os quatro de `gc.py` entraram por ÚLTIMO, e por um consumidor que não é
+    // evento de harness: o contrato `quality_gate.gstack_check`, provado
+    // executando o hook a partir da config que o `init` gera.
+    "hooks/hooks/gc.py:183",
+    "hooks/hooks/gc.py:189",
+    "hooks/hooks/gc.py:195",
+    "hooks/hooks/gc.py:272",
     "hooks/hooks/post_sprint.py:327",
     "hooks/hooks/post_sprint.py:367",
     "hooks/hooks/post_tool_use_review.py:111",
@@ -303,15 +318,18 @@ test("REPO: `gc.py` é distribuído e NUNCA registrado em evento", async () => {
     "é a cópia em bloco que os distribui sem registrá-los")
 })
 
-test("REPO: os 4 pontos de `gc.py` seguem `unknown` — fail-closed, não silêncio", async () => {
+/**
+ * FIM DA FILA. Os dois hooks que sobraram fecharam por caminhos OPOSTOS, e a
+ * assimetria era a decisão: `before_shell.py` foi REMOVIDO — distribuído sem
+ * consumidor e duplicando capacidade viva —, e `gc.py` ganhou CONTRATO
+ * executável, porque o consumidor dele existia e só não tinha forma verificável.
+ *
+ * Nenhum dos dois foi registrado em evento para fazer número.
+ */
+test("REPO: nenhum ponto Python segue `unknown`", async () => {
   const { buildInventory } = await imp()
   const abertos = buildInventory({ repoRoot }).points.filter((p) => p.audience === "unknown")
-  assert.deepEqual(abertos.map((p) => `${p.file}:${p.line}`).sort(), [
-    "hooks/hooks/gc.py:183",
-    "hooks/hooks/gc.py:189",
-    "hooks/hooks/gc.py:195",
-    "hooks/hooks/gc.py:272",
-  ], "`before_shell.py` saiu por remoção; `gc.py` espera contrato executável")
+  assert.deepEqual(abertos.map((p) => `${p.file}:${p.line}`), [])
 })
 
 /**

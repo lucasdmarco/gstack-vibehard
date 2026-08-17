@@ -40,15 +40,23 @@ test("o grafo de raízes inclui ciclo de vida do npm, não só src/ e bin", asyn
   assert.deepEqual(o["sync-qg-version.mjs"], ["lifecycle:version"], "roda ao versionar")
 })
 
-test("Fase 1A: estado declarado impede ler `extractor mergeado` como `inventário pronto`", async () => {
+/**
+ * FASE 1 ENCERRADA — e o estado declarado continua impedindo a leitura errada,
+ * agora do outro lado. Durante todo o programa este teste dizia "extractor
+ * mergeado NAO e inventario pronto"; hoje o inventario ESTA pronto, e a coisa que
+ * ele impede de ler errado e outra: `Fase 1 completa` NAO autoriza a claim
+ * English-first. Isso e do cutover, e `englishFirstClaimAllowed` segue `false`.
+ */
+test("Fase 1 encerrada NAO autoriza a claim — o cutover e outra decisao", async () => {
   const { buildInventory, phaseStatus } = await imp()
   const s = phaseStatus(buildInventory({ repoRoot }))
-  assert.equal(s.phaseStatus, "partial")
-  assert.equal(s.phase, "1A")
-  assert.equal(s.nextPhase, "1B")
-  assert.equal(s.rcBlocked, true)
-  assert.equal(s.englishFirstClaimAllowed, false, "nenhuma claim English-first antes do cutover")
-  assert.ok(s.unknown > 0)
+  assert.equal(s.phaseStatus, "complete")
+  assert.equal(s.phase, "1")
+  assert.equal(s.nextPhase, "2")
+  assert.equal(s.unknown, 0)
+  assert.equal(s.englishFirstClaimAllowed, false,
+    "encerrar a Fase 1 libera a MIGRACAO, nunca a claim publica")
+  assert.equal(s.rcBlocked, true, "e o RC segue bloqueado ate o cutover acontecer")
 })
 
 test("CONTROLE POSITIVO: com unknown zerado, a Fase 1 encerra e libera a migração", async () => {
@@ -179,7 +187,7 @@ test("validateRegistry recusa script que NÃO é alcançado pelo runtime (não p
  *
  * ATUALIZE AQUI, e so aqui, a cada arquivo reconciliado no lote JS.
  */
-test("CENSO GLOBAL: 1905 pontos, 4 unknown, 25 arquivos convertidos", async () => {
+test("CENSO GLOBAL: 1905 pontos, 0 unknown, 25 arquivos convertidos", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
 
@@ -306,8 +314,14 @@ test("CENSO GLOBAL: 1905 pontos, 4 unknown, 25 arquivos convertidos", async () =
   // que e o efeito correto, e o oposto de entrarem calados na claim. Ver
   // tests/i18n_hook_rules.test.js, que guarda o achado como asercao.
   //
-  // 5 -> 4 com a remocao do hook orfao. Os 4 restantes sao de `gc.py`.
-  assert.equal(inv.unknown, 4, "so `gc.py` segue aberto, por falta de contrato executavel")
+  // 5 -> 4 com a remocao do hook orfao; 4 -> 0 com o contrato executavel de
+  // `quality_gate.gstack_check`, que da consumidor verificavel ao `gc.py`.
+  //
+  // FASE 1B FECHADA. Os dois ultimos hooks sairam por caminhos OPOSTOS, e a
+  // assimetria era a decisao: um foi REMOVIDO (distribuido sem consumidor,
+  // duplicando capacidade viva), o outro ganhou CONTRATO. Nenhum foi registrado
+  // em evento para fazer numero.
+  assert.equal(inv.unknown, 0, "nenhum ponto de saida sem audiencia, em nenhuma linguagem")
   assert.equal(inv.jsRegistry.convertedFiles.length, 25)
   assert.equal(inv.blocked, false)
 
