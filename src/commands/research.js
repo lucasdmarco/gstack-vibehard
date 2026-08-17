@@ -176,6 +176,24 @@ async function auditCmd(cwd, args, json, opts) {
   return emitAudit(mirror, cwd, json)
 }
 
+/**
+ * Emite o payload do conector NotebookLM: serializado sob `--json`, renderizado
+ * pelo `humanFn` fora dele.
+ *
+ * O tipo GENÉRICO não é decoração e não muda comportamento nenhum: ele diz o que
+ * a função já fazia — o renderizador humano recebe EXATAMENTE o payload que
+ * entrou. Sem isso o parâmetro do callback é implicitamente `any`, e o acesso a
+ * campo lá dentro não resolve para declaração alguma; com isso, `p.message` em
+ * `notebookLmConnectCmd` resolve para o literal que o produz
+ * (`src/tools/notebooklm.js`). É o que permite decidir a provenance daquele
+ * ponto por resolução do checker em vez de por leitura.
+ *
+ * @template P
+ * @param {P} payload
+ * @param {boolean} json
+ * @param {(p: P) => void} humanFn
+ * @returns {P}
+ */
 function emitNotebookLm(payload, json, humanFn) {
   if (json) { process.stdout.write(JSON.stringify(payload) + "\n"); return payload }
   humanFn(payload)

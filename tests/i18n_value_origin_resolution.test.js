@@ -158,18 +158,63 @@ test("NEGATIVO real: as origens de `rule.status` são TOKENS, não frases", asyn
 })
 
 /**
- * ORIGEM NAO RESOLVIDA — `p.message` em `research.js:195`.
+ * `p.message` em `research.js` — DE BLOQUEADO A RESOLVIDO, e o que mudou foi o
+ * CODIGO, nao o criterio.
  *
- * `p` e parametro de arrow sem tipo, entao o checker nao resolve `message` e
- * devolve ZERO declaracoes. Ler o codigo com os olhos mostra a frase em
- * `src/tools/notebooklm.js`, mas LER NAO E PROVAR: o ponto 7 do contrato manda
- * bloquear origem nao resolvida, e e o que acontece. Por isso `research.js:195`
- * NAO recebe esta estrategia.
+ * A versao anterior deste teste afirmava que o ponto nao resolvia e por isso
+ * ficava de fora — `p` era parametro de arrow sem tipo, o checker devolvia ZERO
+ * declaracoes, e ler a frase em `src/tools/notebooklm.js` com os olhos nao e
+ * prova. Aquele teste ja previa o desfecho: "se passar a resolver, reavaliar".
+ *
+ * `emitNotebookLm` ganhou assinatura GENERICA (`@template P`) dizendo o que a
+ * funcao sempre fez — o renderizador humano recebe exatamente o payload que
+ * entrou. E anotacao de tipo pura: zero mudanca de runtime, `typecheck` limpo.
+ * Com ela o parametro do callback deixa de ser `any` e `.message` resolve para
+ * a UNICA declaracao que o produz.
+ *
+ * O criterio nao foi afrouxado em ponto nenhum: continua exigindo UMA origem, no
+ * projeto, e literal de FRASE.
  */
-test("NEGATIVO real: `p.message` em research.js:195 NÃO resolve — bloqueia", async () => {
-  const origens = await origensNoPonto("src/commands/research.js", 195, "message")
-  assert.equal(origens.length, 0,
-    "se passar a resolver, reavaliar: o ponto vira candidato e o bloqueio deixa de valer")
+test("POSITIVO real: `p.message` em research.js resolve para UMA frase, no projeto", async () => {
+  const origens = await origensNoPonto("src/commands/research.js", 213, "message")
+
+  assert.equal(origens.length, 1,
+    `duas origens possíveis bloqueariam: ${origens.map((o) => `${o.file}:${o.line}`).join(", ")}`)
+  const [o] = origens
+  assert.equal(o.file, "src/tools/notebooklm.js", "a origem é o módulo do conector")
+  assert.ok(literalDeFrase(o), "a origem precisa ser um literal de FRASE, não um token")
+})
+
+/**
+ * CONTROLE NEGATIVO DO MECANISMO: sem a assinatura, a mesma forma continua sem
+ * resolver. Sem este caso, um mutante que removesse a anotacao de
+ * `emitNotebookLm` faria o teste acima falhar por "linha errada" — e nao pela
+ * razao verdadeira, que e o parametro do callback voltar a ser `any`.
+ */
+test("NEGATIVO: callback SEM assinatura no higher-order nao resolve o campo", async () => {
+  const { mkdtempSync, writeFileSync, mkdirSync } = await import("node:fs")
+  const { tmpdir } = await import("node:os")
+  const raiz = mkdtempSync(path.join(tmpdir(), "gstack-origem-"))
+  mkdirSync(path.join(raiz, "src"), { recursive: true })
+  const alvo = path.join(raiz, "src", "a.js")
+  writeFileSync(path.join(raiz, "src", "adapter.js"),
+    'export function conectar() { return { message: "uma frase inteira aqui" } }\n')
+  writeFileSync(alvo, `
+import { conectar } from "./adapter.js"
+function emitir(payload, humanFn) { humanFn(payload) }
+export function cmd() { return emitir(conectar(), (p) => { console.log(p.message) }) }
+`)
+  const program = ts.createProgram([alvo], {
+    allowJs: true, checkJs: false, noEmit: true,
+    target: ts.ScriptTarget.Latest, module: ts.ModuleKind.ESNext,
+    moduleResolution: ts.ModuleResolutionKind.NodeNext,
+  })
+  const checker = program.getTypeChecker()
+  const sf = program.getSourceFile(alvo)
+  const acesso = acessoNaLinha(sf, 4, "message")
+  assert.ok(acesso, "o fixture precisa ter o acesso na linha 4")
+  assert.equal(origensDe(checker, acesso).length, 0,
+    "sem assinatura no higher-order, o parametro do callback e `any` e nao ha declaracao a apontar")
 })
 
 /**
