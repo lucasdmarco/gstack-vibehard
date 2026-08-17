@@ -301,6 +301,55 @@ export const PROVENANCE_STRATEGIES = Object.freeze([
    * mesmo jeito que `expectedFileHash` do sink ja faz.
    */
   "translate_at_value_origin",
+  /**
+   * Ponto SEM moldura literal cujo valor interpolado E LINGUISTICO e NAO E
+   * NOSSO — conteudo do usuario ou de fonte documental externa, transportado e
+   * exibido pelo GStack sem traducao.
+   *
+   * Nasceu de `context.js:201`, que nenhuma das outras tres descrevia sem
+   * mentir: nao ha frame a traduzir; declarar um trecho de documento como
+   * `glyph`/`identifier`/`control` seria falso; e `translate_at_value_origin`
+   * exigiria ancorar a origem num literal de modulo do PROJETO, que nao existe
+   * — o texto nasce em runtime, do arquivo do usuario.
+   *
+   * A DIFERENCA PARA `translate_at_value_origin` E O DESTINO, nao a forma: la a
+   * frase e nossa e deve ser traduzida NA ORIGEM; aqui ela nunca deve ser
+   * traduzida, em lugar nenhum. Por isso `translationSite` e PROIBIDO nesta
+   * estrategia — declara-lo seria dizer o contrario do que ela significa.
+   *
+   * A contrapartida e ser mais exigente onde importa: cada valor precisa dizer
+   * de que ESPECIE de fonte veio e por qual FRONTEIRA entrou no processo, e a
+   * cadeia nao pode ter literal linguistico do projeto (fallback, prefixo ou
+   * sufixo) misturado ao conteudo.
+   */
+  "preserve_user_content_verbatim",
+])
+
+/**
+ * De quem e o conteudo. Lista FECHADA — cresce com evidencia, nunca por
+ * conveniencia, como todas as outras deste modulo.
+ *
+ * NENHUMA delas descreve texto produzido pelo proprio pacote: e justamente essa
+ * a fronteira que a estrategia existe para marcar. Saida do nosso subprocesso,
+ * por exemplo, so entra aqui quando o subprocesso ECOA conteudo do usuario — e
+ * a prova disso e da camada estrutural, nao do JSON.
+ */
+export const USER_CONTENT_SOURCE_KINDS = Object.freeze([
+  "indexed_user_document",    // trecho de documento que o usuario indexou
+  "user_supplied_input",      // argumento, resposta ou arquivo que o usuario forneceu
+  "external_service_payload", // corpo devolvido por servico de terceiros
+])
+
+/**
+ * Por onde o conteudo ENTROU no processo. Sem isto a decisao afirmaria "e do
+ * usuario" sem dizer como se sabe — e a fronteira e exatamente o lugar onde o
+ * projeto poderia ter misturado texto proprio sem ninguem notar.
+ */
+export const USER_CONTENT_BOUNDARIES = Object.freeze([
+  "subprocess_stdout",   // capturado de um processo filho
+  "file_read",           // lido de arquivo em disco
+  "cli_argument",        // veio da linha de comando
+  "network_response",    // veio da rede
 ])
 
 /**
@@ -331,8 +380,15 @@ export const TRANSLATION_SITE_ORIGIN = "value_origin"
  */
 export const STRATEGY_BY_KIND = Object.freeze({
   interpolated: Object.freeze(["translate_literal_frame_preserve_interpolations"]),
-  no_local_frame: Object.freeze(["preserve_nonlinguistic_dynamic_values", "translate_at_value_origin"]),
+  no_local_frame: Object.freeze([
+    "preserve_nonlinguistic_dynamic_values",
+    "translate_at_value_origin",
+    "preserve_user_content_verbatim",
+  ]),
 })
+
+/** Unica audiencia em que `preserve_user_content_verbatim` faz sentido. */
+export const USER_CONTENT_AUDIENCE = "user_content"
 
 /**
  * Categorias de valor dinâmico que podem ser preservados sem tradução.
@@ -501,6 +557,55 @@ const problemaDeAlgumaOrigem = (d, repoRoot) => {
   return null
 }
 
+/**
+ * `preserve_user_content_verbatim` — o conteudo e do USUARIO, e a decisao tem de
+ * dizer de que especie de fonte veio e por qual fronteira entrou.
+ *
+ * `origin` e OPCIONAL aqui, e isso nao e frouxidao: o texto nasce em runtime e
+ * frequentemente NAO tem ancora no repositorio. Quando houver — um literal do
+ * projeto no caminho —, ela e validada com o mesmo rigor das outras estrategias,
+ * hash incluso. O que nao se aceita e ancora meia-boca.
+ */
+const problemaDoValorDoUsuario = (v, id) => {
+  if (v.id !== id) return `\`values.${id}.id\` não confere com a chave`
+  if (v.category !== undefined) {
+    return `\`values.${id}.category\` não pertence a esta estratégia — categoria é de \`preserve_nonlinguistic_dynamic_values\``
+  }
+  if (!USER_CONTENT_SOURCE_KINDS.includes(v.sourceKind)) {
+    return `\`values.${id}.sourceKind\` inválido: ${JSON.stringify(v.sourceKind)}`
+  }
+  if (!USER_CONTENT_BOUNDARIES.includes(v.boundary)) {
+    return `\`values.${id}.boundary\` inválida: ${JSON.stringify(v.boundary)}`
+  }
+  const vazio = justificativaVazia(v)
+  return vazio ? `\`values.${id}.${vazio}\` vazio` : null
+}
+
+const problemaDeUmValorDoUsuario = (v, id, repoRoot) => {
+  if (!ehObjeto(v)) return `\`values.${id}\` ausente`
+  const doValor = problemaDoValorDoUsuario(v, id)
+  if (doValor || v.origin === undefined) return doValor
+  return problemaFormaDaOrigem(v.origin, id) || problemaOrigemNoDisco(v.origin, id, repoRoot)
+}
+
+const problemaDeAlgumValorDoUsuario = (d, repoRoot) => {
+  for (const id of d.interpolations) {
+    const problema = problemaDeUmValorDoUsuario(d.values[id], id, repoRoot)
+    if (problema) return problema
+  }
+  return null
+}
+
+const problemaConteudoDoUsuario = (d, i, repoRoot) => {
+  if (d.strategy !== "preserve_user_content_verbatim") return null
+  if (d.translationSite !== undefined) {
+    return `decisão de provenance #${i}: \`translationSite\` NÃO pertence a esta estratégia — ela significa preservar conteúdo do usuário, jamais traduzi-lo em lugar nenhum`
+  }
+  if (!ehObjeto(d.values)) return `decisão de provenance #${i}: \`values\` ausente ou não é objeto`
+  const problema = problemaDeCobertura(d) || problemaDeAlgumValorDoUsuario(d, repoRoot)
+  return problema ? `decisão de provenance #${i}: ${problema}` : null
+}
+
 const problemaOrigensLinguisticas = (d, i, repoRoot) => {
   if (d.strategy !== "translate_at_value_origin") return null
   if (d.translationSite !== TRANSLATION_SITE_ORIGIN) {
@@ -541,16 +646,52 @@ const problemaArquivoDecisao = (d, i, alvo) => {
   return null
 }
 
-const problemaCallsiteDecisao = (d, i, entrada) => {
+const problemaIdsDaDecisao = (d, i, entrada) => {
+  const gerado = entrada.provenance.ids ?? []
+  if (mesmosIds(d.interpolations, gerado)) return null
+  return `decisão de provenance #${i}: interpolações divergem do gerado (decidido=${JSON.stringify([...d.interpolations].sort())}, gerado=${JSON.stringify([...gerado].sort())})`
+}
+
+const problemaEntradaDaDecisao = (d, i, entrada) => {
   if (!entrada) return `decisão de provenance #${i}: nenhum callsite em ${d.file}:${d.line}:${d.column}`
   if (entrada.provenance?.resolved !== false) {
     return `decisão de provenance #${i}: o callsite ${d.file}:${d.line}:${d.column} já tem provenance resolvida — decisão desnecessária`
   }
-  const gerado = entrada.provenance.ids ?? []
-  if (!mesmosIds(d.interpolations, gerado)) {
-    return `decisão de provenance #${i}: interpolações divergem do gerado (decidido=${JSON.stringify([...d.interpolations].sort())}, gerado=${JSON.stringify([...gerado].sort())})`
-  }
-  return problemaEstrategiaVsKind(d, i, entrada.provenance.kind)
+  return null
+}
+
+/** O curto-circuito garante `entrada` válida nas etapas seguintes. */
+const problemaCallsiteDecisao = (d, i, entrada, audiencia) => problemaEntradaDaDecisao(d, i, entrada)
+  || problemaIdsDaDecisao(d, i, entrada)
+  || problemaEstrategiaVsKind(d, i, entrada.provenance.kind)
+  || problemaAudienciaDaEstrategia(d, i, audiencia || entrada.audience)
+
+/**
+ * `preserve_user_content_verbatim` so vale onde a audiencia JA diz que o
+ * conteudo nao e nosso.
+ *
+ * Sem esta porta a estrategia viraria atalho: bastaria declarar "e do usuario"
+ * num ponto classificado como diagnostico publico e a frase sairia da claim sem
+ * que ninguem tivesse revisto a audiencia. A audiencia e a decisao de CANAL e
+ * vem antes; a estrategia so descreve o que fazer com o valor.
+ *
+ * A audiencia EFETIVA e a do override quando existe, e a do registry quando nao
+ * — porque override e exatamente o mecanismo de decisao humana de canal, e ele e
+ * aplicado no inventario, depois de o registry ja estar gravado. Ler so o
+ * registry aqui recusaria toda decisao legitima.
+ */
+const problemaAudienciaDaEstrategia = (d, i, audiencia) => {
+  if (d.strategy !== "preserve_user_content_verbatim") return null
+  if (audiencia === USER_CONTENT_AUDIENCE) return null
+  return `decisão de provenance #${i}: \`preserve_user_content_verbatim\` exige audiência \`${USER_CONTENT_AUDIENCE}\`, e o callsite ${d.file}:${d.line}:${d.column} está como \`${audiencia}\``
+}
+
+const ancoraDe = (file, line, column) => `${file}|${line}|${column}`
+
+/** Audiencia declarada por override para a ancora, ou `null`. */
+const audienciaDeOverride = (overrides, chave) => {
+  const ov = (overrides ?? []).find((o) => ancoraDe(o.file, o.line, o.column) === chave)
+  return ov ? ov.audience : null
 }
 
 /**
@@ -565,19 +706,21 @@ const problemaEstrategiaVsKind = (d, i, kind) => {
   return `decisão de provenance #${i}: estratégia \`${d.strategy}\` incompatível com \`provenance.kind: ${kind}\` (aceitas: ${aceitas.join(", ")})`
 }
 
-const problemaReferenciaDecisao = (d, i, registry) => {
+const problemaReferenciaDecisao = (d, i, registry, audiencia) => {
   const alvo = registry.files[d.file]
   const doArquivo = problemaArquivoDecisao(d, i, alvo)
   if (doArquivo) return doArquivo
-  return problemaCallsiteDecisao(d, i, alvo.entries.find((e) => e.line === d.line && e.column === d.column))
+  const entrada = alvo.entries.find((e) => e.line === d.line && e.column === d.column)
+  return problemaCallsiteDecisao(d, i, entrada, audiencia)
 }
 
-const problemaDecisao = (d, i, registry, repoRoot) => {
+const problemaDecisao = (d, i, registry, repoRoot, audiencia) => {
   if (!ehObjeto(d)) return `decisão de provenance #${i} não é objeto (${JSON.stringify(d)})`
   return problemaCamposDecisao(d, i)
     || problemaFormaDecisao(d, i)
     || problemaOrigensLinguisticas(d, i, repoRoot)
-    || problemaReferenciaDecisao(d, i, registry)
+    || problemaConteudoDoUsuario(d, i, repoRoot)
+    || problemaReferenciaDecisao(d, i, registry, audiencia)
 }
 
 function validarDecisoesProvenance(o, registry, repoRoot) {
@@ -587,12 +730,41 @@ function validarDecisoesProvenance(o, registry, repoRoot) {
 
   const ancoras = new Set()
   for (const [i, d] of lista.entries()) {
-    const problema = problemaDecisao(d, i, registry, repoRoot)
+    const ancora = ancoraDe(d.file, d.line, d.column)
+    const problema = problemaDecisao(d, i, registry, repoRoot, audienciaDeOverride(o.overrides, ancora))
     if (problema) return problema
 
-    const ancora = `${d.file}|${d.line}|${d.column}`
     if (ancoras.has(ancora)) return `decisão de provenance #${i}: âncora duplicada (${ancora})`
     ancoras.add(ancora)
+  }
+  return problemaConteudoDoUsuarioSemDecisao(registry, ancoras, o.overrides)
+}
+
+/**
+ * FECHA O ATALHO que a audiência `user_content` abriria sozinha.
+ *
+ * `unresolvedProvenance` só cobra decisão de ponto `in_scope`, e `user_content`
+ * está fora da claim. Sem esta checagem, marcar um ponto como conteúdo do
+ * usuário o tiraria do gate SEM decisão nenhuma — e a estratégia nova viraria
+ * decoração opcional, exatamente o que ela existe para impedir.
+ *
+ * Aqui a exigência é explícita: ponto de conteúdo do usuário, sem moldura e com
+ * provenance não resolvida PRECISA declarar `preserve_user_content_verbatim`.
+ * A audiência diz de quem é o canal; a decisão diz de onde veio o texto e por
+ * qual fronteira entrou. Uma não substitui a outra.
+ */
+const exigeDecisaoDeUsuario = (e, audiencia) => audiencia === USER_CONTENT_AUDIENCE
+  && e.provenance?.resolved === false
+  && e.provenance?.kind === "no_local_frame"
+
+function problemaConteudoDoUsuarioSemDecisao(registry, ancoras, overrides) {
+  for (const [file, dados] of Object.entries(registry.files)) {
+    for (const e of dados.entries) {
+      const chave = ancoraDe(file, e.line, e.column)
+      const audiencia = audienciaDeOverride(overrides, chave) ?? e.audience
+      if (!exigeDecisaoDeUsuario(e, audiencia) || ancoras.has(chave)) continue
+      return `${file}:${e.line}:${e.column} é \`${USER_CONTENT_AUDIENCE}\` com provenance não resolvida e NÃO declara \`preserve_user_content_verbatim\` — audiência não substitui decisão`
+    }
   }
   return null
 }

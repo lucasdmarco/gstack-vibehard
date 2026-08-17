@@ -212,14 +212,21 @@ test("a estratégia não-linguística tem lista FECHADA e mapeamento por kind", 
   }
   assert.deepEqual([...STRATEGY_BY_KIND.interpolated], ["translate_literal_frame_preserve_interpolations"],
     "havendo moldura literal a tradução é do próprio callsite — não há segunda opção")
-  // `no_local_frame` passou a aceitar DUAS por decisão humana explícita: o caso
-  // "não tem moldura E o valor é prosa" não cabia em nenhuma das anteriores sem
-  // mentir na categoria. As duas se excluem pelo que a decisão consegue provar —
-  // categoria fechada por valor, ou origem ancorada — e nunca por preferência.
+  // `no_local_frame` aceita TRÊS, cada uma por decisão humana explícita, e as
+  // três se excluem pelo que a decisão consegue PROVAR — nunca por preferência:
+  //
+  //   preserve_nonlinguistic_dynamic_values  categoria fechada, valor a valor
+  //   translate_at_value_origin              origem ancorada num literal NOSSO
+  //   preserve_user_content_verbatim         espécie e fronteira do conteúdo do
+  //                                          USUÁRIO, que não se traduz em lugar
+  //                                          nenhum
+  //
+  // A quarta entrou porque `context.js:201` — trecho de documento indexado do
+  // usuário — não cabia em nenhuma das três sem mentir no único campo conferível.
   assert.deepEqual([...STRATEGY_BY_KIND.no_local_frame].sort(),
-    ["preserve_nonlinguistic_dynamic_values", "translate_at_value_origin"])
-  assert.equal(PROVENANCE_STRATEGIES.length, 3,
-    "três estratégias; uma quarta exigiria decisão explícita, como esta terceira exigiu")
+    ["preserve_nonlinguistic_dynamic_values", "preserve_user_content_verbatim", "translate_at_value_origin"])
+  assert.equal(PROVENANCE_STRATEGIES.length, 4,
+    "quatro estratégias; uma quinta exigiria decisão explícita, como esta quarta exigiu")
 })
 
 test("só UM ponto usa a estratégia não-linguística, e ele tem values completo", () => {

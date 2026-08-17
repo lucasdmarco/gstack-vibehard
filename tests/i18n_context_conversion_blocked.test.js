@@ -91,12 +91,15 @@ test("o ponto bloqueador e `:201`, e o valor dele vem do documento do USUARIO", 
  * que pertence ao USUARIO". Este teste fixa a restricao para que uma tentativa
  * futura tropece nela em vez de contorna-la.
  */
-test("nenhuma das duas estrategias de `no_local_frame` descreve o ponto sem mentir", async () => {
+test("as duas estrategias ANTIGAS de `no_local_frame` nao descreviam o ponto sem mentir", async () => {
   const { STRATEGY_BY_KIND, NONLINGUISTIC_VALUE_CATEGORIES, ORIGIN_SOURCE_KINDS } = await loader()
 
-  assert.deepEqual(STRATEGY_BY_KIND.no_local_frame,
-    ["preserve_nonlinguistic_dynamic_values", "translate_at_value_origin"],
-    "se o vocabulario crescer, e aqui que a proxima tentativa deve comecar")
+  // O VOCABULARIO JA CRESCEU: `preserve_user_content_verbatim` foi aprovada
+  // exatamente para este ponto. O que este teste guarda agora e o motivo pelo
+  // qual ela precisou existir — as duas anteriores seguem sem descrever o caso,
+  // e e por isso que a quarta nao e conveniencia.
+  assert.ok(STRATEGY_BY_KIND.no_local_frame.includes("preserve_user_content_verbatim"),
+    "a estrategia que resolve o caso ja existe; o que falta e APLICA-LA e auditar os outros 27")
 
   // 1. Preservar como valor NAO linguistico exigiria declarar prosa do usuario
   //    como glifo, identificador ou byte de controle.
