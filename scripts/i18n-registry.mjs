@@ -104,43 +104,33 @@ export const CONVERTED_FILES = Object.freeze([
   // depois que a auditoria mostrou que `:201` (trecho de documento indexado do
   // usuario) nao cabia em nenhuma das tres anteriores sem mentir.
   "src/commands/context.js",
+  // Lote JS, arquivo 11/14. Plugin do OpenCode: nao tem comando, e a borda e a
+  // tabela de handlers de evento devolvida pela fabrica exportada. Os tres
+  // `console.warn` de moldura interpolada so fecham com a capacidade de
+  // entrypoint de plugin; `:93` depende tambem de o handler ser nomeado pela
+  // CHAVE da tabela, e nao `<anon>`.
+  "src/plugins/opencode/gstack-session.js",
 ])
 
 /**
- * `src/commands/context.js` — CONVERSAO REVERTIDA, e o motivo esta em UM ponto.
+ * A LICAO QUE `context.js` COBROU, e por isso ela mora aqui e nao num handoff:
+ * `unknown: 0` E CONDICAO NECESSARIA, NAO SUFICIENTE para declarar conversao.
  *
- * O arquivo chegou a `unknown: 0` (os quatro repasses por
- * `stream-counted-subprocess-origin`, o `:50` pela guarda herdada mais a prova
- * publica de `context --json`) e ficou algumas horas em `convertedFiles`. Foi
- * ERRADO, e a medicao mostrou: converter levou `unresolvedProvenance` de 0 para
- * 28. Chegar a `unknown: 0` e condicao necessaria, nao suficiente — cada ponto
- * interpolado in_scope tambem precisa de decisao de provenance declarada.
+ * O arquivo chegou a zero unknown, entrou nesta lista e ficou algumas horas em
+ * master. Foi ERRADO, e a medicao mostrou: converter levou
+ * `unresolvedProvenance` de 0 para 28. Cada ponto interpolado in_scope tambem
+ * precisa de DECISAO DE PROVENANCE declarada, e nenhuma existia.
  *
- * 27 dos 28 admitem `translate_literal_frame_preserve_interpolations` sem
- * esforco: sao frases com moldura literal e dados de runtime dentro.
+ * A conversao foi revertida, os 28 pontos auditados um a um, e o arquivo so
+ * voltou quando as 28 decisoes existiam — 27 de moldura literal e uma que exigiu
+ * uma DECISAO ARQUITETURAL: `:201` interpola um trecho dos documentos indexados
+ * do usuario, e nenhuma das tres estrategias de entao o descrevia sem mentir no
+ * unico campo conferivel. Dai nasceu `preserve_user_content_verbatim`.
  *
- * O 28o NAO admite decisao honesta com o vocabulario de hoje. `context.js:201`
- * e `info` de uma moldura que so tem espacos, interpolando um trecho de 120
- * caracteres de `d.evidence` — texto extraido dos DOCUMENTOS INDEXADOS DO
- * USUARIO. `kind` e `no_local_frame`, e as duas estrategias possiveis para esse
- * kind mentem, cada uma no campo que o revisor consegue conferir:
- *
- *   preserve_nonlinguistic_dynamic_values  exigiria declarar aquele trecho como
- *                                          `glyph`/`identifier`/`control` — e e
- *                                          prosa;
- *   translate_at_value_origin              exigiria ancorar a origem num literal
- *                                          de modulo do projeto, com hash. Nao
- *                                          existe: o texto nasce em runtime, do
- *                                          arquivo do usuario. Ja provado em
- *                                          tests/i18n_value_origin_resolution.test.js.
- *
- * O que falta e uma DECISAO ARQUITETURAL, nao mais uma capacidade: como o
- * vocabulario descreve "valor linguistico que pertence ao USUARIO, renderizado
- * no canal humano". Enquanto ela nao existir, o arquivo fica fora — meia
- * conversao valida e pior que conversao nenhuma, porque some com a divida.
- *
- * As capacidades da leva seguem entregues e provadas; o que sai e so a
- * declaracao de conversao. Ver tests/i18n_context_conversion_blocked.test.js.
+ * ANTES DE ACRESCENTAR QUALQUER ARQUIVO AQUI, meca `unresolvedProvenance` antes
+ * e depois. Ver tests/i18n_context_user_content.test.js, que guarda a invariante
+ * como asercao: nenhum arquivo convertido pode ter ponto in_scope com provenance
+ * pendente.
  */
 
 const norm = (p) => String(p).replace(/\\/g, "/")

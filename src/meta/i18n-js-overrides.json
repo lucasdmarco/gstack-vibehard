@@ -2100,6 +2100,51 @@
           "evidence": "src/commands/context.js:201 — `.slice(0, 120)` aplicado ao texto já coagido."
         }
       }
+    },
+    {
+      "file": "src/plugins/opencode/gstack-session.js",
+      "line": 33,
+      "column": 5,
+      "expectedFileHash": "sha256:b0ecc73d73c19e5754a12e089b61817d6b922870fd544b1999caab210775e1f4",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "e",
+        "message",
+        "e"
+      ],
+      "reason": "A moldura 'gstack-session: erro ao ler update_status: ' é do produto — o prefixo `gstack-session:` identifica QUEM está falando no log compartilhado do OpenCode, e o resto é o diagnóstico. O interpolado é `e.message` de um `JSON.parse` que falhou, com fallback para a própria exceção: texto do runtime do Node, frequentemente com posição do caractere. Traduzi-lo descolaria a mensagem do que o motor reportou.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/plugins/opencode/gstack-session.js:33 — `catch` de `readUpdateStatus`, ao ler `~/.gstack_vibehard/update_status.json`. Alcançado a partir do handler `session.created` da tabela do plugin."
+    },
+    {
+      "file": "src/plugins/opencode/gstack-session.js",
+      "line": 51,
+      "column": 5,
+      "expectedFileHash": "sha256:b0ecc73d73c19e5754a12e089b61817d6b922870fd544b1999caab210775e1f4",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "e",
+        "message",
+        "e"
+      ],
+      "reason": "Mesmo prefixo de identidade, outro estágio: aqui a falha é ao CONSULTAR a versão publicada (rede/npm), não ao ler o arquivo local. São dois pontos separados porque o usuário precisa distinguir 'não consegui ler o cache' de 'não consegui checar atualização' — o segundo é normal offline. O interpolado segue sendo a mensagem da exceção original.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/plugins/opencode/gstack-session.js:51 — `catch` de `maybeCheckUpdate`, em torno de `fetchUpdateStatus` e da escrita do status."
+    },
+    {
+      "file": "src/plugins/opencode/gstack-session.js",
+      "line": 93,
+      "column": 9,
+      "expectedFileHash": "sha256:b0ecc73d73c19e5754a12e089b61817d6b922870fd544b1999caab210775e1f4",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "interpolations": [
+        "e",
+        "message",
+        "e"
+      ],
+      "reason": "A moldura 'gstack-session: erro ao executar stop.py: ' é do produto e nomeia o artefato que falhou. O interpolado é a exceção do `execFileSync` do hook Python — pode ser erro de spawn, timeout ou saída não-zero, e o texto vem do sistema operacional ou do próprio Python. É exatamente o que quem depura o fim de sessão vai procurar.",
+      "owner": "certificação RC PRD51 (Fase 1B)",
+      "evidence": "src/plugins/opencode/gstack-session.js:93 — `catch` do handler `session.deleted`, em torno do spawn de `stop.py`. Este é o ponto que só fecha porque o handler é nomeado pela CHAVE da tabela, e não `<anon>`."
     }
   ]
 }

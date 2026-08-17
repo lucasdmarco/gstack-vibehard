@@ -179,7 +179,7 @@ test("validateRegistry recusa script que NÃO é alcançado pelo runtime (não p
  *
  * ATUALIZE AQUI, e so aqui, a cada arquivo reconciliado no lote JS.
  */
-test("CENSO GLOBAL: 1924 pontos, 40 unknown, 13 arquivos convertidos", async () => {
+test("CENSO GLOBAL: 1920 pontos, 36 unknown, 14 arquivos convertidos", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
 
@@ -202,7 +202,7 @@ test("CENSO GLOBAL: 1924 pontos, 40 unknown, 13 arquivos convertidos", async () 
   // GStack que nao era contada em lugar nenhum. Subir aqui NAO e regressao: e o
   // censo passando a medir o que sempre existiu. Ver
   // tests/i18n_python_boundary.test.js.
-  assert.equal(inv.total, 1924, "converter nao pode sumir com ponto REAL; ampliar a fronteira medida pode somar")
+  assert.equal(inv.total, 1920, "converter nao pode sumir com ponto REAL; falso positivo do regex pode cair")
 
   // Medicao em movimento: cai a cada arquivo reconciliado. 54 -> 53 com qa.js;
   // 53 -> 52 com secrets.js.
@@ -255,8 +255,13 @@ test("CENSO GLOBAL: 1924 pontos, 40 unknown, 13 arquivos convertidos", async () 
   // `preserve_user_content_verbatim` para `:201`, o trecho de documento do
   // usuario. O delta e -4 e nao -5 pela troca de regua: o regex media 4 unknown
   // no arquivo, o AST media 5.
-  assert.equal(inv.unknown, 40, "context.js reconvertido, agora com a provenance inteira declarada")
-  assert.equal(inv.jsRegistry.convertedFiles.length, 13)
+  //
+  // 40 -> 36 com o plugin do OpenCode (lote JS 11/14). Delta -4, e o TOTAL cai 4
+  // junto: o regex media 8 pontos onde o AST ve 4 -- os quatro extras sao falso
+  // positivo do padrao de helper dentro de `console.warn(`. Nenhum ponto REAL
+  // sumiu, e a distincao entre as duas coisas e o que esta asercao guarda.
+  assert.equal(inv.unknown, 36, "plugin do OpenCode fechou pela capacidade de entrypoint de plugin")
+  assert.equal(inv.jsRegistry.convertedFiles.length, 14)
   assert.equal(inv.blocked, false)
 
   // A relacao que sustenta o numero: nenhum convertido guarda unknown.

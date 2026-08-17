@@ -12,7 +12,8 @@
     "src/commands/research.js",
     "src/commands/secrets.js",
     "src/commands/visual.js",
-    "src/index.js"
+    "src/index.js",
+    "src/plugins/opencode/gstack-session.js"
   ],
   "files": {
     "scripts/clean-pkg.mjs": {
@@ -7692,6 +7693,91 @@
         }
       ],
       "fileHash": "sha256:f880b4af5f239a688640d3be484fe1340ee565515213c521f6ee84449a3a4909"
+    },
+    "src/plugins/opencode/gstack-session.js": {
+      "entries": [
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.warn",
+          "calleePath": "console.warn",
+          "canonicalName": "warn",
+          "column": 5,
+          "line": 33,
+          "provenance": {
+            "ids": [
+              "e",
+              "message",
+              "e"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.warn",
+          "calleePath": "console.warn",
+          "canonicalName": "warn",
+          "column": 5,
+          "line": 51,
+          "provenance": {
+            "ids": [
+              "e",
+              "message",
+              "e"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.warn",
+          "calleePath": "console.warn",
+          "canonicalName": "warn",
+          "column": 11,
+          "line": 77,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "console.warn",
+          "calleePath": "console.warn",
+          "canonicalName": "warn",
+          "column": 9,
+          "line": 93,
+          "provenance": {
+            "ids": [
+              "e",
+              "message",
+              "e"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "command-human-branch",
+          "sink": null
+        }
+      ],
+      "fileHash": "sha256:b0ecc73d73c19e5754a12e089b61817d6b922870fd544b1999caab210775e1f4"
     }
   },
   "schema": "gstack.i18n-js-registry.v1"
