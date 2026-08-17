@@ -2603,6 +2603,19 @@ export const JS_RULES = Object.freeze([
     reason: "helper de render cuja DECLARACAO resolve no modulo canonico — nome canonico e origem conferidos pelo checker",
   },
   {
+    /**
+     * Par de `render-via-canonical-helper` para quando a IDENTIDADE do helper vem
+     * de uma tabela local, e nao de um import direto. A audiencia e a mesma
+     * porque o canal e o mesmo: seja `info` ou `warn` que rode, os dois sao o
+     * render sancionado. O que a regra exige e que TODAS as alternativas o sejam.
+     */
+    id: "render-via-destructured-helper",
+    when: (p) => p.canonicalRenderViaTable === true,
+    audience: "public_diagnostic",
+    trigger: "sanctioned_channel",
+    reason: "helper de render cuja identidade vem de tabela local cujas alternativas sao TODAS primitivas do modulo canonico: qualquer delas que rode escreve no canal sancionado",
+  },
+  {
     id: "render-module-literal-output",
     when: (p) => isCanonicalRenderFile(p.file) && p.binding.kind === "global",
     audience: "public_diagnostic",
@@ -3364,6 +3377,83 @@ export function origemContadaDeSubprocesso(arg, ctx) {
     .find((c) => ctx.countedOrigins.has(c)) ?? null
 }
 
+// ── Helper de render resolvido por DESESTRUTURACAO de tabela local ──────────
+
+/**
+ * `install.js:359` — o callee e `log`, e `log` nao e `console.log`.
+ *
+ *   const groups = [
+ *     ["Adicionados:", report.added, "+", info],
+ *     ["Erros:",       report.errors, "",  warn],
+ *   ]
+ *   for (const [title, items, prefix, log] of groups) …
+ *
+ * O identificador vem de uma TABELA LOCAL, e por isso `render-via-canonical-helper`
+ * nao o alcanca: `canonicalName` e `log` (o nome do binding) e `declaredIn` e o
+ * proprio `install.js`. O ponto ficava `unknown` por falta de vocabulario, nao
+ * por duvida — a linha `  + <arquivo>` do relatorio de instalacao e saida humana
+ * como qualquer outra.
+ *
+ * MESMO ESPIRITO DE C-3 (`tabelasDeDespacho`): quando a identidade vem de uma
+ * tabela local congelavel, o que decide e o CONJUNTO de alternativas naquela
+ * posicao. Aqui a regra e universal — TODAS precisam ser helper canonico. Uma
+ * posicao com qualquer outra coisa (um `console.log`, uma funcao local, um valor
+ * dinamico) derruba tudo, porque ai nao se sabe qual canal roda.
+ */
+const bindingElementDe = (checker, id, sf) => {
+  const d = declaracaoResolvida(checker, id, sf)
+  return d && ts.isBindingElement(d) ? d : null
+}
+
+/** Posicao do elemento no padrao de array, ou `-1`. */
+const posicaoNoPadrao = (be) => {
+  const pai = be.parent
+  return pai && ts.isArrayBindingPattern(pai) ? pai.elements.indexOf(be) : -1
+}
+
+/** O `for (const [...] of X)` que envolve o binding, ou `null`. */
+const forOfDoBinding = (be) => {
+  const no = be.parent?.parent?.parent?.parent
+  return no && ts.isForOfStatement(no) && ts.isIdentifier(no.expression) ? no : null
+}
+
+/** Literal de array do `for (const [...] of TABELA)`, ou `null`. */
+const tabelaDoForOf = (be, ctx) => {
+  const forOf = forOfDoBinding(be)
+  const init = forOf ? inicializadorDeConstLocal(forOf.expression, ctx) : null
+  return init && ts.isArrayLiteralExpression(init) ? init : null
+}
+
+/** Coluna `i` da tabela; `null` quando alguma linha nao e tupla com aquela posicao. */
+const colunaDaTabela = (tabela, i) => {
+  const coluna = []
+  for (const linha of tabela.elements) {
+    if (!ts.isArrayLiteralExpression(linha) || i >= linha.elements.length) return null
+    coluna.push(linha.elements[i])
+  }
+  return coluna.length > 0 ? coluna : null
+}
+
+/** O identificador E uma primitiva de render declarada no modulo canonico? */
+const ehHelperCanonico = (id, ctx) => {
+  if (!ts.isIdentifier(id) || !RENDER_PRIMITIVES.has(canonicalNameOf(ctx.checker, id) ?? "")) return false
+  return isCanonicalRenderFile(resolveBinding(ctx.checker, id, ctx.sf.fileName).declaredIn || "")
+}
+
+/** Coluna da tabela a que o identificador corresponde, ou `null`. */
+const colunaDoIdentificador = (idNode, ctx) => {
+  const be = bindingElementDe(ctx.checker, idNode, ctx.sf)
+  const i = be ? posicaoNoPadrao(be) : -1
+  const tabela = i >= 0 ? tabelaDoForOf(be, ctx) : null
+  return tabela ? colunaDaTabela(tabela, i) : null
+}
+
+export function helperCanonicoPorTabela(idNode, ctx) {
+  if (!idNode || !ctx?.checker) return false
+  const coluna = colunaDoIdentificador(idNode, ctx)
+  return Boolean(coluna) && coluna.every((n) => ehHelperCanonico(n, ctx))
+}
+
 export const SINK_RULES = Object.freeze([
   {
     // Guarda POSITIVA. `requiresDebugEnv` ja garante que `!DEBUG` e
@@ -3770,6 +3860,8 @@ export function analyzeFile(filePath, analyzer = null, ctx = {}) {
       receiverOrigin: origemDoReceptor(node, ancestry(node).functions, receptores, ctxAst),
       // Implementacao do canal, nao mensagem: o texto vem do chamador.
       inLocalRenderPrimitive: dentroDeLoggerCanonicoLocal(node, ctxAst),
+      // Identidade do helper vinda de tabela local (C-3 aplicado ao render).
+      canonicalRenderViaTable: helperCanonicoPorTabela(d.alvo.idNode, ctxAst),
       templateIds: templateIdentifiers(arg0),
       // De onde vem o BYTE, quando o argumento e um repasse: `project`,
       // `external`, `unresolved` ou `none`. So `external` classifica — as outras
