@@ -3392,6 +3392,159 @@ export function origemContadaDeSubprocesso(arg, ctx) {
     .find((c) => ctx.countedOrigins.has(c)) ?? null
 }
 
+// ── Origem do PARAMETRO de um arrow, por todos os callsites elegiveis ───────
+
+/**
+ * `runtime-supervisor.js:346` e `:389` sao a mesma forma:
+ *
+ *   const write = opts.write || ((s) => process.stdout.write(s))
+ *   …
+ *   write(readTail(logPath, offset, size))
+ *
+ * O valor impresso nao esta no callsite — esta no PARAMETRO de um arrow. O
+ * engine, com razao, derruba `<anon>` na cadeia de alcance: quem roda um callback
+ * depende de quem o recebeu. Mas aqui a pergunta nao e "quem roda", e sim "o que
+ * ele recebe", e essa tem resposta quando TODOS os callsites elegiveis do proprio
+ * arrow concordam.
+ *
+ * O `||` NAO cria ambiguidade sobre o parametro: quando `opts.write` existe, o
+ * nosso arrow nao roda; quando roda, recebe exatamente o argumento daquela
+ * chamada. A alternativa externa muda QUEM escreve, nunca O QUE este arrow
+ * recebe.
+ *
+ * NADA AQUI OLHA O NOME DO PARAMETRO. `s` podia se chamar qualquer coisa; o que
+ * decide e a POSICAO dele na assinatura e o argumento naquela posicao.
+ *
+ * E NAO reusa a regra de funcao-em-propriedade: la a identidade vem da tabela que
+ * declara o handler; aqui viria do CHAMADOR, que e outro domínio.
+ */
+export const ORIGEM_ARQUIVO = "file_read"
+export const ORIGEM_MISTA = "mixed"
+export const ORIGEM_INDEFINIDA = "unresolved"
+export const ORIGEM_AUSENTE = "none"
+
+/** Modulos de leitura de arquivo. Identidade de MODULO, como em C-4(a). */
+const MODULOS_DE_ARQUIVO = new Set(["fs", "node:fs"])
+
+const chamadaDeModulo = (node, checker, modulos) => {
+  if (!ts.isCallExpression(node)) return null
+  const d = declaracaoDoCallee(node, checker)
+  const modulo = d ? especificadorDoImport(d) : null
+  return modulo && modulos.has(modulo) ? node : null
+}
+
+/** Parametro do arrow que envolve o no, com indice; `null` fora dessa forma. */
+const parametroDoArrow = (id, ctx) => {
+  const d = declaracaoResolvida(ctx.checker, id, ctx.sf)
+  if (!d || !ts.isParameter(d) || !ts.isArrowFunction(d.parent)) return null
+  const i = d.parent.parameters.indexOf(d)
+  return i >= 0 ? { arrow: d.parent, indice: i } : null
+}
+
+/**
+ * Callsites do arrow: ou ele e chamado direto (IIFE, inclusive atras de `||`),
+ * ou foi guardado num `const` local e chamado pelo nome. Qualquer outra forma —
+ * passado como argumento, exportado, atribuido a propriedade — devolve `null`,
+ * porque ai os chamadores visiveis deixam de esgotar os reais.
+ */
+const subindoPorOu = (n) => {
+  let atual = n
+  while (atual.parent && (ts.isBinaryExpression(atual.parent) || ts.isParenthesizedExpression(atual.parent))) {
+    atual = atual.parent
+  }
+  return atual
+}
+
+/**
+ * Chamadas do SIMBOLO declarado, por identidade — nao por nome.
+ *
+ * `callsitesDe` indexa so declaracoes de TOPO, e o caso real e um `const` DENTRO
+ * de `followLog`. Comparar simbolo do checker resolve escopo e sombreamento de
+ * graca; comparar texto acharia qualquer `write` do arquivo.
+ *
+ * Uma unica referencia FORA da posicao de callee — passada adiante, exportada,
+ * guardada noutro lugar — devolve `null`: dali em diante os chamadores visiveis
+ * deixam de esgotar os reais.
+ */
+const callsitesDaDeclaracao = (decl, ctx) => {
+  const alvo = ctx.checker.getSymbolAtLocation(decl.name)
+  if (!alvo) return null
+  const achados = []
+  let comoValor = false
+  percorrerNos(ctx.sf, (n) => {
+    if (!ts.isIdentifier(n) || n === decl.name) return
+    if (ctx.checker.getSymbolAtLocation(n) !== alvo) return
+    if (ehCalleeDaChamada(n)) achados.push(n.parent)
+    else comoValor = true
+  })
+  if (comoValor || achados.length === 0) return null
+  return achados
+}
+
+const ehInvocadoDireto = (topo) => Boolean(topo.parent)
+  && ts.isCallExpression(topo.parent) && topo.parent.expression === topo
+
+const ehGuardadoEmConst = (topo) => Boolean(topo.parent)
+  && ts.isVariableDeclaration(topo.parent) && ts.isIdentifier(topo.parent.name)
+
+const callsitesDoArrow = (arrow, ctx) => {
+  const topo = subindoPorOu(arrow)
+  if (ehInvocadoDireto(topo)) return [topo.parent]
+  return ehGuardadoEmConst(topo) ? callsitesDaDeclaracao(topo.parent, ctx) : null
+}
+
+const LIMITE_ORIGEM = 10
+
+/** Especie da origem de UMA expressao. Base: leitura de arquivo NAO ancorada. */
+/** Leitura de arquivo do PROPRIO pacote nao e origem de fora — ancora de C-4(a). */
+const especieDaLeitura = (no, ctx) =>
+  (no.arguments.some((a) => contemAncoraDeModulo(a, ctx)) ? ORIGEM_INDEFINIDA : ORIGEM_ARQUIVO)
+
+const especiePorIdentificador = (no, ctx, prof) => {
+  const init = inicializadorDeConstLocal(no, ctx)
+  return init ? especieDaOrigem(init, ctx, prof + 1) : ORIGEM_INDEFINIDA
+}
+
+const ESPECIE_POR_FORMA = [
+  [(n, ctx) => Boolean(chamadaDeModulo(n, ctx.checker, MODULOS_DE_ARQUIVO)), especieDaLeitura],
+  [(n) => ts.isIdentifier(n), especiePorIdentificador],
+  [(n) => ts.isCallExpression(n), especieDaOrigemDeChamada],
+]
+
+function especieDaOrigem(no, ctx, prof = 0) {
+  if (!no || prof > LIMITE_ORIGEM) return ORIGEM_INDEFINIDA
+  const caso = ESPECIE_POR_FORMA.find(([forma]) => forma(no, ctx))
+  return caso ? caso[1](no, ctx, prof) : ORIGEM_INDEFINIDA
+}
+
+/** Chamada a funcao local: a especie e a dos retornos dela, e todos concordam. */
+function especieDaOrigemDeChamada(no, ctx, prof) {
+  const fn = funcaoLocalDoCallee(no, ctx)
+  const retornos = fn ? expressoesDeRetorno(fn) : null
+  if (!retornos) return ORIGEM_INDEFINIDA
+  return retornos.map((r) => especieDaOrigem(r, ctx, prof + 1)).reduce(juntarEspecie)
+}
+
+const juntarEspecie = (a, b) => (a === b ? a : ORIGEM_MISTA)
+
+/**
+ * Especie do valor que o parametro recebe, exigindo convergencia UNIVERSAL entre
+ * os callsites. Sem callsite, com callback, com alias dinamico ou com origens
+ * divergentes, o resultado NAO e conclusivo — e nao conclusivo mantem `unknown`.
+ */
+const ehIdentificadorAnalisavel = (arg, ctx) =>
+  Boolean(arg) && Boolean(ctx?.checker) && ts.isIdentifier(arg)
+
+export function origemDoParametro(arg, ctx) {
+  const p = ehIdentificadorAnalisavel(arg, ctx) ? parametroDoArrow(arg, ctx) : null
+  if (!p) return ORIGEM_AUSENTE
+  const chamadas = callsitesDoArrow(p.arrow, ctx)
+  if (!chamadas) return ORIGEM_INDEFINIDA
+  return chamadas
+    .map((c) => especieDaOrigem(c.arguments[p.indice], ctx))
+    .reduce(juntarEspecie)
+}
+
 // ── Helper de render resolvido por DESESTRUTURACAO de tabela local ──────────
 
 /**
@@ -3877,6 +4030,9 @@ export function analyzeFile(filePath, analyzer = null, ctx = {}) {
       inLocalRenderPrimitive: dentroDeLoggerCanonicoLocal(node, ctxAst),
       // Identidade do helper vinda de tabela local (C-3 aplicado ao render).
       canonicalRenderViaTable: helperCanonicoPorTabela(d.alvo.idNode, ctxAst),
+      // Especie do valor que um parametro de arrow recebe, exigindo convergencia
+      // universal entre os callsites elegiveis do proprio arrow.
+      parameterOrigin: origemDoParametro(arg0, ctxAst),
       templateIds: templateIdentifiers(arg0),
       // De onde vem o BYTE, quando o argumento e um repasse: `project`,
       // `external`, `unresolved` ou `none`. So `external` classifica — as outras
