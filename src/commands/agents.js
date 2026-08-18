@@ -11,6 +11,7 @@ import { runP0Conformance } from "../skills/behavioral-conformance.js"
 import { codexTrustStatus, codexTrustVerdict } from "../harness/codex-trust.js"
 import { enforcementScopeReport } from "../harness/enforcement-scope.js"
 import { section, success, warn, error, info } from "../cli/index.js"
+import { statusDosHooksDoCodex } from "../harness/codex-hooks-status.js"
 
 const PKG_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..")
 const SCRIPT = join(PKG_ROOT, "scripts", "scripts", "build_agents.js")
@@ -233,7 +234,7 @@ function countMissingContract(files) {
 const buildMatrix = (adapters) => Object.entries(adapters).map(([id, a]) => ({ ...capabilityRow(id), status: a.status, files: (a.files || []).length }))
 const agentsDoctorOk = (manifest, drift, contract, scorecard) =>
   !!manifest && manifest.schemaVersion === 2 && drift.ok && contract.missing === 0 && scorecard.ok
-function buildAgentsDoctorReport(manifest, drift, matrix, contract, scorecard) {
+function buildAgentsDoctorReport(manifest, drift, matrix, contract, scorecard, codexHooks) {
   return {
     schemaVersion: manifest ? manifest.schemaVersion : null,
     compilerVersion: manifest ? manifest.compilerVersion : null,
@@ -244,6 +245,10 @@ function buildAgentsDoctorReport(manifest, drift, matrix, contract, scorecard) {
     matrix,
     matrixSchema: "gstack.capability.v2",
     scorecard,
+    // PRD52 S52.F — o estado REAL dos hooks do Codex nesta máquina. É
+    // OBSERVAÇÃO, não gate: `ok` não muda por causa dele, porque o que o
+    // relatório mede é registro, e o que o `ok` afirmaria é enforcement.
+    codexHooks,
     ok: agentsDoctorOk(manifest, drift, contract, scorecard),
   }
 }
@@ -293,7 +298,8 @@ export function computeAgentsDoctor() {
   const matrix = buildMatrix(adapters)
   const scorecard = validateScorecard()
   const contract = countMissingContract(collectAdapterFiles())
-  const report = buildAgentsDoctorReport(manifest, drift, matrix, contract, scorecard)
+  const codexHooks = statusDosHooksDoCodex()
+  const report = buildAgentsDoctorReport(manifest, drift, matrix, contract, scorecard, codexHooks)
   return { report, manifest, drift, scorecard }
 }
 

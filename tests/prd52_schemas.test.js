@@ -392,7 +392,8 @@ function consumidoresDe(modulo) {
  */
 test("os consumidores do §26 são exatamente os declarados", async () => {
   assert.deepEqual(consumidoresDe("prd52-schemas.js"),
-    ["src/dream/claim-reconciler.js", "src/release/support-matrix.js", "src/tools/readiness-freshness.js"],
+    ["src/dream/claim-reconciler.js", "src/release/clean-machine-e2e.js",
+      "src/release/support-matrix.js", "src/tools/readiness-freshness.js"],
     "consumidor novo do §26 entra por decisão, não por carona")
 })
 
