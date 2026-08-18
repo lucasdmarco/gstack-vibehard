@@ -68,10 +68,13 @@ function resolveHeadCommit(root) {
 function auditCmd(ctx) {
   // PRD42 S42.0B: o modo COMPORTAMENTAL é o default do CLI — arquivo presente não vale
   // como REAL (vira NOT_PROVED). O modo legado (por arquivo) só sob opt-in `--files-only`.
-  const r = audit({ root: ctx.root, behavioral: !ctx.filesOnly })
+  // PRD52 S52.C: o commit é resolvido UMA vez e serve tanto ao placar quanto aos
+  // recibos — dois carimbos de tempo diferentes na mesma saída seriam duas verdades.
+  const commit = resolveHeadCommit(ctx.root)
+  const r = audit({ root: ctx.root, behavioral: !ctx.filesOnly, receipts: true, commit })
   // PRD51 S51.0A/0C: placar vivo com proveniência do commit real — nunca número fixo nem
   // commit nulo por omissão (achados 4.3 e o do 51.0C).
-  const scoreboard = scoreboardFromAudit(r, { commit: resolveHeadCommit(ctx.root) })
+  const scoreboard = scoreboardFromAudit(r, { commit })
   const withBoard = { ...r, scoreboard }
   return emit(ctx.json, withBoard, () => {
     section("dream audit — promessas vs evidência (determinístico, sem LLM)")

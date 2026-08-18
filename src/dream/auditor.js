@@ -3,6 +3,7 @@ import { join, dirname } from "path"
 import { fileURLToPath } from "url"
 import { HARNESS_CAPABILITIES } from "./capabilities.js"
 import { gradeClaimStatus, contractFor, motivosDaQueda, NOT_PROVED } from "./claim-contract.js"
+import { emitirRecibo } from "./claim-receipt.js"
 
 /**
  * Auditor anti-placebo (PRD Fase 3 §1). DETERMINÍSTICO, sem LLM, somente-leitura:
@@ -341,10 +342,27 @@ function applyBehavioral(claim, io) {
   }
 }
 
+/**
+ * PRD52 S52.C: anexa o RECIBO da evidência — ancorado por hash no commit lido.
+ *
+ * Opt-in (`opts.receipts`) porque o recibo custa reler os arquivos de evidência,
+ * e nem todo chamador do audit precisa dele. O commit vem de fora: este módulo
+ * não chama git, pela mesma razão que o placar não chama — quem sabe qual é o
+ * HEAD relevante é o comando, não a auditoria.
+ */
+function comRecibo(claim, io, commit) {
+  const contract = contractFor(claim.id)
+  if (!contract) return claim
+  return { ...claim, receipt: emitirRecibo({ claimId: claim.id, contract, io, sourceCommit: commit }) }
+}
+
 export function audit(opts = {}) {
   const root = opts.root || DEFAULT_ROOT
   const { has, read } = reader(root)
   const raw = CLAIM_BUILDERS.map((build) => build(has, read))
-  const claims = opts.behavioral ? raw.map((c) => applyBehavioral(c, { has, read })) : raw
+  const graduados = opts.behavioral ? raw.map((c) => applyBehavioral(c, { has, read })) : raw
+  const claims = opts.receipts
+    ? graduados.map((c) => comRecibo(c, { has, read }, opts.commit ?? null))
+    : graduados
   return { generatedAt: new Date().toISOString(), root: ".", behavioral: Boolean(opts.behavioral), scope: auditScope(root), claims, summary: tallySummary(claims) }
 }
