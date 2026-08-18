@@ -101,7 +101,13 @@ test("node-health: node OK mas npm quebrado → blocker explica que node não ba
   assert.equal(h.smoke.detail, "pulado (npm não executável)")
 })
 
-test("node-health: node antigo (<18) bloqueia; registry indisponível é degraded (não blocker)", async () => {
+/**
+ * `<18` bloqueia porque a matriz de runtime COMEÇA no 18 — não é "não
+ * suportado", é NÃO MEDIDO. A decisão de 2026-08-17 acrescentou o nível
+ * `best_effort` acima disto (18/20 avisam e rodam), e o piso continua onde a
+ * evidência acaba.
+ */
+test("node-health: node NÃO MEDIDO (<18) bloqueia; registry indisponível é degraded (não blocker)", async () => {
   const { checkNodeHealth } = await imp("src/installer/node-health.js")
   const h = checkNodeHealth({
     platform: "linux", ...tmpFs(),
@@ -110,7 +116,8 @@ test("node-health: node antigo (<18) bloqueia; registry indisponível é degrade
       [/npm pkg get name/, '"gstack-smoke"'], [/npm config get registry/, new Error("offline")],
     ]),
   })
-  assert.ok(h.blockers.some((b) => /v16.*< mínimo v18/.test(b)))
+  assert.equal(h.node.supportTier, "unmeasured")
+  assert.ok(h.blockers.some((b) => /v16.*piso MEDIDO|v16.*não há evidência/.test(b)), JSON.stringify(h.blockers))
   assert.equal(h.registry.status, "degraded")
   assert.ok(!h.blockers.some((b) => /registry/i.test(b)), "registry nunca é blocker de ambiente")
 })

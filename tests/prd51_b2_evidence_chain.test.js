@@ -162,15 +162,32 @@ test("cobertura é de UM sistema operacional, e isso está escrito", () => {
  * A instrução é explícita: o recibo prova `runtime_compatibility` e MAIS NADA.
  * Inflar as outras duas claims foi exatamente o erro que originou o P0.
  */
-test("as três claims permanecem no escopo medido — nenhuma inflada", () => {
-  const esperado = {
-    runtime_compatibility: "proved_windows_local",
-    suite_compatibility: "failing",
-    safe_support: "undecided",
-  }
+/**
+ * A ÂNCORA É HISTÓRICA e o ledger é atual — e a diferença entre eles é uma LINHA
+ * DO TEMPO, não uma divergência. A âncora registra o que era verdade em
+ * 2026-08-05, com bytes preservados por `.gitattributes`; reescrevê-la para
+ * "sincronizar" apagaria a evidência da medição.
+ *
+ * O que precisa continuar valendo nos dois é o ESCOPO: nada do que a medição
+ * provou pode ter inflado depois. `runtime_compatibility` segue
+ * `proved_windows_local` nos dois, e `suite_compatibility` segue `failing`.
+ */
+test("as claims MEDIDAS permanecem no escopo, na âncora e no ledger", () => {
   const item = PRD51_RC_ITEMS.find((i) => i.id === "P0.NODE-SUPPORT-GATE-INVALID")
-  assert.deepEqual({ ...item.claims }, esperado, "claims do ledger saíram do escopo medido")
-  assert.deepEqual({ ...ancora().claims }, esperado, "a âncora não pode prometer mais que o ledger")
+  const a = ancora()
+
+  for (const fonte of [item.claims, a.claims]) {
+    assert.equal(fonte.runtime_compatibility, "proved_windows_local",
+      "um SO medido nunca vira `proved` liso")
+    assert.equal(fonte.suite_compatibility, "failing",
+      "a suíte não foi consertada por nenhuma decisão")
+  }
+
+  // `safe_support` é o ÚNICO campo que se move, porque é decisão e não medida.
+  // A âncora guarda `undecided` (era verdade na data dela); o ledger guarda a
+  // decisão de 2026-08-17.
+  assert.equal(a.claims.safe_support, "undecided", "a âncora não pode ser reescrita")
+  assert.equal(item.claims.safe_support, "node22_official_only")
 })
 
 /**
@@ -198,14 +215,21 @@ test("CONTROLE: o detector de contradição REALMENTE pega a frase antiga", () =
   assert.match(textoAntigo, AFIRMA_UNPROVEN, "a regex precisa reprovar a redação que existia")
 })
 
+/**
+ * DECIDIR NÃO É PROVAR. A decisão de suporte fechou o P0, e absolutamente nada
+ * do que estava não-provado foi promovido junto — é aqui que a promoção por
+ * tabela entraria, se fosse entrar.
+ */
 test("o que PERMANECE não-provado segue escrito, sem promoção por tabela", () => {
   const item = PRD51_RC_ITEMS.find((i) => i.id === "P0.NODE-SUPPORT-GATE-INVALID")
   assert.match(MATRIZ.cross_os, /unproven/, "cross-OS não pode ser promovido junto com o runtime")
-  assert.equal(item.claims.suite_compatibility, "failing")
-  assert.equal(item.claims.safe_support, "undecided")
-  assert.notEqual(item.status, "delivered")
+  assert.equal(item.claims.cross_os, "unproven")
+  assert.equal(item.claims.suite_compatibility, "failing",
+    "decidir suporte não conserta a suíte e não pode fingir que consertou")
   assert.match(item.impact, /decis[ãa]o de pol[íi]tica/i,
-    "a parte que depende de decisão humana precisa continuar declarada como tal")
+    "a natureza da decisão precisa continuar declarada como tal")
+  assert.match(item.supportDecision.coherenceApplied.notClaimed, /cross-OS/,
+    "e o que NÃO foi afirmado precisa estar escrito junto do que foi")
 })
 
 /**
@@ -256,13 +280,27 @@ test("a âncora declara por escrito o que NÃO prova", () => {
   }
 })
 
-test("o P0 segue ABERTO e a evidência não declara release pronto", () => {
+/**
+ * A ÂNCORA CONTINUA DIZENDO "aberto", e isso está CERTO: ela é o recibo de
+ * 2026-08-05, quando estava. O P0 fechou em 2026-08-17 — e fechou exatamente
+ * pelo caminho que a âncora previa, "decisão humana", nunca por medição.
+ *
+ * Reescrever a âncora para refletir o fechamento seria falsificar um recibo. O
+ * que a prova exige é que o fechamento tenha respeitado a condição que ela
+ * registrou.
+ */
+test("a âncora preserva o estado da SUA data; o P0 fechou pelo caminho que ela previa", () => {
   const item = PRD51_RC_ITEMS.find((i) => i.id === "P0.NODE-SUPPORT-GATE-INVALID")
-  assert.notEqual(item.status, "delivered", "medir compatibilidade não fecha decisão de política")
   const a = ancora()
-  assert.equal(a.releaseReady, false)
-  assert.equal(a.p0.estado, "aberto")
+
+  assert.equal(a.releaseReady, false, "o recibo nunca declarou release pronto")
+  assert.equal(a.p0.estado, "aberto", "e preserva o estado da data dele")
   assert.match(a.p0.fechaCom, /decis[ãa]o humana/i)
+
+  assert.equal(item.status, "delivered", "o P0 fechou depois")
+  assert.ok(item.supportDecision.decidedBy, "e por DECISÃO HUMANA, com autor — como a âncora exigia")
+  assert.ok(item.supportDecision.decidedOn > "2026-08-05",
+    "a decisão é posterior à medição: nenhuma medição fechou este P0")
 })
 
 test("o Markdown, o recibo e o ledger contam a MESMA história de backend", () => {
