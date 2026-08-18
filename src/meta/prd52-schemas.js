@@ -119,13 +119,30 @@ export const READINESS_OBSERVATION_FIELDS = Object.freeze([
   "sourceCommit", "observedHead", "probeCommandRef", "probeResultRef",
 ])
 
-/** `stale` e `unknown` são estados CONSUMÍVEIS — não erros a esconder. */
+/**
+ * O vocabulário REAL de readiness — o que `.gstack/tool-readiness.json` documenta
+ * e emite — mais os dois estados de degradação.
+ *
+ * S52.D corrigiu esta lista: o S52.A tinha inventado um vocabulário reduzido
+ * (`callable|routed|missing`) sem conferir o que o produto de fato produz. Um
+ * schema que não descreve a realidade rebaixaria observações legítimas para
+ * `unknown` e apresentaria isso como rigor.
+ */
 export const READINESS_STATUSES = Object.freeze([
-  "callable", "routed", "missing", "stale", "unknown",
+  "missing", "installed_not_callable", "timeout_degraded",
+  "callable", "callable_not_routed", "routed",
+  "stale", "unknown",
 ])
 
-/** Estados que já são o próprio veredito: nada os degrada mais. */
-const ESTADOS_TERMINAIS = Object.freeze(["stale", "unknown", "missing"])
+/**
+ * Estados que já são o próprio veredito: nada os degrada mais.
+ *
+ * Só os DOIS de degradação entram aqui. `missing` saiu na S52.D: uma observação
+ * velha de `missing` é tão pouco confiável quanto uma velha de `callable` — a
+ * ferramenta pode ter sido instalada desde então, e tratar o negativo como
+ * atemporal seria acreditar no passado só quando ele é inconveniente.
+ */
+const ESTADOS_TERMINAIS = Object.freeze(["stale", "unknown"])
 
 const headMudou = (o) => Boolean(o.sourceCommit && o.observedHead && o.sourceCommit !== o.observedHead)
 const janelaDe = (o) => (Number(o.staleAfterSeconds) > 0 ? Number(o.staleAfterSeconds) : null)

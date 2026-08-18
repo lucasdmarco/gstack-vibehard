@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process"
 import { join } from "node:path"
 import { audit } from "../dream/auditor.js"
 import { scoreboardFromAudit, renderScoreboardLine } from "../dream/scoreboard.js"
+import { reconciliarAudit } from "../dream/claim-reconciler.js"
 import { HARNESS_CAPABILITIES } from "../dream/capabilities.js"
 import { createProposal, promoteProposal, rejectProposal, listProposals, learningSummary } from "../dream/learning.js"
 import { dreamImprove } from "../dream/runner.js"
@@ -238,9 +239,35 @@ function statusCmd(ctx) {
   })
 }
 
+/**
+ * PRD52 S52.D — §26.1: as projeções da mesma claim comparadas de verdade.
+ *
+ * `fail` significa que o status afirma prova e a evidência não sustenta.
+ * `inconclusive:claim_conflict` significa que as projeções discordam SEM
+ * adjudicação — não é um `fail` disfarçado, e sai com exit 0 justamente porque
+ * quem adjudica é humano, não este comando.
+ */
+function reconcileCmd(ctx) {
+  const commit = resolveHeadCommit(ctx.root)
+  const r = audit({ root: ctx.root, behavioral: true, receipts: true, commit })
+  const rec = reconciliarAudit(r)
+  if (rec.byVerdict.fail || rec.invalidRecords.length) process.exitCode = 1
+  return emit(ctx.json, rec, () => {
+    section("dream reconcile — a mesma claim vista por projeções diferentes (§26.1)")
+    for (const [v, n] of Object.entries(rec.byVerdict)) info(`  ${n} ${v}`)
+    for (const i of rec.items.filter((x) => x.registro.consistencyVerdict !== "consistent")) {
+      const reg = i.registro
+      warn(`  ${i.id}: ${reg.consistencyVerdict} — ledger=${reg.ledgerStatus}, evidência faltando=${i.missingEvidence.length}, drift=${i.drift.length}`)
+    }
+    for (const i of rec.invalidRecords) error(`  registro INVÁLIDO em ${i.id}: ${i.problems.join("; ")}`)
+    if (rec.ok) success("  Nenhuma projeção contradiz a evidência.")
+  })
+}
+
 // Continuous learning seguro (PRD14 §4.5): proposta → review humano → staging.
 const SUBCOMMANDS = {
   audit: auditCmd,
+  reconcile: reconcileCmd,
   learn: (ctx) => learnCmd(ctx.cwd, ctx.args, ctx.json, "lesson"),
   "propose-skill": (ctx) => learnCmd(ctx.cwd, ctx.args, ctx.json, "skill"),
   promote: (ctx) => promoteCmd(ctx.cwd, ctx.args, ctx.json),

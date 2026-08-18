@@ -368,21 +368,41 @@ test("a soma NÃO mistura denominadores", async () => {
 
 // ── A regra do sprint: FUNDAÇÃO sem consumidor ─────────────────────────────
 
-/**
- * 52.A entrega schemas e mais nada. Um consumidor prematuro acoplaria a fundação
- * ao primeiro uso dela, e é o que os sprints 52.B–52.G existem para fazer, cada
- * um com a sua prova.
- */
-test("nenhum módulo de produto consome os schemas ainda", async () => {
-  const novos = ["prd52-schemas.js", "mission-schemas.js"]
-  const consumidores = []
-  for (const dir of ["src/commands", "src/dream", "src/release", "src/tools", "src/project-plan", "src/installer"]) {
+const DIRS_DE_PRODUTO = ["src/commands", "src/dream", "src/release", "src/tools", "src/project-plan", "src/installer"]
+
+function consumidoresDe(modulo) {
+  const achados = []
+  for (const dir of DIRS_DE_PRODUTO) {
     const abs = path.join(repoRoot, dir)
     for (const f of readdirSync(abs).filter((x) => x.endsWith(".js"))) {
-      const src = readFileSync(path.join(abs, f), "utf-8")
-      if (novos.some((n) => src.includes(n))) consumidores.push(`${dir}/${f}`)
+      if (readFileSync(path.join(abs, f), "utf-8").includes(modulo)) achados.push(`${dir}/${f}`)
     }
   }
-  assert.deepEqual(consumidores, [],
-    "52.A é fundação: o consumo vem nos sprints seguintes, com prova própria")
+  return achados.sort()
+}
+
+/**
+ * O §26 ganhou consumidor no S52.D, e ele é NOMEADO aqui.
+ *
+ * A lista fixa não é burocracia: quando o schema tinha zero consumidores, o
+ * teste garantia que a fundação não fosse acoplada ao primeiro uso. Agora que há
+ * uso, ele garante a outra metade — que o consumo continue sendo o que foi
+ * decidido, e que um consumidor novo apareça numa revisão em vez de entrar de
+ * carona.
+ */
+test("os consumidores do §26 são exatamente os declarados", async () => {
+  assert.deepEqual(consumidoresDe("prd52-schemas.js"),
+    ["src/dream/claim-reconciler.js", "src/tools/readiness-freshness.js"],
+    "consumidor novo do §26 entra por decisão, não por carona")
+})
+
+/**
+ * O §25 continua SEM consumidor, e isso é a decisão humana registrada: o PRD52
+ * possui os schemas e as invariantes da missão; o motor, o scheduler e o
+ * lifecycle são do PRD54. **O PRD52 não implementa loop autônomo** — um
+ * consumidor aqui seria o começo silencioso dele.
+ */
+test("o §25 (missão) segue sem consumidor: o motor é do PRD54", async () => {
+  assert.deepEqual(consumidoresDe("mission-schemas.js"), [],
+    "schemas de missão sem motor é o combinado; consumi-los aqui antecipa o PRD54")
 })

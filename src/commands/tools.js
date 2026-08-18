@@ -11,6 +11,7 @@ import { buildToolCatalog, annotateCatalogEntry, LOCAL_CATALOG } from "../tools/
 import { recordToolProvenance } from "../tools/provenance.js"
 import { buildReadiness } from "../tools/readiness.js"
 import { buildCapabilityVerdict } from "../meta/capability-verdict.js"
+import { readinessConsumivel } from "../tools/readiness-freshness.js"
 import { computeAgentsDoctor } from "./agents.js"
 import { runCleanMachine } from "../installer/clean-machine.js"
 import { buildToolRefresh } from "../tools/refresh.js"
@@ -356,6 +357,7 @@ function handleToolsHelp() {
   info("    tools agent-reach channels|doctor [--json]   Catalogo e estado por canal")
   info("  Qualidade:")
   info("    tools readiness [--json] [--write] [--clean-machine]  Estado REAL das ferramentas (Fallow/Graphify/Headroom/context)")
+  info("    tools readiness --stored      Validade do readiness JÁ gravado (§26.2: vencido vira stale)")
   info("    tools verdict [--json]        Capability verdict canônico (reconcilia readiness + agents doctor)")
   info("    tools clean-machine [--json] [--no-write] [--keep]    Proof pack offline: OpenCode sacred, backup/restore byte-for-byte, matriz de tools")
   info("    tools refresh [--changed] [--json] [--strict]         Action close: refresca graphify/context/headroom/fallow (bounded) + report + readiness")
@@ -401,7 +403,38 @@ function writeReadiness(cwd, report) {
   writeFileSync(path, JSON.stringify(report, null, 2) + "\n")
   return path
 }
-function handleReadiness({ args, opts, cwd }) {
+/**
+ * PRD52 S52.D (§26.2) — o que o ARQUIVO ainda autoriza afirmar.
+ *
+ * `tools readiness` sem flag SONDA tudo de novo. Este caminho é a pergunta
+ * oposta e mais barata, e é a que o agente faz quando lê
+ * `.gstack/tool-readiness.json` antes de explorar código: o que está gravado
+ * ainda vale? Uma observação fora da janela vira `stale` — nunca segue
+ * aparecendo como `callable` só porque o arquivo existe.
+ */
+function renderStoredReadiness(rep) {
+  section("tools readiness --stored — validade do que está gravado (§26.2)")
+  if (!rep.present) { warn("  .gstack/tool-readiness.json ausente ou ilegível — nada a consumir."); return }
+  info(`  gravado em ${rep.generatedAt} · janela ${rep.staleAfterSeconds}s`)
+  for (const c of rep.capabilities) {
+    const linha = `  ${c.capabilityId}: gravado=${c.storedStatus} → consumível=${c.consumableStatus}`
+    ;(c.degraded ? warn : info)(c.degraded ? `${linha} (DEGRADADO pela validade)` : linha)
+  }
+  if (rep.anyStale) warn("  Há observação vencida: rode `gstack_vibehard tools readiness --write` antes de contar com ela.")
+}
+
+function handleStoredReadiness({ args, cwd, opts }) {
+  const rep = readinessConsumivel(cwd, { agoraMs: opts.now ? opts.now() : Date.now(), head: opts.head || null })
+  if (args.includes("--json")) return emitTools(rep)
+  renderStoredReadiness(rep)
+  return rep
+}
+
+function handleReadiness(ctx) {
+  // `--stored` NÃO sonda: consultar o disco e sondar a máquina são perguntas
+  // diferentes, e misturá-las faria o comando responder a que não foi feita.
+  if (ctx.args.includes("--stored")) return handleStoredReadiness(ctx)
+  const { args, opts, cwd } = ctx
   const report = buildReadiness({ cwd, home: opts.home, probe: opts.probe, git: opts.git, now: opts.now, cleanMachine: args.includes("--clean-machine") })
   const wrote = args.includes("--write") ? writeReadiness(cwd, report) : null
   if (args.includes("--json")) return emitTools(wrote ? { ...report, writtenTo: wrote } : report)
