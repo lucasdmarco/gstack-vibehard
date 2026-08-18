@@ -128,3 +128,59 @@ desta leva.
 - CI executado — `runtime-compat.yml` nunca rodou.
 - Headroom roteado — `doctor` mostra proxy inacessível e harness não roteado.
 - Compatibilidade cross-OS — `unproven`, e assim permanece até o CI real.
+
+
+---
+
+# Adendo — 2026-08-18: decisões humanas aplicadas
+
+**HEAD:** `58b6129`
+
+```
+suíte JS   3358 · 3357 pass · 0 fail · 1 skip · EXIT=0
+pytest     110 pass · 61 subtests
+lint 797 · typecheck limpo · QG L1/L2/L3 0 blockers · registry fresco
+test:pack OK · diff --check limpo
+ready:false · programComplete:false · DoD 18/24
+```
+
+## O que fechou
+
+| id | antes | agora |
+|---|---|---|
+| **PRD49 P1.5** | `deferred` | **`nonGoal`** aprovado — `status` segue `partial`, porque a skill de fato não foi vendorizada. Non-goal fecha por DECISÃO, nunca por promoção de status. |
+| **P1.CLI-JSON-EXIT-CODE** | `pending` | **`delivered`** em 3 commits (`context`, `research`, `task run`) |
+
+## O que mudou de tamanho
+
+**P0.CODEX-HOOKS** era maior do que o registrado. A confrontação com o binário do
+Codex 0.145.0 mostrou que a integração **nunca teve como executar**:
+`on_session_start` e `on_stop` têm **zero ocorrências** no binário; o handler é
+objeto e não array de strings; e sem `trusted_hash` o Codex diz "hooks won't run".
+O wiring inerte saiu e é limpo no merge. A integração **real não existe**, e
+escrevê-la exige o modelo de confiança que a extração não revela.
+
+**P0.CODEX-SECURITY**: modelo de ameaça achou 6 vetores auto-aprovados. O central
+era o comando **composto** — `re.match` ancora no início, então `ls && cat .env`
+passava inteiro. Fechados por análise por segmento. O que falta não é correção, é
+**enforcement observado**.
+
+## Segue aberto
+
+- **2 P0 do PRD48** — agora por ENFORCEMENT não observado, não por defeito de script.
+- **DOD.1/3/23** — caixas `runtime`, só fecham no commit final do RC.
+- **DOD.8** — 5 residuais, todos com disposição, dono e milestone.
+- **DOD.12** — recorte deferido ao PRD52.
+- **Token npm** — `security_blocking` até rotação humana comprovada. **Não afirmado como revogado.**
+- CI real, clean-machine e Headroom seguem `external_evidence_required`.
+
+## Erros meus, corrigidos e registrados
+
+1. O re-ancorador de provenance tratava override por `expectedIds`, e `[]` casa
+   com qualquer ponto sem ids — moveu **dois overrides para callsites errados**.
+   Overrides saíram do script: âncora humana exige auditoria, não heurística.
+2. A primeira versão das correções de `--json` passava a frase como **argumento**
+   do helper, o que tira o literal do callsite de um sink — **8 pontos de mensagem
+   sumiram do censo**. Corrigido com thunk, o idioma que `ctxFail` já usava.
+3. Um padrão `--version` na allowlist ficou **inalcançável** (a trava dispara
+   antes): pior que ausente, porque parecia cobertura. Removido.
