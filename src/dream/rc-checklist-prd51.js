@@ -372,12 +372,12 @@ export const RESIDUAL_DISPOSITIONS = Object.freeze([
     recommendation: "manter aberto até o CI real; não é dívida técnica",
   }),
   Object.freeze({
-    prdId: "PRD48", id: "P1.CLI-JSON-EXIT-CODE", disposition: "open", owner: "lucas",
-    milestone: "pós-RC, com correção autorizada",
-    rationale: "Exit code inconsistente sob `--json`. `fixAuthorized:false` por decisão humana explícita, e os três achados associados seguem registrados.",
-    recommendation: "NÃO corrigir nesta leva — a autorização é do usuário",
+    prdId: "PRD48", id: "P1.CLI-JSON-EXIT-CODE", disposition: "delivered", owner: "lucas",
+    milestone: "corrigido em 2026-08-17",
+    rationale: "Exit code inconsistente sob `--json`, mais dois achados da mesma familia. Ficaram FIXADOS por teste ate a autorizacao humana, porque mudar parsing de argumento ou canal de erro e mudanca de comportamento publico.",
+    recommendation: "ENTREGUE em tres commits (`context`, `research`, `task run`). A correcao veio deliberada e visivel, que era o objetivo de te-los fixado.",
   }),
-  Object.freeze({
+    Object.freeze({
     prdId: "PRD48", id: "P2.1", disposition: "deferred", owner: "lucas",
     milestone: "Fase 2 — cutover English-first",
     // ATUALIZADO em 2026-08-17: o que travava este residual acabou de sair.

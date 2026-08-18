@@ -55,14 +55,35 @@ export const PRD48_RC_ITEMS = Object.freeze([
   // (qual exit code para qual classe de erro) é decisão humana ainda não tomada.
   {
     id: "P1.CLI-JSON-EXIT-CODE", tier: "P1", sprint: "certificação RC", version: "5.107.0",
-    status: "pending",
-    needsDecision: true,
+    status: "delivered",
+    needsDecision: false,
+    fixedOn: "2026-08-17",
     evidence: "src/index.js chama runCLI(...) e DESCARTA o retorno; comandos que devolvem {error:true} (prd, plan) saem com exit 0, enquanto outros caminhos chamam process.exit(1) diretamente (cli/index.js:306,394; init.js:28,38,47; sprint.js:53,98; create.js:1867)",
     impact: "automação não distingue erro por process exit status — um consumidor de máquina precisa parsear o JSON para saber se falhou; scripts que checam `$?` tratam erro como sucesso",
     affectedScope: "comandos que anunciam --json",
-    fixAuthorized: false,
-    title: "Exit code inconsistente sob `--json`: erro sai 0 em parte dos comandos — automação não distingue falha pelo status do processo",
-    proof: null,
+    fixAuthorized: true,
+    title: "Exit code inconsistente sob `--json`: erro saía 0 em parte dos comandos — automação não distinguia falha pelo status do processo",
+    /**
+     * TRÊS CORREÇÕES, uma por commit, e a raiz é a mesma nas três: a superfície
+     * de erro não respondia ao consumidor que a chamou.
+     *
+     *   context       a flag virava o posicional, e os ramos de recusa por
+     *                 omissão eram INALCANÇÁVEIS
+     *   research      erros de USO saíam em prosa ANSI sob `--json`, em 6 pontos
+     *   task run      as 3 guardas de segurança saíam em prosa E com exit 0 —
+     *                 a mais grave: recusa por `.env` rastreado lida como sucesso
+     *
+     * Em todas, o exit code passou a valer nos DOIS modos. A automação que não
+     * usa `--json` merece o mesmo contrato de status, e deixá-la de fora seria
+     * corrigir metade do problema.
+     */
+    fix: "`context`: `posicional(args)` pula flags e valores de flags; `ctxFail`/`scoutError` setam `process.exitCode`. `research`: `researchUsageFail` emite `gstack.research.usage-error.v1` nos 6 pontos de uso. `task run`: `taskRunFail` emite `gstack.task-run.refusal.v1` com `blocked:true`, separando recusa por guarda de falha de execução.",
+    // `proof` e UM caminho, conferido em disco pelo guarda do checklist — juntar
+    // tres num campo so faria a verificacao passar por string, nao por arquivo.
+    // O de `task run` encabeca por ser a ocorrencia mais grave; os outros dois
+    // ficam em `additionalProofs`, cada um tambem conferido.
+    proof: "tests/task_run_json_contract.test.js",
+    additionalProofs: ["tests/context_json_contract.test.js", "tests/research_json_contract.test.js"],
     /**
      * DOIS ACHADOS DA MESMA FAMÍLIA, encontrados ao escrever as provas públicas
      * de `context --json` e `research --json` na Fase 1B do PRD51.
@@ -72,11 +93,10 @@ export const PRD48_RC_ITEMS = Object.freeze([
      * comando sob `--json` quando a chamada está errada. Abrir item novo daria
      * aparência de três problemas independentes.
      *
-     * NENHUM foi corrigido: mudar parsing de argumento ou o canal de erro é
-     * mudança de comportamento público, e não classificação de mensagem. Os dois
-     * estão FIXADOS por teste no estado observado, sem afirmar que estão certos —
-     * para que a correção futura seja deliberada e visível, e não efeito
-     * colateral silencioso.
+     * Ficaram FIXADOS por teste no estado observado até a autorização humana de
+     * 2026-08-17 — mudar parsing de argumento ou canal de erro é mudança de
+     * comportamento público, e não classificação de mensagem. A correção veio
+     * deliberada e visível, que era exatamente o objetivo de fixá-los.
      */
     relatedFindings: [
       {

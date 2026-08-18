@@ -467,7 +467,7 @@ test("todo residual aberto tem disposição, dono e milestone", async () => {
   const abertos = residualReport().open.filter((x) => x.tier !== "P0")
   assert.ok(abertos.length > 0, "há residuais abertos — é o estado honesto do RC")
 
-  const vocabulario = new Set(["open", "deferred", "external_evidence_required", "nonGoal"])
+  const vocabulario = new Set(["open", "deferred", "external_evidence_required", "nonGoal", "delivered"])
   for (const r of abertos) {
     const d = dispositionOf(r.prdId, r.id)
     assert.ok(d, `${r.prdId} ${r.id} sem disposição declarada`)

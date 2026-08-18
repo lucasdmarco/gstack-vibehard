@@ -27,12 +27,14 @@ import { evaluateJsonRun } from "./helpers/json-purity.js"
  *   :43  recusa `{"error":"plan_not_found"}` — literal já serializado
  *   :97  resultado completo do loop, com `planId`, contadores e branches
  *
- * ACHADO DE PRODUTO, fixado e NÃO corrigido: as três guardas de segurança
- * (repo git, `.env` rastreado, `--yes` ausente) escrevem PROSA mesmo sob
- * `--json`. É a mesma classe já registrada em P1.CLI-JSON-EXIT-CODE.b para
- * `research` — aqui é a terceira ocorrência, e o teste a fixa no estado
- * observado.
- */
+ * ACHADO DE PRODUTO CORRIGIDO (`P1.CLI-JSON-EXIT-CODE`, fix autorizado em
+ * 2026-08-17). As tres guardas de seguranca (repo git, `.env` rastreado, `--yes`
+ * ausente) escreviam PROSA mesmo sob `--json`, e TODAS saiam com exit 0.
+ *
+ * Era a ocorrencia mais perigosa das tres: um consumidor de maquina que
+ * recebesse a recusa por `.env` rastreado lia "o loop rodou bem", quando o loop
+ * tinha se RECUSADO a rodar porque um segredo iria para a worktree.
+  */
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const bin = path.join(repoRoot, "src", "index.js")
@@ -115,17 +117,97 @@ test("CONTROLE NEGATIVO: sem `--json`, a recusa sai em prosa", (t) => {
   assert.equal(r.pure, false, "no ramo humano o stdout não pode ser documento JSON puro")
 })
 
+// ── As guardas sob `--json`: documento, nunca prosa ───────────────────────
+
 /**
- * A GUARDA de `--yes` protege execução real em worktree. Ela funciona; o que
- * este teste fixa é que ela responde em PROSA mesmo sob `--json` — mesma classe
- * de P1.CLI-JSON-EXIT-CODE.b. Fixado como está, sem afirmar que está certo.
+ * A GUARDA de `--yes` protege execução real em worktree. Ela sempre funcionou; o
+ * que faltava era RESPONDER a quem chamou com `--json`.
  */
-test("ACHADO: a guarda de `--yes` ignora `--json` e responde em prosa", (t) => {
+test("GUARDA `--yes`: documento puro, `blocked:true` e exit != 0", (t) => {
   const cwd = sandbox(t)
   comPlano(cwd, "p2", [{ id: "s1", title: "noop", command: "node -e 0" }])
 
   const r = rodar(cwd, ["p2", "--json"])
   assertRodou(r, "sem --yes")
-  assert.equal(r.pure, false,
-    "comportamento ATUAL, não desejado: consumidor de máquina recebe texto onde espera documento")
+  assert.equal(r.pure, true, `stdout precisa ser documento puro (motivo: ${r.reason})`)
+  assert.equal(r.doc.blocked, true, "recusa por guarda é `blocked`, não falha de execução")
+  assert.equal(r.doc.error, "confirmation_required")
+  assert.notEqual(r.exitCode, 0)
+})
+
+/**
+ * A GUARDA MAIS IMPORTANTE das três. `.env` rastreado no git significa que o
+ * segredo iria para a worktree — e era exatamente aqui que o consumidor lia
+ * exit 0 e prosa, ou seja, "rodou bem".
+ */
+test("GUARDA `.env` rastreado: recusa serializada, com o arquivo nomeado", (t) => {
+  const cwd = sandbox(t)
+  comPlano(cwd, "p3", [{ id: "s1", title: "noop", command: "node -e 0" }])
+  writeFileSync(path.join(cwd, ".env"), "SECRET=1\n")
+  git(cwd, "add", "-f", ".env")
+  git(cwd, "commit", "-m", "env rastreado")
+
+  const r = rodar(cwd, ["p3", "--yes", "--json"])
+  assertRodou(r, "com .env rastreado")
+  assert.equal(r.pure, true, `stdout precisa ser documento puro (motivo: ${r.reason})`)
+  assert.equal(r.doc.error, "tracked_secrets")
+  assert.match(r.doc.detail, /\.env/, "o consumidor precisa saber QUAL arquivo bloqueou")
+  assert.notEqual(r.exitCode, 0, "exit 0 aqui seria ler 'segredo bloqueado' como 'tudo certo'")
+})
+
+test("GUARDA repositório git: recusa serializada", (t) => {
+  const cwd = mkdtempSync(path.join(tmpdir(), "gstack-taskrun-nogit-"))
+  t.after(() => cleanupTmp(cwd))
+  comPlano(cwd, "p4", [{ id: "s1", title: "noop", command: "node -e 0" }])
+
+  const r = rodar(cwd, ["p4", "--yes", "--json"])
+  assertRodou(r, "fora de repo git")
+  assert.equal(r.pure, true, `stdout precisa ser documento puro (motivo: ${r.reason})`)
+  assert.equal(r.doc.error, "not_a_git_repo")
+  assert.notEqual(r.exitCode, 0)
+})
+
+/**
+ * `blocked` separado de `ok` NÃO é redundância: recusa por guarda e falha de
+ * execução são estados diferentes para quem automatiza. Sem a distinção, um
+ * consumidor trataria "não rodou porque eu chamei errado" igual a "rodou e
+ * falhou" — e tentaria de novo, ou desistiria, na hora errada.
+ */
+test("o schema da recusa distingue `blocked` de `ok`", (t) => {
+  const cwd = sandbox(t)
+  comPlano(cwd, "p5", [{ id: "s1", title: "noop", command: "node -e 0" }])
+  const r = rodar(cwd, ["p5", "--json"])
+  assert.equal(r.doc.schemaVersion, "gstack.task-run.refusal.v1")
+  assert.equal(r.doc.ok, false)
+  assert.equal(r.doc.blocked, true)
+  assert.ok(r.doc.detail && r.doc.detail.length > 10, "a frase humana viaja junto")
+})
+
+// ── Exit code: a raiz do P1 ───────────────────────────────────────────────
+
+test("`plan_not_found` mantém o código público e ganha exit != 0", (t) => {
+  const r = rodar(sandbox(t), ["--json"])
+  assert.equal(r.doc.error, "plan_not_found", "o código já era público — preservado")
+  assert.notEqual(r.exitCode, 0, "o que muda é o status, que era 0")
+})
+
+test("CONTROLE POSITIVO: o caminho de RESULTADO continua saindo com 0", (t) => {
+  const cwd = sandbox(t)
+  comPlano(cwd, "p6", [{ id: "s1", title: "noop", command: "node -e 0" }])
+  const r = rodar(cwd, ["p6", "--yes", "--json"])
+  assert.equal(r.exitCode, 0, "sem isto, o exit code não distinguiria recusa de execução")
+  assert.equal(r.pure, true)
+})
+
+/**
+ * O modo humano não muda: mesma prosa, mesmo canal. O status de saída passa a
+ * valer para os dois — quem não usa `--json` merece o mesmo contrato.
+ */
+test("HUMANO: a guarda continua em prosa, e NÃO vira documento", (t) => {
+  const cwd = sandbox(t)
+  comPlano(cwd, "p7", [{ id: "s1", title: "noop", command: "node -e 0" }])
+  const r = rodar(cwd, ["p7"])
+  assertRodou(r, "sem --json")
+  assert.equal(r.pure, false, "o ramo humano nunca pode virar documento JSON")
+  assert.notEqual(r.exitCode, 0)
 })

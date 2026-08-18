@@ -32,6 +32,51 @@ function readBudget(cwd) {
  * circuit breaker. SEM auto-merge: cada passo aceito vira um branch pronto pra revisão.
  * IO injetável (opts) para teste hermético; default usa git/worktree/diffHygiene reais.
  */
+/**
+ * RECUSA de `task run` — documento puro sob `--json`, prosa sem ele.
+ *
+ * Fecha a parte mais perigosa do `P1.CLI-JSON-EXIT-CODE`: as tres guardas de
+ * seguranca respondiam em PROSA mesmo sob `--json`, e todas saiam com exit 0.
+ * Um consumidor de maquina que recebesse a recusa por `.env` rastreado no git
+ * lia "o loop rodou bem" — o loop tinha se RECUSADO a rodar justamente porque um
+ * segredo iria para a worktree. Silencio no pior lugar possivel.
+ *
+ * `blocked:true` e explicito e separado de `ok`: recusa por guarda nao e falha
+ * de execucao, e o consumidor precisa distinguir "nao rodou porque a chamada
+ * estava errada" de "rodou e falhou".
+ */
+const TASK_RUN_REFUSAL_SCHEMA = "gstack.task-run.refusal.v1"
+
+function taskRunFail(json, code, detail, humano) {
+  process.exitCode = 1
+  if (json) {
+    process.stdout.write(JSON.stringify({
+      schemaVersion: TASK_RUN_REFUSAL_SCHEMA, ok: false, blocked: true, error: code, detail,
+    }) + "\n")
+    return true
+  }
+  humano(detail)
+  return true
+}
+
+/** Guardas de seguranca ANTES de qualquer worktree. `true` = recusou. */
+function guardasDeTaskRun(cwd, yes, json) {
+  if (!isGitRepo(cwd)) {
+    return taskRunFail(json, "not_a_git_repo",
+      "`task run` exige um repositorio git (worktree por passo).", error)
+  }
+  const tracked = checkTrackedSecrets(cwd)
+  if (tracked.length) {
+    return taskRunFail(json, "tracked_secrets",
+      `.env RASTREADO no git (${tracked.join(", ")}) - nao rodo o loop (segredo iria pra worktree). Remova do git primeiro.`, error)
+  }
+  if (!yes) {
+    return taskRunFail(json, "confirmation_required",
+      "`task run` executa comandos reais em worktree por passo. Releia o plano e rode com `--yes`.", warn)
+  }
+  return false
+}
+
 export function taskRunCommand(args = [], opts = {}) {
   const cwd = opts.cwd || process.cwd()
   const json = args.includes("--json")
@@ -40,19 +85,16 @@ export function taskRunCommand(args = [], opts = {}) {
   const tasksRoot = join(cwd, ".gstack", "tasks")
   const planDir = planId ? join(tasksRoot, planId) : latestPlanDir(tasksRoot)
   if (!planDir || !existsSync(join(planDir, "task.json"))) {
-    if (json) { process.stdout.write('{"error":"plan_not_found"}\n'); return }
-    error('Plano não encontrado. Gere com `task "<pedido>"` primeiro.'); return
+    // `plan_not_found` ja era o codigo publico e fica preservado. O que muda e o
+    // exit code, que era 0.
+    taskRunFail(json, "plan_not_found", 'Plano nao encontrado. Gere com `task "<pedido>"` primeiro.', error)
+    return
   }
   const plan = JSON.parse(stripBom(readFileSync(join(planDir, "task.json"), "utf-8")))
 
-  // Guardas de segurança ANTES de qualquer worktree.
   const injected = opts.makeWorktree || opts.applyStep
-  if (!injected) {
-    if (!isGitRepo(cwd)) { error("`task run` exige um repositório git (worktree por passo)."); return }
-    const tracked = checkTrackedSecrets(cwd)
-    if (tracked.length) { error(`.env RASTREADO no git (${tracked.join(", ")}) — não rodo o loop (segredo iria pra worktree). Remova do git primeiro.`); return }
-    if (!yes) { warn("`task run` executa comandos reais em worktree por passo. Releia o plano e rode com `--yes`."); return }
-  }
+  if (!injected && guardasDeTaskRun(cwd, yes, json)) return
+
 
   const exec = opts.exec || ((file, a, o) => execFileSync(file, a, { stdio: "pipe", shell: false, timeout: 600000, ...o }))
   const created = []

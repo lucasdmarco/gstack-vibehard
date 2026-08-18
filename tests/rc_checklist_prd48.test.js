@@ -70,3 +70,21 @@ test("cobre as 8 lacunas do PRD48 §3.2 (P1.1-P1.6, P2.1-P2.2) + o baseline P0.1
   assert.ok(ids.has("P2.1"))
   assert.ok(ids.has("P2.2"))
 })
+
+/**
+ * `additionalProofs` existe porque `proof` e UM caminho: o guarda o confere em
+ * disco, e juntar varios numa string faria a verificacao passar por texto e nao
+ * por arquivo. Quando um item fecha com mais de uma prova, cada uma precisa ser
+ * conferivel do mesmo jeito.
+ */
+test("toda prova adicional tambem existe em disco", async () => {
+  const { existsSync } = await import("node:fs")
+  const { PRD48_RC_ITEMS } = await imp()
+  const comExtras = PRD48_RC_ITEMS.filter((i) => Array.isArray(i.additionalProofs))
+  assert.ok(comExtras.length > 0, "ha item fechado com mais de uma prova")
+  for (const i of comExtras) {
+    for (const prova of i.additionalProofs) {
+      assert.ok(existsSync(path.join(repoRoot, prova)), `prova adicional de ${i.id} existe: ${prova}`)
+    }
+  }
+})
