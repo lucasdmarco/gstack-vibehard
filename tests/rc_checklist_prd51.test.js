@@ -467,7 +467,7 @@ test("todo residual aberto tem disposição, dono e milestone", async () => {
   const abertos = residualReport().open.filter((x) => x.tier !== "P0")
   assert.ok(abertos.length > 0, "há residuais abertos — é o estado honesto do RC")
 
-  const vocabulario = new Set(["open", "deferred", "external_evidence_required"])
+  const vocabulario = new Set(["open", "deferred", "external_evidence_required", "nonGoal"])
   for (const r of abertos) {
     const d = dispositionOf(r.prdId, r.id)
     assert.ok(d, `${r.prdId} ${r.id} sem disposição declarada`)
@@ -485,14 +485,28 @@ test("todo residual aberto tem disposição, dono e milestone", async () => {
  * checklist. Onde a conversão é defensável — `PRD49 P1.5`, cuja exclusão nasceu
  * de achado real do auditor —, ela vem RECOMENDADA e não aplicada.
  */
-test("nenhuma disposição converte residual em non-goal por conta própria", async () => {
+/**
+ * `nonGoal` EXISTE no vocabulário, mas só chega lá por decisão humana com razão
+ * escrita — nunca por default nem por conveniência de contagem. `PRD49 P1.5` veio
+ * primeiro como RECOMENDAÇÃO nesta tabela e só foi convertido depois de aprovado.
+ */
+test("todo non-goal carrega razão, dono e data da decisão", async () => {
   const { RESIDUAL_DISPOSITIONS } = await imp()
-  for (const d of RESIDUAL_DISPOSITIONS) {
-    assert.notEqual(d.disposition, "nonGoal", `${d.id} foi fechado sem decisão humana`)
+  const { PRD49_RC_ITEMS } = await import(
+    `${pathToFileURL(path.join(repoRoot, "src", "dream", "rc-checklist-prd49.js"))}?t=${Date.now()}`)
+  const naoObjetivos = RESIDUAL_DISPOSITIONS.filter((d) => d.disposition === "nonGoal")
+  assert.ok(naoObjetivos.length > 0, "há non-goal aprovado nesta leva")
+  for (const d of naoObjetivos) {
+    assert.ok(d.owner, `${d.id}: non-goal sem dono é abandono com outro nome`)
+    assert.ok(d.rationale && d.rationale.length > 60, `${d.id}: razão precisa ser escrita`)
   }
-  const p15 = RESIDUAL_DISPOSITIONS.find((d) => d.prdId === "PRD49" && d.id === "P1.5")
-  assert.match(p15.recommendation, /nonGoal/, "a conversão defensável precisa aparecer como RECOMENDAÇÃO")
-  assert.equal(p15.disposition, "deferred", "e não como fato consumado")
+
+  // O ITEM do programa é a fonte: a disposição aponta para ele, não o substitui.
+  const p15 = PRD49_RC_ITEMS.find((i) => i.id === "P1.5")
+  assert.equal(p15.nonGoal, true)
+  assert.ok(p15.nonGoalReason && p15.nonGoalReason.length > 80, "a razão vive no item")
+  assert.ok(p15.owner && p15.nonGoalDecidedOn, "com dono e data")
+  assert.match(p15.nonGoalReason, /npm install -g/, "o motivo REAL, não uma paráfrase")
 })
 
 test("DOD.8 segue `pending` com os residuais abertos, e diz que TODOS têm destino", async () => {
@@ -577,4 +591,37 @@ test("o registry de operações serve ao firewall, não à validação de entrad
     assert.equal(/unknown (sub)?command|comando desconhecido/i.test(src), false,
       `${c} usa o registry para validar entrada — aí o recorte do DOD.12 passa a afetar claim`)
   }
+})
+
+/**
+ * NON-GOAL NÃO É ENTREGA. O item continua `status: "partial"` — porque a skill
+ * de fato não foi vendorizada — e o que o fecha é a DECISÃO registrada, não uma
+ * promoção de status. Confundir os dois transformaria "decidimos não fazer" em
+ * "fizemos", que é a mentira mais fácil de contar num checklist.
+ */
+test("non-goal fecha o residual SEM se declarar entregue", async () => {
+  const { residualReport } = await imp()
+  const { PRD49_RC_ITEMS } = await import(
+    `${pathToFileURL(path.join(repoRoot, "src", "dream", "rc-checklist-prd49.js"))}?t=${Date.now()}`)
+
+  const p15 = PRD49_RC_ITEMS.find((i) => i.id === "P1.5")
+  assert.notEqual(p15.status, "delivered", "non-goal jamais vira `delivered`")
+  assert.equal(p15.status, "partial", "o estado real do trabalho não muda por decisão")
+  assert.equal(p15.nonGoal, true)
+
+  const abertos = residualReport().open.map((x) => `${x.prdId} ${x.id}`)
+  assert.equal(abertos.includes("PRD49 P1.5"), false, "mas sai da lista de abertos")
+})
+
+/**
+ * A PORTA que impede o atalho: `nonGoal` sem razão NÃO fecha nada. Sem isto,
+ * bastaria marcar a flag para esvaziar o checklist inteiro.
+ */
+test("CONTROLE NEGATIVO: `nonGoal` sem razão continua ABERTO", async () => {
+  const { residualReport } = await imp()
+  const semRazao = [{ prdId: "X", items: [{ id: "P1.X", tier: "P1", status: "partial", nonGoal: true }] }]
+  const comRazao = [{ prdId: "X", items: [{ id: "P1.X", tier: "P1", status: "partial", nonGoal: true, nonGoalReason: "razão declarada" }] }]
+
+  assert.equal(residualReport(semRazao).total, 1, "flag sem razão é abandono, não decisão")
+  assert.equal(residualReport(comRazao).total, 0, "com razão escrita, fecha")
 })

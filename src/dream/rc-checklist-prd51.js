@@ -384,11 +384,15 @@ export const RESIDUAL_DISPOSITIONS = Object.freeze([
     rationale: "A CLI pública é PT-BR e só 4/1.049 saídas usam a infraestrutura de i18n. O bloqueio real era não existir inventário confiável da superfície de mensagem — e a Fase 1B FECHOU (1905 pontos, 0 `unknown`, gate aprovando). O caminho está aberto; a migração é a Fase 2, com plano próprio.",
     recommendation: "manter `deferred`: migrar 1.045 saídas dentro de um closeout seria o oposto de plano aprovado",
   }),
+  // CONVERTIDO em `nonGoal` por decisão humana (2026-08-17), depois de vir como
+  // recomendação nesta mesma tabela. Sai da lista de abertos — e a disposição
+  // permanece registrada, porque um residual fechado por decisão precisa dizer
+  // QUEM decidiu, não sumir.
   Object.freeze({
-    prdId: "PRD49", id: "P1.5", disposition: "deferred", owner: "lucas",
-    milestone: "PRD52 — decidir a conversão em non-goal",
-    rationale: "4 de 5 skills vendorizadas. A quinta (`defuddle`) foi excluída por achado REAL do auditor: o upstream exige `npm install -g`, que o produto não aceita.",
-    recommendation: "converter em `nonGoal` — a exclusão já é uma decisão de produto tomada, não uma pendência. NÃO convertido aqui porque a conversão fecha o residual, e fechar por conta própria é exatamente o atalho que o §9 proíbe.",
+    prdId: "PRD49", id: "P1.5", disposition: "nonGoal", owner: "lucas",
+    milestone: "decidido em 2026-08-17",
+    rationale: "4 de 5 skills vendorizadas. A quinta (`defuddle`) exige `npm install -g` no upstream, e o GStack não instala dependência de skill globalmente — mesma política que recusa `curl | sh`.",
+    recommendation: "APROVADO como non-goal. A razão está no item do PRD49, e `tests/prd_ledger.test.js` impede que non-goal seja lido como entregue.",
   }),
   Object.freeze({
     prdId: "PRD49", id: "P1.6", disposition: "deferred", owner: "lucas",

@@ -25,7 +25,26 @@ export const PRD49_RC_ITEMS = Object.freeze([
   { id: "P1.2", tier: "P1", sprint: "S49.3", version: "5.41.0", status: "delivered", title: "Projeções de hook project-local por harness — cada harness recebe seu mecanismo real, nunca global, config-sacred provado", proof: "tests/design_hook_projection.test.js" },
   { id: "P1.3", tier: "P1", sprint: "S49.4", version: "5.42.0", status: "delivered", title: "Graphify query-first — subcomandos declarados, policy soft/strict explícita, conformance honesta por harness", proof: "tests/graphify_query_first.test.js" },
   { id: "P1.4", tier: "P1", sprint: "S49.5/S51.7.4", version: "5.88.0", status: "delivered", title: "Minimality gate COM wiring real — `collectMinimalityEvidence` (PRD51 S51.7.4) popula decision-evidence do diff REAL (dependência nova em package.json, arquivo-fonte novo, concerns protegidos por caminho) e `reviewStage` consome; campos não-deriváveis ficam undefined de propósito (conservador: nunca bloqueio falso); ADVISORY, nunca reescreve o veredito de test/verify", proof: "tests/minimality_evidence.test.js" },
-  { id: "P1.5", tier: "P1", sprint: "S49.6", version: "5.44.0", status: "partial", title: "Governed Obsidian skill bundle — 4 de 5 skills vendorizadas na íntegra; defuddle excluído por achado real do auditor (npm install -g no upstream)", proof: "tests/obsidian_skill_routes.test.js" },
+  /**
+   * NON-GOAL declarado (decisão humana, 2026-08-17). A quinta skill do bundle
+   * (`defuddle`) NÃO será vendorizada.
+   *
+   * A exclusão nunca foi lacuna de implementação: o auditor achou que o upstream
+   * exige `npm install -g`, e o produto não aceita instalação global de
+   * dependência de skill. Manter o item `partial` sugeria trabalho pendente onde
+   * há decisão tomada — e `partial` sem prazo é a pior das respostas, porque
+   * parece andamento e não obriga ninguém.
+   */
+  {
+    id: "P1.5", tier: "P1", sprint: "S49.6", version: "5.44.0",
+    status: "partial",
+    nonGoal: true,
+    owner: "lucas",
+    nonGoalReason: "`defuddle` exige `npm install -g` no upstream, e o GStack não instala dependência de skill globalmente — é a mesma política que recusa `curl | sh`. Vendorizá-la exigiria ou aceitar a instalação global (contradiz o produto) ou forkar o upstream (assume manutenção de terceiro). As outras 4 skills do bundle estão vendorizadas na íntegra e nenhuma claim depende da quinta.",
+    nonGoalDecidedOn: "2026-08-17",
+    title: "Governed Obsidian skill bundle — 4 de 5 skills vendorizadas na íntegra; `defuddle` é NON-GOAL declarado (upstream exige `npm install -g`)",
+    proof: "tests/obsidian_skill_routes.test.js",
+  },
   { id: "P1.6", tier: "P1", sprint: "S49.7", version: "5.45.0", status: "partial", title: "Scroll World — controle de fluxo real (intake/orçamento/fallback/manifesto) provado via fake-provider E2E; gates determinísticos/operacionais de mídia real (seam/mobile/reduced-motion) não construídos", proof: "tests/scroll_world_route.test.js" },
   { id: "P1.7", tier: "P1", sprint: "S49.8", version: "5.46.0", status: "delivered", title: "Media-intake router (transcript-first, frame bounded) + Claude Video spike corretamente NÃO promovido sem benchmark real", proof: "tests/media_intake_router.test.js" },
   { id: "P1.8", tier: "P1", sprint: "S49.9", version: "5.47.0", status: "partial", title: "NotebookLM connector experimental — adapter real e testado (connect sempre interativo, nunca cookie automático); sem ambiente Python pinado real configurado", proof: "tests/notebooklm_adapter.test.js" },
