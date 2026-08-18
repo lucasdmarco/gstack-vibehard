@@ -61,7 +61,7 @@ Legenda de destino: **local_complete** · **human_action_required** ·
 |---|---|---|---|---|---|
 | **external_clean_machine_e2e** | não executado | `test:pack` e job `e2e` herdam ambiente preparado — nenhum é máquina LIMPA | lucas | external_evidence_required | execução em hardware/imagem sem GStack instalado, nos 3 SOs |
 | **execução real do CI** | **nunca executado** | `runtime-compat.yml` existe e nunca rodou no GitHub | lucas | external_evidence_required | run no commit do RC; até lá cross-OS é `unproven` |
-| **revogação do token npm** | **NÃO será feita** | decisão do usuário: o token segue em uso | lucas | human_action_required (decidido) | — · nada será afirmado sobre revogação |
+| **revogação do token npm** | **`security_blocking`** | decisão de 2026-08-18 — SUPERSEDE a linha anterior desta tabela, que dizia "não será feita" | lucas | human_action_required | rotação humana COMPROVADA; nada será afirmado sobre revogação até lá |
 | **sync:qg** | ✅ executado | `QG_VERSION = 5.107.0 (já sincronizado)`, hash de `qg.py` inalterado (`71cd140b…`), backup feito e descartado sem uso | claude | local_complete | ✅ idempotente, nada a restaurar |
 | **Headroom** | **não roteado** | `headroom doctor`: proxy não alcançável em `127.0.0.1:8787`; claude e codex `not routed`; `no savings recorded` | lucas | external_evidence_required | doctor com proxy ativo + harness roteado, antes de qualquer claim de economia |
 
@@ -87,7 +87,7 @@ Legenda de destino: **local_complete** · **human_action_required** ·
 1. **PRD48 `P0.CODEX-SECURITY` e `P0.CODEX-HOOKS`** — são o que mantém `ready:false`.
 2. **`PRD49 P1.5`** — autorizar a conversão em `nonGoal`.
 3. **`P1.CLI-JSON-EXIT-CODE`** — autorizar (ou não) a correção funcional.
-4. **Token npm** — decidido: **não será revogado**, segue em uso.
+4. **Token npm** — `security_blocking` até **rotação humana comprovada** (decisão de 2026-08-18).
 
 ### external_evidence_required
 
@@ -123,7 +123,7 @@ desta leva.
 
 ## Não afirmado
 
-- Token npm revogado — **decidido que não será**, e nada é dito além disso.
+- Token npm revogado — segue `security_blocking`; nada é afirmado até a rotação ser comprovada.
 - Clean-machine executado — não há máquina externa.
 - CI executado — `runtime-compat.yml` nunca rodou.
 - Headroom roteado — `doctor` mostra proxy inacessível e harness não roteado.
