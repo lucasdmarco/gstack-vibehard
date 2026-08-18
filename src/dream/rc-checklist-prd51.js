@@ -329,16 +329,118 @@ export function estadoDod7(prd51Items = PRD51_RC_ITEMS, programs = PROGRAM_CHECK
   }
 }
 
-const residualSummary = (() => {
-  const r = residualReport()
-  const nome = (x) => `${x.prdId} ${x.id}`
-  const bloq = r.blocking.map(nome)
-  const outros = r.open.filter((x) => !x.blocking).map(nome)
-  const partes = []
-  if (bloq.length) partes.push(`BLOQUEANTE(S): ${bloq.join(", ")}`)
-  if (outros.length) partes.push(`aguardando classificação: ${outros.join(", ")}`)
-  return `${r.total} residual(is) aberto(s) — ${partes.join(" | ")}`
-})()
+/**
+ * DISPOSIÇÃO de cada residual aberto — a decisão administrativa do RC.
+ *
+ * `residualReport()` responde O QUE está aberto. Isto responde O QUE SERÁ FEITO,
+ * e é outra pergunta: sem ela, "7 residuais abertos" é um número que não obriga
+ * ninguém a nada e envelhece igual em qualquer cenário.
+ *
+ * VOCABULÁRIO FECHADO, e nenhum dos três significa "resolvido":
+ *
+ *   open                       segue aberto nesta leva, por decisão explícita
+ *   deferred                   sai do RC com destino e milestone nomeados
+ *   external_evidence_required não depende de código: depende de ambiente,
+ *                              credencial ou execução que não existe aqui
+ *
+ * `nonGoal` NÃO aparece por default. Converter ausência de correção em non-goal
+ * é a forma mais barata de inflar um checklist, e é justamente o que o §9 proíbe.
+ * Onde a conversão é defensável, ela vem RECOMENDADA — a decisão é humana.
+ */
+export const RESIDUAL_DISPOSITIONS = Object.freeze([
+  Object.freeze({
+    prdId: "PRD47", id: "P1.8", disposition: "external_evidence_required", owner: "lucas",
+    milestone: "CI real + credenciais de Stripe/Supabase",
+    rationale: "7 de 14 evidências estão `proved`; as demais exigem contas reais de terceiros e multi-SO. Nenhuma linha de código fecha isso aqui.",
+    recommendation: "manter aberto até o CI real; não é dívida técnica",
+  }),
+  Object.freeze({
+    prdId: "PRD48", id: "P1.CLI-JSON-EXIT-CODE", disposition: "open", owner: "lucas",
+    milestone: "pós-RC, com correção autorizada",
+    rationale: "Exit code inconsistente sob `--json`. `fixAuthorized:false` por decisão humana explícita, e os três achados associados seguem registrados.",
+    recommendation: "NÃO corrigir nesta leva — a autorização é do usuário",
+  }),
+  Object.freeze({
+    prdId: "PRD48", id: "P2.1", disposition: "deferred", owner: "lucas",
+    milestone: "Fase 2 — cutover English-first",
+    // ATUALIZADO em 2026-08-17: o que travava este residual acabou de sair.
+    rationale: "A CLI pública é PT-BR e só 4/1.049 saídas usam a infraestrutura de i18n. O bloqueio real era não existir inventário confiável da superfície de mensagem — e a Fase 1B FECHOU (1905 pontos, 0 `unknown`, gate aprovando). O caminho está aberto; a migração é a Fase 2, com plano próprio.",
+    recommendation: "manter `deferred`: migrar 1.045 saídas dentro de um closeout seria o oposto de plano aprovado",
+  }),
+  Object.freeze({
+    prdId: "PRD49", id: "P1.5", disposition: "deferred", owner: "lucas",
+    milestone: "PRD52 — decidir a conversão em non-goal",
+    rationale: "4 de 5 skills vendorizadas. A quinta (`defuddle`) foi excluída por achado REAL do auditor: o upstream exige `npm install -g`, que o produto não aceita.",
+    recommendation: "converter em `nonGoal` — a exclusão já é uma decisão de produto tomada, não uma pendência. NÃO convertido aqui porque a conversão fecha o residual, e fechar por conta própria é exatamente o atalho que o §9 proíbe.",
+  }),
+  Object.freeze({
+    prdId: "PRD49", id: "P1.6", disposition: "deferred", owner: "lucas",
+    milestone: "PRD52",
+    rationale: "Scroll World tem controle de fluxo provado por E2E com fake-provider; faltam os gates determinísticos/operacionais de mídia.",
+    recommendation: "manter `deferred` — exige provedor real, não é fechável por decisão",
+  }),
+  Object.freeze({
+    prdId: "PRD49", id: "P1.8", disposition: "deferred", owner: "lucas",
+    milestone: "PRD52",
+    rationale: "Conector NotebookLM com adapter real e testado (connect sempre interativo, nunca cookie automático); falta ambiente Python pinado real.",
+    recommendation: "manter `deferred` — o recorte honesto já está escrito no item",
+  }),
+  Object.freeze({
+    prdId: "PRD50", id: "P1.7", disposition: "external_evidence_required", owner: "lucas",
+    milestone: "rodada de rótulo humano cego",
+    rationale: "Gates objetivos medidos e passando; a fatia subjetiva depende de rótulo humano cego POR DESIGN metodológico. Não é lacuna de implementação.",
+    recommendation: "manter aberto — fechar sem os rótulos inverteria a própria metodologia do PRD50",
+  }),
+])
+
+/**
+ * `external_clean_machine_e2e` — SEPARADO dos residuais de propósito.
+ *
+ * É condição de release, não residual de programa: nenhuma linha de código a
+ * fecha, e somá-la à contagem de P1 faria parecer dívida técnica o que é
+ * ausência de máquina externa.
+ */
+export const EXTERNAL_CLEAN_MACHINE_E2E = Object.freeze({
+  id: "external_clean_machine_e2e",
+  disposition: "external_evidence_required",
+  owner: "lucas",
+  milestone: "execução em máquina externa limpa, nos três SOs",
+  rationale: "`test:pack` prova o tarball nesta máquina, e o job `e2e` roda o lifecycle em três SOs no CI. Nenhum dos dois é máquina LIMPA: ambos herdam ambiente já preparado. A prova exige hardware/imagem sem GStack instalado.",
+  notClaimed: "nada será declarado sobre clean-machine sem que a execução exista",
+})
+
+/** Um residual só está DISPOSTO se alguém e alguma data respondem por ele. */
+export function dispositionOf(prdId, id, dispositions = RESIDUAL_DISPOSITIONS) {
+  return dispositions.find((d) => d.prdId === prdId && d.id === id) || null
+}
+
+/**
+ * Estado do DOD.8: residuais abertos, cada um COM disposição declarada.
+ *
+ * Duas falhas diferentes, e o texto as separa: residual SEM disposição é o que a
+ * certificação corrigiu (número que não obriga ninguém a nada); residual COM
+ * disposição segue aberto por decisão registrada, que é outra coisa.
+ */
+export function estadoDod8(dispositions = RESIDUAL_DISPOSITIONS, programs = PROGRAM_CHECKLISTS) {
+  const abertos = residualReport(programs).open.filter((x) => x.tier !== "P0")
+  const semDisposicao = abertos.filter((x) => !dispositionOf(x.prdId, x.id, dispositions))
+  if (abertos.length === 0) {
+    return { status: "satisfied", evidence: "derivado: nenhum residual P1 aberto", open: [] }
+  }
+  const nome = (x) => {
+    const d = dispositionOf(x.prdId, x.id, dispositions)
+    return `${x.prdId} ${x.id} [${d ? d.disposition : "SEM DISPOSIÇÃO"}]`
+  }
+  const cauda = semDisposicao.length > 0
+    ? ` — ${semDisposicao.length} SEM disposição declarada, que é a falha que o §9 proíbe`
+    : " — todos com disposição, dono e milestone declarados; abertos por decisão, não por esquecimento"
+  return {
+    status: "pending",
+    missing: `${abertos.length} residual(is) aberto(s): ${abertos.map(nome).join(", ")}${cauda}`,
+    open: abertos,
+    undisposed: semDisposicao.length,
+  }
+}
 
 export const PRD51_DOD_ITEMS = Object.freeze([
   { id: "DOD.1", kind: "runtime", requirement: "suíte completa passa três vezes em máquina fria", status: "pending", missing: "Execução não realizada; a suíte passa nesta máquina, que não é fria. ACHADO DA CERTIFICAÇÃO: a suíte tem 1 skip condicional (`tests/e2e/capabilities/docker-harness.e2e.test.js`, gated por `GSTACK_CAP_E2E=1`). Ele roda a sério em `capability-e2e.yml --strict`, MAS esse workflow é path-filtered (`src/capabilities/**`, `tests/e2e/capabilities/**`, `scripts/test-capabilities.mjs`); num commit de RC que não toque esses caminhos, o job NÃO dispara e o teste fica sem cobertura em lugar nenhum. Para certificar: acionar `workflow_dispatch` do capability-e2e no commit exato do RC e registrar o resultado — skip nunca conta como aprovado." },
@@ -355,11 +457,39 @@ export const PRD51_DOD_ITEMS = Object.freeze([
   // dizia "PRD47 P1.8 e 4 P1 do PRD49" e estava errado em duas frentes — o PRD49 tinha 3
   // (o quarto foi fechado pelo S51.7.4) e faltavam PRD48 P2.1 e PRD50 P1.7. Contar à mão
   // uma lista que muda a cada sprint garante divergência; agora sai de `residualReport()`.
-  { id: "DOD.8", kind: "derived", requirement: "residuais P1 são entregues ou convertidos explicitamente em non-goal", status: "pending", missing: residualSummary },
+  { id: "DOD.8", kind: "derived", requirement: "residuais P1 são entregues ou convertidos explicitamente em non-goal", ...estadoDod8() },
   { id: "DOD.9", kind: "static", requirement: "programComplete não depende apenas de ready", status: "satisfied", evidence: "tests/release_baseline_failclosed.test.js" },
   { id: "DOD.10", kind: "static", requirement: "dream audit não usa placar fixo", status: "satisfied", evidence: "tests/public_claims_honesty.test.js" },
   { id: "DOD.11", kind: "static", requirement: "toda claim core pública possui contrato comportamental", status: "satisfied", evidence: "tests/claim_contracts_s51_6_4.test.js" },
-  { id: "DOD.12", kind: "static", requirement: "command registry, help, dispatch e firewall têm uma fonte única", status: "partial", missing: "S51.4.5 deixou 2 das 5 detecções fora de escopo (subcomando inexistente / flag documentada não reconhecida) — exigiriam catálogo de subcomandos e flags que não existe", evidence: "tests/operation_registry.test.js" },
+  /**
+   * RECORTE DECIDIDO na certificação do RC, e não mais `partial` indefinido.
+   *
+   * `partial` sem prazo é a pior das três respostas: parece trabalho em
+   * andamento e não obriga ninguém. As 3 detecções entregues cobrem o que o RC
+   * afirma; as 2 que ficaram de fora exigiriam um catálogo de subcomandos e
+   * flags que NÃO EXISTE, e construí-lo é escopo de programa, não de closeout.
+   *
+   * O QUE NÃO SERÁ ENTREGUE, dito por extenso: detecção de subcomando
+   * inexistente e de flag documentada porém não reconhecida. Quem digitar
+   * `gstack_vibehard foo bar` com `bar` inválido, ou usar uma flag que a
+   * documentação cita e o parser ignora, NÃO recebe erro específico do registry
+   * — recai no caminho genérico do comando.
+   *
+   * NENHUMA CLAIM DO RC DEPENDE DISSO, e há teste provando: o registry é
+   * consumido para efeitos por OPERAÇÃO (o firewall Knowledge/Execution), não
+   * para validar entrada do usuário. Validação de entrada é de cada comando.
+   */
+  {
+    id: "DOD.12", kind: "static", requirement: "command registry, help, dispatch e firewall têm uma fonte única",
+    status: "partial",
+    disposition: "deferred_to_post_rc",
+    owner: "lucas",
+    milestone: "PRD52 — catálogo de subcomandos e flags",
+    notDelivered: "detecção de (a) subcomando inexistente e (b) flag documentada não reconhecida",
+    rcClaimsAffected: [],
+    missing: "S51.4.5 entregou 3 das 5 detecções. As 2 restantes exigem catálogo de subcomandos e flags que não existe — DEFERIDO para o PRD52, com o que não será entregue escrito por extenso. Nenhuma claim do RC depende do recorte: o registry serve ao firewall de efeitos por operação, não à validação de entrada do usuário.",
+    evidence: "tests/operation_registry.test.js",
+  },
   // Fechado após o PRD51: `meta/json-contract.js` deriva do registry quem anuncia
   // `--json` (25) e obriga cada um a ter receita de varredura OU exclusão com motivo —
   // 0 sem conta. A varredura achou 2 quebras reais (`dev` e `actions ledger` emitiam

@@ -454,3 +454,127 @@ test("CONTROLE: nonGoal COM motivo fecha o P0; sem motivo, não", async () => {
   assert.equal(estadoDod7(semMotivo, []).status, "pending",
     "`nonGoal` sem razão escrita é abandono com outro nome")
 })
+
+// ── DOD.8: residual aberto precisa de DONO e DESTINO ───────────────────────
+
+/**
+ * `residualReport()` responde O QUE está aberto. Sem disposição, "7 residuais
+ * abertos" é um número que não obriga ninguém a nada e envelhece igual em
+ * qualquer cenário — que é a forma administrativa do mesmo defeito do DOD.7.
+ */
+test("todo residual aberto tem disposição, dono e milestone", async () => {
+  const { residualReport, dispositionOf } = await imp()
+  const abertos = residualReport().open.filter((x) => x.tier !== "P0")
+  assert.ok(abertos.length > 0, "há residuais abertos — é o estado honesto do RC")
+
+  const vocabulario = new Set(["open", "deferred", "external_evidence_required"])
+  for (const r of abertos) {
+    const d = dispositionOf(r.prdId, r.id)
+    assert.ok(d, `${r.prdId} ${r.id} sem disposição declarada`)
+    assert.ok(vocabulario.has(d.disposition), `${r.id}: disposição fora do vocabulário`)
+    assert.ok(d.owner, `${r.id} sem dono`)
+    assert.ok(d.milestone, `${r.id} sem milestone`)
+    assert.ok(d.rationale && d.rationale.length > 40, `${r.id} sem razão escrita`)
+    assert.ok(d.recommendation, `${r.id} sem recomendação`)
+  }
+})
+
+/**
+ * `nonGoal` NÃO está no vocabulário de disposição, e a ausência é a regra:
+ * converter ausência de correção em non-goal é a forma mais barata de inflar um
+ * checklist. Onde a conversão é defensável — `PRD49 P1.5`, cuja exclusão nasceu
+ * de achado real do auditor —, ela vem RECOMENDADA e não aplicada.
+ */
+test("nenhuma disposição converte residual em non-goal por conta própria", async () => {
+  const { RESIDUAL_DISPOSITIONS } = await imp()
+  for (const d of RESIDUAL_DISPOSITIONS) {
+    assert.notEqual(d.disposition, "nonGoal", `${d.id} foi fechado sem decisão humana`)
+  }
+  const p15 = RESIDUAL_DISPOSITIONS.find((d) => d.prdId === "PRD49" && d.id === "P1.5")
+  assert.match(p15.recommendation, /nonGoal/, "a conversão defensável precisa aparecer como RECOMENDAÇÃO")
+  assert.equal(p15.disposition, "deferred", "e não como fato consumado")
+})
+
+test("DOD.8 segue `pending` com os residuais abertos, e diz que TODOS têm destino", async () => {
+  const { PRD51_DOD_ITEMS, estadoDod8 } = await imp()
+  const d8 = PRD51_DOD_ITEMS.find((d) => d.id === "DOD.8")
+  assert.equal(d8.status, "pending", "residual aberto não vira satisfeito por ter dono")
+  assert.equal(d8.undisposed, 0)
+  assert.match(d8.missing, /todos com disposição/)
+  assert.equal(d8.status, estadoDod8().status, "a caixa é o cálculo, não uma cópia")
+})
+
+/**
+ * CONTROLE NEGATIVO da própria disposição: residual SEM destino declarado
+ * precisa aparecer nomeado, senão o registro não obriga a nada.
+ */
+test("CONTROLE NEGATIVO: residual sem disposição é acusado", async () => {
+  const { estadoDod8 } = await imp()
+  const programa = [{ prdId: "PRD_X", items: [{ id: "P1.ORFAO", tier: "P1", status: "partial" }] }]
+  const r = estadoDod8([], programa)
+  assert.equal(r.status, "pending")
+  assert.equal(r.undisposed, 1)
+  assert.match(r.missing, /SEM DISPOSIÇÃO/)
+  assert.match(r.missing, /que o §9 proíbe/)
+})
+
+test("CONTROLE POSITIVO: sem residual aberto, DOD.8 fecha", async () => {
+  const { estadoDod8 } = await imp()
+  assert.equal(estadoDod8([], []).status, "satisfied", "o caminho para satisfied existe")
+})
+
+/**
+ * `external_clean_machine_e2e` fica FORA da contagem de residuais. É condição de
+ * release, não dívida de programa: somá-la aos P1 faria parecer código faltando
+ * o que é ausência de máquina.
+ */
+test("o E2E de máquina limpa é separado dos residuais, e não é afirmado", async () => {
+  const { EXTERNAL_CLEAN_MACHINE_E2E, RESIDUAL_DISPOSITIONS } = await imp()
+  assert.equal(EXTERNAL_CLEAN_MACHINE_E2E.disposition, "external_evidence_required")
+  assert.ok(EXTERNAL_CLEAN_MACHINE_E2E.owner && EXTERNAL_CLEAN_MACHINE_E2E.milestone)
+  assert.match(EXTERNAL_CLEAN_MACHINE_E2E.notClaimed, /nada será declarado/)
+  assert.equal(RESIDUAL_DISPOSITIONS.some((d) => d.id === "external_clean_machine_e2e"), false,
+    "misturá-lo aos residuais faria parecer dívida técnica o que é ausência de ambiente")
+})
+
+// ── DOD.12: recorte DECIDIDO, e não `partial` indefinido ───────────────────
+
+/**
+ * `partial` sem prazo é a pior das três respostas: parece trabalho em andamento
+ * e não obriga ninguém. Aqui o recorte vira decisão, com destino, dono e — o que
+ * mais importa — o que NÃO será entregue, escrito por extenso.
+ */
+test("DOD.12 declara destino, o que não será entregue e as claims afetadas", async () => {
+  const { PRD51_DOD_ITEMS } = await imp()
+  const d = PRD51_DOD_ITEMS.find((x) => x.id === "DOD.12")
+  assert.equal(d.status, "partial")
+  assert.equal(d.disposition, "deferred_to_post_rc")
+  assert.ok(d.owner && d.milestone)
+  assert.match(d.notDelivered, /subcomando inexistente/)
+  assert.match(d.notDelivered, /flag documentada/)
+  assert.deepEqual(d.rcClaimsAffected, [], "nenhuma claim do RC depende do recorte")
+})
+
+/**
+ * A PROVA de que nenhuma claim depende do recorte, e não a afirmação dela: o
+ * registry é consumido pelo FIREWALL de efeitos por operação, nunca para validar
+ * entrada do usuário. Se algum dia alguém o usar para validar entrada, as duas
+ * detecções que ficaram de fora passam a importar — e este teste quebra.
+ */
+test("o registry de operações serve ao firewall, não à validação de entrada", async () => {
+  const { readFileSync, readdirSync } = await import("node:fs")
+  const consumidores = []
+  for (const dir of ["src/commands", "src/cli", "src/meta", "src/skills"]) {
+    const abs = path.join(repoRoot, dir)
+    for (const f of readdirSync(abs).filter((x) => x.endsWith(".js"))) {
+      const src = readFileSync(path.join(abs, f), "utf-8")
+      if (/operation-registry/.test(src)) consumidores.push(`${dir}/${f}`)
+    }
+  }
+  assert.ok(consumidores.length > 0, "o registry precisa ter consumidor real")
+  for (const c of consumidores) {
+    const src = readFileSync(path.join(repoRoot, c), "utf-8")
+    assert.equal(/unknown (sub)?command|comando desconhecido/i.test(src), false,
+      `${c} usa o registry para validar entrada — aí o recorte do DOD.12 passa a afetar claim`)
+  }
+})
