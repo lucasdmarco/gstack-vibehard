@@ -63,7 +63,14 @@ test("item de CERTIFICAÇÃO carrega o que um achado sem dono precisa carregar",
     assert.ok(i.title && i.title.length > 10, `${i.id} tem título descritivo`)
     assert.ok(i.evidence && i.evidence.length > 50, `${i.id} carrega evidência medida, não impressão`)
     assert.ok(i.impact, `${i.id} declara o impacto`)
-    assert.equal(i.status, "pending", `${i.id} é pendência — não se auto-resolve`)
+    // Achado de certificação NÃO se auto-resolve: ou segue `pending`, ou fechou
+    // com PROVA apontável. `delivered` sem prova seria exatamente o que este
+    // teste existe para impedir.
+    if (i.status === "delivered") {
+      assert.ok(i.proof, `${i.id} fechou — precisa exibir a prova que o fechou`)
+    } else {
+      assert.equal(i.status, "pending", `${i.id} é pendência — não se auto-resolve`)
+    }
   }
 })
 
@@ -113,12 +120,18 @@ test("nenhuma caixa `runtime` é dada como satisfeita — execução não se pre
  * Não relaxar isto é o ponto: um bloqueante registrado que não derruba `ready`
  * seria decoração.
  */
-test("prd51Readiness: ready:false — os P0 dos sprints fecharam, mas a certificação abriu um", async () => {
+/**
+ * `ready` AGREGA. Fechar o bloqueante do Node zerou `p0Pending` e `ready` saltou
+ * para `true` com DOIS P0 do PRD48 abertos — o mesmo defeito do DOD.7 uma camada
+ * acima. O programa que AUDITA os outros não pode se declarar pronto ignorando
+ * os P0 que ele mesmo agrega.
+ */
+test("prd51Readiness: ready:false — P0 aberto em programa AGREGADO conta", async () => {
   const { prd51Readiness } = await imp()
   const r = prd51Readiness()
-  assert.equal(r.ready, false, "existe P0 aberto — o bloqueante de suporte do Node")
-  assert.deepEqual(r.p0Pending, ["P0.NODE-SUPPORT-GATE-INVALID"],
-    "e é SÓ ele: nenhum P0 de sprint regrediu")
+  assert.equal(r.ready, false, "PRD48 ainda tem dois P0 abertos")
+  assert.deepEqual(r.p0Pending, [], "os P0 do PRD51 fecharam — e isso sozinho não basta")
+  assert.deepEqual(r.p0OpenAggregated, ["PRD48 P0.CODEX-SECURITY", "PRD48 P0.CODEX-HOOKS"])
   assert.equal(r.programComplete, false, "o §9 ainda tem caixas abertas — ready nunca autoriza 'concluído'")
   assert.ok(r.counts.dodOpen > 0)
   assert.equal(r.counts.dodSatisfied + r.counts.dodOpen, r.counts.dod)
@@ -135,14 +148,14 @@ test("P0.NODE-SUPPORT-GATE-INVALID está registrado com classificação e opçõ
   assert.ok(item, "o achado precisa estar no ledger, não só no relatório")
 
   assert.equal(item.tier, "P0")
-  assert.equal(item.status, "pending")
-  assert.equal(item.blocking, true)
+  assert.equal(item.status, "delivered", "decisão TOMADA e coerência APLICADA")
+  assert.equal(item.blocking, false)
   // DECIDIDO em 2026-08-17 — `needsDecision` cai, mas o P0 NÃO fecha: o que
   // bloqueia passou a ser a coerência de `engines`/bootstrap com a decisão.
   assert.equal(item.needsDecision, false)
-  assert.equal(item.blockingReason, "engines_bootstrap_coherence")
-  assert.equal(item.fixAuthorized, false, "correção dos 351 arquivos NÃO foi autorizada")
-  assert.equal(item.proof, null, "sem prova: é exatamente o que falta")
+  assert.equal(item.blockingReason, null, "fechado: não há mais razão de bloqueio a declarar")
+  assert.equal(item.fixAuthorized, false, "correção dos 351 arquivos segue NÃO autorizada")
+  assert.equal(item.proof, "tests/node_support_contract.test.js")
 
   // `classification` e preservada VERBATIM: e o registro do estado no momento em
   // que o achado foi levantado, e reescreve-lo apagaria o historico do raciocinio.
@@ -228,15 +241,20 @@ test("as três claims do bloqueante são registradas SEPARADAMENTE", async () =>
  * decisão nenhuma, porque parece resolvida. Enquanto `engines` e o bootstrap
  * disserem `>=18`, o contrato público afirma o oposto do que foi decidido.
  */
-test("decisão TOMADA e hipótese refutada — o P0 segue aberto por COERÊNCIA", async () => {
+/**
+ * O P0 fechou em DUAS etapas, e a ordem importava: primeiro a decisão, depois a
+ * coerência. Fechar na primeira teria registrado uma decisão que o produto
+ * contradizia; pular a primeira teria mudado `engines` sem decisão humana.
+ */
+test("o P0 fechou: decisão TOMADA e coerência APLICADA", async () => {
   const { PRD51_RC_ITEMS, prd51Readiness } = await imp()
   const item = PRD51_RC_ITEMS.find((i) => i.id === "P0.NODE-SUPPORT-GATE-INVALID")
 
-  assert.equal(item.status, "pending")
-  assert.equal(item.blocking, true)
-  assert.equal(item.needsDecision, false, "a decisão existe")
-  assert.equal(item.blockingReason, "engines_bootstrap_coherence", "o que falta é aplicá-la")
-  assert.deepEqual(prd51Readiness().p0Pending, ["P0.NODE-SUPPORT-GATE-INVALID"])
+  assert.equal(item.status, "delivered")
+  assert.equal(item.blocking, false)
+  assert.equal(item.blockingReason, null)
+  assert.equal(item.needsDecision, false)
+  assert.deepEqual(prd51Readiness().p0Pending, [], "nenhum P0 do PRD51 segue aberto")
 })
 
 /**
@@ -259,7 +277,9 @@ test("a decisão de suporte registra tiers, base e o que NÃO é afirmado", asyn
     "o escopo viaja na claim: um SO medido não autoriza afirmação cross-OS")
   assert.match(melhorEsforco.basis, /rodar não é ser suportado/i)
   assert.match(melhorEsforco.notClaimed, /cross-OS/)
-  assert.match(d.remainingCondition, /engines/, "a condição de fechamento é objetiva")
+  assert.equal(d.remainingCondition, null, "a condição foi cumprida")
+  assert.ok(d.coherenceApplied.engines && d.coherenceApplied.bootstrap && d.coherenceApplied.ci,
+    "o que foi feito para fechar precisa estar escrito, e não só o veredito")
 })
 
 test("a evidência da matriz registra as QUATRO versões com escopo e procedência", async () => {
@@ -293,11 +313,22 @@ test("a Fase 1B NÃO é responsabilizada pelo bloqueante do Node", async () => {
     "a separação de culpa é parte do registro: misturar as duas coisas esconderia as duas")
 })
 
-test("o contrato de engines NÃO foi alterado antes da decisão", async () => {
+/**
+ * Durante todo o P0 este teste dizia "engines NÃO foi alterado antes da decisão"
+ * — mexer nele sozinho seria decidir qual runtime o produto suporta. A decisão
+ * existe agora, e a afirmação inverte: `engines` PRECISA refletir o que foi
+ * decidido, senão o contrato público contradiz o ledger.
+ */
+test("o contrato de engines segue a decisão humana — nem antes, nem sem ela", async () => {
   const { readFileSync } = await import("node:fs")
+  const { PRD51_RC_ITEMS } = await imp()
   const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"))
-  assert.match(pkg.engines.node, />=\s*18/,
-    "mexer em engines antes da decisão humana seria decidir sozinho qual runtime o produto suporta")
+  const d = PRD51_RC_ITEMS.find((i) => i.id === "P0.NODE-SUPPORT-GATE-INVALID").supportDecision
+
+  assert.equal(pkg.engines.node, ">=22")
+  assert.equal(d.tiers.find((t) => t.tier === "official").range, pkg.engines.node,
+    "a faixa oficial do ledger e o `engines` são a MESMA afirmação vista de dois lugares")
+  assert.ok(d.decidedBy, "e ela tem autor — engines nunca muda por conta própria")
 })
 
 // S51.10.4: a versão anterior fixava `DOD.22` como pendência aberta — e quebrou no
@@ -333,17 +364,20 @@ test("CONTROLE NEGATIVO: um P0 que regredir derruba ready E programComplete", as
 test("CONTROLE POSITIVO: com todo o DoD satisfeito E os P0 fechados, programComplete vira true", async () => {
   const { prd51Readiness, PRD51_RC_ITEMS, PRD51_DOD_ITEMS } = await imp()
   const tudoOk = PRD51_DOD_ITEMS.map((d) => ({ ...d, status: "satisfied", evidence: d.evidence || "sintético" }))
-  const r = prd51Readiness(comP0Fechados(PRD51_RC_ITEMS), tudoOk)
+  // Programas agregados VAZIOS: o controle é sobre o PRD51, e os P0 do PRD48 têm
+  // teste próprio. Misturá-los tornaria este positivo inalcançável por construção.
+  const r = prd51Readiness(comP0Fechados(PRD51_RC_ITEMS), tudoOk, [])
   assert.equal(r.programComplete, true, "o caminho para 'concluído' existe — não é inalcançável por construção")
   assert.equal(r.counts.dodOpen, 0)
 })
 
-test("CONTROLE: o bloqueante do Node, sozinho, impede programComplete mesmo com o DoD inteiro satisfeito", async () => {
+test("CONTROLE: UM P0 aberto basta para impedir programComplete, mesmo com o DoD inteiro satisfeito", async () => {
   const { prd51Readiness, PRD51_RC_ITEMS, PRD51_DOD_ITEMS } = await imp()
   const tudoOk = PRD51_DOD_ITEMS.map((d) => ({ ...d, status: "satisfied", evidence: d.evidence || "sintético" }))
-  const r = prd51Readiness(PRD51_RC_ITEMS, tudoOk)
-  assert.equal(r.programComplete, false, "um P0 aberto basta — o DoD satisfeito não o compensa")
-  assert.deepEqual(r.p0Pending, ["P0.NODE-SUPPORT-GATE-INVALID"])
+  const umAberto = [{ prdId: "PRD_X", items: [{ id: "P0.X", tier: "P0", status: "pending" }] }]
+  const r = prd51Readiness(comP0Fechados(PRD51_RC_ITEMS), tudoOk, umAberto)
+  assert.equal(r.programComplete, false, "o DoD satisfeito não compensa um P0 aberto")
+  assert.deepEqual(r.p0OpenAggregated, ["PRD_X P0.X"])
 })
 
 test("CONTROLE NEGATIVO: uma única caixa `partial` do DoD já impede programComplete", async () => {
@@ -365,13 +399,15 @@ test("CONTROLE NEGATIVO: uma única caixa `partial` do DoD já impede programCom
  * O erro não era o número — era a FORMA. Caixa derivada escrita à mão envelhece
  * calada, que é exatamente o defeito já corrigido no DOD.8 e repetido ao lado.
  */
-test("DOD.7 não pode ficar `satisfied` com P0 aberto — e hoje há três", async () => {
+test("DOD.7 não pode ficar `satisfied` com P0 aberto — e hoje há dois", async () => {
   const { PRD51_DOD_ITEMS, estadoDod7 } = await imp()
   const dod7 = PRD51_DOD_ITEMS.find((d) => d.id === "DOD.7")
   assert.equal(dod7.status, "pending")
   assert.equal(dod7.status, estadoDod7().status, "a caixa é o cálculo, não uma cópia dele")
-  assert.match(dod7.missing, /3 P0 aberto/)
-  for (const esperado of ["P0.NODE-SUPPORT-GATE-INVALID", "P0.CODEX-SECURITY", "P0.CODEX-HOOKS"]) {
+  // Eram TRÊS quando o defeito foi encontrado; o do Node fechou e sobraram dois.
+  // O teste segue a lista real, que é o ponto de a caixa ser derivada.
+  assert.match(dod7.missing, /2 P0 aberto/)
+  for (const esperado of ["P0.CODEX-SECURITY", "P0.CODEX-HOOKS"]) {
     assert.match(dod7.missing, new RegExp(esperado), `${esperado} precisa aparecer NOMEADO`)
   }
 })

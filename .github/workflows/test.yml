@@ -7,6 +7,10 @@ on:
     branches: [main, master]
 
 jobs:
+  # 18 e 20 continuam aqui DE PROPÓSITO, e é a única cobertura de CI que eles têm: o
+  # produto declara `best_effort` neles (decisão de 2026-08-17), e `best_effort` significa
+  # que RODA. Este job executa o produto e prova exatamente isso — nunca suíte verde, que
+  # é outra afirmação e continua falsa em 18/20.
   doctor:
     strategy:
       matrix:
@@ -38,19 +42,31 @@ jobs:
       - run: npm test
         name: "Unit tests (Node)"
 
-  # PRD51 S51.10.2 (§51.10, dimensão "Node suportado mínimo, LTS atual e versão usada no
-  # release"): as três versões só rodavam no job `doctor`, que executa UM comando. A suíte
-  # rodava exclusivamente em Node 22 — uma regressão exclusiva do Node 18 passaria batido.
-  # Aqui a suíte INTEIRA roda no mínimo e no LTS. Fica no Linux de propósito: a matriz
-  # 3 SOs × 3 Node triplicaria o custo de CI para cobrir uma combinação improvável
-  # (incompatibilidade de versão de Node que só se manifesta num SO). Recorte declarado
-  # em src/release/rc-matrix.js, não inferido.
-  test-node-matrix:
+  # PRD51 S51.10.2 criou este job para rodar a suíte INTEIRA no mínimo declarado (18) e no
+  # LTS (20), porque "uma regressão exclusiva do Node 18 passaria batido".
+  #
+  # A DECISÃO DE SUPORTE DE 2026-08-17 (`safe_support: node22_official_only`) muda a
+  # pergunta. Com o mínimo OFICIAL em 22, rodar a suíte em 18/20 seria exigir suíte verde
+  # de versões que o produto declara `best_effort` — e ela FALHA lá, por
+  # `import.meta.dirname` em 351 arquivos de teste. Um job vermelho por construção é ruído
+  # constante, indistinguível de gate ausente: foi exatamente o achado que abriu
+  # `P0.NODE-SUPPORT-GATE-INVALID`.
+  #
+  # A cobertura não sumiu, MUDOU DE PERGUNTA:
+  #   - suíte no mínimo oficial (22): job `test`, e em TRÊS SOs;
+  #   - runtime em 18/20 (best_effort): job `doctor` abaixo, que executa o produto;
+  #   - runtime empacotado nas quatro versões: `runtime-compat.yml`.
+  # Nenhuma delas afirma suíte verde em best_effort, porque ela não é.
+  test-node-next:
     strategy:
       fail-fast: false
       matrix:
-        node: [18, 20]
+        node: [24]
     runs-on: ubuntu-latest
+    # Node 24 é a PRÓXIMA versão, não um requisito: a matriz de runtime já o mediu
+    # `runtime_compatible`, mas a suíte nunca rodou lá. `continue-on-error` mantém o sinal
+    # sem transformar uma pergunta de compatibilidade futura em bloqueio do RC.
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -59,7 +75,7 @@ jobs:
       - run: npm ci
         name: "Install dependencies"
       - run: npm test
-        name: "Unit tests (Node ${{ matrix.node }})"
+        name: "Unit tests (Node ${{ matrix.node }}, informativo)"
 
   pytest:
     runs-on: ubuntu-latest

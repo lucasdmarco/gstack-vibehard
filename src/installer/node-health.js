@@ -16,7 +16,23 @@ import { npmArgv } from "./deps.js"
  * PURO/testável: exec/fs injetáveis. Registry é informativo (degraded), não gate.
  */
 
-const MIN_NODE_MAJOR = 18 // package.json engines: node >=18
+/**
+ * DOIS NÍVEIS, porque a decisão de suporte tem dois (2026-08-17,
+ * `safe_support: node22_official_only` em rc-checklist-prd51.js):
+ *
+ *   >= 22   OFICIAL. Suíte verde, runtime medido, dentro do suporte upstream.
+ *   18 | 20 BEST_EFFORT. O produto RODA — medido em pacote real, Windows,
+ *           instalação offline (matriz de 2026-08-05) — mas a suíte falha e as
+ *           versões estão fora de suporte upstream.
+ *   < 18    BLOQUEIA. Não é "não suportado": é NÃO MEDIDO. A matriz começa no 18.
+ *
+ * BLOQUEAR 18/20 SERIA MENTIR NA OUTRA DIREÇÃO. Eles rodam; quebrar quem já os
+ * usa afirmaria uma incompatibilidade que a medição refutou. `best_effort` é
+ * aviso, e é por isso que `package.json#engines` fica em `>=22` SEM
+ * `engine-strict`: o npm avisa e não impede.
+ */
+const MIN_NODE_MAJOR = 18        // piso MEDIDO — abaixo disto não há evidência
+const OFFICIAL_NODE_MAJOR = 22   // package.json engines: node >=22
 
 function defaultDeps() {
   return {
@@ -53,12 +69,27 @@ function npmShimArgv(bin, platform) {
   return { file: bin, argv: ["--version"] }
 }
 
+/** `official` | `best_effort` | `unmeasured` — o tier, nunca só um booleano. */
+function nodeSupportTier(major) {
+  if (major >= OFFICIAL_NODE_MAJOR) return "official"
+  return major >= MIN_NODE_MAJOR ? "best_effort" : "unmeasured"
+}
+
 function checkNodeVersion(nodeProbe) {
-  if (!nodeProbe.ok) return { ok: false, detail: `node não executável (${nodeProbe.detail})` }
+  if (!nodeProbe.ok) return { ok: false, tier: null, detail: `node não executável (${nodeProbe.detail})` }
   const major = parseInt(String(nodeProbe.version).replace(/^v/, ""), 10)
-  if (!Number.isInteger(major)) return { ok: false, detail: `versão ilegível: ${nodeProbe.version}` }
-  if (major < MIN_NODE_MAJOR) return { ok: false, detail: `node ${nodeProbe.version} < mínimo v${MIN_NODE_MAJOR}` }
-  return { ok: true, detail: null }
+  if (!Number.isInteger(major)) return { ok: false, tier: null, detail: `versão ilegível: ${nodeProbe.version}` }
+
+  const tier = nodeSupportTier(major)
+  if (tier === "unmeasured") {
+    return { ok: false, tier, detail: `node ${nodeProbe.version} < v${MIN_NODE_MAJOR} — abaixo do piso MEDIDO; não há evidência de que o produto rode aqui` }
+  }
+  if (tier === "best_effort") {
+    // `ok:true` de propósito: o produto RODA, e transformar isso em blocker
+    // afirmaria uma incompatibilidade que a matriz de 2026-08-05 refutou.
+    return { ok: true, tier, detail: `node ${nodeProbe.version} roda, mas o suporte OFICIAL é >=v${OFFICIAL_NODE_MAJOR}; 18/20 são best_effort (suíte falha, versões fora de suporte upstream)` }
+  }
+  return { ok: true, tier, detail: null }
 }
 
 /**
@@ -121,7 +152,17 @@ export function checkNodeHealth(overrides = {}) {
   return {
     schemaVersion: "gstack.node-health.v1",
     ok: blockers.length === 0,
-    node: { ...node, minMajor: MIN_NODE_MAJOR, versionOk: nodeVersion.ok },
+    node: {
+      ...node,
+      minMajor: MIN_NODE_MAJOR,
+      officialMajor: OFFICIAL_NODE_MAJOR,
+      supportTier: nodeVersion.tier,
+      versionOk: nodeVersion.ok,
+    },
+    // Aviso NÃO é blocker: `best_effort` precisa aparecer sem impedir. Somar as
+    // duas coisas numa lista só faria o consumidor tratar "roda com ressalva"
+    // como "não roda".
+    warnings: nodeVersion.tier === "best_effort" ? [`Node: ${nodeVersion.detail}`] : [],
     npm, npx, smoke, registry,
     windowsShim: deps.platform === "win32" ? "npm.cmd via cmd.exe (npm.ps1 pode ser bloqueado por ExecutionPolicy)" : null,
     blockers,

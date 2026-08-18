@@ -123,12 +123,13 @@ export const PRD51_RC_ITEMS = Object.freeze([
   // suportado, e não alterar `engines` antes da decisão.
   {
     id: "P0.NODE-SUPPORT-GATE-INVALID", tier: "P0", sprint: "certificação RC", version: "5.107.0",
-    status: "pending",
-    blocking: true,
-    // A DECISÃO FOI TOMADA (2026-08-17). O que ainda bloqueia não é ela: é a
-    // COERÊNCIA do contrato público com `engines`/bootstrap, que muda instalação
-    // e upgrade e por isso vive em commit próprio.
-    blockingReason: "engines_bootstrap_coherence",
+    status: "delivered",
+    blocking: false,
+    // FECHADO em 2026-08-17. As duas condições foram cumpridas em commits
+    // separados: a DECISÃO (`safe_support: node22_official_only`) e a COERÊNCIA
+    // do contrato público com `engines`/bootstrap. O item permanece no ledger
+    // com todo o histórico — fechar não é apagar como se chegou aqui.
+    blockingReason: null,
     needsDecision: false,
     fixAuthorized: false,
     /**
@@ -153,7 +154,13 @@ export const PRD51_RC_ITEMS = Object.freeze([
           notClaimed: "cross-OS não é afirmado: `runtime-compat.yml` nunca executou no GitHub",
         }),
       ]),
-      remainingCondition: "`engines` e `node-health.js` ainda dizem `>=18`; enquanto disserem, o contrato público contradiz a decisão e este P0 NÃO fecha",
+      remainingCondition: null,
+      coherenceApplied: Object.freeze({
+        engines: "package.json#engines.node: `>=18` -> `>=22`, SEM `engine-strict` — o npm avisa e não impede, que é a semântica de best_effort",
+        bootstrap: "src/installer/node-health.js ganhou DOIS níveis: `official` (>=22), `best_effort` (18/20, aviso sem bloqueio) e `unmeasured` (<18, bloqueia). Bloquear 18/20 afirmaria uma incompatibilidade que a matriz refutou",
+        ci: "o job de suíte em 18/20 saiu — exigir suíte verde de versão `best_effort` era o job vermelho por construção que ORIGINOU este achado. A cobertura de 18/20 fica no job `doctor`, que EXECUTA o produto em três SOs",
+        notClaimed: "cross-OS segue `unproven`: `runtime-compat.yml` nunca rodou no GitHub",
+      }),
     }),
     // Nomes preservados verbatim da classificação humana: o registro é a decisão,
     // não uma paráfrase dela.
@@ -240,7 +247,7 @@ export const PRD51_RC_ITEMS = Object.freeze([
       { id: "B", recommended: false, summary: "Manter Node 18 como suportado", requires: "frente SEPARADA para migrar 351 arquivos de teste de `import.meta.dirname` para `fileURLToPath(import.meta.url)`, com a suíte verde em Node 18 antes de qualquer claim" },
     ]),
     title: "Suporte a Node 18 anunciado sem prova: a suíte não roda no Node 18 (352/561 falham por `import.meta.dirname`) e o gate `test-node-matrix` é estruturalmente inválido desde o S51.10.2",
-    proof: null,
+    proof: "tests/node_support_contract.test.js",
   },
 
   // Achado da revisão da Task 2 (2026-08-07). DEFERIDO para a Fatia 7/CI por
@@ -394,15 +401,30 @@ const isSatisfied = (d) => d.status === "satisfied"
  *
  * `openDoD` sai com o que falta, item a item, para que nada fique pendente em silêncio.
  */
-export function prd51Readiness(items = PRD51_RC_ITEMS, dod = PRD51_DOD_ITEMS) {
+export function prd51Readiness(items = PRD51_RC_ITEMS, dod = PRD51_DOD_ITEMS, programs = PROGRAM_CHECKLISTS) {
   const p0 = items.filter((i) => i.tier === "P0")
   const p0Pending = p0.filter((i) => !itemIsClosed(i))
   const p1Open = items.filter((i) => i.tier === "P1" && !itemIsClosed(i))
   const dodOpen = dod.filter((d) => !isSatisfied(d))
+
+  /**
+   * P0 ABERTOS EM QUALQUER PROGRAMA, e não só nos itens do PRD51.
+   *
+   * Fechar o `P0.NODE-SUPPORT-GATE-INVALID` levou `p0Pending` a zero e `ready`
+   * saltou para `true` — com DOIS P0 do PRD48 abertos. Era o mesmo defeito do
+   * DOD.7 uma camada acima: o programa que AUDITA os outros não pode se declarar
+   * pronto ignorando os P0 que ele mesmo agrega.
+   *
+   * `p0Pending` continua respondendo "os sprints do PRD51 fecharam?" — é
+   * informação útil e diferente. `ready` passa a exigir as duas coisas.
+   */
+  const p0Agregados = p0AbertosAgregados(items, programs)
+
   return {
     schemaVersion: PRD51_RC_CHECKLIST_SCHEMA,
-    ready: p0Pending.length === 0,
-    programComplete: p0Pending.length === 0 && dodOpen.length === 0,
+    ready: p0Agregados.length === 0,
+    programComplete: p0Agregados.length === 0 && dodOpen.length === 0,
+    p0OpenAggregated: p0Agregados.map((x) => `${x.prdId} ${x.id}`),
     counts: {
       items: items.length,
       p0: p0.length,

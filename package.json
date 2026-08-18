@@ -50,7 +50,7 @@
     "test:visibility": "node scripts/check-test-visibility.mjs"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "files": [
     "src/",
