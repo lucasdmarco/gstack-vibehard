@@ -125,9 +125,36 @@ export const PRD51_RC_ITEMS = Object.freeze([
     id: "P0.NODE-SUPPORT-GATE-INVALID", tier: "P0", sprint: "certificação RC", version: "5.107.0",
     status: "pending",
     blocking: true,
-    blockingReason: "release_support_decision",
-    needsDecision: true,
+    // A DECISÃO FOI TOMADA (2026-08-17). O que ainda bloqueia não é ela: é a
+    // COERÊNCIA do contrato público com `engines`/bootstrap, que muda instalação
+    // e upgrade e por isso vive em commit próprio.
+    blockingReason: "engines_bootstrap_coherence",
+    needsDecision: false,
     fixAuthorized: false,
+    /**
+     * DECISÃO HUMANA DE SUPORTE, registrada verbatim.
+     *
+     * Ela NÃO é consequência da medição — a matriz refutou a incompatibilidade e
+     * mostrou que 18/20 rodam. É decisão de POLÍTICA, tomada sobre duas coisas
+     * que a medição estabeleceu: a suíte não passa em 18/20, e essas versões
+     * estão fora de suporte upstream.
+     */
+    supportDecision: Object.freeze({
+      decidedOn: "2026-08-17",
+      decidedBy: "lucas",
+      safe_support: "node22_official_only",
+      tiers: Object.freeze([
+        Object.freeze({ range: ">=22", tier: "official", basis: "suíte verde, runtime medido, dentro do suporte upstream" }),
+        Object.freeze({
+          range: "18 || 20",
+          tier: "best_effort",
+          claim: "runtime_compatible_windows_local",
+          basis: "o produto RODA (matriz de 2026-08-05, Windows, pacote real), mas a suíte falha e as versões estão fora de suporte upstream — rodar não é ser suportado",
+          notClaimed: "cross-OS não é afirmado: `runtime-compat.yml` nunca executou no GitHub",
+        }),
+      ]),
+      remainingCondition: "`engines` e `node-health.js` ainda dizem `>=18`; enquanto disserem, o contrato público contradiz a decisão e este P0 NÃO fecha",
+    }),
     // Nomes preservados verbatim da classificação humana: o registro é a decisão,
     // não uma paráfrase dela.
     classification: Object.freeze({
@@ -151,8 +178,11 @@ export const PRD51_RC_ITEMS = Object.freeze([
       // deram `runtime_compatible`. A hipótese que originou este P0 — de que o
       // produto poderia não rodar em Node 18 — foi REFUTADA.
       runtime_compatibility: "proved_windows_local",
-      suite_compatibility: "failing",     // 208 pass / 352 fail, medido
-      safe_support: "undecided",          // decisão humana; depende das duas acima
+      suite_compatibility: "failing",     // 208 pass / 352 fail, medido — segue failing
+      // DECIDIDO em 2026-08-17 (ver `supportDecision`). Node >=22 é o suporte
+      // oficial; 18/20 ficam `best_effort` porque RODAM sem que a suíte passe.
+      safe_support: "node22_official_only",
+      cross_os: "unproven",               // nenhuma claim antes do CI real
     }),
     /** Evidência da matriz, com o escopo exato do que foi medido. */
     runtimeMatrix: Object.freeze({
@@ -203,8 +233,8 @@ export const PRD51_RC_ITEMS = Object.freeze([
         node22_status: "recommended_runtime",
         // MEDIDO: as quatro versões deram `runtime_compatible` no Windows.
         node18_20_status: "runtime_compatible_windows_local",
-        obtained: "Matriz autoritativa de 2026-08-05 (ver `runtimeMatrix`): pacote real, instalação offline, 10 oráculos semânticos por versão, completude verificada. O produto FUNCIONA em Node 18/20/22/24 no Windows — a hipótese de incompatibilidade foi refutada.",
-        requires: "Falta apenas a cobertura cross-OS: o workflow `runtime-compat.yml` existe mas NUNCA rodou no GitHub, então Linux/macOS seguem `unproven`. `safe_support` continua `undecided` — é decisão de política, não de compatibilidade.",
+        obtained: "Matriz autoritativa de 2026-08-05 (ver `runtimeMatrix`): pacote real, instalação offline, 10 oráculos semânticos por versão, completude verificada. O produto FUNCIONA em Node 18/20/22/24 no Windows — a hipótese de incompatibilidade foi refutada. DECISÃO TOMADA em 2026-08-17: `safe_support = node22_official_only`, com 18/20 em `best_effort` (ver `supportDecision`).",
+        requires: "Duas coisas, e nenhuma é decisão: (a) COERÊNCIA — `package.json#engines` e `src/installer/node-health.js:MIN_NODE_MAJOR` ainda dizem 18, e enquanto disserem o contrato público contradiz a decisão; (b) cobertura cross-OS — `runtime-compat.yml` existe mas NUNCA rodou no GitHub, então Linux/macOS seguem `unproven` e nada será afirmado sobre eles antes do CI real.",
       },
       { id: "A", recommended: false, summary: "Elevar o mínimo para Node 22 e testar a matriz 22/24", requires: "atualizar package.json, doctor, instalador, documentação e matriz de capacidades; remover toda claim pública de Node 18/20; provar instalação limpa em Node 22. NÃO recomendada AGORA: decidiria o contrato do produto a partir de evidência sobre os testes." },
       { id: "B", recommended: false, summary: "Manter Node 18 como suportado", requires: "frente SEPARADA para migrar 351 arquivos de teste de `import.meta.dirname` para `fileURLToPath(import.meta.url)`, com a suíte verde em Node 18 antes de qualquer claim" },
@@ -257,6 +287,41 @@ export function residualReport(programs = PROGRAM_CHECKLISTS) {
   return { total: abertos.length, blocking: abertos.filter((x) => x.blocking), open: abertos }
 }
 
+/**
+ * P0 ABERTOS em TODOS os checklists — o do PRD51 e os seis agregados.
+ *
+ * DOD.7 diz "nenhum P0 permanece partial/pending", e até esta certificação ele
+ * era a string `satisfied` com uma evidência que AFIRMAVA ser computada e não
+ * era. Três P0 estavam abertos enquanto a caixa se dizia satisfeita — dois do
+ * PRD48 (`P0.CODEX-SECURITY`, `P0.CODEX-HOOKS`) e o próprio
+ * `P0.NODE-SUPPORT-GATE-INVALID` do PRD51.
+ *
+ * O erro não era o número: era a FORMA. Uma caixa `derived` escrita à mão não é
+ * derivada de nada, e envelhece calada — exatamente o defeito que o DOD.8 já
+ * tinha corrigido antes, e que este repetia ao lado.
+ */
+export function p0AbertosAgregados(prd51Items = PRD51_RC_ITEMS, programs = PROGRAM_CHECKLISTS) {
+  const daqui = prd51Items.filter((i) => i.tier === "P0" && !residualFechado(i))
+    .map((i) => residualRow("PRD51", i))
+  const dosOutros = programs.flatMap(({ prdId, items }) =>
+    items.filter((i) => i.tier === "P0" && !residualFechado(i)).map((i) => residualRow(prdId, i)))
+  return [...daqui, ...dosOutros]
+}
+
+/** Estado do DOD.7, DERIVADO de verdade. `satisfied` só com a lista vazia. */
+export function estadoDod7(prd51Items = PRD51_RC_ITEMS, programs = PROGRAM_CHECKLISTS) {
+  const abertos = p0AbertosAgregados(prd51Items, programs)
+  if (abertos.length === 0) {
+    return { status: "satisfied", evidence: "derivado: nenhum P0 aberto no PRD51 nem nos checklists agregados", open: [] }
+  }
+  const nomes = abertos.map((x) => `${x.prdId} ${x.id} (${x.status})`)
+  return {
+    status: "pending",
+    missing: `${abertos.length} P0 aberto(s): ${nomes.join(", ")}`,
+    open: abertos,
+  }
+}
+
 const residualSummary = (() => {
   const r = residualReport()
   const nome = (x) => `${x.prdId} ${x.id}`
@@ -275,7 +340,10 @@ export const PRD51_DOD_ITEMS = Object.freeze([
   { id: "DOD.4", kind: "static", requirement: "`start` não entrega sem gates aplicáveis, acceptance e proof real", status: "satisfied", evidence: "tests/golden_run_default.test.js" },
   { id: "DOD.5", kind: "static", requirement: "PRD47 retorna ready:true", status: "satisfied", evidence: "tests/rc_checklist_prd47.test.js" },
   { id: "DOD.6", kind: "static", requirement: "PRD45–PRD50 possuem checklist no schema comum", status: "satisfied", evidence: "tests/prd_ledger.test.js" },
-  { id: "DOD.7", kind: "derived", requirement: "nenhum P0 permanece partial/pending", status: "satisfied", evidence: "computado de PRD51_RC_ITEMS e dos checklists agregados por `prd status`" },
+  // DERIVADO DE VERDADE desde a certificação do RC. Antes era a string
+  // `satisfied` com uma evidência que dizia ser computada e não era — e havia
+  // TRÊS P0 abertos enquanto a caixa se declarava satisfeita. Ver `estadoDod7`.
+  { id: "DOD.7", kind: "derived", requirement: "nenhum P0 permanece partial/pending", ...estadoDod7() },
   // DERIVADO do ledger (decisão humana na certificação do RC): o texto fixo anterior
   // dizia "PRD47 P1.8 e 4 P1 do PRD49" e estava errado em duas frentes — o PRD49 tinha 3
   // (o quarto foi fechado pelo S51.7.4) e faltavam PRD48 P2.1 e PRD50 P1.7. Contar à mão

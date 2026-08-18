@@ -137,10 +137,15 @@ test("P0.NODE-SUPPORT-GATE-INVALID está registrado com classificação e opçõ
   assert.equal(item.tier, "P0")
   assert.equal(item.status, "pending")
   assert.equal(item.blocking, true)
-  assert.equal(item.needsDecision, true)
+  // DECIDIDO em 2026-08-17 — `needsDecision` cai, mas o P0 NÃO fecha: o que
+  // bloqueia passou a ser a coerência de `engines`/bootstrap com a decisão.
+  assert.equal(item.needsDecision, false)
+  assert.equal(item.blockingReason, "engines_bootstrap_coherence")
   assert.equal(item.fixAuthorized, false, "correção dos 351 arquivos NÃO foi autorizada")
   assert.equal(item.proof, null, "sem prova: é exatamente o que falta")
 
+  // `classification` e preservada VERBATIM: e o registro do estado no momento em
+  // que o achado foi levantado, e reescreve-lo apagaria o historico do raciocinio.
   assert.deepEqual(item.classification, {
     declared_support: "node >=18",
     phase1b_compatibility: "proved_on_node18",
@@ -165,7 +170,7 @@ test("P0.NODE-SUPPORT-GATE-INVALID está registrado com classificação e opçõ
   // `evidence_required` -> `evidence_partial`: a matriz Windows foi obtida; falta
   // cross-OS. O status acompanha a evidência, e não o contrário.
   assert.equal(c.decision_status, "evidence_partial")
-  assert.equal(c.current_engines, "unchanged", "engines segue intocado até a decisão")
+  assert.equal(c.current_engines, "unchanged", "a opção descreve o estado em que foi escrita")
   assert.equal(c.node22_status, "recommended_runtime")
   assert.equal(c.node18_20_status, "runtime_compatible_windows_local",
     "18/20 rodam o produto — o que falta é decisão de suporte, não compatibilidade")
@@ -187,15 +192,22 @@ test("as três claims do bloqueante são registradas SEPARADAMENTE", async () =>
   assert.deepEqual(item.claims, {
     runtime_compatibility: "proved_windows_local",
     suite_compatibility: "failing",
-    safe_support: "undecided",
+    safe_support: "node22_official_only",
+    cross_os: "unproven",
   })
 
   // O escopo viaja na própria claim: `proved_windows_local`, nunca `proved`.
   // Um SO medido não autoriza afirmação cross-OS.
   assert.notEqual(item.claims.runtime_compatibility, "proved")
   assert.match(item.claims.runtime_compatibility, /windows_local/)
-  assert.equal(item.claims.safe_support, "undecided",
-    "medir compatibilidade NÃO decide o contrato de suporte")
+  // DECIDIDO, e a separação continua sendo o ponto: `safe_support` mudou por
+  // decisão humana de POLÍTICA, não porque a compatibilidade foi medida. As
+  // outras duas claims não se moveram — `suite_compatibility` segue `failing`.
+  assert.equal(item.claims.safe_support, "node22_official_only")
+  assert.equal(item.claims.suite_compatibility, "failing",
+    "decidir suporte não conserta a suíte, e não pode fingir que consertou")
+  assert.equal(item.claims.cross_os, "unproven",
+    "nenhuma claim cross-OS antes do CI real")
 
   // A evidência precisa carregar os números medidos, não uma impressão.
   for (const numero of ["208", "352", "351", "74"]) {
@@ -210,14 +222,44 @@ test("as três claims do bloqueante são registradas SEPARADAMENTE", async () =>
  * cross-OS. Fechar aqui seria trocar "o produto funciona" por "o suporte está
  * decidido", que são coisas diferentes.
  */
-test("a matriz REFUTA a hipótese, mas o P0 permanece ABERTO", async () => {
+/**
+ * A matriz REFUTOU a hipótese e a decisão FOI TOMADA — e o P0 continua aberto.
+ * Não é teimosia: uma decisão registrada que o produto contradiz é pior que
+ * decisão nenhuma, porque parece resolvida. Enquanto `engines` e o bootstrap
+ * disserem `>=18`, o contrato público afirma o oposto do que foi decidido.
+ */
+test("decisão TOMADA e hipótese refutada — o P0 segue aberto por COERÊNCIA", async () => {
   const { PRD51_RC_ITEMS, prd51Readiness } = await imp()
   const item = PRD51_RC_ITEMS.find((i) => i.id === "P0.NODE-SUPPORT-GATE-INVALID")
 
-  assert.equal(item.status, "pending", "medir compatibilidade não fecha o bloqueante")
+  assert.equal(item.status, "pending")
   assert.equal(item.blocking, true)
-  assert.equal(item.needsDecision, true)
+  assert.equal(item.needsDecision, false, "a decisão existe")
+  assert.equal(item.blockingReason, "engines_bootstrap_coherence", "o que falta é aplicá-la")
   assert.deepEqual(prd51Readiness().p0Pending, ["P0.NODE-SUPPORT-GATE-INVALID"])
+})
+
+/**
+ * A DECISÃO, registrada com quem decidiu e o que ela NÃO afirma. Duas coisas
+ * precisam sobreviver a qualquer releitura: 18/20 RODAM (rodar não é ser
+ * suportado), e cross-OS não é afirmado.
+ */
+test("a decisão de suporte registra tiers, base e o que NÃO é afirmado", async () => {
+  const { PRD51_RC_ITEMS } = await imp()
+  const d = PRD51_RC_ITEMS.find((i) => i.id === "P0.NODE-SUPPORT-GATE-INVALID").supportDecision
+
+  assert.equal(d.safe_support, "node22_official_only")
+  assert.ok(d.decidedOn && d.decidedBy, "decisão sem autor e data é boato")
+
+  const oficial = d.tiers.find((t) => t.tier === "official")
+  const melhorEsforco = d.tiers.find((t) => t.tier === "best_effort")
+  assert.equal(oficial.range, ">=22")
+  assert.match(melhorEsforco.range, /18/)
+  assert.equal(melhorEsforco.claim, "runtime_compatible_windows_local",
+    "o escopo viaja na claim: um SO medido não autoriza afirmação cross-OS")
+  assert.match(melhorEsforco.basis, /rodar não é ser suportado/i)
+  assert.match(melhorEsforco.notClaimed, /cross-OS/)
+  assert.match(d.remainingCondition, /engines/, "a condição de fechamento é objetiva")
 })
 
 test("a evidência da matriz registra as QUATRO versões com escopo e procedência", async () => {
@@ -309,4 +351,70 @@ test("CONTROLE NEGATIVO: uma única caixa `partial` do DoD já impede programCom
   const umaAberta = PRD51_DOD_ITEMS.map((d, idx) => (idx === 0 ? { ...d, status: "partial", missing: "recorte declarado só para este controle negativo" } : { ...d, status: "satisfied", evidence: "sintético" }))
   const r = prd51Readiness(PRD51_RC_ITEMS, umaAberta)
   assert.equal(r.programComplete, false, "`partial` não é `satisfied` — meia prova não fecha caixa")
+})
+
+// ── DOD.7: derivado de verdade, e não uma string que se diz derivada ────────
+
+/**
+ * O DEFEITO QUE ESTE BLOCO FECHA: `DOD.7` era literalmente
+ * `status: "satisfied"` com `evidence: "computado de PRD51_RC_ITEMS e dos
+ * checklists agregados"` — uma caixa `derived` escrita à mão, que afirmava ser
+ * derivada e não era. Enquanto ela se dizia satisfeita, TRÊS P0 estavam abertos:
+ * o `P0.NODE-SUPPORT-GATE-INVALID` do próprio PRD51 e dois do PRD48.
+ *
+ * O erro não era o número — era a FORMA. Caixa derivada escrita à mão envelhece
+ * calada, que é exatamente o defeito já corrigido no DOD.8 e repetido ao lado.
+ */
+test("DOD.7 não pode ficar `satisfied` com P0 aberto — e hoje há três", async () => {
+  const { PRD51_DOD_ITEMS, estadoDod7 } = await imp()
+  const dod7 = PRD51_DOD_ITEMS.find((d) => d.id === "DOD.7")
+  assert.equal(dod7.status, "pending")
+  assert.equal(dod7.status, estadoDod7().status, "a caixa é o cálculo, não uma cópia dele")
+  assert.match(dod7.missing, /3 P0 aberto/)
+  for (const esperado of ["P0.NODE-SUPPORT-GATE-INVALID", "P0.CODEX-SECURITY", "P0.CODEX-HOOKS"]) {
+    assert.match(dod7.missing, new RegExp(esperado), `${esperado} precisa aparecer NOMEADO`)
+  }
+})
+
+/**
+ * A PORTA DA AGREGAÇÃO, e é ela que justifica o `derived`: um P0 aberto em
+ * OUTRO programa precisa reprovar o DOD.7 do PRD51. Sem isso, o PRD51 poderia se
+ * declarar sem P0 pendente enquanto um programa que ele audita tem.
+ */
+test("CONTROLE NEGATIVO: P0 aberto em checklist AGREGADO reprova o DOD.7", async () => {
+  const { estadoDod7 } = await imp()
+  const prd51Limpo = [{ id: "X", tier: "P0", status: "delivered" }]
+  const outroPrograma = [{
+    prdId: "PRD_SINTETICO",
+    items: [{ id: "P0.SINTETICO", tier: "P0", status: "pending", blocking: true }],
+  }]
+
+  const semAgregado = estadoDod7(prd51Limpo, [])
+  assert.equal(semAgregado.status, "satisfied", "controle positivo: o caminho para satisfied existe")
+
+  const comAgregado = estadoDod7(prd51Limpo, outroPrograma)
+  assert.equal(comAgregado.status, "pending",
+    "P0 de outro programa é P0 aberto — o PRD51 audita os outros, não se isenta deles")
+  assert.match(comAgregado.missing, /PRD_SINTETICO P0\.SINTETICO/)
+})
+
+test("CONTROLE: `partial` também conta como P0 aberto, não só `pending`", async () => {
+  const { estadoDod7 } = await imp()
+  const r = estadoDod7([{ id: "P0.X", tier: "P0", status: "partial" }], [])
+  assert.equal(r.status, "pending", "meia entrega não fecha caixa — é a regra do checklist inteiro")
+})
+
+test("CONTROLE: P1 aberto NÃO reprova o DOD.7 — a caixa é sobre P0", async () => {
+  const { estadoDod7 } = await imp()
+  const r = estadoDod7([{ id: "P1.X", tier: "P1", status: "pending" }], [])
+  assert.equal(r.status, "satisfied", "residual P1 tem caixa própria (DOD.8); confundir as duas esconderia ambas")
+})
+
+test("CONTROLE: nonGoal COM motivo fecha o P0; sem motivo, não", async () => {
+  const { estadoDod7 } = await imp()
+  const comMotivo = [{ id: "P0.X", tier: "P0", status: "pending", nonGoal: true, nonGoalReason: "recorte declarado" }]
+  const semMotivo = [{ id: "P0.X", tier: "P0", status: "pending", nonGoal: true }]
+  assert.equal(estadoDod7(comMotivo, []).status, "satisfied")
+  assert.equal(estadoDod7(semMotivo, []).status, "pending",
+    "`nonGoal` sem razão escrita é abandono com outro nome")
 })
