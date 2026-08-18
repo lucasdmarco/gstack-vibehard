@@ -27,13 +27,20 @@ test("guarda: TODA chave de CLAIM_CONTRACTS corresponde a um claim real (sem con
   assert.throws(() => assertContractsBindToClaims(["verify"]), /não corresponde|órfão|morto/i)
 })
 
-test("os 3 contratos antes mortos agora VINCULAM e graduam REAL (capacidades provadas)", async () => {
+// PRD45 S45.7 provou que estes 3 contratos deixaram de ser config morta (existem e
+// VINCULAM a um claim). O status deles, porém, não é fixo: a régua do PRD52 S52.B
+// verifica o contrato contra o repo, e `action-kernel` caiu para NOT_PROVED porque
+// seu `e2eCommand` era um nome de função. Congelar "REAL" aqui obrigaria a fraudar
+// o contrato para manter o teste verde — o inverso do que ele existe para garantir.
+test("os 3 contratos antes mortos VINCULAM, e o status de cada um bate com o baseline", async () => {
   const { audit } = await imp(auditorMod)
+  const { TEETH_BASELINE } = await imp("src/dream/teeth-baseline.js")
   const claims = audit({ behavioral: true }).claims
   const byId = Object.fromEntries(claims.map((c) => [c.id, c]))
   for (const id of ["qa-lens", "action-kernel", "loop-checkpoint"]) {
     assert.ok(byId[id], `claim '${id}' agora existe`)
-    assert.equal(byId[id].status, "REAL", `'${id}' tem contrato comportamental + arquivos ⇒ REAL`)
+    const esperado = id in TEETH_BASELINE.quedas ? "NOT_PROVED" : "REAL"
+    assert.equal(byId[id].status, esperado, `'${id}': status tem de bater com o baseline registrado`)
   }
 })
 

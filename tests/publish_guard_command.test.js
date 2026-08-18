@@ -31,7 +31,11 @@ test("publish-guard --json: pass quando tudo ok", async () => {
     let buf = ""
     const orig = process.stdout.write.bind(process.stdout)
     process.stdout.write = (s) => { buf += String(s); return true }
-    try { await publishGuardCommand(["--json"], { cwd, exec: gitExec({ tags: ["v2.28.1"] }), noExit: true }) }
+    // Placar por FIXTURE: este teste é sobre o contrato JSON do comando, não sobre
+    // quantas claims do repo estão provadas. Herdar o audit real fazia o resultado
+    // mudar junto com o placar (foi o que o S52.B expôs).
+    const dream = () => ({ summary: { REAL: 1, RISK: 0, PLACEBO: 0 }, claims: [{ id: "verify", status: "REAL" }] })
+    try { await publishGuardCommand(["--json"], { cwd, exec: gitExec({ tags: ["v2.28.1"] }), dream, noExit: true }) }
     finally { process.stdout.write = orig }
     const out = JSON.parse(buf.trim())
     assert.equal(out.status, "pass")

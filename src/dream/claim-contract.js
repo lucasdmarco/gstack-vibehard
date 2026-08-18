@@ -7,7 +7,15 @@
  * que reprova se a capacidade for removida) e uma janela de FRESCOR. Sem isso, o melhor
  * que um claim "com arquivos no lugar" alcança é `NOT_PROVED` — nem RISK/PLACEBO (não é
  * mentira ativa), nem REAL (não há prova de que FUNCIONA para o usuário final).
+ *
+ * PRD52 S52.B — OS DENTES. Até aqui a exigência era só que os quatro campos fossem
+ * *truthy*: prosa bem escrita passava. Agora cada campo é VERIFICADO contra o repo
+ * auditado por `claim-contract-check.js` — o adaptador existe, o comando E2E é
+ * executável, o controle negativo é um teste real e toca a capacidade. Um contrato
+ * que não sobrevive à verificação vale o mesmo que contrato ausente: `NOT_PROVED`.
  */
+import { contratoComDentes, problemasDoContrato } from "./claim-contract-check.js"
+
 export const CLAIM_CONTRACT_SCHEMA = "gstack.dream.claim-contract.v1"
 
 export const CLAIM_CONTRACT_FIELDS = Object.freeze([
@@ -25,12 +33,25 @@ export function hasBehavioralContract(contract) {
 
 /**
  * Rebaixa o status de um claim segundo o contrato: `REAL` só sobrevive COM contrato
- * comportamental; REAL sem contrato → `NOT_PROVED`. RISK/PLACEBO/PARTIAL/ROADMAP passam
- * intactos (não são elevados por arquivo — só o comportamento eleva a REAL).
+ * comportamental VERIFICADO; REAL sem contrato → `NOT_PROVED`. RISK/PLACEBO/PARTIAL/
+ * ROADMAP passam intactos (não são elevados por arquivo — só o comportamento eleva a
+ * REAL).
+ *
+ * `io` é o leitor do repo auditado (o auditor roda tanto no repo-fonte quanto no
+ * tarball). Omiti-lo NÃO desliga a verificação: cai no repo deste módulo. Uma
+ * verificação que só acontece quando alguém lembra de injetar o leitor seria um
+ * portão com porta dos fundos.
  */
-export function gradeClaimStatus(fileStatus, contract) {
+export function gradeClaimStatus(fileStatus, contract, io = undefined) {
   if (fileStatus !== "REAL") return fileStatus
-  return hasBehavioralContract(contract) ? "REAL" : NOT_PROVED
+  if (!hasBehavioralContract(contract)) return NOT_PROVED
+  return contratoComDentes(contract, io) ? "REAL" : NOT_PROVED
+}
+
+/** POR QUE o claim caiu — o motivo por claim que o placar e o closeout registram. */
+export function motivosDaQueda(contract, io = undefined) {
+  if (!hasBehavioralContract(contract)) return ["[campos] contrato ausente ou incompleto"]
+  return problemasDoContrato(contract, io)
 }
 
 // Registro dos claims que TÊM prova comportamental de verdade — os construídos com E2E +
@@ -149,7 +170,7 @@ export const CLAIM_CONTRACTS = Object.freeze({
   // (duplicava a lógica do próprio auditor). Novo teste roda `npm sbom` de
   // verdade e prova o gate FALHANDO sem manifesto válido, não só passando.
   "governance": {
-    evidenceAdapter: "package.json (script sbom)", e2eCommand: "npm sbom --sbom-format cyclonedx --omit dev",
+    evidenceAdapter: "package.json", e2eCommand: "npm sbom --sbom-format cyclonedx --omit dev",
     negativeControl: "tests/governance_sbom_real.test.js — CycloneDX bem-formado com manifesto real; FALHA de verdade (exit != 0, sem JSON válido) sem package.json com version pinada",
     freshness: "por-release",
   },
@@ -167,7 +188,7 @@ export const CLAIM_CONTRACTS = Object.freeze({
   // assim). Novo teste roda o c8 real (mesmo binário do coverage:ci) contra
   // um fixture com branch não coberta de propósito.
   "type-coverage": {
-    evidenceAdapter: "package.json (script coverage:ci)", e2eCommand: "npm run coverage:ci (c8 --check-coverage --lines=70 --functions=72 --branches=65)",
+    evidenceAdapter: "package.json", e2eCommand: "npm run coverage:ci",
     negativeControl: "tests/type_coverage_gate_real.test.js — c8 FALHA de verdade (exit != 0, ERROR reportado) quando o threshold não é atingido; passa quando é; thresholds do script nunca enfraquecidos silenciosamente",
     freshness: "por-build",
   },

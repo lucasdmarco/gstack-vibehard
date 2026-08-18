@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "fs"
 import { join, dirname } from "path"
 import { fileURLToPath } from "url"
 import { HARNESS_CAPABILITIES } from "./capabilities.js"
-import { gradeClaimStatus, contractFor, NOT_PROVED } from "./claim-contract.js"
+import { gradeClaimStatus, contractFor, motivosDaQueda, NOT_PROVED } from "./claim-contract.js"
 
 /**
  * Auditor anti-placebo (PRD Fase 3 §1). DETERMINÍSTICO, sem LLM, somente-leitura:
@@ -327,15 +327,24 @@ function auditScope(root) {
 }
 
 // PRD41 S41.9 (P1.6): rebaixa REAL sem contrato comportamental para NOT_PROVED.
-function applyBehavioral(claim) {
-  const status = gradeClaimStatus(claim.status, contractFor(claim.id))
-  return status === claim.status ? claim : { ...claim, status, notProved: status === NOT_PROVED }
+// PRD52 S52.B: a verificação roda contra o MESMO root que está sendo auditado (repo
+// ou tarball), e a queda vem acompanhada do motivo — um placar que rebaixa sem dizer
+// por quê obriga quem lê a reconstruir a razão de cabeça.
+function applyBehavioral(claim, io) {
+  const contract = contractFor(claim.id)
+  const status = gradeClaimStatus(claim.status, contract, io)
+  if (status === claim.status) return claim
+  return {
+    ...claim, status,
+    notProved: status === NOT_PROVED,
+    notProvedReasons: status === NOT_PROVED ? motivosDaQueda(contract, io) : undefined,
+  }
 }
 
 export function audit(opts = {}) {
   const root = opts.root || DEFAULT_ROOT
   const { has, read } = reader(root)
   const raw = CLAIM_BUILDERS.map((build) => build(has, read))
-  const claims = opts.behavioral ? raw.map(applyBehavioral) : raw
+  const claims = opts.behavioral ? raw.map((c) => applyBehavioral(c, { has, read })) : raw
   return { generatedAt: new Date().toISOString(), root: ".", behavioral: Boolean(opts.behavioral), scope: auditScope(root), claims, summary: tallySummary(claims) }
 }

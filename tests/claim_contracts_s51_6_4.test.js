@@ -24,9 +24,13 @@ test("os 16 claims do S51.6.4 graduam REAL no auditor comportamental REAL (não 
   const { audit } = await imp("src/dream/auditor.js")
   const claims = audit({ behavioral: true }).claims
   const byId = Object.fromEntries(claims.map((c) => [c.id, c]))
+  const { TEETH_BASELINE } = await imp("src/dream/teeth-baseline.js")
   for (const id of PROMOTED_IDS) {
     assert.ok(byId[id], `claim '${id}' existe`)
-    assert.equal(byId[id].status, "REAL", `'${id}' tem contrato comportamental real + arquivos ⇒ REAL`)
+    // PRD52 S52.B: a régua passou a verificar o contrato contra o repo. Quem cai,
+    // cai registrado no baseline com motivo — o que não pode acontecer é cair calado.
+    const esperado = id in TEETH_BASELINE.quedas ? "NOT_PROVED" : "REAL"
+    assert.equal(byId[id].status, esperado, `'${id}': status tem de bater com o baseline registrado`)
   }
 })
 
@@ -97,5 +101,10 @@ test("S51.6.8 (fecha ação #3): type-coverage graduou REAL — as 20 claims NOT
   const r = audit({ behavioral: true })
   const tc = r.claims.find((c) => c.id === "type-coverage")
   assert.equal(tc.status, "REAL", "type-coverage agora tem contrato + controle negativo real")
-  assert.equal(r.summary.NOT_PROVED || 0, 0, "as 20 claims NOT_PROVED do início do Sprint 51.6 chegam a zero")
+  // As 20 NOT_PROVED do início do Sprint 51.6 chegaram a ZERO em S51.6.8. O S52.B
+  // endureceu a régua e reabriu exatamente as quedas registradas no baseline — o
+  // número honesto é esse, e é derivado, nunca digitado.
+  const { TEETH_BASELINE } = await imp("src/dream/teeth-baseline.js")
+  assert.equal(r.summary.NOT_PROVED || 0, Object.keys(TEETH_BASELINE.quedas).length,
+    "NOT_PROVED só pode conter as quedas registradas com motivo no baseline do S52.B")
 })

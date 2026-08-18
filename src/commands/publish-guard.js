@@ -10,7 +10,10 @@ export async function publishGuardCommand(args = [], opts = {}) {
   const cwd = opts.cwd || process.cwd()
   const json = args.includes("--json")
   const checkCi = !args.includes("--no-ci")
-  const report = publishGuard({ cwd, exec: opts.exec, checkCi })
+  // `dream` segue o mesmo caminho de `exec`: injetável para que um teste do COMANDO
+  // possa fixar o placar em vez de herdar o do repo. Sem injeção o comportamento é o
+  // de sempre — o audit real do diretório auditado.
+  const report = publishGuard({ cwd, exec: opts.exec, dream: opts.dream, checkCi })
 
   if (json) { process.stdout.write(JSON.stringify(report) + "\n"); return report }
 
