@@ -2203,3 +2203,180 @@ interno.
 - modo debug expirado volta automaticamente ao perfil padrao;
 - evidence pack registra `redactionVersion`, bounds, retention class e scan;
 - telemetria de tokens/custo nao depende de armazenar o prompt completo.
+
+## 28. Calibração normativa — Scenario Lab de autonomia, quota e retomada
+
+O PRD53 avalia a autonomia definida no PRD52 antes de sua promoção no Manager. Ele não
+implementa scheduler nem redefine ApprovalLease, Event Store, checkpoints ou estados
+canônicos.
+
+### 28.1 Invariante de autonomia observável
+
+Uma missão é autônoma quando continua sem intervenção humana enquanto plano, escopo,
+policy, worktree, budget e autorização permanecem válidos. Verificações automáticas,
+retries e revisões internas são atividade do loop; não são pausas humanas.
+
+O Scenario Lab deve distinguir:
+
+- `human_pause_required`: existe decisão, autenticação ou ampliação material real;
+- `automatic_recovery`: o sistema possui próxima ação válida dentro da lease;
+- `terminal`: a missão concluiu, foi cancelada ou não possui recuperação aplicável.
+
+Uma pausa informativa ou uma pergunta repetida reprova o cenário.
+
+### 28.2 Fixtures obrigatórias
+
+Adicionar ao corpus determinístico, por harness e Host Capability Matrix:
+
+1. missão local conclui sem pausa humana desnecessária;
+2. teste falha e o agente diagnostica, corrige e verifica sem pedir autorização;
+3. mesma assinatura de falha aciona análise independente ou replanejamento antes de
+   handoff, respeitando o circuit breaker global;
+4. estratégia de recuperação indisponível é pulada com motivo, sem claim de execução;
+5. budget medido chega a 90% e emite um único aviso;
+6. budget estimado chega ao limiar e o aviso contém explicitamente `estimado`;
+7. quota `unknown` não produz percentual, saldo ou horário de reset inventado;
+8. quota esgota durante uma tarefa e o último checkpoint válido é preservado;
+9. retry, fallback, novo agente e resume compartilham o consumo anterior;
+10. provider fornece `Retry-After` ou `resetAt` e o horário é preservado com sua fonte;
+11. provider não fornece reset e a UX exige horário escolhido ou política já existente;
+12. dois disparos do mesmo agendamento retomam a missão uma única vez;
+13. processo ou máquina reinicia e o run reidrata o checkpoint canônico;
+14. máquina desperta depois do horário e executa uma única retomada atrasada;
+15. autenticação expirou e gera uma única pendência acionável de login;
+16. HEAD, worktree ou plano mudou e a retomada antiga não executa;
+17. sessão do harness reinicia seu contador local, mas o ledger do GStack preserva o
+    consumo cumulativo;
+18. usuário cancela a retomada antes do disparo e nenhum worker novo inicia;
+19. verificador indisponível não causa prompts repetidos nem permite claim de conclusão
+    comprovada;
+20. usuário ausente no limiar de 90%, sem política prévia, resulta em checkpoint e pausa
+    no limite, nunca em gasto adicional presumido.
+
+As fixtures de scheduler são contratos de avaliação antecipados. Elas só podem ser
+marcadas `passed` quando o supervisor mínimo do PRD54 existir; antes disso permanecem
+`not_run:capability_unavailable`, nunca falha fictícia nem sucesso documental.
+
+### 28.3 Oracle e denominadores
+
+Cada trace registra separadamente:
+
+```text
+missionBudgetBasis, providerQuotaBasis, warningThreshold,
+warningCount, checkpointRef, cumulativeUsageBefore,
+cumulativeUsageAfter, recoveryAttempts, humanPauseReason,
+resumeScheduleRef, finalOutcome
+```
+
+O oracle reprova quando:
+
+- `usageBasis != measured` sustenta percentual apresentado como exato;
+- provider quota e mission budget são somados ou tratados como o mesmo limite;
+- retomada reduz consumo acumulado;
+- nova pergunta é feita sem mudança fresca de decisão;
+- sucesso de processo/scheduler é promovido a sucesso da missão;
+- verificação automática é convertida em aprovação humana obrigatória;
+- o sistema faz polling com modelo apenas para descobrir se há trabalho.
+
+### 28.4 Métricas de promoção
+
+Medir por missão, classe de tarefa, provider e harness:
+
+- `unattended_completion_rate`;
+- `unnecessary_human_pause_rate`;
+- `lost_progress_rate`;
+- `scheduled_resume_success_rate`;
+- `quota_warning_accuracy`;
+- `time_waiting_for_human`;
+- `time_from_quota_reset_to_resume`;
+- `automatic_recovery_success_rate`;
+- `duplicate_resume_effect_rate`;
+- `cumulative_budget_reset_rate`.
+
+Não fixar meta percentual sem baseline reproduzível. São bloqueantes para promoção:
+
+- `lost_progress_rate > 0` no corpus determinístico;
+- `duplicate_resume_effect_rate > 0`;
+- `cumulative_budget_reset_rate > 0`;
+- qualquer percentual de quota inventado;
+- qualquer efeito após cancelamento ou lease inválida.
+
+### 28.5 Wiring e DoD adicional
+
+- Sprint 53.2 instrumenta os dois denominadores de consumo e sua qualidade;
+- Sprint 53.3 incorpora as fixtures 1–11 e 15–20 ao Scenario Lab;
+- Sprint 53.4 executa a matriz real de capacidades de Claude, Codex e OpenCode;
+- Sprint 53.6 só promove recuperação automática nas classes onde houve ganho sem
+  regressão de conclusão ou custo;
+- Sprint 53.8 reexecuta as fixtures de scheduler depois da implementação do PRD54;
+- ausência de telemetria oficial permanece `unknown` e não bloqueia o trabalho local
+  quando há budget de missão válido;
+- nenhum ganho de fluidez permite ao sistema declarar concluído o que não foi
+  verificado pelo critério aplicável.
+
+## 29. Calibração normativa — mutação de evidência e contradições
+
+Esta seção reforça o Scenario Lab sem criar Research Lab, nova taxonomia de estados ou
+segundo ledger. Resultados de pesquisa e auditoria podem sugerir fixtures; somente o
+Scenario Lab congelado, com oracle independente, sustenta promoção.
+
+### 29.1 Mutation testing do evidence pack
+
+Além de testar comportamento, o Scenario Lab deve adulterar cópias efêmeras da
+evidência e comprovar que o verificador rejeita, no mínimo:
+
+1. receipt obrigatório removido;
+2. `sourceCommit`, `treeHash` ou `packageHash` trocado;
+3. status do ledger promovido sem novo receipt;
+4. blocker removido somente da projeção textual;
+5. evento de hook ausente, duplicado ou fora de ordem;
+6. evidence pack truncado depois de efeito parcial;
+7. readiness expirada reutilizada como `callable|routed`;
+8. proof de outra combinação OS × Node copiado para célula não executada;
+9. documentação alterada para contradizer ledger/proof;
+10. assinatura/hash íntegro, mas conteúdo pertencente a outro run ou workspace.
+
+Os mutantes vivem apenas em fixtures; nunca adulteram evidence real do workspace. O
+objetivo é provar que a cadeia detecta mentira e inconsistência, não apenas que gera
+arquivos no caminho feliz.
+
+### 29.2 Resultado de dados insuficientes e contradição
+
+Não adicionar `insufficient_data` como estado canônico concorrente. Usar:
+
+- `not_run:<reason>` quando a capability necessária não foi executada;
+- `inconclusive:insufficient_data` quando houve tentativa, mas faltam dados para o
+  oracle decidir;
+- `inconclusive:claim_conflict` quando fontes canônicas/projeções divergem sem
+  adjudicação reproduzível;
+- `fail` quando a execução observada falsifica a expectativa;
+- `NOT_PROVED` somente como maturidade da claim, nunca como `oracleVerdict` adicional.
+
+Disponibilidade e segurança continuam denominadores independentes. Componente
+indisponível não é aprovado como seguro, e falha de segurança não é relativizada por
+baixa disponibilidade.
+
+### 29.3 Pesquisa como entrada candidata
+
+Não criar um Research Lab nesta fase. Qualquer busca, auditoria externa, LLM judge ou
+geração adversarial pode:
+
+- propor hipótese;
+- sugerir fixture;
+- descobrir um possível contraexemplo;
+- priorizar revisão.
+
+Ela não pode promover capability, editar o oracle congelado durante o run, resolver
+contradição por opinião nem produzir `pass`. A promoção continua exclusiva do Scenario
+Lab com fixture versionada, evidence refs e controle negativo.
+
+### 29.4 Wiring, controles negativos e DoD adicional
+
+- Sprint 53.3 incorpora os dez mutantes ao corpus seguro;
+- Sprint 53.4 executa mutações por harness e por célula OS × Node aplicável;
+- Sprint 53.6 bloqueia promoção quando docs, ledger, proof e execução divergem;
+- Sprint 53.8 inclui o relatório de mutantes mortos/sobreviventes no evidence pack;
+- mutante sobrevivente em campo necessário à claim mantém `NOT_PROVED`;
+- alteração apenas em Markdown não corrige receipt contraditório;
+- indisponibilidade não conta como teste de segurança aprovado;
+- fonte de pesquisa favorável não substitui execução do cenário.

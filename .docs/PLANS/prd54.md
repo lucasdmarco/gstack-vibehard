@@ -1086,8 +1086,9 @@ Referência: <https://github.com/agno-agi/agno>, commit
 `21de30f323f4ceaf07a429cb2be9bea236643a9d`, Apache-2.0.
 
 Adaptar eventos tipados, run lineage, cancelamento, expected-state approval e
-métricas. Não incorporar AgentOS, UI, FastAPI, scheduler, canais, A2A, telemetry
-default ou o workflow engine do Agno.
+métricas. Não incorporar do Agno AgentOS, UI, FastAPI, scheduler, canais, A2A,
+telemetry default ou seu workflow engine. O agendador local mínimo de retomada da
+seção 25 é implementação própria e limitada do GStack, não integração com Agno.
 
 ### 22.8 DoD adicional do PRD54
 
@@ -1372,3 +1373,328 @@ DoD:
 - `stale_cache` nunca equivale a autenticado ou disponivel;
 - probe ausente nao gera erro repetido;
 - toda acao mutante continua sujeita a consentimento, backup e rollback.
+
+## 25. Calibração normativa — missões autônomas e retomada agendada
+
+Esta seção torna a autonomia uma função de produto para usuários não técnicos. O
+Manager continua reutilizando Loop Engine, ApprovalLease, Event Store, journal,
+checkpoints, budgets, adapters e PendingRequirement; não cria um segundo runtime.
+
+Em conflito com qualquer formulação anterior que proíba genericamente `scheduler`,
+vale a distinção desta seção: permanece proibido importar o scheduler/runtime do Agno
+ou construir um orquestrador genérico; é obrigatório implementar o agendador local
+mínimo necessário para retomar uma missão já autorizada.
+
+### 25.1 Jornada padrão da missão autônoma
+
+Para o usuário padrão, o fluxo é:
+
+1. descrever o resultado desejado;
+2. receber um plano em linguagem simples;
+3. autorizar uma vez a missão local e seus limites;
+4. deixar o Manager distribuir, executar, verificar, corrigir e retomar o trabalho;
+5. voltar quando a missão concluir ou quando existir uma decisão realmente humana.
+
+Antes de iniciar, a superfície padrão mostra somente:
+
+- o que será construído;
+- qual projeto será alterado;
+- estimativa de tempo/uso quando disponível;
+- o que o GStack pode fazer sozinho;
+- quais efeitos externos não estão incluídos.
+
+Worktrees, hashes, receipts, adapters e detalhes da ApprovalLease ficam disponíveis em
+`inspect --full`, mas não são requisitos para o usuário começar.
+
+### 25.2 Autorização única e execução contínua
+
+A ação principal da UX equivale a `Começar e continuar sozinho`. Ela cria ou resolve a
+ApprovalLease já definida no PRD52; não cria uma autorização paralela.
+
+Dentro da lease válida:
+
+- não pedir aprovação por comando, subetapa, teste, retry ou troca interna de agente;
+- verificadores alimentam o próximo ciclo automaticamente;
+- mensagens de progresso não pausam a missão;
+- a conclusão de um card libera o próximo trabalho elegível;
+- agentes podem reivindicar tarefas prontas atomicamente;
+- o usuário pode pausar, cancelar ou inspecionar a qualquer momento.
+
+O GStack reduz prompts sob seu controle, mas não promete suprimir aprovação imposta
+pelo harness, sistema operacional ou provider. O adapter declara essa limitação antes
+da missão.
+
+### 25.3 Supervisor local mínimo
+
+O supervisor persiste a missão fora da conversa e possui somente cinco
+responsabilidades:
+
+1. observar o estado canônico sem chamar modelo quando não há trabalho;
+2. iniciar a próxima tarefa elegível;
+3. preservar heartbeat, cursor, checkpoint e consumo cumulativo;
+4. reagendar uma retomada já autorizada;
+5. notificar o usuário somente por `PendingRequirement` acionável ou estado terminal.
+
+Ele usa o mecanismo do sistema operacional suportado pelo host e não exige sessão do
+harness aberta. Não implementa marketplace, fila distribuída, painel remoto ou
+scheduler de propósito geral.
+
+Backends mínimos por host devem ser provados na Host Capability Matrix. Quando nenhum
+backend persistente estiver disponível, o estado é `resume_scheduling_unavailable`; a
+missão ainda pode executar na sessão atual sem falsa promessa de retomada.
+
+### 25.4 Projeção simples de estado
+
+A UX apresenta estes rótulos derivados do Event Store, sem criar uma nova máquina de
+estados canônica:
+
+- `Trabalhando`;
+- `Precisa de você`;
+- `Aguardando renovação do limite`;
+- `Retomada agendada`;
+- `Concluído`;
+- `Não foi possível continuar`.
+
+`Precisa de você` exige exatamente uma pergunta atual, com opções curtas e o efeito da
+resposta. Status, log de atividade e resultado de verificador não são perguntas.
+
+### 25.5 Aviso de 90% e escolha do usuário
+
+Ao atingir 90% de um denominador conhecido, o Manager cria checkpoint e apresenta:
+
+1. `Pausar e retomar quando o limite renovar`;
+2. `Continuar até o limite máximo`;
+3. `Encerrar e entregar o progresso atual`.
+
+Regras de apresentação:
+
+- percentual exato somente para `usageBasis: measured`;
+- estimativa deve ser rotulada `estimada`;
+- `unknown` mostra que o saldo não pôde ser consultado, sem barra ou percentual falso;
+- sem medição oficial da quota do provider, 90% refere-se apenas ao budget da missão;
+- o aviso é deduplicado por missão, denominador e janela de consumo.
+
+Se o usuário estiver ausente e não houver política previamente escolhida, o Manager
+continua somente até um checkpoint seguro e pausa no limite. Ele não presume extensão
+de custo.
+
+O usuário pode escolher antecipadamente `pausar e retomar automaticamente` para o
+restante da missão. Essa escolha é revogável e não autoriza efeitos externos novos.
+
+### 25.6 Contrato mínimo de retomada
+
+O agendamento persiste:
+
+```text
+ResumeSchedule:
+  scheduleId, missionId, checkpointRef, approvalLeaseRef
+  providerRef, harnessRef, resumeAfter, timeSource
+  expectedPlanHash, expectedVersion, expectedStatus, status
+  createdAt, cancelledAt, firedAt, idempotencyKey
+```
+
+Valores fechados:
+
+```text
+timeSource: provider_reset | retry_after | user_selected
+status: scheduled | cancelled | fired | superseded | failed
+```
+
+Regras:
+
+- usar `resetAt` ou `Retry-After` somente quando acompanhados de fonte observável;
+- sem horário confiável, usar o horário escolhido pelo usuário;
+- máquina desligada não executa trabalho local;
+- após suspensão, desligamento ou horário perdido, retomar uma única vez no próximo
+  despertar/login suportado;
+- autenticação expirada produz `Precisa de você`, sem tentar contorná-la;
+- plano, versão/estado, worktree ou lease stale bloqueiam a retomada e apresentam uma
+  decisão única;
+- disparo duplicado é idempotente;
+- cancelamento fecha admissão antes que novo worker seja criado;
+- retomada não reinicia budget, attempts nem aviso já emitido para a mesma janela.
+
+O Event Store registra, no mínimo:
+
+```text
+quota_warning_emitted, resume_scheduled, resume_cancelled,
+resume_due, resume_started, resume_skipped, resume_failed
+```
+
+`resume_due` não prova que a missão retomou; somente `resume_started` ligado ao
+checkpoint revalidado comprova nova execução.
+
+### 25.7 Recuperação antes de handoff
+
+Uma falha técnica não chama imediatamente o usuário. Dentro do budget e dos efeitos
+seguros, o Manager tenta a escada definida no PRD52:
+
+1. diagnóstico e retry corrigido;
+2. agente independente para analisar a falha;
+3. replanejamento da tarefa afetada;
+4. modelo/harness alternativo já autorizado;
+5. restauração do checkpoint saudável.
+
+O Manager encerra a escada cedo quando a próxima etapa não for suportada, repetir um
+efeito não for seguro ou o circuit breaker indicar ausência de progresso. Nesse caso,
+`Precisa de você` mostra o problema, o que já foi tentado e no máximo três opções.
+
+### 25.8 Superfície de produto
+
+A superfície CLI existente deve evoluir sem criar outro motor:
+
+```text
+gstack_vibehard start "<objetivo>" --autonomous
+gstack_vibehard task status <id>
+gstack_vibehard task pause|resume|cancel <id>
+gstack_vibehard task schedule-resume <id> --at <timestamp>
+gstack_vibehard task inbox
+```
+
+Os nomes finais dependem de command parity antes da estabilização. A função obrigatória
+é a capacidade, não cada spelling provisório. A interface visual futura consome os
+mesmos contratos.
+
+### 25.9 Wiring nos sprints
+
+**54.1 — Read model**
+
+- projetar estado simples, consumo, checkpoint e próxima retomada;
+- manter o Event Store como fonte canônica.
+
+**54.2 — Message, Control e Pending Requirements**
+
+- adicionar a escolha única de política aos 90%;
+- deduplicar aviso e autenticação pendente;
+- não representar progresso como pergunta.
+
+**54.3 — Workspace e checkpoints**
+
+- persistir checkpoint independente da sessão;
+- revalidar plano/worktree antes da retomada.
+
+**54.4 — Orquestração e budget**
+
+- aplicar recuperação progressiva antes de handoff;
+- preservar budget cumulativo entre agents/harnesses/resume;
+- reservar trabalho atomicamente antes do fan-out.
+
+**54.6 — Runtime**
+
+- implementar supervisor e agendamento local mínimos;
+- instalar/remover a integração com o agendador do host de forma explícita e
+  reversível;
+- comprovar cancelamento, idempotência e retomada após despertar.
+
+**54.7 — Benchmark/RC**
+
+- reexecutar as fixtures da seção 28 do PRD53;
+- medir autonomia, pausas, perda de progresso e precisão de quota por harness.
+
+### 25.10 Não objetivos e DoD adicional
+
+Não implementar nesta entrega:
+
+- runtime próprio que substitua Claude, Codex ou OpenCode;
+- board colaborativo completo ou clone do Workbench;
+- aprovação por comando;
+- Docker obrigatório para toda missão;
+- execução automática de deploy, publicação, compra ou outro efeito externo não
+  incluído na autorização inicial;
+- polling periódico com modelo quando uma observação local determinística basta;
+- promessa de percentual ou horário de renovação sem dado confiável.
+
+DoD adicional:
+
+- uma missão local reversível pode concluir sem pausa humana desnecessária;
+- teste/verificador vermelho volta ao loop sem pedir autorização por padrão;
+- o aviso de 90% é honesto, único e ligado a um denominador;
+- a política de retomada sobrevive à sessão e pode ser cancelada;
+- reinício, despertar ou disparo duplicado não repetem efeitos;
+- budget acumulado nunca reinicia ao trocar agente, harness ou sessão;
+- detalhes técnicos permanecem disponíveis sem serem impostos ao usuário leigo;
+- nenhuma limitação do harness é apresentada como capacidade comprovada do GStack.
+
+## 26. Calibração normativa — evidência no Task Graph e origem das falhas
+
+Esta seção fecha as lacunas de apresentação e propagação identificadas pela auditoria.
+Ela consome contratos dos PRDs 52/53 e não transforma o Manager em dono de release,
+hooks, evidence ou avaliação.
+
+### 26.1 Transições dependentes de evidência
+
+Cada aresta que depende de prova referencia requisitos/claims por ID e classifica a
+evidência requerida como `fresh|stale|incomplete|absent|invalid`.
+
+Regras:
+
+- `verifying -> passed` exige evidence fresca e completa para os critérios obrigatórios
+  da tarefa;
+- `passed -> merge_ready` revalida freshness contra HEAD, plan e worktree atuais;
+- evidence stale/incompleta bloqueia somente tarefas e claims que dependem dela;
+- evidence opcional ausente permanece na superfície não verificada, sem bloquear tarefa
+  não dependente;
+- read model não converte `stale|incomplete|absent|invalid` em sucesso;
+- refresh bem-sucedido cria nova referência; não edita a evidence antiga.
+
+O motivo de bloqueio preserva `requirementId|claimId`, evidence esperada, evidence
+observada e próxima ação. Isso impede um blocker genérico de paralisar toda a missão.
+
+### 26.2 PendingRequirement para migração e ambiente
+
+Migração ou condição ambiental não gera pergunta automaticamente. O Manager continua
+sozinho quando existe recuperação reversível coberta pela ApprovalLease. Criar
+`PendingRequirement` somente quando faltar decisão, autenticação, autoridade ou ação
+física do usuário.
+
+Extensão aditiva do contrato existente:
+
+```text
+requirementKind: decision | authentication | migration_choice |
+                 environment_remediation
+blockerOriginRef, affectedTaskIds, resumeCommandRef
+```
+
+A pergunta mostra o que está bloqueado, o que o GStack já tentou e no máximo três
+opções. Resolver o requisito retoma somente as tarefas afetadas; não reinicia a missão
+nem seu budget.
+
+### 26.3 Escopo e origem da falha são eixos distintos
+
+Manter `failureScope` como alcance operacional e acrescentar:
+
+```text
+failureOrigin: product | workspace | environment | harness |
+               provider | external_dependency | unknown
+attributionBasis: verified | inferred | unknown
+originEvidenceRefs[]
+```
+
+Um timeout do provider pode bloquear a tarefa sem provar defeito do produto. Uma falha
+do produto continua falha mesmo quando observada por um harness degradado, desde que a
+atribuição seja reproduzível. `inferred|unknown` nunca é apresentado como causa
+confirmada.
+
+### 26.4 Lifecycle de hooks como projeção
+
+O Manager pode apresentar `discovered|invoked|duplicate|failed|removed|restored` apenas
+a partir dos receipts canônicos do PRD52. Ele não infere funcionamento pela presença do
+arquivo e não cria outro registry de hooks.
+
+Ações de instalar, atualizar, remover ou restaurar hook usam Control tipado,
+`expectedVersion`, rollback e drain quando houver processo em voo. Falha externa é
+propagada à tarefa dependente com `failureOrigin` e evidence refs; não desaparece como
+N/A verde nem vira automaticamente falha global do produto.
+
+### 26.5 Wiring e DoD adicional
+
+- Sprint 54.1 projeta freshness/completeza da evidence e `failureOrigin` no read model;
+- Sprint 54.2 incorpora `requirementKind` sem criar outro sistema de prompts;
+- Sprint 54.3 revalida evidence antes de `passed|merge_ready`;
+- Sprint 54.6 consome lifecycle de hooks e preserva rollback/drain existentes;
+- Sprint 54.7 inclui fixtures de evidence stale, migração acionável, provider
+  indisponível e harness degradado;
+- blocker externo nunca desaparece, mas também não reprova claims independentes;
+- nenhuma atribuição de culpa é mostrada como verificada sem `originEvidenceRefs`;
+- pendência histórica do PRD51 não é marcada resolvida apenas porque o Manager sabe
+  representá-la.

@@ -1277,8 +1277,9 @@ Adaptar:
 - cancelamento idempotente e hierárquico;
 - scorers reproduzíveis e métricas de chamadas auxiliares.
 
-Não importar Agno, AgentOS, FastAPI, UI, telemetria default, scheduler, canais ou
-workflow engine. O GStack mantém um único control plane local.
+Não importar do Agno AgentOS, FastAPI, UI, telemetria default, scheduler, canais ou
+workflow engine. O GStack mantém um único control plane local. Isso não proíbe o
+agendador local mínimo pertencente ao PRD54.
 
 ### 22.7 DoD adicional
 
@@ -1471,3 +1472,176 @@ Controles obrigatorios:
 
 Nenhum desses cenarios pode resultar em `ready`, `applied` ou
 `production_ready`.
+
+## 25. Calibração normativa — missão autônoma, checkpoint e consumo cumulativo
+
+Esta seção incorpora a fundação mínima para missões autônomas. Ela especializa as
+seções 22.3 e 23, sem criar outro motor de loop, autorização, scheduler ou UI.
+
+### 25.1 Uma ApprovalLease por missão autorizada
+
+Uma `ApprovalLease` válida cobre todos os passos locais, reversíveis e previstos
+necessários para cumprir o DoD da missão. O usuário aprova a fronteira da missão uma
+vez; o sistema não solicita confirmação por comando, subetapa, retry, verificação,
+troca interna de agente ou retomada.
+
+A continuidade automática exige que permaneçam iguais:
+
+- `planHash`, `scopeHash`, `policyHash` e `worktreeId`;
+- paths, ferramentas, comandos e rede já cobertos;
+- budget e efeitos externos autorizados;
+- identidade da missão e validade da lease.
+
+Nova aprovação continua necessária somente quando a ação amplia materialmente essa
+fronteira. A ApprovalLease existente continua sendo a única autoridade; não criar
+`AutonomyLease`, `MissionGrant` ou autorização paralela.
+
+### 25.2 Checkpoint independente do harness
+
+O estado recuperável pertence ao GStack, não à conversa do harness. Um checkpoint de
+missão deve preservar, por referência ou valor estável:
+
+```text
+missionId, runId, planHash, worktreeRef, completedTaskIds,
+currentTaskId, nextActionRef, cumulativeUsage, stopReason,
+providerRef, harnessRef, createdAt
+```
+
+Fechar, compactar, trocar ou retomar uma sessão de Claude, Codex ou OpenCode não pode
+apagar trabalho concluído nem reconstruir a próxima ação a partir de texto livre. A
+retomada revalida lease, plano e workspace antes de prosseguir.
+
+### 25.3 Budget e observação de uso
+
+Budget é global por missão e cumulativo entre workers, subagentes, retries, fallback,
+troca de modelo/harness, reinício de processo e retomada. Nenhum desses eventos reinicia
+contadores.
+
+Toda observação de consumo declara:
+
+```text
+UsageObservation:
+  usageBasis: measured | estimated | unknown
+  subject: mission_budget | provider_quota
+  consumed, limit, unit, observedAt, sourceRef
+```
+
+Regras:
+
+- `measured` exige fonte observável e permite percentual exato;
+- `estimated` sempre aparece como estimativa;
+- `unknown` nunca vira zero, suficiente ou percentual aparente;
+- sem sinal oficial do provider, o limiar de 90% aplica-se somente ao budget da
+  missão;
+- quota da conta e budget da missão permanecem denominadores distintos.
+
+### 25.4 Pausa mínima e recuperação
+
+Conclusão de subetapa, mensagem informativa, verificação automática, falha recuperável
+ou retry dentro da lease não devolvem controle ao usuário. Antes de produzir handoff por
+falha técnica, o loop pode tentar, dentro do mesmo budget e da mesma autoridade:
+
+1. diagnóstico e retry com contexto corrigido;
+2. análise por agente independente;
+3. replanejamento somente da tarefa afetada;
+4. fallback de modelo/harness já autorizado;
+5. restauração do último checkpoint saudável.
+
+A ordem concreta é policy do Loop Engine. Esta seção não cria um segundo loop nem
+obriga executar todas as etapas quando uma não estiver disponível ou quando repetir o
+efeito não for seguro.
+
+### 25.5 Limites desta fundação
+
+Não pertencem ao PRD52:
+
+- scheduler ou daemon local;
+- Cockpit, board ou nova UI;
+- Docker obrigatório para toda execução;
+- runtime próprio para substituir os harnesses;
+- nova taxonomia de estados concorrente com o run state existente.
+
+Esses limites impedem que a fundação de autonomia volte a introduzir cerimônia no
+caminho do usuário.
+
+### 25.6 Wiring e DoD adicional
+
+- Sprint 52.2 persiste `UsageObservation` e checkpoint no ledger/journal canônico;
+- Sprint 52.4 mantém consumo cumulativo no replay;
+- Sprint 52.7 prova que continuidade sob a mesma ApprovalLease não pede aprovação por
+  comando;
+- Sprint 52.9 inclui encerramento de sessão e retomada por outro harness sem perda de
+  progresso;
+- nenhuma claim de percentual usa `estimated` ou `unknown` como medição;
+- nenhuma falha recuperável termina em pausa sem antes registrar a estratégia tentada
+  ou a indisponibilidade das estratégias aplicáveis.
+
+## 26. Calibração normativa — consistência de fechamento, readiness e suporte
+
+Esta seção incorpora somente as lacunas confirmadas pelo cruzamento da auditoria do
+estado atual. Ela não transfere para o PRD52 pendências que já eram Definition of Done
+do PRD51 e não permite que implementação futura feche retroativamente um sprint antigo.
+
+### 26.1 Reconciliação executável das claims
+
+DoD, blockers, Evidence Ledger, `proof`, closeout e matriz de RC são projeções da mesma
+claim canônica. Para cada `claimId`, a reconciliação registra:
+
+```text
+claimId, sourceCommit, requiredEvidenceRefs, observedEvidenceRefs,
+ledgerStatus, proofStatus, blockerStatus, rcStatus,
+consistencyVerdict, checkedAt
+```
+
+Regras:
+
+- receipts e ledger canônicos têm precedência sobre resumo ou documentação;
+- projeções divergentes não são resolvidas por maioria nem pelo estado mais favorável;
+- evidência ausente mantém a claim `NOT_PROVED`;
+- evidência observável que contradiz a claim produz `fail` para a claim afetada;
+- fontes conflitantes sem adjudicação produzem `inconclusive:claim_conflict`;
+- conflito bloqueia somente a promoção/claim dependente, sem impedir release corretiva
+  que não alegue conclusão do programa;
+- toda correção atualiza a fonte canônica e regenera as projeções; editar somente a
+  tabela ou o texto não resolve a divergência.
+
+### 26.2 Readiness possui validade temporal
+
+Arquivo de readiness antigo não representa o estado atual por existir no workspace.
+Toda capacidade usada por gate ou claim registra, no mínimo:
+
+```text
+capabilityId, status, generatedAt, staleAfterSeconds,
+sourceCommit, observedHead, probeCommandRef, probeResultRef
+```
+
+Se o prazo expirou, o HEAD relevante mudou ou a prova do comando está ausente, o
+estado consumível é `stale|unknown`, nunca `callable|routed` por cache histórico. Uma
+nova probe pode atualizar a observação; não inicia instalação, login ou mudança global.
+
+### 26.3 Evidência de suporte é uma matriz OS × Node
+
+`CI cross-OS verde` não prova automaticamente toda a faixa de versões Node declarada.
+O evidence pack mantém células por sistema operacional, arquitetura e versão Node:
+
+```text
+os, arch, nodeVersion, packageHash, installReceiptRef,
+runtimeReceiptRef, uninstallReceiptRef, verdict
+```
+
+Uma célula não executada permanece `not_run`. A matriz pública de suporte inclui
+somente células provadas ou uma faixa explicitamente reduzida por decisão humana. A
+decisão humana define o compromisso de suporte, mas não transforma célula falha ou não
+executada em verde.
+
+### 26.4 Fronteira com o PRD51 e DoD adicional
+
+- requisito já pertencente ao fechamento do PRD51 continua aberto nele até possuir sua
+  evidência do commit correto;
+- PRD52 pode consumir a correção e impedir regressão, mas não reclassifica o passado;
+- Context DB mantém a obrigação já definida em 52.6: migrar antes da leitura e executar
+  busca real;
+- lifecycle de hooks mantém a obrigação já definida em 24.3/24.5: presença de arquivo
+  sem evento de descoberta/invocação não prova funcionamento;
+- RC não promove enquanto houver `claim_conflict`, readiness stale usado por requisito
+  ou célula obrigatória da matriz OS × Node sem prova.
