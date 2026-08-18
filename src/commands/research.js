@@ -157,10 +157,36 @@ async function resolveMirror(cwd, args, json, opts) {
   const refusal = await grantRepoConsent(repo, json, opts, args)
   return refusal ? { refusal } : { mirror: mirrorRepo(repo, cwd) }
 }
-function emitNoMirror(repo, json) {
-  if (!repo) error("research skills audit: informe --path <dir> ou --repo <url>")
-  process.exitCode = 1
+/**
+ * ERRO DE USO sob `--json` — documento puro, nunca prosa.
+ *
+ * Corrige `P1.CLI-JSON-EXIT-CODE.b`: os erros de uso saíam pelo canal HUMANO
+ * mesmo sob `--json`, com escapes ANSI. Quem chamava errado recebia texto
+ * colorido onde esperava documento, e o consumidor de máquina não tinha como
+ * distinguir erro de uso de payload malformado — as duas coisas chegavam como
+ * "isto não parseia".
+ *
+ * `code` é estável e legível por máquina; `detail` é a frase que o humano já
+ * recebia. O modo humano não muda: mesma mensagem, mesmo canal.
+ */
+const RESEARCH_USAGE_SCHEMA = "gstack.research.usage-error.v1"
+
+function researchUsageFail(json, code, detail, exitCode = 1) {
+  process.exitCode = exitCode
+  if (json) {
+    process.stdout.write(JSON.stringify({
+      schemaVersion: RESEARCH_USAGE_SCHEMA, ok: false, error: code, detail,
+    }) + "\n")
+    return null
+  }
+  error(detail)
   return null
+}
+
+function emitNoMirror(repo, json) {
+  if (repo) { process.exitCode = 1; return null }
+  return researchUsageFail(json, "missing_source",
+    "research skills audit: informe --path <dir> ou --repo <url>")
 }
 function emitAudit(mirror, cwd, json) {
   const audit = auditExternalSkills({ source: mirror.source, commit: mirror.commit, files: collectMirrorFiles(mirror.dir) })
@@ -216,7 +242,10 @@ function notebookLmConnectCmd(json) {
 function notebookLmQueryCmd(args, json) {
   const notebookId = flagValue(args, "--notebook")
   const question = flagValue(args, "--question")
-  if (!notebookId || !question) { error("research notebooklm query: informe --notebook <id> --question <texto>"); process.exitCode = 1; return null }
+  if (!notebookId || !question) {
+    return researchUsageFail(json, "missing_notebook_or_question",
+      "research notebooklm query: informe --notebook <id> --question <texto>")
+  }
   const r = notebookLmQuery({ notebookId, question })
   return emitNotebookLm(r, json, (p) => { section("research notebooklm query"); warn(`  status: ${p.status} (${p.category})`) })
 }
@@ -229,9 +258,15 @@ function notebookLmImportCmd(args, json) {
   const resultPath = flagValue(args, "--result")
   const to = flagValue(args, "--to")
   const approved = args.includes("--approved") // explícito na linha de comando -- --yes NUNCA basta (ver costGateStatus/spendConfirmed em outras sprints)
-  if (!resultPath || !to) { error("research notebooklm import: informe --result <artefato> --to context|obsidian"); process.exitCode = 1; return null }
+  if (!resultPath || !to) {
+    return researchUsageFail(json, "missing_result_or_target",
+      "research notebooklm import: informe --result <artefato> --to context|obsidian")
+  }
   const result = readImportResult(resultPath)
-  if (!result) { error(`research notebooklm import: não consegui ler/parsear ${resultPath}`); process.exitCode = 1; return null }
+  if (!result) {
+    return researchUsageFail(json, "unreadable_result",
+      `research notebooklm import: não consegui ler/parsear ${resultPath}`)
+  }
   const r = notebookLmImport({ result, approved, to })
   if (!r.ok) process.exitCode = 1
   return emitNotebookLm(r, json, (p) => {
@@ -250,9 +285,8 @@ const NOTEBOOKLM_HANDLERS = Object.freeze({
 function notebookLmCmd(sub, args, json) {
   const handler = NOTEBOOKLM_HANDLERS[sub[1]]
   if (handler) return handler(args, json)
-  error("research notebooklm: use doctor|connect|query|import")
-  process.exitCode = 1
-  return null
+  return researchUsageFail(json, "unknown_subcommand",
+    "research notebooklm: use doctor|connect|query|import")
 }
 
 // ── PRD50 S50.4: `research validate` (§13.1) ────────────────────────────────
@@ -297,9 +331,10 @@ function annotateReview(review, { classified, resolved, networkAllowed }) {
 function validateCmd(args, json) {
   const question = args.filter((a) => !a.startsWith("-") && a !== "validate").join(" ").trim()
   if (!question) {
-    error('research validate: informe o claim ou pergunta. Ex.: research validate "X reduz Y" --level auto')
-    process.exitCode = 2
-    return null
+    // exit 2 preservado: era o código deste erro de uso antes da correção, e
+    // mudá-lo quebraria automação que já o distingue de falha de veredito.
+    return researchUsageFail(json, "missing_claim",
+      'research validate: informe o claim ou pergunta. Ex.: research validate "X reduz Y" --level auto', 2)
   }
   const classified = classifyLevel(signalsFromQuestion(question))
   const resolved = resolveLevel({ classified: classified.level, requested: flagValue(args, "--level") || "auto" })
@@ -322,13 +357,32 @@ function printResearchUsage() {
   warn("  validate é KNOWLEDGE: nunca executa código; experimentos saem como plano p/ `workflow`.")
 }
 
+/** Rota do subcomando, ou `null` quando nenhuma reconhece. */
+function rotaDeResearch(sub) {
+  if (sub[0] === "skills" && sub[1] === "audit") return (cwd, args, json, opts) => auditCmd(cwd, args, json, opts)
+  if (sub[0] === "notebooklm") return (_cwd, args, json) => notebookLmCmd(sub, args, json)
+  if (sub[0] === "validate") return (_cwd, args, json) => validateCmd(args, json)
+  return null
+}
+
+/**
+ * Sem subcomando reconhecido: o humano recebe o usage; a máquina recebe um
+ * DOCUMENTO. Imprimir o usage sob `--json` era a mesma falha do
+ * `P1.CLI-JSON-EXIT-CODE.b`, na porta de entrada — e a mais provável de um
+ * consumidor encontrar, porque basta errar o nome do subcomando.
+ */
+function researchSemRota(json) {
+  if (json) return researchUsageFail(json, "unknown_subcommand", "research: use skills audit|notebooklm|validate")
+  printResearchUsage()
+  process.exitCode = 1
+  return null
+}
+
 /** Dispatcher do `research`. */
 export async function researchCommand(args = [], opts = {}) {
   const cwd = opts.cwd || process.cwd()
   const json = args.includes("--json")
   const sub = args.filter((a) => !a.startsWith("-"))
-  if (sub[0] === "skills" && sub[1] === "audit") return auditCmd(cwd, args, json, opts)
-  if (sub[0] === "notebooklm") return notebookLmCmd(sub, args, json)
-  if (sub[0] === "validate") return validateCmd(args, json)
-  printResearchUsage()
+  const rota = rotaDeResearch(sub)
+  return rota ? rota(cwd, args, json, opts) : researchSemRota(json)
 }

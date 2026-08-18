@@ -28,11 +28,10 @@ import { evaluateJsonRun } from "./helpers/json-purity.js"
  * responde NAO a um confirm INTERATIVO. Sem TTY o fluxo para antes, em
  * `repoRefused`, que esta coberto. Mesma forma da lacuna de `visual.js:138`.
  *
- * ACHADO DE PRODUTO, fixado e NAO corrigido aqui: os ramos de ERRO DE USO
- * (`validate` sem claim, `skills audit` sem `--path`/`--repo`) ignoram `--json` e
- * escrevem prosa colorida. Um consumidor de maquina que chame errado recebe
- * texto ANSI onde esperava um documento. E a mesma classe de defeito do
- * posicional de `context`, e esta em `tests/context_json_contract.test.js`.
+ * ACHADO DE PRODUTO CORRIGIDO (`P1.CLI-JSON-EXIT-CODE.b`, 2026-08-17): os ramos
+ * de ERRO DE USO ignoravam `--json` e respondiam em prosa ANSI. Hoje emitem
+ * documento puro com codigo estavel e exit code proprio, e o modo humano segue
+ * identico. Ver a secao "Erro de USO" abaixo.
  */
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
@@ -137,14 +136,76 @@ test("CONTROLE NEGATIVO: sem `--json`, `validate` NAO emite documento", (t) => {
   assert.equal(r.pure, false)
 })
 
+// ── Erro de USO sob `--json`: documento, nunca prosa ──────────────────────
+
 /**
- * O ACHADO, FIXADO COMO ESTA. O ramo de erro de uso ignora `--json`. O teste NAO
- * afirma que isso esta certo: fixa o comportamento observado para que a correcao
- * futura seja deliberada e visivel.
+ * O ACHADO CORRIGIDO (`P1.CLI-JSON-EXIT-CODE.b`, fix autorizado em 2026-08-17).
+ *
+ * Os ramos de erro de uso escreviam pelo canal HUMANO mesmo sob `--json`, com
+ * escapes ANSI. Quem chamava errado recebia texto colorido onde esperava
+ * documento -- e o consumidor de maquina nao tinha como distinguir erro de USO
+ * de payload malformado: as duas coisas chegavam como "isto nao parseia".
+ *
+ * SEIS pontos, cobertos um a um. O ultimo -- o dispatcher sem subcomando -- e o
+ * mais provavel de um consumidor encontrar, e era o mesmo defeito na porta de
+ * entrada.
  */
-test("ACHADO: erro de USO ignora `--json` e responde em prosa", (t) => {
-  const r = rodar(sandbox(t), ["skills", "audit", "--json"])
-  assertRodou(r, "audit sem --path nem --repo")
-  assert.equal(r.pure, false,
-    "comportamento ATUAL, nao desejado: quem chama errado com `--json` recebe texto, nao documento")
+for (const [nome, args, code, exit] of [
+  ["audit sem fonte", ["skills", "audit", "--json"], "missing_source", 1],
+  ["validate sem claim", ["validate", "--json"], "missing_claim", 2],
+  ["notebooklm query sem args", ["notebooklm", "query", "--json"], "missing_notebook_or_question", 1],
+  ["notebooklm import sem args", ["notebooklm", "import", "--json"], "missing_result_or_target", 1],
+  ["notebooklm subcomando invalido", ["notebooklm", "xyz", "--json"], "unknown_subcommand", 1],
+  ["dispatcher sem subcomando", ["--json"], "unknown_subcommand", 1],
+]) {
+  test(`USO: ${nome} responde documento puro, com codigo e exit proprios`, (t) => {
+    const r = rodar(sandbox(t), args)
+    assertRodou(r, nome)
+    assert.equal(r.pure, true, `${nome}: stdout precisa ser documento JSON puro (motivo: ${r.reason})`)
+    assert.equal(r.stderrHasStandaloneJson, false, "o payload nunca sai pelo stderr")
+    assert.equal(r.doc.ok, false)
+    assert.equal(r.doc.error, code, "o codigo e estavel e legivel por maquina")
+    assert.ok(r.doc.detail && r.doc.detail.length > 10, "e a frase que o humano ja recebia viaja junto")
+    assert.equal(r.exitCode, exit, "erro de uso com exit 0 engana quem decide por status")
+  })
+}
+
+/**
+ * `validate` sai com 2 e nao 1, e isso e PRESERVADO de proposito: era o codigo
+ * deste erro de uso antes da correcao, e muda-lo quebraria automacao que ja o
+ * distingue de falha de VEREDITO (que tambem sai != 0, por outro caminho).
+ */
+test("USO: `validate` mantem o exit 2 que ja tinha", (t) => {
+  const r = rodar(sandbox(t), ["validate", "--json"])
+  assert.equal(r.exitCode, 2, "codigo de uso preservado — a correcao muda o CANAL, nao o contrato")
 })
+
+/**
+ * NENHUM ESCAPE ANSI no documento. Era o sintoma exato do achado: texto colorido
+ * chegando onde se esperava JSON.
+ */
+test("USO: o documento nao carrega escape ANSI algum", (t) => {
+  const r = rodar(sandbox(t), ["skills", "audit", "--json"])
+  // eslint-disable-next-line no-control-regex
+  assert.doesNotMatch(r.stdout ?? JSON.stringify(r.doc), /\u001b\[/, "ANSI no payload de maquina")
+})
+
+// ── O modo humano nao muda ────────────────────────────────────────────────
+
+/**
+ * A correcao troca o CANAL sob `--json`, e mais nada. Sem `--json` a mensagem
+ * continua sendo a mesma prosa, no mesmo lugar -- se mudasse, seria uma segunda
+ * mudanca de comportamento publico escondida dentro da primeira.
+ */
+for (const [nome, args] of [
+  ["audit sem fonte", ["skills", "audit"]],
+  ["validate sem claim", ["validate"]],
+  ["dispatcher sem subcomando", []],
+]) {
+  test(`HUMANO: ${nome} continua em prosa, e NAO vira documento`, (t) => {
+    const r = rodar(sandbox(t), args)
+    assertRodou(r, nome)
+    assert.equal(r.pure, false, "sem `--json`, a saida humana nao pode virar JSON")
+    assert.notEqual(r.exitCode, 0, "mas o status de saida vale para os dois modos")
+  })
+}
