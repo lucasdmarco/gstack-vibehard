@@ -176,7 +176,7 @@ test("NEGATIVO real: as origens de `rule.status` são TOKENS, não frases", asyn
  * projeto, e literal de FRASE.
  */
 test("POSITIVO real: `p.message` em research.js resolve para UMA frase, no projeto", async () => {
-  const origens = await origensNoPonto("src/commands/research.js", 213, "message")
+  const origens = await origensNoPonto("src/commands/research.js", 245, "message")
 
   assert.equal(origens.length, 1,
     `duas origens possíveis bloqueariam: ${origens.map((o) => `${o.file}:${o.line}`).join(", ")}`)
@@ -222,8 +222,8 @@ export function cmd() { return emitir(conectar(), (p) => { console.log(p.message
  * `out.results` do context scout, isto e, dos documentos INDEXADOS DO USUARIO.
  * Nao ha declaracao no projeto a ancorar, e o conteudo nem e nosso.
  */
-test("NEGATIVO real: `d.evidence` em context.js:201 NÃO resolve — conteúdo do usuário", async () => {
-  const origens = await origensNoPonto("src/commands/context.js", 201, "evidence")
+test("NEGATIVO real: `d.evidence` em context.js:243 NÃO resolve — conteúdo do usuário", async () => {
+  const origens = await origensNoPonto("src/commands/context.js", 243, "evidence")
   assert.equal(origens.length, 0,
     "origem dinâmica/externa bloqueia — este ponto pede `user_content`, não esta estratégia")
 })

@@ -44,10 +44,10 @@
   "overrides": [
     {
       "file": "src/commands/context.js",
-      "line": 201,
+      "line": 243,
       "column": 5,
       "audience": "user_content",
-      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "expectedFileHash": "sha256:23d47e29793a5ddc7a949fa922d96c523eeffe1d29664463466627c0992c7e4e",
       "reason": "O valor impresso é um trecho do documento INDEXADO DO USUÁRIO, e a moldura são seis espaços — não há uma palavra do GStack na linha. `public_diagnostic` afirmaria que a mensagem é do produto e a colocaria na claim English-first, o que mandaria traduzir a citação que o usuário pediu para ver. A audiência é a decisão de canal e precisa vir antes da estratégia de provenance.",
       "owner": "certificação RC PRD51 (Fase 1B)",
       "evidence": "Cadeia provada em `src/context-docs/py/context_db.py:450` — `\"evidence\": (r[\"content\"] or \"\").strip()[:280]`, lido de `chunks.content` (índice populado dos documentos do usuário) — até `src/commands/context.js:201`, sem literal linguístico do projeto no caminho. Contraste no mesmo arquivo Python: `:540` é literal NOSSO e segue `public_diagnostic` na origem."
@@ -1402,7 +1402,7 @@
       "file": "src/commands/research.js",
       "line": 67,
       "column": 27,
-      "expectedFileHash": "sha256:57fddc26a14d07467a032bc21daa4037a0dc372ded029a2536bb404d228d5503",
+      "expectedFileHash": "sha256:7cff54fbe2360fa84b0bb8f7380d08120bec6c028aef581f079e59b0eaf669bb",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "dir"
@@ -1415,7 +1415,7 @@
       "file": "src/commands/research.js",
       "line": 76,
       "column": 3,
-      "expectedFileHash": "sha256:57fddc26a14d07467a032bc21daa4037a0dc372ded029a2536bb404d228d5503",
+      "expectedFileHash": "sha256:7cff54fbe2360fa84b0bb8f7380d08120bec6c028aef581f079e59b0eaf669bb",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "r",
@@ -1432,7 +1432,7 @@
       "file": "src/commands/research.js",
       "line": 91,
       "column": 29,
-      "expectedFileHash": "sha256:57fddc26a14d07467a032bc21daa4037a0dc372ded029a2536bb404d228d5503",
+      "expectedFileHash": "sha256:7cff54fbe2360fa84b0bb8f7380d08120bec6c028aef581f079e59b0eaf669bb",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "fetch",
@@ -1449,7 +1449,7 @@
       "file": "src/commands/research.js",
       "line": 114,
       "column": 3,
-      "expectedFileHash": "sha256:57fddc26a14d07467a032bc21daa4037a0dc372ded029a2536bb404d228d5503",
+      "expectedFileHash": "sha256:7cff54fbe2360fa84b0bb8f7380d08120bec6c028aef581f079e59b0eaf669bb",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "audit",
@@ -1464,7 +1464,7 @@
       "file": "src/commands/research.js",
       "line": 115,
       "column": 3,
-      "expectedFileHash": "sha256:57fddc26a14d07467a032bc21daa4037a0dc372ded029a2536bb404d228d5503",
+      "expectedFileHash": "sha256:7cff54fbe2360fa84b0bb8f7380d08120bec6c028aef581f079e59b0eaf669bb",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "audit",
@@ -1482,7 +1482,7 @@
       "file": "src/commands/research.js",
       "line": 116,
       "column": 3,
-      "expectedFileHash": "sha256:57fddc26a14d07467a032bc21daa4037a0dc372ded029a2536bb404d228d5503",
+      "expectedFileHash": "sha256:7cff54fbe2360fa84b0bb8f7380d08120bec6c028aef581f079e59b0eaf669bb",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "c",
@@ -1496,7 +1496,7 @@
       "file": "src/commands/research.js",
       "line": 117,
       "column": 3,
-      "expectedFileHash": "sha256:57fddc26a14d07467a032bc21daa4037a0dc372ded029a2536bb404d228d5503",
+      "expectedFileHash": "sha256:7cff54fbe2360fa84b0bb8f7380d08120bec6c028aef581f079e59b0eaf669bb",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "c",
@@ -1510,7 +1510,7 @@
       "file": "src/commands/research.js",
       "line": 118,
       "column": 20,
-      "expectedFileHash": "sha256:57fddc26a14d07467a032bc21daa4037a0dc372ded029a2536bb404d228d5503",
+      "expectedFileHash": "sha256:7cff54fbe2360fa84b0bb8f7380d08120bec6c028aef581f079e59b0eaf669bb",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "c",
@@ -1524,7 +1524,7 @@
       "file": "src/commands/research.js",
       "line": 119,
       "column": 3,
-      "expectedFileHash": "sha256:57fddc26a14d07467a032bc21daa4037a0dc372ded029a2536bb404d228d5503",
+      "expectedFileHash": "sha256:7cff54fbe2360fa84b0bb8f7380d08120bec6c028aef581f079e59b0eaf669bb",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "dir"
@@ -1537,7 +1537,7 @@
       "file": "src/commands/research.js",
       "line": 140,
       "column": 57,
-      "expectedFileHash": "sha256:57fddc26a14d07467a032bc21daa4037a0dc372ded029a2536bb404d228d5503",
+      "expectedFileHash": "sha256:7cff54fbe2360fa84b0bb8f7380d08120bec6c028aef581f079e59b0eaf669bb",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "url"
@@ -1548,9 +1548,9 @@
     },
     {
       "file": "src/commands/research.js",
-      "line": 207,
+      "line": 239,
       "column": 5,
-      "expectedFileHash": "sha256:57fddc26a14d07467a032bc21daa4037a0dc372ded029a2536bb404d228d5503",
+      "expectedFileHash": "sha256:7cff54fbe2360fa84b0bb8f7380d08120bec6c028aef581f079e59b0eaf669bb",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "p",
@@ -1562,9 +1562,9 @@
     },
     {
       "file": "src/commands/research.js",
-      "line": 213,
+      "line": 245,
       "column": 83,
-      "expectedFileHash": "sha256:57fddc26a14d07467a032bc21daa4037a0dc372ded029a2536bb404d228d5503",
+      "expectedFileHash": "sha256:7cff54fbe2360fa84b0bb8f7380d08120bec6c028aef581f079e59b0eaf669bb",
       "strategy": "translate_at_value_origin",
       "translationSite": "value_origin",
       "interpolations": [
@@ -1605,9 +1605,9 @@
     },
     {
       "file": "src/commands/research.js",
-      "line": 221,
+      "line": 256,
       "column": 81,
-      "expectedFileHash": "sha256:57fddc26a14d07467a032bc21daa4037a0dc372ded029a2536bb404d228d5503",
+      "expectedFileHash": "sha256:7cff54fbe2360fa84b0bb8f7380d08120bec6c028aef581f079e59b0eaf669bb",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "p",
@@ -1621,9 +1621,9 @@
     },
     {
       "file": "src/commands/research.js",
-      "line": 234,
-      "column": 18,
-      "expectedFileHash": "sha256:57fddc26a14d07467a032bc21daa4037a0dc372ded029a2536bb404d228d5503",
+      "line": 274,
+      "column": 13,
+      "expectedFileHash": "sha256:7cff54fbe2360fa84b0bb8f7380d08120bec6c028aef581f079e59b0eaf669bb",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "resultPath"
@@ -1634,9 +1634,9 @@
     },
     {
       "file": "src/commands/research.js",
-      "line": 311,
+      "line": 352,
       "column": 3,
-      "expectedFileHash": "sha256:57fddc26a14d07467a032bc21daa4037a0dc372ded029a2536bb404d228d5503",
+      "expectedFileHash": "sha256:7cff54fbe2360fa84b0bb8f7380d08120bec6c028aef581f079e59b0eaf669bb",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "resolved",
@@ -1648,9 +1648,9 @@
     },
     {
       "file": "src/commands/context.js",
-      "line": 63,
+      "line": 103,
       "column": 3,
-      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "expectedFileHash": "sha256:23d47e29793a5ddc7a949fa922d96c523eeffe1d29664463466627c0992c7e4e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "chosen"
@@ -1661,9 +1661,9 @@
     },
     {
       "file": "src/commands/context.js",
-      "line": 69,
+      "line": 109,
       "column": 68,
-      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "expectedFileHash": "sha256:23d47e29793a5ddc7a949fa922d96c523eeffe1d29664463466627c0992c7e4e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "globalDefault"
@@ -1674,9 +1674,9 @@
     },
     {
       "file": "src/commands/context.js",
-      "line": 81,
+      "line": 121,
       "column": 3,
-      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "expectedFileHash": "sha256:23d47e29793a5ddc7a949fa922d96c523eeffe1d29664463466627c0992c7e4e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "Object",
@@ -1690,9 +1690,9 @@
     },
     {
       "file": "src/commands/context.js",
-      "line": 89,
+      "line": 129,
       "column": 21,
-      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "expectedFileHash": "sha256:23d47e29793a5ddc7a949fa922d96c523eeffe1d29664463466627c0992c7e4e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "parts",
@@ -1704,9 +1704,9 @@
     },
     {
       "file": "src/commands/context.js",
-      "line": 96,
+      "line": 136,
       "column": 18,
-      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "expectedFileHash": "sha256:23d47e29793a5ddc7a949fa922d96c523eeffe1d29664463466627c0992c7e4e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "r",
@@ -1719,9 +1719,9 @@
     },
     {
       "file": "src/commands/context.js",
-      "line": 97,
+      "line": 137,
       "column": 3,
-      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "expectedFileHash": "sha256:23d47e29793a5ddc7a949fa922d96c523eeffe1d29664463466627c0992c7e4e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "s",
@@ -1741,9 +1741,9 @@
     },
     {
       "file": "src/commands/context.js",
-      "line": 112,
+      "line": 152,
       "column": 73,
-      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "expectedFileHash": "sha256:23d47e29793a5ddc7a949fa922d96c523eeffe1d29664463466627c0992c7e4e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "e",
@@ -1755,9 +1755,9 @@
     },
     {
       "file": "src/commands/context.js",
-      "line": 114,
+      "line": 154,
       "column": 3,
-      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "expectedFileHash": "sha256:23d47e29793a5ddc7a949fa922d96c523eeffe1d29664463466627c0992c7e4e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "injectMode",
@@ -1769,9 +1769,9 @@
     },
     {
       "file": "src/commands/context.js",
-      "line": 115,
+      "line": 155,
       "column": 3,
-      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "expectedFileHash": "sha256:23d47e29793a5ddc7a949fa922d96c523eeffe1d29664463466627c0992c7e4e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "c",
@@ -1791,9 +1791,9 @@
     },
     {
       "file": "src/commands/context.js",
-      "line": 138,
+      "line": 178,
       "column": 12,
-      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "expectedFileHash": "sha256:23d47e29793a5ddc7a949fa922d96c523eeffe1d29664463466627c0992c7e4e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "obs"
@@ -1804,9 +1804,9 @@
     },
     {
       "file": "src/commands/context.js",
-      "line": 139,
+      "line": 179,
       "column": 14,
-      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "expectedFileHash": "sha256:23d47e29793a5ddc7a949fa922d96c523eeffe1d29664463466627c0992c7e4e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "gpath"
@@ -1817,9 +1817,9 @@
     },
     {
       "file": "src/commands/context.js",
-      "line": 144,
+      "line": 184,
       "column": 28,
-      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "expectedFileHash": "sha256:23d47e29793a5ddc7a949fa922d96c523eeffe1d29664463466627c0992c7e4e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "folder"
@@ -1830,9 +1830,9 @@
     },
     {
       "file": "src/commands/context.js",
-      "line": 146,
+      "line": 186,
       "column": 3,
-      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "expectedFileHash": "sha256:23d47e29793a5ddc7a949fa922d96c523eeffe1d29664463466627c0992c7e4e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "folder"
@@ -1843,9 +1843,9 @@
     },
     {
       "file": "src/commands/context.js",
-      "line": 151,
+      "line": 191,
       "column": 3,
-      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "expectedFileHash": "sha256:23d47e29793a5ddc7a949fa922d96c523eeffe1d29664463466627c0992c7e4e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "action"
@@ -1856,9 +1856,9 @@
     },
     {
       "file": "src/commands/context.js",
-      "line": 186,
+      "line": 228,
       "column": 3,
-      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "expectedFileHash": "sha256:23d47e29793a5ddc7a949fa922d96c523eeffe1d29664463466627c0992c7e4e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "q"
@@ -1869,9 +1869,9 @@
     },
     {
       "file": "src/commands/context.js",
-      "line": 188,
+      "line": 230,
       "column": 3,
-      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "expectedFileHash": "sha256:23d47e29793a5ddc7a949fa922d96c523eeffe1d29664463466627c0992c7e4e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "report",
@@ -1887,9 +1887,9 @@
     },
     {
       "file": "src/commands/context.js",
-      "line": 189,
+      "line": 231,
       "column": 35,
-      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "expectedFileHash": "sha256:23d47e29793a5ddc7a949fa922d96c523eeffe1d29664463466627c0992c7e4e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "r",
@@ -1914,9 +1914,9 @@
     },
     {
       "file": "src/commands/context.js",
-      "line": 191,
+      "line": 233,
       "column": 3,
-      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "expectedFileHash": "sha256:23d47e29793a5ddc7a949fa922d96c523eeffe1d29664463466627c0992c7e4e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "report",
@@ -1929,9 +1929,9 @@
     },
     {
       "file": "src/commands/context.js",
-      "line": 192,
+      "line": 234,
       "column": 3,
-      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "expectedFileHash": "sha256:23d47e29793a5ddc7a949fa922d96c523eeffe1d29664463466627c0992c7e4e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "scoutRouting",
@@ -1943,9 +1943,9 @@
     },
     {
       "file": "src/commands/context.js",
-      "line": 198,
+      "line": 240,
       "column": 3,
-      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "expectedFileHash": "sha256:23d47e29793a5ddc7a949fa922d96c523eeffe1d29664463466627c0992c7e4e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "out",
@@ -1957,9 +1957,9 @@
     },
     {
       "file": "src/commands/context.js",
-      "line": 200,
+      "line": 242,
       "column": 5,
-      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "expectedFileHash": "sha256:23d47e29793a5ddc7a949fa922d96c523eeffe1d29664463466627c0992c7e4e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "d",
@@ -1979,9 +1979,9 @@
     },
     {
       "file": "src/commands/context.js",
-      "line": 204,
+      "line": 246,
       "column": 3,
-      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "expectedFileHash": "sha256:23d47e29793a5ddc7a949fa922d96c523eeffe1d29664463466627c0992c7e4e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "out",
@@ -1997,9 +1997,9 @@
     },
     {
       "file": "src/commands/context.js",
-      "line": 245,
+      "line": 287,
       "column": 14,
-      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "expectedFileHash": "sha256:23d47e29793a5ddc7a949fa922d96c523eeffe1d29664463466627c0992c7e4e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "orEmpty",
@@ -2011,9 +2011,9 @@
     },
     {
       "file": "src/commands/context.js",
-      "line": 250,
+      "line": 292,
       "column": 51,
-      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "expectedFileHash": "sha256:23d47e29793a5ddc7a949fa922d96c523eeffe1d29664463466627c0992c7e4e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "r",
@@ -2025,9 +2025,9 @@
     },
     {
       "file": "src/commands/context.js",
-      "line": 256,
+      "line": 298,
       "column": 14,
-      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "expectedFileHash": "sha256:23d47e29793a5ddc7a949fa922d96c523eeffe1d29664463466627c0992c7e4e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "orEmpty",
@@ -2039,9 +2039,9 @@
     },
     {
       "file": "src/commands/context.js",
-      "line": 261,
+      "line": 303,
       "column": 52,
-      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "expectedFileHash": "sha256:23d47e29793a5ddc7a949fa922d96c523eeffe1d29664463466627c0992c7e4e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "r",
@@ -2053,9 +2053,9 @@
     },
     {
       "file": "src/commands/context.js",
-      "line": 276,
+      "line": 318,
       "column": 3,
-      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "expectedFileHash": "sha256:23d47e29793a5ddc7a949fa922d96c523eeffe1d29664463466627c0992c7e4e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "topic"
@@ -2066,9 +2066,9 @@
     },
     {
       "file": "src/commands/context.js",
-      "line": 201,
+      "line": 243,
       "column": 5,
-      "expectedFileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4",
+      "expectedFileHash": "sha256:23d47e29793a5ddc7a949fa922d96c523eeffe1d29664463466627c0992c7e4e",
       "strategy": "preserve_user_content_verbatim",
       "interpolations": [
         "String",
@@ -2161,9 +2161,9 @@
     },
     {
       "file": "src/commands/task-run.js",
-      "line": 53,
-      "column": 27,
-      "expectedFileHash": "sha256:935312a20976d05c0da1913a8dccd17ec3b0b66f1aacd12e738a8572675550b1",
+      "line": 81,
+      "column": 13,
+      "expectedFileHash": "sha256:b3121ce234ba017559a882c54ae19ba261094b4375b037fa4caf953428509e9e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "tracked",
@@ -2175,9 +2175,9 @@
     },
     {
       "file": "src/commands/task-run.js",
-      "line": 98,
+      "line": 151,
       "column": 3,
-      "expectedFileHash": "sha256:935312a20976d05c0da1913a8dccd17ec3b0b66f1aacd12e738a8572675550b1",
+      "expectedFileHash": "sha256:b3121ce234ba017559a882c54ae19ba261094b4375b037fa4caf953428509e9e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "plan",
@@ -2189,9 +2189,9 @@
     },
     {
       "file": "src/commands/task-run.js",
-      "line": 99,
+      "line": 152,
       "column": 37,
-      "expectedFileHash": "sha256:935312a20976d05c0da1913a8dccd17ec3b0b66f1aacd12e738a8572675550b1",
+      "expectedFileHash": "sha256:b3121ce234ba017559a882c54ae19ba261094b4375b037fa4caf953428509e9e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "id"
@@ -2202,9 +2202,9 @@
     },
     {
       "file": "src/commands/task-run.js",
-      "line": 100,
+      "line": 153,
       "column": 36,
-      "expectedFileHash": "sha256:935312a20976d05c0da1913a8dccd17ec3b0b66f1aacd12e738a8572675550b1",
+      "expectedFileHash": "sha256:b3121ce234ba017559a882c54ae19ba261094b4375b037fa4caf953428509e9e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "r",
@@ -2218,9 +2218,9 @@
     },
     {
       "file": "src/commands/task-run.js",
-      "line": 101,
+      "line": 154,
       "column": 36,
-      "expectedFileHash": "sha256:935312a20976d05c0da1913a8dccd17ec3b0b66f1aacd12e738a8572675550b1",
+      "expectedFileHash": "sha256:b3121ce234ba017559a882c54ae19ba261094b4375b037fa4caf953428509e9e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "id"
@@ -2231,9 +2231,9 @@
     },
     {
       "file": "src/commands/task-run.js",
-      "line": 102,
+      "line": 155,
       "column": 23,
-      "expectedFileHash": "sha256:935312a20976d05c0da1913a8dccd17ec3b0b66f1aacd12e738a8572675550b1",
+      "expectedFileHash": "sha256:b3121ce234ba017559a882c54ae19ba261094b4375b037fa4caf953428509e9e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "result",
@@ -2246,9 +2246,9 @@
     },
     {
       "file": "src/commands/task-run.js",
-      "line": 104,
+      "line": 157,
       "column": 3,
-      "expectedFileHash": "sha256:935312a20976d05c0da1913a8dccd17ec3b0b66f1aacd12e738a8572675550b1",
+      "expectedFileHash": "sha256:b3121ce234ba017559a882c54ae19ba261094b4375b037fa4caf953428509e9e",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "branches",

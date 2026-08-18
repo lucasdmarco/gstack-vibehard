@@ -29,7 +29,7 @@ command = "npx"
 args = ["custom-supabase", "--minha-flag"]
 `
 
-test("mergeCodexConfig com mcp:true preserva config do usuario e adiciona hooks/mcp gstack", async () => {
+test("mergeCodexConfig com mcp:true preserva config do usuario, LIMPA hooks inertes e adiciona mcp", async () => {
   const tmp = await mkdtemp(path.join(tmpdir(), "gstack-codex-"))
   try {
     const cfg = path.join(tmp, "config.toml")
@@ -45,9 +45,12 @@ test("mergeCodexConfig com mcp:true preserva config do usuario e adiciona hooks/
     assert.deepEqual(parsed.mcp_servers.meu_server.args, ["meu-mcp.js"])
     // usuario vence em servidor de mesmo nome (supabase customizado preservado)
     assert.deepEqual(parsed.mcp_servers.supabase.args, ["custom-supabase", "--minha-flag"])
-    // hook do usuario na mesma chave (on_stop) e PRESERVADO + gstack anexado
+    // O hook do usuario e PRESERVADO; o do GStack e REMOVIDO. A confrontacao com
+    // o binario do Codex 0.145.0 mostrou que aquelas chaves nunca existiram, e
+    // limpar aqui alcanca quem ja instalou -- que so passa pelo merge.
     assert.ok(parsed.hooks.on_stop.includes("meu-hook-pessoal.sh"), "hook do usuario preservado")
-    assert.ok(parsed.hooks.on_stop.some((c) => c.includes("stop.py")), "gstack anexado")
+    assert.equal(parsed.hooks.on_stop.some((c) => c.includes("stop.py")), false,
+      "configuracao inerte e removida, nao reescrita")
     assert.ok(parsed.mcp_servers.fallow)
     assert.ok(parsed.mcp_servers.headroom)
   } finally {
@@ -65,9 +68,9 @@ test("mergeCodexConfig DEFAULT (opt-out): NÃO escreve mcp_servers gstack; prese
     const parsed = parseToml(await readFile(cfg, "utf-8"))
     assert.equal(parsed.mcp_servers.fallow, undefined, "sem --global-mcp não injeta fallow")
     assert.equal(parsed.mcp_servers.context7, undefined)
-    // servidores do usuário preservados; hooks gstack ainda escritos
+    // servidores do usuário preservados; NENHUM hook gstack escrito
     assert.deepEqual(parsed.mcp_servers.meu_server.args, ["meu-mcp.js"])
-    assert.ok(parsed.hooks.on_stop.some((c) => c.includes("stop.py")))
+    assert.equal(parsed.hooks.on_stop.some((c) => c.includes("stop.py")), false)
   } finally {
     await rm(tmp, { recursive: true, force: true })
   }
@@ -121,7 +124,8 @@ test("mergeCodexConfig em arquivo inexistente escreve config gstack pura", async
     const { mergeCodexConfig } = await import(`${pathToFileURL(codexModule)}?t=${Date.now()}`)
     mergeCodexConfig(cfg, { mcp: true, readImpl: read, writeImpl: write })
     const parsed = parseToml(await readFile(cfg, "utf-8"))
-    assert.ok(parsed.hooks.on_stop[0].includes("stop.py"))
+    // Arquivo novo: sem bloco de hook, porque o GStack nao o escreve mais.
+    assert.equal("hooks" in parsed, false, "nenhuma configuracao inerte em config nova")
     assert.ok(parsed.mcp_servers.fallow)
     assert.ok(parsed.agent.skills_dir.includes(".agents/skills"))
   } finally {

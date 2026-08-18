@@ -5,6 +5,7 @@ import { fileURLToPath } from "url"
 import { execFileSync } from "child_process"
 import { parse as parseToml, stringify as stringifyToml } from "smol-toml"
 import { writeWithBackup, ensureDir } from "../installer/merge.js"
+import { CHAVES_INERTES_ESCRITAS } from "./codex-hook-contract.js"
 
 const HOME = homedir()
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -50,19 +51,28 @@ export async function installCodex(config, report) {
 export const GSTACK_MCP_SERVERS = [
   "fallow", "supabase", "playwright", "context7", "gbrain", "graphify", "headroom",
 ]
-export const GSTACK_HOOK_KEYS = ["on_session_start", "on_stop", "pre_tool_use", "post_tool_use"]
+/**
+ * Chaves que o GStack ja escreveu em `[hooks]` e agora apenas REMOVE.
+ *
+ * Derivadas do contrato, nao recopiadas: se a lista de chaves inertes mudar, a
+ * limpeza acompanha sozinha.
+ */
+export const GSTACK_HOOK_KEYS = CHAVES_INERTES_ESCRITAS.map((c) => c.key)
 
 function buildGstackConfig() {
   const skillsDir = join(HOME, ".agents", "skills").replaceAll("\\", "/")
   const hooksDirPosix = join(HOME, ".codex", "hooks").replaceAll("\\", "/")
   const pythonCmd = resolvePythonCmd()
+  // `hooks` NAO e mais escrito. A confrontacao com o binario do Codex 0.145.0
+  // (ver `codex-hook-contract.js`) mostrou que o bloco nunca teve como executar:
+  // `on_session_start`/`on_stop` nao existem no Codex, o valor era array de
+  // strings onde ele espera handler com `type`/`command`, e falta `trusted_hash`
+  // -- sem o qual o proprio Codex avisa que "hooks won't run".
+  //
+  // Escrever configuracao INERTE no arquivo do usuario e pior que nao escrever:
+  // dá aparencia de integracao ativa e polui o config. As chaves seguem
+  // declaradas em `CHAVES_INERTES_ESCRITAS` para LIMPEZA de quem ja instalou.
   return {
-    hooks: {
-      on_session_start: [`${pythonCmd} ${hooksDirPosix}/session_start.py`],
-      on_stop: [`${pythonCmd} ${hooksDirPosix}/stop.py`],
-      pre_tool_use: [`${pythonCmd} ${hooksDirPosix}/pre_tool_use_security.py`],
-      post_tool_use: [`${pythonCmd} ${hooksDirPosix}/stop.py`],
-    },
     agent: {
       skills_dir: skillsDir,
       instructions: [
@@ -95,43 +105,86 @@ function buildGstackConfig() {
  * - agent / mcp_servers: usuario vence (preserva customizacoes); gstack so adiciona o que falta
  * Exportada para teste com path injetavel.
  */
+/**
+ * Remove as chaves INERTES que o GStack escreveu em versoes anteriores,
+ * preservando o que for do usuario. Devolve `null` quando nao sobra nada.
+ *
+ * O comando do usuario dentro de uma chave inerte E preservado: a chave nao
+ * funciona, mas apagar o que outra pessoa escreveu seria destruir trabalho
+ * alheio para limpar sujeira nossa.
+ */
+const comandosDoUsuario = (valor) =>
+  toArray(valor).filter((c) => !(typeof c === "string" && isGstackHookCmd(c)))
+
+/** Objeto sem as chaves vazias — `null` quando nao sobra nada. */
+const ouNulo = (obj) => (Object.keys(obj).length > 0 ? obj : null)
+
+function limparHooksInertes(hooks) {
+  if (!hooks || typeof hooks !== "object") return null
+  const saida = { ...hooks }
+  for (const k of GSTACK_HOOK_KEYS.filter((x) => x in saida)) {
+    const doUsuario = comandosDoUsuario(saida[k])
+    if (doUsuario.length > 0) saida[k] = doUsuario
+    else delete saida[k]
+  }
+  return ouNulo(saida)
+}
+
+/**
+ * `mcp_servers` do merge, ou `null` quando nao ha nada a escrever.
+ *
+ * OPT-IN (P0.3): sem `mcp`, o GStack nao injeta servidor nenhum -- so preserva
+ * os do usuario. Com `mcp`, adiciona os defaults (filtrados quando o usuario
+ * escolheu servidores especificos), e o usuario vence em nome repetido.
+ */
+/**
+ * Le o `config.toml`, ou `{}` quando ausente/corrompido.
+ *
+ * No MERGE, config corrompida vira `{}` e o gstack parte do zero -- o `.bak` do
+ * `writeWithBackup` preserva o original. No STRIP a decisao e OPOSTA (aborta sem
+ * escrever), e a diferenca e proposital: escrever config nova e util, mas apagar
+ * config quebrada do usuario para limpar sujeira nossa seria pior que a sujeira.
+ */
+function lerConfigTolerante(configFile, readImpl) {
+  if (!existsSync(configFile)) return {}
+  try {
+    return parseToml(readImpl(configFile, "utf-8")) || {}
+  } catch {
+    return {}
+  }
+}
+
+function resolverMcpServers(gstack, existing, mcp, mcpServers) {
+  if (!mcp) return existing.mcp_servers || null
+  const escolhidos = Array.isArray(mcpServers) && mcpServers.length
+  const add = escolhidos
+    ? Object.fromEntries(Object.entries(gstack.mcp_servers).filter(([k]) => mcpServers.includes(k)))
+    : gstack.mcp_servers
+  return { ...add, ...(existing.mcp_servers || {}) }
+}
+
 export function mergeCodexConfig(configFile, opts = {}) {
   const { mcp = false, mcpServers = null, readImpl = readFileSync, writeImpl = writeWithBackup } = opts
   const gstack = buildGstackConfig()
-  let existing = {}
-  if (existsSync(configFile)) {
-    try {
-      existing = parseToml(readImpl(configFile, "utf-8")) || {}
-    } catch {
-      // config.toml corrompido — preserva como .bak e parte do zero gstack
-      existing = {}
-    }
-  }
+  const existing = lerConfigTolerante(configFile, readImpl)
   const merged = { ...existing }
-  // hooks: ANEXA os comandos gstack preservando os do usuario na mesma chave.
-  // Remove apenas entradas gstack antigas (apontam para nossos .py) para nao
-  // duplicar entre reinstalacoes/versoes.
-  merged.hooks = { ...(existing.hooks || {}) }
-  for (const [key, gstackCmds] of Object.entries(gstack.hooks)) {
-    const userCmds = toArray(existing.hooks?.[key]).filter(
-      (c) => typeof c === "string" && !isGstackHookCmd(c)
-    )
-    merged.hooks[key] = [...userCmds, ...gstackCmds]
-  }
+  // hooks: o GStack NAO escreve mais nenhum. O que este bloco faz agora e
+  // LIMPAR o que versoes anteriores escreveram -- chaves que o Codex nunca
+  // reconheceu --, preservando integralmente o que for do usuario.
+  //
+  // Roda no MERGE e nao so no uninstall de proposito: quem ja instalou so passa
+  // por aqui, e deixar a configuracao inerte na maquina dele seria manter a
+  // aparencia de integracao ativa que este achado desfez.
+  const hooksLimpos = limparHooksInertes(existing.hooks)
+  if (hooksLimpos) merged.hooks = hooksLimpos
+  else delete merged.hooks
   // agent: usuario vence
   merged.agent = { ...gstack.agent, ...(existing.agent || {}) }
   // mcp_servers: OPT-IN (P0.3). Sem `mcp`, NÃO injeta servidores gstack — só
   // preserva os do usuario. Com `mcp`, adiciona os defaults (filtrados por
   // `mcpServers` quando o usuario escolheu servidores específicos); usuario vence.
-  if (mcp) {
-    let add = gstack.mcp_servers
-    if (Array.isArray(mcpServers) && mcpServers.length) {
-      add = Object.fromEntries(Object.entries(gstack.mcp_servers).filter(([k]) => mcpServers.includes(k)))
-    }
-    merged.mcp_servers = { ...add, ...(existing.mcp_servers || {}) }
-  } else if (existing.mcp_servers) {
-    merged.mcp_servers = existing.mcp_servers
-  }
+  const servidores = resolverMcpServers(gstack, existing, mcp, mcpServers)
+  if (servidores) merged.mcp_servers = servidores
 
   writeImpl(configFile, stringifyToml(merged))
 }
@@ -152,6 +205,30 @@ function isGstackHookCmd(cmd) {
  * Remove apenas as chaves de propriedade do gstack do config.toml, preservando
  * todo o restante. Usada pelo uninstall.
  */
+/** Grava o valor limpo, ou remove a chave quando nao sobrou nada dela. */
+function aplicarOuRemover(obj, chave, valor) {
+  if (valor) obj[chave] = valor
+  else delete obj[chave]
+}
+
+/** Servidores gstack que o usuario NAO customizou — so esses saem. */
+function limparMcpServersGstack(existentes, defaults) {
+  const saida = { ...existentes }
+  for (const nome of GSTACK_MCP_SERVERS) {
+    if (!(nome in saida)) continue
+    const igualAoDefault = JSON.stringify(saida[nome]) === JSON.stringify(defaults[nome])
+    if (igualAoDefault) delete saida[nome]
+  }
+  return ouNulo(saida)
+}
+
+/**
+ * Remove do `config.toml` apenas o que e do gstack, preservando todo o resto.
+ *
+ * Config ilegivel NAO e sobrescrita as cegas: devolve `false` e sai. Config do
+ * usuario quebrada e problema dele, e destrui-la para limpar sujeira nossa seria
+ * pior que o problema.
+ */
 export function stripGstackFromCodexConfig(configFile, readImpl = readFileSync, writeImpl = writeWithBackup) {
   if (!existsSync(configFile)) return false
   let parsed
@@ -160,35 +237,12 @@ export function stripGstackFromCodexConfig(configFile, readImpl = readFileSync, 
   } catch {
     return false
   }
-  if (parsed.hooks) {
-    // Remove apenas os comandos gstack de cada array, preservando os do usuario
-    for (const k of GSTACK_HOOK_KEYS) {
-      if (!(k in parsed.hooks)) continue
-      const userCmds = toArray(parsed.hooks[k]).filter(
-        (c) => !(typeof c === "string" && isGstackHookCmd(c))
-      )
-      if (userCmds.length > 0) parsed.hooks[k] = userCmds
-      else delete parsed.hooks[k]
-    }
-    if (Object.keys(parsed.hooks).length === 0) delete parsed.hooks
-  }
-  if (parsed.mcp_servers) {
-    // So remove um servidor gstack se ele NAO foi customizado pelo usuario
-    // (i.e., ainda igual ao default que o gstack escreveu). Preserva servidores
-    // que o usuario tunou mesmo compartilhando nome com um default gstack.
-    const defaults = buildGstackConfig().mcp_servers
-    for (const s of GSTACK_MCP_SERVERS) {
-      if (parsed.mcp_servers[s] && JSON.stringify(parsed.mcp_servers[s]) === JSON.stringify(defaults[s])) {
-        delete parsed.mcp_servers[s]
-      }
-    }
-    if (Object.keys(parsed.mcp_servers).length === 0) delete parsed.mcp_servers
-  }
-  // agent: remove apenas se ainda for o bloco gstack (skills_dir gstack)
-  if (parsed.agent && typeof parsed.agent.skills_dir === "string"
-      && parsed.agent.skills_dir.includes(".agents/skills")) {
-    delete parsed.agent
-  }
+
+  aplicarOuRemover(parsed, "hooks", limparHooksInertes(parsed.hooks))
+  aplicarOuRemover(parsed, "mcp_servers",
+    parsed.mcp_servers ? limparMcpServersGstack(parsed.mcp_servers, buildGstackConfig().mcp_servers) : null)
+
   writeImpl(configFile, stringifyToml(parsed))
   return true
 }
+

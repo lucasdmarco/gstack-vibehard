@@ -2284,7 +2284,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 23,
-          "line": 61,
+          "line": 101,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -2301,7 +2301,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 3,
-          "line": 63,
+          "line": 103,
           "provenance": {
             "ids": [
               "chosen"
@@ -2320,7 +2320,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 68,
-          "line": 69,
+          "line": 109,
           "provenance": {
             "ids": [
               "globalDefault"
@@ -2339,7 +2339,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 27,
-          "line": 71,
+          "line": 111,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -2356,7 +2356,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 3,
-          "line": 74,
+          "line": 114,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -2373,7 +2373,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 99,
-          "line": 78,
+          "line": 118,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -2390,7 +2390,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 8,
-          "line": 79,
+          "line": 119,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -2407,7 +2407,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 3,
-          "line": 81,
+          "line": 121,
           "provenance": {
             "ids": [
               "Object",
@@ -2429,7 +2429,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 82,
+          "line": 122,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -2446,7 +2446,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 21,
-          "line": 89,
+          "line": 129,
           "provenance": {
             "ids": [
               "parts",
@@ -2466,7 +2466,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 40,
-          "line": 92,
+          "line": 132,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -2483,7 +2483,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 18,
-          "line": 96,
+          "line": 136,
           "provenance": {
             "ids": [
               "r",
@@ -2504,7 +2504,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 97,
+          "line": 137,
           "provenance": {
             "ids": [
               "s",
@@ -2532,7 +2532,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 3,
-          "line": 102,
+          "line": 142,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -2549,7 +2549,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 5,
-          "line": 107,
+          "line": 147,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -2566,7 +2566,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 73,
-          "line": 112,
+          "line": 152,
           "provenance": {
             "ids": [
               "e",
@@ -2586,7 +2586,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 114,
+          "line": 154,
           "provenance": {
             "ids": [
               "injectMode",
@@ -2606,7 +2606,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 115,
+          "line": 155,
           "provenance": {
             "ids": [
               "c",
@@ -2634,7 +2634,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 3,
-          "line": 131,
+          "line": 171,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -2651,7 +2651,7 @@
           "calleePath": "error",
           "canonicalName": "error",
           "column": 21,
-          "line": 136,
+          "line": 176,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -2668,7 +2668,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 3,
-          "line": 137,
+          "line": 177,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -2685,7 +2685,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 12,
-          "line": 138,
+          "line": 178,
           "provenance": {
             "ids": [
               "obs"
@@ -2704,7 +2704,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 14,
-          "line": 139,
+          "line": 179,
           "provenance": {
             "ids": [
               "gpath"
@@ -2723,7 +2723,7 @@
           "calleePath": "error",
           "canonicalName": "error",
           "column": 23,
-          "line": 143,
+          "line": 183,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -2740,7 +2740,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 28,
-          "line": 144,
+          "line": 184,
           "provenance": {
             "ids": [
               "folder"
@@ -2759,7 +2759,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 3,
-          "line": 146,
+          "line": 186,
           "provenance": {
             "ids": [
               "folder"
@@ -2778,7 +2778,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 147,
+          "line": 187,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -2795,7 +2795,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 3,
-          "line": 151,
+          "line": 191,
           "provenance": {
             "ids": [
               "action"
@@ -2814,7 +2814,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 12,
-          "line": 155,
+          "line": 195,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -2831,7 +2831,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 157,
+          "line": 197,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -2848,7 +2848,7 @@
           "calleePath": "error",
           "canonicalName": "error",
           "column": 8,
-          "line": 168,
+          "line": 210,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -2865,7 +2865,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 3,
-          "line": 186,
+          "line": 228,
           "provenance": {
             "ids": [
               "q"
@@ -2884,7 +2884,7 @@
           "calleePath": "error",
           "canonicalName": "error",
           "column": 26,
-          "line": 187,
+          "line": 229,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -2901,7 +2901,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 188,
+          "line": 230,
           "provenance": {
             "ids": [
               "report",
@@ -2925,7 +2925,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 35,
-          "line": 189,
+          "line": 231,
           "provenance": {
             "ids": [
               "r",
@@ -2958,7 +2958,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 36,
-          "line": 190,
+          "line": 232,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -2975,7 +2975,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 191,
+          "line": 233,
           "provenance": {
             "ids": [
               "report",
@@ -2996,7 +2996,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 192,
+          "line": 234,
           "provenance": {
             "ids": [
               "scoutRouting",
@@ -3016,7 +3016,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 3,
-          "line": 198,
+          "line": 240,
           "provenance": {
             "ids": [
               "out",
@@ -3036,7 +3036,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 5,
-          "line": 200,
+          "line": 242,
           "provenance": {
             "ids": [
               "d",
@@ -3064,7 +3064,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 5,
-          "line": 201,
+          "line": 243,
           "provenance": {
             "ids": [
               "String",
@@ -3086,7 +3086,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 33,
-          "line": 203,
+          "line": 245,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -3103,7 +3103,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 204,
+          "line": 246,
           "provenance": {
             "ids": [
               "out",
@@ -3127,7 +3127,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 14,
-          "line": 245,
+          "line": 287,
           "provenance": {
             "ids": [
               "orEmpty",
@@ -3147,7 +3147,7 @@
           "calleePath": "error",
           "canonicalName": "error",
           "column": 55,
-          "line": 246,
+          "line": 288,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -3164,7 +3164,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 72,
-          "line": 247,
+          "line": 289,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -3181,7 +3181,7 @@
           "calleePath": "process.stdout.write",
           "canonicalName": "write",
           "column": 20,
-          "line": 249,
+          "line": 291,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -3198,7 +3198,7 @@
           "calleePath": "error",
           "canonicalName": "error",
           "column": 51,
-          "line": 250,
+          "line": 292,
           "provenance": {
             "ids": [
               "r",
@@ -3218,7 +3218,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 14,
-          "line": 256,
+          "line": 298,
           "provenance": {
             "ids": [
               "orEmpty",
@@ -3238,7 +3238,7 @@
           "calleePath": "error",
           "canonicalName": "error",
           "column": 58,
-          "line": 257,
+          "line": 299,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -3255,7 +3255,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 72,
-          "line": 258,
+          "line": 300,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -3272,7 +3272,7 @@
           "calleePath": "process.stdout.write",
           "canonicalName": "write",
           "column": 20,
-          "line": 260,
+          "line": 302,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -3289,7 +3289,7 @@
           "calleePath": "error",
           "canonicalName": "error",
           "column": 52,
-          "line": 261,
+          "line": 303,
           "provenance": {
             "ids": [
               "r",
@@ -3309,7 +3309,7 @@
           "calleePath": "error",
           "canonicalName": "error",
           "column": 59,
-          "line": 273,
+          "line": 315,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -3326,7 +3326,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 72,
-          "line": 274,
+          "line": 316,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -3343,7 +3343,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 3,
-          "line": 276,
+          "line": 318,
           "provenance": {
             "ids": [
               "topic"
@@ -3362,7 +3362,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 277,
+          "line": 319,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -3379,7 +3379,7 @@
           "calleePath": "process.stdout.write",
           "canonicalName": "write",
           "column": 3,
-          "line": 278,
+          "line": 320,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -3396,7 +3396,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 279,
+          "line": 321,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -3413,7 +3413,7 @@
           "calleePath": "process.stdout.write",
           "canonicalName": "write",
           "column": 3,
-          "line": 280,
+          "line": 322,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -3430,7 +3430,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 3,
-          "line": 284,
+          "line": 326,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -3447,7 +3447,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 285,
+          "line": 327,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -3464,7 +3464,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 286,
+          "line": 328,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -3481,7 +3481,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 287,
+          "line": 329,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -3498,7 +3498,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 288,
+          "line": 330,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -3515,7 +3515,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 289,
+          "line": 331,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -3532,7 +3532,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 290,
+          "line": 332,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -3549,7 +3549,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 291,
+          "line": 333,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -3559,7 +3559,7 @@
           "sink": null
         }
       ],
-      "fileHash": "sha256:ce98c035169b66f41e703c6864c93dc73783907ecfc4cd76853d37cd712bdff4"
+      "fileHash": "sha256:23d47e29793a5ddc7a949fa922d96c523eeffe1d29664463466627c0992c7e4e"
     },
     "src/commands/init.js": {
       "entries": [
@@ -5554,14 +5554,31 @@
           "sink": null
         },
         {
+          "audience": "machine_protocol",
+          "bindingKind": "global",
+          "bindingOrigin": null,
+          "callee": "process.stdout.write",
+          "calleePath": "process.stdout.write",
+          "canonicalName": "write",
+          "column": 5,
+          "line": 183,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "stream-json-protocol",
+          "sink": "stdout"
+        },
+        {
           "audience": "public_diagnostic",
           "bindingKind": "import",
           "bindingOrigin": "src/cli/index.js",
           "callee": "error",
           "calleePath": "error",
           "canonicalName": "error",
-          "column": 14,
-          "line": 161,
+          "column": 11,
+          "line": 195,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -5578,7 +5595,7 @@
           "calleePath": "process.stdout.write",
           "canonicalName": "write",
           "column": 15,
-          "line": 168,
+          "line": 200,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -5595,7 +5612,7 @@
           "calleePath": "process.stdout.write",
           "canonicalName": "write",
           "column": 15,
-          "line": 198,
+          "line": 230,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -5603,172 +5620,6 @@
           },
           "rule": "stream-json-protocol",
           "sink": "stdout"
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "section",
-          "calleePath": "section",
-          "canonicalName": "section",
-          "column": 5,
-          "line": 206,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "warn",
-          "calleePath": "warn",
-          "canonicalName": "warn",
-          "column": 5,
-          "line": 207,
-          "provenance": {
-            "ids": [
-              "p",
-              "status"
-            ],
-            "kind": "interpolated",
-            "resolved": false
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "section",
-          "calleePath": "section",
-          "canonicalName": "section",
-          "column": 43,
-          "line": 213,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "warn",
-          "calleePath": "warn",
-          "canonicalName": "warn",
-          "column": 83,
-          "line": 213,
-          "provenance": {
-            "ids": [
-              "p",
-              "message"
-            ],
-            "kind": "no_local_frame",
-            "resolved": false
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "error",
-          "calleePath": "error",
-          "canonicalName": "error",
-          "column": 35,
-          "line": 219,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "section",
-          "calleePath": "section",
-          "canonicalName": "section",
-          "column": 43,
-          "line": 221,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "warn",
-          "calleePath": "warn",
-          "canonicalName": "warn",
-          "column": 81,
-          "line": 221,
-          "provenance": {
-            "ids": [
-              "p",
-              "status",
-              "p",
-              "category"
-            ],
-            "kind": "interpolated",
-            "resolved": false
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "error",
-          "calleePath": "error",
-          "canonicalName": "error",
-          "column": 29,
-          "line": 232,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "error",
-          "calleePath": "error",
-          "canonicalName": "error",
-          "column": 18,
-          "line": 234,
-          "provenance": {
-            "ids": [
-              "resultPath"
-            ],
-            "kind": "interpolated",
-            "resolved": false
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
         },
         {
           "audience": "public_diagnostic",
@@ -5791,11 +5642,124 @@
           "audience": "public_diagnostic",
           "bindingKind": "import",
           "bindingOrigin": "src/cli/index.js",
+          "callee": "warn",
+          "calleePath": "warn",
+          "canonicalName": "warn",
+          "column": 5,
+          "line": 239,
+          "provenance": {
+            "ids": [
+              "p",
+              "status"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "section",
+          "calleePath": "section",
+          "canonicalName": "section",
+          "column": 43,
+          "line": 245,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "warn",
+          "calleePath": "warn",
+          "canonicalName": "warn",
+          "column": 83,
+          "line": 245,
+          "provenance": {
+            "ids": [
+              "p",
+              "message"
+            ],
+            "kind": "no_local_frame",
+            "resolved": false
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
           "callee": "error",
           "calleePath": "error",
           "canonicalName": "error",
-          "column": 3,
+          "column": 13,
           "line": 253,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "section",
+          "calleePath": "section",
+          "canonicalName": "section",
+          "column": 43,
+          "line": 256,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "warn",
+          "calleePath": "warn",
+          "canonicalName": "warn",
+          "column": 81,
+          "line": 256,
+          "provenance": {
+            "ids": [
+              "p",
+              "status",
+              "p",
+              "category"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "error",
+          "calleePath": "error",
+          "canonicalName": "error",
+          "column": 13,
+          "line": 269,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -5811,8 +5775,61 @@
           "callee": "error",
           "calleePath": "error",
           "canonicalName": "error",
+          "column": 13,
+          "line": 274,
+          "provenance": {
+            "ids": [
+              "resultPath"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "section",
+          "calleePath": "section",
+          "canonicalName": "section",
           "column": 5,
-          "line": 300,
+          "line": 279,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "error",
+          "calleePath": "error",
+          "canonicalName": "error",
+          "column": 11,
+          "line": 295,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "error",
+          "calleePath": "error",
+          "canonicalName": "error",
+          "column": 13,
+          "line": 343,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -5829,7 +5846,7 @@
           "calleePath": "process.stdout.write",
           "canonicalName": "write",
           "column": 15,
-          "line": 310,
+          "line": 351,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -5846,7 +5863,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 3,
-          "line": 311,
+          "line": 352,
           "provenance": {
             "ids": [
               "resolved",
@@ -5866,7 +5883,7 @@
           "calleePath": "console.log",
           "canonicalName": "log",
           "column": 3,
-          "line": 312,
+          "line": 353,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -5883,7 +5900,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 3,
-          "line": 317,
+          "line": 358,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -5900,7 +5917,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 318,
+          "line": 359,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -5917,7 +5934,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 319,
+          "line": 360,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -5934,7 +5951,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 320,
+          "line": 361,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -5951,7 +5968,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 321,
+          "line": 362,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -5968,7 +5985,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 3,
-          "line": 322,
+          "line": 363,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -5978,7 +5995,7 @@
           "sink": null
         }
       ],
-      "fileHash": "sha256:57fddc26a14d07467a032bc21daa4037a0dc372ded029a2536bb404d228d5503"
+      "fileHash": "sha256:7cff54fbe2360fa84b0bb8f7380d08120bec6c028aef581f079e59b0eaf669bb"
     },
     "src/commands/runtime-supervisor.js": {
       "entries": [
@@ -7319,14 +7336,14 @@
           "callee": "process.stdout.write",
           "calleePath": "process.stdout.write",
           "canonicalName": "write",
-          "column": 17,
-          "line": 43,
+          "column": 5,
+          "line": 63,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
             "resolved": true
           },
-          "rule": "stream-json-document-literal",
+          "rule": "stream-json-protocol",
           "sink": "stdout"
         },
         {
@@ -7336,8 +7353,8 @@
           "callee": "error",
           "calleePath": "error",
           "canonicalName": "error",
-          "column": 5,
-          "line": 44,
+          "column": 13,
+          "line": 76,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -7353,25 +7370,8 @@
           "callee": "error",
           "calleePath": "error",
           "canonicalName": "error",
-          "column": 28,
-          "line": 51,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "error",
-          "calleePath": "error",
-          "canonicalName": "error",
-          "column": 27,
-          "line": 53,
+          "column": 13,
+          "line": 81,
           "provenance": {
             "ids": [
               "tracked",
@@ -7390,8 +7390,25 @@
           "callee": "warn",
           "calleePath": "warn",
           "canonicalName": "warn",
-          "column": 17,
-          "line": 54,
+          "column": 13,
+          "line": 85,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "error",
+          "calleePath": "error",
+          "canonicalName": "error",
+          "column": 13,
+          "line": 101,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -7408,7 +7425,7 @@
           "calleePath": "process.stdout.write",
           "canonicalName": "write",
           "column": 15,
-          "line": 97,
+          "line": 150,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -7425,7 +7442,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 3,
-          "line": 98,
+          "line": 151,
           "provenance": {
             "ids": [
               "plan",
@@ -7445,7 +7462,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 37,
-          "line": 99,
+          "line": 152,
           "provenance": {
             "ids": [
               "id"
@@ -7464,7 +7481,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 36,
-          "line": 100,
+          "line": 153,
           "provenance": {
             "ids": [
               "r",
@@ -7486,7 +7503,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 36,
-          "line": 101,
+          "line": 154,
           "provenance": {
             "ids": [
               "id"
@@ -7505,7 +7522,7 @@
           "calleePath": "error",
           "canonicalName": "error",
           "column": 23,
-          "line": 102,
+          "line": 155,
           "provenance": {
             "ids": [
               "result",
@@ -7526,7 +7543,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 104,
+          "line": 157,
           "provenance": {
             "ids": [
               "branches",
@@ -7539,7 +7556,7 @@
           "sink": null
         }
       ],
-      "fileHash": "sha256:935312a20976d05c0da1913a8dccd17ec3b0b66f1aacd12e738a8572675550b1"
+      "fileHash": "sha256:b3121ce234ba017559a882c54ae19ba261094b4375b037fa4caf953428509e9e"
     },
     "src/commands/visual.js": {
       "entries": [

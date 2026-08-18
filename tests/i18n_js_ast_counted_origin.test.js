@@ -9,7 +9,7 @@ import { cleanupTmp } from "./helpers/tmp.js"
 /**
  * REPASSE DE SUBPROCESSO DO PROPRIO PACOTE, COM A ORIGEM JA CONTADA.
  *
- * `context.js:249/260/278/280` encaminham, sem uma moldura sequer, o stdout de
+ * `context.js:291/302/320/322` encaminham, sem uma moldura sequer, o stdout de
  * `src/context-docs/py/context_db.py`. Desde a fatia da fronteira Python aquele
  * arquivo tem PONTOS PROPRIOS no inventario — as frases dele estao contadas na
  * origem. Conta-las de novo no repasse duplicaria as mesmas mensagens.
@@ -179,7 +179,7 @@ const origensReais = async () => new Set((await inv()).distributedPythonFiles(re
 
 test("REPO: os quatro repasses de `context.js` saem da fila, nomeando o indexer", async () => {
   const pts = await pontosDoContext(await origensReais())
-  for (const linha of [249, 260, 278, 280]) {
+  for (const linha of [291, 302, 320, 322]) {
     const p = pts.find((x) => x.line === linha)
     assert.ok(p, `o ponto :${linha} precisa existir`)
     assert.equal(p.rule, "stream-counted-subprocess-origin", `:${linha}`)
@@ -191,7 +191,7 @@ test("REPO: os quatro repasses de `context.js` saem da fila, nomeando o indexer"
 test("REPO: tirar o indexer da fronteira devolve os quatro pontos para a fila", async () => {
   const semIndexer = new Set([...(await origensReais())].filter((f) => !f.endsWith("context_db.py")))
   const pts = await pontosDoContext(semIndexer)
-  for (const linha of [249, 260, 278, 280]) {
+  for (const linha of [291, 302, 320, 322]) {
     assert.equal(pts.find((x) => x.line === linha).audience, "unknown",
       `:${linha} nao pode sumir da claim quando a origem deixa de ser contada`)
   }

@@ -7,6 +7,15 @@ import path from "node:path"
 import { pathToFileURL } from "node:url"
 import { cleanupTmp } from "./helpers/tmp.js"
 
+/**
+ * As funcoes de comando setam `process.exitCode` para que a automacao distinga
+ * falha pelo status do processo (`P1.CLI-JSON-EXIT-CODE`). Chamadas EM PROCESSO
+ * herdam esse efeito, e o runner leria o arquivo inteiro como falho mesmo com
+ * todas as asercoes verdes. Zerar aqui e a contrapartida de exercitar a funcao
+ * fora do subprocesso.
+ */
+test.afterEach(() => { process.exitCode = 0 })
+
 const repoRoot = path.resolve(import.meta.dirname, "..")
 const cmdMod = path.join(repoRoot, "src", "commands", "task-run.js")
 

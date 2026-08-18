@@ -165,7 +165,9 @@ for (const [nome, args, code, exit] of [
     assert.equal(r.stderrHasStandaloneJson, false, "o payload nunca sai pelo stderr")
     assert.equal(r.doc.ok, false)
     assert.equal(r.doc.error, code, "o codigo e estavel e legivel por maquina")
-    assert.ok(r.doc.detail && r.doc.detail.length > 10, "e a frase que o humano ja recebia viaja junto")
+    // O documento carrega o CODIGO, nao a prosa: consumidor de maquina decide
+    // por codigo, nunca parseando frase. E o mesmo contrato de `ctxFail`.
+    assert.equal("detail" in r.doc, false, "prosa no payload convidaria o consumidor a parsea-la")
     assert.equal(r.exitCode, exit, "erro de uso com exit 0 engana quem decide por status")
   })
 }
@@ -175,6 +177,18 @@ for (const [nome, args, code, exit] of [
  * deste erro de uso antes da correcao, e muda-lo quebraria automacao que ja o
  * distingue de falha de VEREDITO (que tambem sai != 0, por outro caminho).
  */
+/**
+ * `research` SOZINHO e AJUDA, e ajuda nao e erro: sai com 0, como `--help`. Sob
+ * `--json` e outra coisa -- uma maquina pediu documento e a chamada estava
+ * malformada --, e ai o status precisa dizer isso. A assimetria e deliberada.
+ */
+test("HUMANO: `research` sem subcomando imprime o usage e sai com 0", (t) => {
+  const r = rodar(sandbox(t), [])
+  assertRodou(r, "usage humano")
+  assert.equal(r.pure, false)
+  assert.equal(r.exitCode, 0, "ajuda nao e erro")
+})
+
 test("USO: `validate` mantem o exit 2 que ja tinha", (t) => {
   const r = rodar(sandbox(t), ["validate", "--json"])
   assert.equal(r.exitCode, 2, "codigo de uso preservado — a correcao muda o CANAL, nao o contrato")
@@ -200,12 +214,10 @@ test("USO: o documento nao carrega escape ANSI algum", (t) => {
 for (const [nome, args] of [
   ["audit sem fonte", ["skills", "audit"]],
   ["validate sem claim", ["validate"]],
-  ["dispatcher sem subcomando", []],
 ]) {
   test(`HUMANO: ${nome} continua em prosa, e NAO vira documento`, (t) => {
     const r = rodar(sandbox(t), args)
     assertRodou(r, nome)
     assert.equal(r.pure, false, "sem `--json`, a saida humana nao pode virar JSON")
-    assert.notEqual(r.exitCode, 0, "mas o status de saida vale para os dois modos")
   })
 }

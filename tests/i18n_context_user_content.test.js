@@ -32,7 +32,7 @@ const loader = () => import(pathToFileURL(path.join(repoRoot, "src", "meta", "i1
 const inv = () => import(`${pathToFileURL(path.join(repoRoot, "src", "meta", "i18n-inventory.js"))}?t=${Date.now()}`)
 
 const ALVO = "src/commands/context.js"
-const LINHA_DO_USUARIO = 201
+const LINHA_DO_USUARIO = 243
 
 test("o arquivo esta convertido, e com a provenance INTEIRA declarada", async () => {
   const { CONVERTED_FILES } = await reg()
@@ -63,7 +63,7 @@ test("NENHUM arquivo convertido tem ponto in_scope com provenance pendente", asy
 
 // ── O ponto que exigiu a estrategia nova ───────────────────────────────────
 
-test("`:201` e `user_content`, fora da claim, e NAO `public_diagnostic`", async () => {
+test("`:243` e `user_content`, fora da claim, e NAO `public_diagnostic`", async () => {
   const { buildInventory } = await inv()
   const p = buildInventory({ repoRoot }).points.find((x) => x.file === ALVO && x.line === LINHA_DO_USUARIO)
   assert.ok(p, "se o ponto mudou de linha, a auditoria precisa ser refeita")

@@ -187,7 +187,7 @@ test("validateRegistry recusa script que NÃO é alcançado pelo runtime (não p
  *
  * ATUALIZE AQUI, e so aqui, a cada arquivo reconciliado no lote JS.
  */
-test("CENSO GLOBAL: 1905 pontos, 0 unknown, 25 arquivos convertidos", async () => {
+test("CENSO GLOBAL: 1906 pontos, 0 unknown, 25 arquivos convertidos", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
 
@@ -225,7 +225,14 @@ test("CENSO GLOBAL: 1905 pontos, 0 unknown, 25 arquivos convertidos", async () =
   // scanner contava `:44` duas vezes (`print` e `json`), a mesma dupla contagem
   // ja documentada em `context_db.py`. Aqui o total cai porque a SUPERFICIE
   // sumiu de verdade, e nao por falso positivo.
-  assert.equal(inv.total, 1905, "converter nao pode sumir com ponto REAL; falso positivo do regex pode cair")
+  //
+  // 1905 -> 1906: a correcao do `P1.CLI-JSON-EXIT-CODE` acrescentou UM ponto de
+  // mensagem -- o documento de erro de uso do `research`. Os demais nao se
+  // moveram: as recusas passaram a emitir por THUNK justamente para que o
+  // literal continuasse no callsite de um sink e nao sumisse do censo. A
+  // primeira versao da correcao perdeu 8 pontos por passar a frase como
+  // argumento, e foi o proprio inventario que cobrou.
+  assert.equal(inv.total, 1906, "converter nao pode sumir com ponto REAL; falso positivo do regex pode cair")
 
   // Medicao em movimento: cai a cada arquivo reconciliado. 54 -> 53 com qa.js;
   // 53 -> 52 com secrets.js.

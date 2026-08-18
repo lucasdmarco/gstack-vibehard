@@ -23,7 +23,7 @@ import { cleanupTmp } from "./helpers/tmp.js"
  * resolvida continua `unknown`.
  *
  * O ACHADO QUE DECIDIU A FATIA, e ele veio da medicao, nao da leitura. Os unicos
- * candidatos de repasse cru do repositorio sao `context.js:249/260/278/280`
+ * candidatos de repasse cru do repositorio sao `context.js:291/302/320/322`
  * (`process.stdout.write(r.stdout)`). O subprocesso deles NAO e ferramenta de
  * terceiros: e `src/context-docs/py/context_db.py`, que viaja dentro do pacote
  * (`package.json#files` inclui `src/`) e imprime prosa escrita pelo GStack
@@ -504,7 +504,7 @@ test("REPO: os quatro candidatos de `context.js` NAO sao repasse externo", async
   const { analyzeFile, createAnalyzer } = await eng()
   const alvo = path.join(repoRoot, "src", "commands", "context.js")
   const pts = analyzeFile(alvo, createAnalyzer([alvo]), { repoRoot })
-  for (const linha of [249, 260, 278, 280]) {
+  for (const linha of [291, 302, 320, 322]) {
     const p = pts.find((x) => x.line === linha)
     assert.ok(p, `o ponto :${linha} precisa existir — se mudou de linha, a medicao mudou`)
     assert.equal(p.calleePath, "process.stdout.write")

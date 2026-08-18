@@ -150,8 +150,8 @@ test("GUARDA `.env` rastreado: recusa serializada, com o arquivo nomeado", (t) =
   const r = rodar(cwd, ["p3", "--yes", "--json"])
   assertRodou(r, "com .env rastreado")
   assert.equal(r.pure, true, `stdout precisa ser documento puro (motivo: ${r.reason})`)
-  assert.equal(r.doc.error, "tracked_secrets")
-  assert.match(r.doc.detail, /\.env/, "o consumidor precisa saber QUAL arquivo bloqueou")
+  assert.equal(r.doc.error, "tracked_secrets",
+    "o código diz o QUE bloqueou; o arquivo específico sai na prosa do modo humano")
   assert.notEqual(r.exitCode, 0, "exit 0 aqui seria ler 'segredo bloqueado' como 'tudo certo'")
 })
 
@@ -180,7 +180,9 @@ test("o schema da recusa distingue `blocked` de `ok`", (t) => {
   assert.equal(r.doc.schemaVersion, "gstack.task-run.refusal.v1")
   assert.equal(r.doc.ok, false)
   assert.equal(r.doc.blocked, true)
-  assert.ok(r.doc.detail && r.doc.detail.length > 10, "a frase humana viaja junto")
+  // Sem prosa no documento: consumidor de máquina decide por CÓDIGO. A frase
+  // continua existindo — no ramo humano, que é de quem ela é.
+  assert.equal("detail" in r.doc, false)
 })
 
 // ── Exit code: a raiz do P1 ───────────────────────────────────────────────

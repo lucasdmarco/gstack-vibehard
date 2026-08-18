@@ -47,15 +47,25 @@ function readBudget(cwd) {
  */
 const TASK_RUN_REFUSAL_SCHEMA = "gstack.task-run.refusal.v1"
 
-function taskRunFail(json, code, detail, humano) {
+/**
+ * O ramo humano chega como THUNK, e nao como string, e a razao e de MEDICAO --
+ * cobrada pelo proprio inventario. Passar a frase como argumento tira o literal
+ * do callsite de um sink, e o extrator deixa de enxerga-la: 4 pontos de mensagem
+ * sumiram do censo na primeira versao desta correcao. Dentro do arrow o callee
+ * continua sendo `error`/`warn`, e a mensagem segue contada onde sempre esteve.
+ *
+ * O documento carrega o CODIGO, nao a prosa: consumidor de maquina decide por
+ * codigo estavel, nunca parseando frase. E o mesmo contrato de `ctxFail`.
+ */
+function taskRunFail(json, code, humano) {
   process.exitCode = 1
   if (json) {
     process.stdout.write(JSON.stringify({
-      schemaVersion: TASK_RUN_REFUSAL_SCHEMA, ok: false, blocked: true, error: code, detail,
+      schemaVersion: TASK_RUN_REFUSAL_SCHEMA, ok: false, blocked: true, error: code,
     }) + "\n")
     return true
   }
-  humano(detail)
+  humano()
   return true
 }
 
@@ -63,16 +73,16 @@ function taskRunFail(json, code, detail, humano) {
 function guardasDeTaskRun(cwd, yes, json) {
   if (!isGitRepo(cwd)) {
     return taskRunFail(json, "not_a_git_repo",
-      "`task run` exige um repositorio git (worktree por passo).", error)
+      () => error("`task run` exige um repositorio git (worktree por passo)."))
   }
   const tracked = checkTrackedSecrets(cwd)
   if (tracked.length) {
     return taskRunFail(json, "tracked_secrets",
-      `.env RASTREADO no git (${tracked.join(", ")}) - nao rodo o loop (segredo iria pra worktree). Remova do git primeiro.`, error)
+      () => error(`.env RASTREADO no git (${tracked.join(", ")}) - nao rodo o loop (segredo iria pra worktree). Remova do git primeiro.`))
   }
   if (!yes) {
     return taskRunFail(json, "confirmation_required",
-      "`task run` executa comandos reais em worktree por passo. Releia o plano e rode com `--yes`.", warn)
+      () => warn("`task run` executa comandos reais em worktree por passo. Releia o plano e rode com `--yes`."))
   }
   return false
 }
@@ -87,7 +97,8 @@ export function taskRunCommand(args = [], opts = {}) {
   if (!planDir || !existsSync(join(planDir, "task.json"))) {
     // `plan_not_found` ja era o codigo publico e fica preservado. O que muda e o
     // exit code, que era 0.
-    taskRunFail(json, "plan_not_found", 'Plano nao encontrado. Gere com `task "<pedido>"` primeiro.', error)
+    taskRunFail(json, "plan_not_found",
+      () => error('Plano nao encontrado. Gere com `task "<pedido>"` primeiro.'))
     return
   }
   const plan = JSON.parse(stripBom(readFileSync(join(planDir, "task.json"), "utf-8")))

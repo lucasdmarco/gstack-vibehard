@@ -421,7 +421,7 @@ const HOOK_RULES = Object.freeze([
  * escrita na própria regra de hook: "stdout de hook é o canal do protocolo com o
  * harness". Aqui não há harness nenhum. Quem executa é o GStack, e quem lê o
  * stdout é o usuário — `context.js` captura a saída do indexer e a encaminha
- * crua (`context.js:249/260/278/280`) ou a reparseia (`explainJson`).
+ * crua (`context.js:291/302/320/322`) ou a reparseia (`explainJson`).
  *
  * A CONSEQUÊNCIA DISSO É A REGRA `cli-stdout-surface`: em subprocesso de CLI, o
  * stdout é superfície de leitura por padrão, não protocolo. É o inverso exato do
@@ -963,7 +963,7 @@ const collectJsPoints = (repoRoot, runtimeScripts, registry = null) => {
 
 // ── Fronteira do inventário Python ──────────────────────────────────────────
 //
-// ACHADO QUE ABRIU ESTA FATIA (C-4(a)). `context.js:249/260/278/280` repassam,
+// ACHADO QUE ABRIU ESTA FATIA (C-4(a)). `context.js:291/302/320/322` repassam,
 // sem uma moldura sequer, o stdout de `src/context-docs/py/context_db.py`. O
 // provador de origem mostrou que aquele artefato NÃO é ferramenta de terceiros:
 // é script do próprio pacote, e ele imprime prosa escrita pelo GStack

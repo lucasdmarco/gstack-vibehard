@@ -166,27 +166,33 @@ async function resolveMirror(cwd, args, json, opts) {
  * distinguir erro de uso de payload malformado — as duas coisas chegavam como
  * "isto não parseia".
  *
- * `code` é estável e legível por máquina; `detail` é a frase que o humano já
- * recebia. O modo humano não muda: mesma mensagem, mesmo canal.
+ * `code` é estável e legível por máquina: o consumidor decide pelo CÓDIGO, não
+ * parseando prosa. É o mesmo contrato de `ctxFail` em `context.js`.
+ *
+ * O ramo humano chega como THUNK, e não como string. A razão é de MEDIÇÃO, e foi
+ * cobrada pelo inventário: passar a frase como argumento tira o literal do
+ * callsite de um sink, e o extrator deixa de enxergá-lo — 4 pontos de mensagem
+ * sumiram do censo na primeira versão desta correção. Dentro do arrow, o callee
+ * continua sendo `error`/`warn`, e a mensagem segue contada onde sempre esteve.
  */
 const RESEARCH_USAGE_SCHEMA = "gstack.research.usage-error.v1"
 
-function researchUsageFail(json, code, detail, exitCode = 1) {
+function researchUsageFail(json, code, humano, exitCode = 1) {
   process.exitCode = exitCode
   if (json) {
     process.stdout.write(JSON.stringify({
-      schemaVersion: RESEARCH_USAGE_SCHEMA, ok: false, error: code, detail,
+      schemaVersion: RESEARCH_USAGE_SCHEMA, ok: false, error: code,
     }) + "\n")
     return null
   }
-  error(detail)
+  humano()
   return null
 }
 
 function emitNoMirror(repo, json) {
   if (repo) { process.exitCode = 1; return null }
   return researchUsageFail(json, "missing_source",
-    "research skills audit: informe --path <dir> ou --repo <url>")
+    () => error("research skills audit: informe --path <dir> ou --repo <url>"))
 }
 function emitAudit(mirror, cwd, json) {
   const audit = auditExternalSkills({ source: mirror.source, commit: mirror.commit, files: collectMirrorFiles(mirror.dir) })
@@ -244,7 +250,7 @@ function notebookLmQueryCmd(args, json) {
   const question = flagValue(args, "--question")
   if (!notebookId || !question) {
     return researchUsageFail(json, "missing_notebook_or_question",
-      "research notebooklm query: informe --notebook <id> --question <texto>")
+      () => error("research notebooklm query: informe --notebook <id> --question <texto>"))
   }
   const r = notebookLmQuery({ notebookId, question })
   return emitNotebookLm(r, json, (p) => { section("research notebooklm query"); warn(`  status: ${p.status} (${p.category})`) })
@@ -260,12 +266,12 @@ function notebookLmImportCmd(args, json) {
   const approved = args.includes("--approved") // explícito na linha de comando -- --yes NUNCA basta (ver costGateStatus/spendConfirmed em outras sprints)
   if (!resultPath || !to) {
     return researchUsageFail(json, "missing_result_or_target",
-      "research notebooklm import: informe --result <artefato> --to context|obsidian")
+      () => error("research notebooklm import: informe --result <artefato> --to context|obsidian"))
   }
   const result = readImportResult(resultPath)
   if (!result) {
     return researchUsageFail(json, "unreadable_result",
-      `research notebooklm import: não consegui ler/parsear ${resultPath}`)
+      () => error(`research notebooklm import: não consegui ler/parsear ${resultPath}`))
   }
   const r = notebookLmImport({ result, approved, to })
   if (!r.ok) process.exitCode = 1
@@ -286,7 +292,7 @@ function notebookLmCmd(sub, args, json) {
   const handler = NOTEBOOKLM_HANDLERS[sub[1]]
   if (handler) return handler(args, json)
   return researchUsageFail(json, "unknown_subcommand",
-    "research notebooklm: use doctor|connect|query|import")
+    () => error("research notebooklm: use doctor|connect|query|import"))
 }
 
 // ── PRD50 S50.4: `research validate` (§13.1) ────────────────────────────────
@@ -334,7 +340,7 @@ function validateCmd(args, json) {
     // exit 2 preservado: era o código deste erro de uso antes da correção, e
     // mudá-lo quebraria automação que já o distingue de falha de veredito.
     return researchUsageFail(json, "missing_claim",
-      'research validate: informe o claim ou pergunta. Ex.: research validate "X reduz Y" --level auto', 2)
+      () => error('research validate: informe o claim ou pergunta. Ex.: research validate "X reduz Y" --level auto'), 2)
   }
   const classified = classifyLevel(signalsFromQuestion(question))
   const resolved = resolveLevel({ classified: classified.level, requested: flagValue(args, "--level") || "auto" })
@@ -372,9 +378,11 @@ function rotaDeResearch(sub) {
  * consumidor encontrar, porque basta errar o nome do subcomando.
  */
 function researchSemRota(json) {
-  if (json) return researchUsageFail(json, "unknown_subcommand", "research: use skills audit|notebooklm|validate")
+  if (json) return researchUsageFail(json, "unknown_subcommand", () => {})
+  // Sem `--json`, `research` sozinho e AJUDA, e ajuda nao e erro: sai com 0, como
+  // `--help`. Sob `--json` e outra coisa -- uma maquina pediu documento e a
+  // chamada estava malformada --, e ai o status precisa dizer isso.
   printResearchUsage()
-  process.exitCode = 1
   return null
 }
 
