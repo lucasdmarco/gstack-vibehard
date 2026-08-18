@@ -50,8 +50,48 @@ function ensureDocDirs(cwd) {
 const ctxJson = (obj) => process.stdout.write(JSON.stringify(obj) + "\n")
 const jsonFlag = (json) => (json ? ["--json"] : [])
 const orEmpty = (x) => x || ""
-/** Falha padronizada: JSON puro com `error:code`, ou mensagem humana. */
+
+/**
+ * Flags de `context` que consomem o PRÓXIMO argumento como valor. Sem esta
+ * lista, `context search --source docs` leria `docs` como o termo de busca.
+ */
+const FLAGS_COM_VALOR = new Set(["--max", "--backend", "--mode", "--source", "--kind", "--since", "--db"])
+
+/**
+ * Primeiro POSICIONAL depois do subcomando.
+ *
+ * Corrige `P1.CLI-JSON-EXIT-CODE.a`: os handlers liam `args[1]` cru, então
+ * `context search --json` buscava pelo literal `"--json"` e `context scout
+ * --json` respondia como se a flag fosse a pergunta. Pior que o resultado
+ * errado, os ramos de recusa por omissão (`missing query`, `missing entity`,
+ * `missing topic`, `pergunta obrigatória`) eram INALCANÇÁVEIS: só um argumento
+ * vazio explícito chegava neles.
+ *
+ * `--flag=valor` é pulada pela mesma porta que `--flag`, e sem consumir o
+ * próximo argumento — é uma forma só, não duas.
+ */
+function posicional(args) {
+  for (let i = 1; i < args.length; i++) {
+    const a = String(args[i])
+    if (!a.startsWith("-")) return a
+    if (FLAGS_COM_VALOR.has(a)) i += 1
+  }
+  return undefined
+}
+/**
+ * Falha padronizada: JSON puro com `error:code`, ou mensagem humana.
+ *
+ * `process.exitCode = 1` fecha a metade do `P1.CLI-JSON-EXIT-CODE` que este
+ * arquivo controla: sem ele, `context search --json` sem termo escrevia o
+ * documento de erro e o processo saía com 0, e quem checa `$?` lia falha como
+ * sucesso. `exitCode` e não `process.exit()` de propósito — o comando termina
+ * seu próprio fluxo, e nada fica pela metade.
+ *
+ * Vale nos DOIS modos: o humano também precisa sair diferente de zero, senão a
+ * automação que não usa `--json` continuaria enganada.
+ */
 function ctxFail(json, code, human) {
+  process.exitCode = 1
   if (json) return ctxJson({ error: code })
   human()
 }
@@ -163,6 +203,8 @@ const scoutMaxResults = (args) => {
 }
 const isFastcontextBackend = (args) => args.includes("--backend") && args[args.indexOf("--backend") + 1] === "fastcontext"
 function scoutError(msg, json) {
+  // Mesmo contrato de `ctxFail`: erro sai diferente de zero nos dois modos.
+  process.exitCode = 1
   const err = { ok: false, error: msg }
   if (json) ctxJson(err)
   else error(msg)
@@ -214,7 +256,7 @@ function decisionContext(cwd, q, json) {
   return out
 }
 function ctxScout(args, cwd) {
-  const q = args[1]
+  const q = posicional(args)
   const json = args.includes("--json")
   if (!q) return scoutError('pergunta obrigatória: context scout "como X funciona?"', json)
   // FastContext/remoto NUNCA por default (PRD18) — opt-in explícito ainda não implementado.
@@ -239,7 +281,7 @@ function forwardSearchFilters(args) {
   return out
 }
 function ctxSearch(args, cwd) {
-  const q = args[1]
+  const q = posicional(args)
   const json = args.includes("--json")
   // --json → stdout PURO (sem header/banner) para automação/MCP.
   if (!json) section(`context search — ${orEmpty(q)}`)
@@ -251,7 +293,7 @@ function ctxSearch(args, cwd) {
 }
 
 function ctxRelated(args, cwd) {
-  const ent = args[1]
+  const ent = posicional(args)
   const json = args.includes("--json")
   if (!json) section(`context related — ${orEmpty(ent)}`)
   if (!ent) return ctxFail(json, "missing entity", () => error("Forneça a entidade: context related <Nome>"))
@@ -268,7 +310,7 @@ function explainJson(cwd, topic) {
   ctxJson({ topic, search: safe(s.stdout), related: safe(rel.stdout) })
 }
 function ctxExplain(args, cwd) {
-  const topic = args[1]
+  const topic = posicional(args)
   const json = args.includes("--json")
   if (!topic) return ctxFail(json, "missing topic", () => error("Forneça o tópico: context explain \"...\""))
   if (!existsSync(dbPath(cwd))) return ctxFail(json, "no_index", () => warn("Índice não existe. Rode `context index` antes."))

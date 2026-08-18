@@ -82,10 +82,13 @@ export const PRD48_RC_ITEMS = Object.freeze([
       {
         id: "P1.CLI-JSON-EXIT-CODE.a",
         title: "`context <sub> --json` consome a própria flag como argumento posicional",
-        evidence: "src/commands/context.js lê o posicional como `args[1]` cru (ctxSearch:242, ctxRelated:254, ctxExplain:271, ctxScout:217). Com `context search --json` o termo de busca vira a string `\"--json\"`, e `context scout --json` responde como se a flag fosse a pergunta — provado em tests/context_json_contract.test.js",
-        impact: "os ramos de recusa por omissão (`missing query`, `missing entity`, `missing topic`, `pergunta obrigatória`) são INALCANÇÁVEIS: só um argumento vazio explícito chega neles. Um consumidor que chame `context search --json` recebe resultado de uma busca pelo literal `--json`, não um erro",
-        fixAuthorized: false,
-        pinnedBy: "tests/context_json_contract.test.js — fixa o comportamento ATUAL, declarando que não é o desejado",
+        evidence: "src/commands/context.js lia o posicional como `args[1]` cru (ctxSearch, ctxRelated, ctxExplain, ctxScout). Com `context search --json` o termo de busca virava a string `\"--json\"`, e `context scout --json` respondia como se a flag fosse a pergunta — provado em tests/context_json_contract.test.js",
+        impact: "os ramos de recusa por omissão (`missing query`, `missing entity`, `missing topic`, `pergunta obrigatória`) eram INALCANÇÁVEIS: só um argumento vazio explícito chegava neles. Um consumidor que chamasse `context search --json` recebia resultado de uma busca pelo literal `--json`, não um erro",
+        fixAuthorized: true,
+        status: "delivered",
+        fixedOn: "2026-08-17",
+        fix: "`posicional(args)` pula flags e os valores das que consomem argumento (`--max`, `--backend`, `--mode`, `--source`, `--kind`, `--since`, `--db`). Os quatro handlers passaram a usá-lo. `ctxFail` e `scoutError` passaram a setar `process.exitCode = 1` — nos DOIS modos, porque a automação que não usa `--json` merece o mesmo contrato de status.",
+        proof: "tests/context_json_contract.test.js — 21 controles: recusa por omissão alcançada nos 4 subcomandos, flag com VALOR não confundida com posicional, exit != 0 na recusa e == 0 no sucesso, modo humano preservado",
       },
       {
         id: "P1.CLI-JSON-EXIT-CODE.b",

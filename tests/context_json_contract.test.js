@@ -32,15 +32,15 @@ import { evaluateJsonRun } from "./helpers/json-purity.js"
  * esta e o schema especifico daqueles dois payloads. Quem cobre o motor de busca
  * por tras deles e tests/test_context_db.py.
  *
- * ACHADO DE PRODUTO, encontrado ao escrever esta prova e NAO corrigido aqui
- * (mudar parsing de argumento e mudanca de comportamento publico, nao
- * classificacao): o posicional e lido como `args[1]` cru, entao
- * `context search --json` trata a PROPRIA FLAG como termo de busca. Os ramos de
- * recusa (`missing query`, `missing entity`, `missing topic`, "pergunta
- * obrigatoria") sao inalcancaveis por omissao — so um argumento vazio EXPLICITO
- * chega neles, e e assim que os testes abaixo os exercitam. Em `context scout`
- * o efeito e mais visivel: `scout --json` responde como se `--json` fosse a
- * pergunta.
+ * ACHADO DE PRODUTO CORRIGIDO (`P1.CLI-JSON-EXIT-CODE.a`, fix autorizado em
+ * 2026-08-17). O posicional era lido como `args[1]` cru, entao
+ * `context search --json` tratava a PROPRIA FLAG como termo de busca, e os ramos
+ * de recusa (`missing query`, `missing entity`, `missing topic`, "pergunta
+ * obrigatoria") eram inalcancaveis por omissao -- so um argumento vazio
+ * EXPLICITO chegava neles, e nenhum consumidor real escreve isso.
+ *
+ * Os testes que exercitam a recusa com `""` explicito FICAM: continuam sendo
+ * contrato valido, e provam que a correcao nao quebrou o caminho antigo.
  */
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
@@ -115,15 +115,80 @@ test("`context scout … --backend fastcontext --json`: recusa o backend remoto"
 })
 
 /**
- * O ACHADO DE PRODUTO, FIXADO COMO ESTA. `--json` vira o proprio termo de busca
- * quando nao ha posicional. Nao esta certo, e o teste NAO afirma que esta: fixa
- * o comportamento observado para que uma correcao futura seja uma mudanca
- * DELIBERADA e visivel, e nao um efeito colateral silencioso.
+ * O ACHADO CORRIGIDO (`P1.CLI-JSON-EXIT-CODE.a`, fix autorizado em 2026-08-17).
+ *
+ * Este teste FIXAVA o defeito: `--json` virava o proprio termo de busca, porque
+ * os handlers liam `args[1]` cru. Pior que o resultado errado, os ramos de
+ * recusa por omissao eram INALCANCAVEIS -- so um argumento vazio EXPLICITO
+ * chegava neles, e nenhum consumidor real escreve isso.
+ *
+ * Agora `posicional()` pula flags, e a flag deixa de ser confundida com dado.
  */
-test("ACHADO: sem posicional, a propria flag vira o argumento do subcomando", (t) => {
+test("sem posicional, a flag NAO vira argumento: a recusa por omissao e alcancada", (t) => {
   const p = payloadDe(sandbox(t), ["scout", "--json"], "scout sem pergunta e sem posicional")
-  assert.equal(p.question, "--json",
-    "comportamento ATUAL, nao desejado: o parsing le `args[1]` cru e engole a flag")
+  assert.equal(p.ok, false, "sem pergunta, a resposta e recusa")
+  assert.match(p.error, /pergunta obrigat/i)
+  assert.notEqual(p.question, "--json", "a flag nunca pode ser lida como a pergunta")
+})
+
+/** Os quatro subcomandos, sem posicional algum: todos recusam. */
+for (const [sub, campo, esperado] of [
+  ["search", "error", "missing query"],
+  ["related", "error", "missing entity"],
+  ["explain", "error", "missing topic"],
+]) {
+  test(`\`context ${sub} --json\` (sem posicional) recusa com \`${esperado}\``, (t) => {
+    const p = payloadDe(sandbox(t), [sub, "--json"], `${sub} sem posicional`)
+    assert.equal(p[campo], esperado)
+  })
+}
+
+/**
+ * A PORTA DAS FLAGS COM VALOR. Sem ela, `--source docs` faria `docs` virar o
+ * termo de busca -- trocaria um bug de parsing por outro, mais dificil de ver
+ * porque produziria um resultado plausivel em vez de um erro.
+ */
+test("flag com VALOR nao e confundida com o posicional", (t) => {
+  const cwd = sandbox(t)
+  const p = payloadDe(cwd, ["search", "--source", "docs", "--json"], "search so com filtro")
+  assert.equal(p.error, "missing query",
+    "`docs` e valor de `--source`, nunca o termo de busca")
+})
+
+test("com filtro ANTES do termo, o termo continua sendo o termo", (t) => {
+  const cwd = sandbox(t)
+  const r = rodar(cwd, ["search", "--source", "docs", "termo-real", "--json"])
+  assertRodou(r, "search com filtro antes do termo")
+  assert.notEqual(r.doc.error, "missing query", "o posicional depois do filtro precisa ser encontrado")
+  assert.equal(r.doc.error, "no_index", "sem indice, a recusa e outra -- e e a certa")
+})
+
+// ── Exit code: a metade do P1 que este arquivo controla ────────────────────
+
+/**
+ * `P1.CLI-JSON-EXIT-CODE`, a raiz. O documento de erro saia com exit 0, e quem
+ * checa `$?` lia falha como sucesso -- o pior modo de falhar, porque e silencioso.
+ *
+ * Vale nos DOIS modos: sem `--json` tambem precisa sair != 0, senao a automacao
+ * que nao usa a flag continuaria enganada.
+ */
+for (const args of [["search", "--json"], ["related", "--json"], ["explain", "--json"], ["scout", "--json"]]) {
+  test(`\`context ${args.join(" ")}\`: recusa sai com exit != 0`, (t) => {
+    const r = rodar(sandbox(t), args)
+    assert.notEqual(r.exitCode, 0, "erro com exit 0 engana quem decide por status do processo")
+    assert.equal(r.pure, true, "e continua sendo documento JSON puro")
+  })
+}
+
+test("CONTROLE POSITIVO: sucesso continua saindo com 0", (t) => {
+  const r = rodar(sandbox(t), ["scout", "como funciona o gate", "--json"])
+  assert.equal(r.exitCode, 0, "sem isto, o exit code nao distinguiria nada")
+  assert.equal(r.pure, true)
+})
+
+test("o modo HUMANO tambem sai != 0 na recusa", (t) => {
+  const r = rodar(sandbox(t), ["search"])
+  assert.notEqual(r.exitCode, 0, "quem nao usa `--json` merece o mesmo contrato de status")
 })
 
 /**
