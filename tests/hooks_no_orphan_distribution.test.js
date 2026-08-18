@@ -2,7 +2,7 @@ import test from "node:test"
 import assert from "node:assert/strict"
 import { readFileSync, readdirSync, existsSync } from "node:fs"
 import path from "node:path"
-import { fileURLToPath } from "node:url"
+import { fileURLToPath, pathToFileURL } from "node:url"
 
 /**
  * HOOK DISTRIBUÍDO PRECISA DE CONSUMIDOR — o controle que `before_shell.py`
@@ -217,4 +217,27 @@ test("o uninstall deriva os hooks do pacote — não há lista a atualizar", () 
     "derivar do pacote é o que faz a remoção se propagar sozinha")
   assert.equal(un.includes("before_shell"), false,
     "e o arquivo removido nunca esteve na lista de registros a limpar")
+})
+
+// ── O achado registrado no ledger, e não só neste arquivo ──────────────────
+
+/**
+ * Um teste que impede a regressão não substitui o REGISTRO do risco: quem lê o
+ * checklist do RC precisa saber que a distribuição de hooks não é curada, e que
+ * um deles depende de wiring manual. Sem isso, o achado morre no arquivo que o
+ * encontrou.
+ */
+test("o achado de wiring dos hooks está no ledger, com destino e dono", async () => {
+  const { PRD51_RC_ITEMS } = await import(
+    `${pathToFileURL(path.join(repoRoot, "src", "dream", "rc-checklist-prd51.js"))}?t=${Date.now()}`)
+  const item = PRD51_RC_ITEMS.find((i) => i.id === "P1.HOOK-WIRING-UNCERTIFIED")
+
+  assert.ok(item, "o risco precisa estar registrado, não só mitigado por teste")
+  assert.equal(item.status, "pending", "o segundo achado segue aberto")
+  assert.equal(item.blocking, false, "nenhuma claim do RC depende disso")
+  assert.equal(item.deferredTo, "PRD52")
+  assert.ok(item.owner)
+  assert.match(item.evidence, /permission_request\.py/, "o achado ABERTO precisa ser nomeado")
+  assert.match(item.evidence, /before_shell\.py/, "e o fechado, também — é o que dá base ao risco")
+  assert.match(item.requires, /manifest EXPL/, "o destino é certificação de wiring, não refactor genérico")
 })

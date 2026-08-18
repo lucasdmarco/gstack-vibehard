@@ -250,6 +250,23 @@ export const PRD51_RC_ITEMS = Object.freeze([
     proof: "tests/node_support_contract.test.js",
   },
 
+  /**
+   * Achado da Fase 1B (2026-08-17), levantado ao fechar os últimos `unknown` do
+   * inventário Python. REGISTRA O RISCO E O ESTADO REAL — nenhum refactor foi
+   * aberto, porque nenhuma claim do RC depende disso.
+   */
+  {
+    id: "P1.HOOK-WIRING-UNCERTIFIED", tier: "P1", sprint: "certificação RC", version: "5.107.0",
+    status: "pending", deferredTo: "PRD52", blocking: false,
+    owner: "lucas",
+    title: "Distribuição de hooks não é curada: `readdirSync` copia todo `.py`, e um hook pode ser entregue sem estar registrado em evento algum",
+    evidence: "`src/harness/codex.js:29` copia TODO `.py` de `hooks/hooks/` para a máquina do usuário. A curadoria não existe: basta um arquivo entrar no diretório. Foi assim que `before_shell.py` chegou a todo usuário sem ser registrado por `claude.js` (5 eventos) nem por `codex.js` (4 chaves) — e duplicando capacidade VIVA de `pre_tool_use_security.py:121`. Ele foi REMOVIDO nesta leva. Segundo achado, ainda ABERTO: `permission_request.py` se sustenta apenas em wiring DOCUMENTAL — `skills/skills/mcp-setup/SKILL.md:120` declara `PermissionRequest | ^Bash$ | permission_request.py` e `codex-trust.js:36` o lista, mas NENHUM instalador o registra. O usuário aplica à mão, ou ele não roda.",
+    impact: "Nenhum no RC: o hook órfão saiu, e `tests/hooks_no_orphan_distribution.test.js` impede o próximo de entrar em silêncio — todo `.py` distribuído precisa de evento, comando, irmão ou contrato versionado. O risco residual é de PROCEDÊNCIA: `permission_request.py` depende de a documentação continuar existindo, e documentação não é instalação. Relacionado a `PRD48 P0.CODEX-HOOKS`, que já registra hooks fora do manifest.",
+    requires: "PRD52: certificação de wiring/ownership dos hooks com manifest EXPLÍCITO — cada `.py` distribuído declarando evento, dono e se o registro é automático ou manual. A cópia em bloco vira allowlist, e o que hoje é documento vira dado verificável.",
+    affectedScope: "hooks distribuídos pelo instalador e a relação entre o que é copiado e o que é registrado",
+    proof: null,
+  },
+
   // Achado da revisão da Task 2 (2026-08-07). DEFERIDO para a Fatia 7/CI por
   // decisão humana: a correção redesenha a procedência do runner, e o closeout
   // não é lugar para isso.
