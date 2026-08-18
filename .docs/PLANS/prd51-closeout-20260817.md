@@ -153,12 +153,20 @@ ready:false · programComplete:false · DoD 18/24
 
 ## O que mudou de tamanho
 
-**P0.CODEX-HOOKS** era maior do que o registrado. A confrontação com o binário do
-Codex 0.145.0 mostrou que a integração **nunca teve como executar**:
-`on_session_start` e `on_stop` têm **zero ocorrências** no binário; o handler é
-objeto e não array de strings; e sem `trusted_hash` o Codex diz "hooks won't run".
-O wiring inerte saiu e é limpo no merge. A integração **real não existe**, e
-escrevê-la exige o modelo de confiança que a extração não revela.
+**P0.CODEX-HOOKS** — esta leitura foi **REVOGADA em 2026-08-18**. O texto abaixo
+fica como registro do erro, não como estado:
+
+> ~~A integração real não existe, e escrevê-la exige o modelo de confiança que a
+> extração não revela.~~
+
+O que estava certo: `on_session_start` e `on_stop` têm **zero ocorrências** no
+binário, e o wiring de `config.toml` era inerte — a remoção dele vale e não volta.
+
+O que estava **errado**: concluir que a integração não era construível. O contrato
+canônico é **`~/.codex/hooks.json`** (`SessionStart`, `PreToolUse`, `PostToolUse`,
+`PermissionRequest`, `Stop`, `UserPromptSubmit`), e `config.toml [hooks.state]` é
+**ledger de confiança** — o mecanismo de aprovação, não um impedimento. Li a
+exigência de `trusted_hash` como barreira; ela pertence a quem aprova.
 
 **P0.CODEX-SECURITY**: modelo de ameaça achou 6 vetores auto-aprovados. O central
 era o comando **composto** — `re.match` ancora no início, então `ls && cat .env`
