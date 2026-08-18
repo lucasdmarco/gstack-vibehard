@@ -245,4 +245,3 @@ export function stripGstackFromCodexConfig(configFile, readImpl = readFileSync, 
   writeImpl(configFile, stringifyToml(parsed))
   return true
 }
-

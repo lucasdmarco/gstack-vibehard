@@ -9,11 +9,18 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _harness import emit_permission_decision, normalize_input
+from _cmdsec import segmentos, le_segredo
 
-# FAIL-OPEN: este hook roda em TODO Write/Edit/Bash de TODO projeto. Input
-# malformado/ausente NUNCA pode crashar e travar o turno do usuário — em qualquer
-# erro de parsing, libera (exit 0). A segurança (BLOCK_PATTERNS) só age se o
-# parsing der certo; um crash não deve "bloquear por acidente".
+# INDISPONIBILIDADE NAO E AUTORIZACAO.
+#
+# Este hook roda em TODO Write/Edit/Bash de TODO projeto, e um crash nao pode
+# travar o turno do usuario — ate aqui, nada mudou. O que muda e a LEITURA do
+# `exit 0`: ele significa "este hook NAO DECIDIU", e o fluxo normal de aprovacao
+# assume dali. Nunca significou "autorizado", e o comentario anterior — "libera"
+# — descrevia como concessao o que sempre foi ausencia de decisao.
+#
+# A distincao e a correcao do `P0.CODEX-SECURITY`: input malformado nao pode
+# LIBERAR operacao perigosa. Ele nao libera; ele devolve a decisao a quem sabe.
 try:
     inp = json.loads(sys.stdin.read())
 except Exception:
@@ -109,6 +116,17 @@ def check_design_system_mandate():
 #  SECURITY GUARDRAILS (existing)
 # ═══════════════════════════════════════════════════════
 
+# LEITURA DE SEGREDO, por SEGMENTO. Antes de qualquer denylist de padrao: um
+# comando composto so precisa de UM segmento que leia `.env` para exfiltrar, e a
+# denylist textual olhava a string inteira. Ver `_cmdsec.py` para o modelo.
+_segredos = [seg for seg in segmentos(cmd) if le_segredo(seg)]
+if _segredos:
+    emit_permission_decision(
+        inp, "deny",
+        "leitura de arquivo de segredo bloqueada (%s) — use variavel de ambiente "
+        "ou `gstack_vibehard secrets`, nunca leia o arquivo pelo shell" % _segredos[0],
+    )
+
 BLOCK_PATTERNS = [
     (r'\brm\s+-rf\s+[/\\](\s|$)', "rm -rf / bloqueado (destruiria o sistema)"),
     (r'\brm\s+-rf\s+~[/\\]', "rm -rf na home bloqueado"),
@@ -121,8 +139,13 @@ BLOCK_PATTERNS = [
     (r'[|;]\s*(sh|bash|zsh)\s+-c\s+["\'](?:curl|wget)', "pipe para shell remoto bloqueado"),
 ]
 
+# Por SEGMENTO, e nao sobre a string inteira: `echo ok && rm -rf /` precisa
+# reprovar pelo segundo segmento, e uma busca global ja fazia isso — mas so por
+# acidente. Segmentar torna a intencao explicita e cobre o caso inverso, em que
+# um padrao casaria por acaso atravessando a fronteira de dois comandos.
+_alvos = segmentos(cmd) or [cmd]
 for pattern, reason in BLOCK_PATTERNS:
-    if re.search(pattern, cmd, re.IGNORECASE):
+    if any(re.search(pattern, seg, re.IGNORECASE) for seg in _alvos):
         emit_permission_decision(inp, "deny", reason)
 
 # Design system mandate — só aplica em projeto gstack (.gstack/). Fail-open: se a

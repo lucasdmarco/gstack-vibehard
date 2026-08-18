@@ -63,7 +63,10 @@ test("`context_db.py` entra, e como subprocesso de CLI — nao como hook", async
 test("Python distribuido mas NAO alcancado pelo runtime fica de fora", async () => {
   const { distributedPythonFiles } = await imp()
   const fronteira = distributedPythonFiles(repoRoot)
-  assert.equal(fronteira.size, 16, "15 hooks + 1 subprocesso de CLI")
+  // 16 -> 17 com `_cmdsec.py`, o modulo de analise de comando que o
+  // `P0.CODEX-SECURITY` criou. Entra pela mesma porta dos outros `_*.py`: e
+  // importado por hooks irmaos, e o instalador o distribui junto.
+  assert.equal(fronteira.size, 17, "16 hooks + 1 subprocesso de CLI")
   for (const f of fronteira.keys()) {
     assert.ok(!f.startsWith("agents/"), `script de skill nao e disparado pela CLI: ${f}`)
     assert.ok(!f.startsWith("scripts/"), `ferramenta de mantenedor nao entra: ${f}`)

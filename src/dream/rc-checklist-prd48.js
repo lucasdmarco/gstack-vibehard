@@ -154,11 +154,56 @@ export const PRD48_RC_ITEMS = Object.freeze([
     id: "P0.CODEX-SECURITY", tier: "P0", sprint: "certificação RC", version: "5.107.0",
     status: "pending", blocking: true,
     forbiddenClaim: "Zero-Trust / proteção real de PreToolUse no Codex",
-    // Camada 2 impossível nesta máquina (Win 11 Home, sem Sandbox/Hyper-V).
-    // Adiado para o fechamento do PRD52 — ver CODEX_INTEGRATION_STATE.
     externalE2E: "blocked_by_external_e2e",
-    blockingReason: "Security policy bypass when Codex hooks are routed: PreToolUse allows secret access and arbitrary execution primitives while PermissionRequest auto-allows cat/type, node, python, npm install/run and destructive/network Git commands. Script-level behavior proven with synthetic payloads; Codex discovery, trust and runtime enforcement remain pending.",
-    title: "Bypass de política de segurança com hooks do Codex roteados — PreToolUse não barreira independente + PermissionRequest com allowlist ampla",
+    /**
+     * MODELO DE AMEAÇA, feito ANTES da correção (2026-08-17). A allowlist do
+     * `permission_request.py` auto-aprovava SEIS caminhos, e cinco davam acesso
+     * a segredo ou execução arbitrária sem que ninguém visse:
+     *
+     *   cat .env / type .env      leitura direta de credencial
+     *   node -e / python -c       interpretador genérico = execução arbitrária
+     *   npm install <pacote>      cadeia de suprimentos sem revisão
+     *   ls && cat .env            COMPOSTO — o mais importante dos seis
+     *   git push --force          destrutivo e com rede
+     *
+     * O do comando composto é o que explica os outros: `re.match` ancora no
+     * INÍCIO, então qualquer comando perigoso encostado num prefixo seguro
+     * passava inteiro. Uma allowlist que decide por prefixo não decide sobre o
+     * comando — decide sobre a primeira palavra dele.
+     */
+    threatModel: Object.freeze({
+      modeledOn: "2026-08-17",
+      vectors: Object.freeze([
+        "leitura de segredo (`cat .env`, `type .env`, `curl -d @.env`, `scp .ssh/id_rsa`)",
+        "interpretador genérico (`node -e`, `python -c`, `npx`, `bash -c`)",
+        "instalação de pacote sem revisão (`npm install`)",
+        "comando COMPOSTO com prefixo seguro (`ls && cat .env`)",
+        "git destrutivo ou com rede (`push`, `pull`, `commit`, `add`)",
+        "input malformado tratado como autorização",
+      ]),
+    }),
+    fixedInThisLeva: Object.freeze([
+      "`_cmdsec.py`: análise por SEGMENTO — um segmento inseguro derruba a aprovação do conjunto",
+      "leitura de arquivo de segredo BLOQUEADA no PreToolUse (deny), por nome de arquivo e nunca por conteúdo",
+      "allowlist sem interpretador genérico — a trava é ABSOLUTA, e o padrão `--version` que existia era INALCANÇÁVEL (pior que ausente: parecia cobertura)",
+      "`npm install` e git destrutivo/rede fora da allowlist",
+      "indisponibilidade separada de autorização: `exit 0` sem saída significa NÃO DECIDI, e input malformado cai aí — nunca em `allow`",
+    ]),
+    /**
+     * O QUE NÃO FOI PROVADO, e por isso o P0 continua aberto: descoberta, trust
+     * e enforcement em runtime PELO CODEX. As correções são de comportamento dos
+     * SCRIPTS, medido com payload sintético — e o próprio contrato extraído
+     * mostra que hooks só rodam depois de `trusted_hash`, que o GStack não
+     * emite. Chamar isto de Zero Trust seria afirmar enforcement que ninguém
+     * observou; `forbiddenClaim` continua valendo.
+     */
+    blockingReason: "Os bypasses de SCRIPT foram fechados e provados (tests/test_codex_security_bypass.py: 17 casos, 59 subtests, com controle positivo e mutation control das portas do analisador). SEGUE BLOQUEANTE porque o que falta não é correção: é ENFORCEMENT observado. Descoberta, trust e execução em runtime pelo Codex nunca foram medidos, e o contrato extraído (`codex-hook-contract.js`) mostra que hooks não rodam sem `trusted_hash` — que o GStack não emite. Enquanto isso, o gate protege quem roda os scripts, não quem depende do Codex os executar. Clean-machine E2E segue `external_evidence_required`.",
+    title: "Bypass de política de segurança com hooks do Codex — allowlist ampla e análise por prefixo CORRIGIDAS; enforcement em runtime pelo Codex segue não observado",
+    // Prova do CONSERTO, não da ENTREGA. `proof` sustenta item entregue, e este
+    // não está: os bypasses de script fecharam, o enforcement em runtime não foi
+    // observado. Apontar o arquivo em `proof` seria o proof forjado que o guarda
+    // do checklist proíbe — e ele reprovou quando tentei.
+    fixProof: "tests/test_codex_security_bypass.py",
     proof: null,
   },
   // BLOQUEANTE DO RC (decisão humana, certificação 2026-08-02). Provado em HOME
