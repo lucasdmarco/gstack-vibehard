@@ -215,45 +215,49 @@ export const PRD48_RC_ITEMS = Object.freeze([
     forbiddenClaim: "integração de hooks do Codex correta/governada",
     externalE2E: "blocked_by_external_e2e",
     /**
-     * O ACHADO ERA MAIOR DO QUE O REGISTRADO. A confrontação com o binário
-     * distribuído do Codex (v0.145.0) mostrou que a integração de hooks do
-     * GStack NUNCA TEVE COMO EXECUTAR — não era "chaves fora do contrato
-     * oficial", era wiring inerte. Três defeitos independentes, e qualquer um
-     * sozinho já bastaria:
+     * DUAS LEITURAS ERRADAS ANTES DESTA, e vale registrar as duas.
      *
-     *   1. `on_session_start` e `on_stop` aparecem ZERO vezes no binário. O enum
-     *      real é `pre_tool_use`, `permission_request`, `post_tool_use`,
-     *      `pre_compact`, `post_compact`, `session_start`, `session_end`,
-     *      `user_prompt_submit`, `subagent_start`, `subagent_stop` — e NÃO há
-     *      `stop`: o equivalente é `session_end`. A recomendação anterior, de
-     *      renomear para `Stop`, teria trocado um nome inválido por outro.
-     *   2. O Codex descreve handler como OBJETO (`type`/`command`/`timeout`/…)
-     *      agrupado por `matcher`; o GStack escrevia array de strings.
-     *   3. O Codex exige `trusted_hash` e diz na própria interface "Continue
-     *      without trusting (hooks won't run)".
+     * A primeira dizia "chaves TOML fora do contrato oficial". A segunda — minha
+     * — concluiu, da extração de strings do binário, que a integração não era
+     * CONSTRUÍVEL porque o modelo de confiança não estava documentado. Essa
+     * conclusão está REVOGADA (decisão humana, 2026-08-18) e era o erro mais
+     * caro dos dois: transformava um wiring no lugar errado em "não dá para
+     * fazer".
      *
-     * O QUE FOI CORRIGIDO: o GStack parou de escrever o bloco inerte, e passou a
-     * REMOVÊ-LO no merge — não só no uninstall —, porque quem já instalou só
-     * passa pelo merge. O comando do usuário dentro de uma chave inerte é
-     * PRESERVADO: a chave não funciona, mas apagar o que outra pessoa escreveu
-     * para limpar sujeira nossa seria pior que a sujeira.
+     * O CONTRATO CANÔNICO é `~/.codex/hooks.json`:
      *
-     * O QUE NÃO FOI, E POR QUÊ: escrever uma integração CORRETA exigiria emitir
-     * `hooks.json` no formato certo E o modelo de confiança (como o
-     * `trusted_hash` é calculado), que a extração de strings não revela.
-     * Inventá-lo seria repetir o erro original com outro nome. Enquanto isso, o
-     * GStack NÃO tem integração de hooks com o Codex — e agora isso está dito,
-     * em vez de simulado por configuração que não roda.
+     *   { "hooks": { "<EventName>": [ { "matcher": "...",
+     *                                   "hooks": [{ "type": "command", ... }] } ] } }
+     *
+     * Eventos: SessionStart, PreToolUse, PostToolUse, PermissionRequest, Stop,
+     * UserPromptSubmit. E `config.toml [hooks.state]` é LEDGER DE CONFIANÇA
+     * (`enabled`, `trusted_hash`) — do Codex e do usuário —, nunca configuração
+     * declarativa. Eu li a presença de `trusted_hash` como impedimento; ela é o
+     * mecanismo de aprovação, e pertence a quem aprova.
+     *
+     * O QUE O COMMIT `0c253f2` VALE, e só isso: a remoção das quatro chaves
+     * LEGADAS de `config.toml` (`on_session_start`, `on_stop`, `pre_tool_use`,
+     * `post_tool_use`), que o Codex de fato ignora. Elas NÃO voltam.
      */
-    contractEvidence: "src/harness/codex-hook-contract.js — enum e campos extraídos do executável distribuído, com procedência declarada e `isOfficialDocumentation: false`",
-    fixedInThisLeva: [
-      "buildGstackConfig deixou de emitir o bloco `hooks`",
-      "mergeCodexConfig LIMPA as chaves inertes de quem já instalou, preservando as do usuário",
-      "stripGstackFromCodexConfig segue preservando config ilegível em vez de sobrescrevê-la",
-    ],
-    blockingReason: "SEGUE BLOQUEANTE por três dimensões não resolvidas, e nenhuma é o wiring inerte (esse saiu): (1) não existe integração de hooks com o Codex — escrevê-la exige o modelo de confiança (`trusted_hash`), que a extração não revela e inventar seria repetir o erro; (2) `uninstall` remove os `.py` por NOME (uninstall.js) sem consultar ownership, e hooks não entram no manifest, violando o invariante #9 do produto; (3) o E2E de máquina limpa segue `external_evidence_required`. Relacionado a `P1.HOOK-WIRING-UNCERTIFIED` no PRD51, que registra a distribuição não-curada.",
-    title: "Integração de hooks do Codex: o wiring escrito era INERTE (chaves inexistentes, forma errada, sem trusted_hash) — removido; a integração real não existe e hooks seguem sem ownership no manifest",
+    contractAuthority: "~/.codex/hooks.json",
+    trustLedger: "config.toml [hooks.state] — lido para diagnóstico, NUNCA escrito",
+    fixedInThisLeva: Object.freeze([
+      "`codex-hooks-json.js`: autoridade única, schema oficial por EventName, merge não destrutivo e idempotente",
+      "`PostToolUse` passa a apontar para `post_tool_use_review.py` — o defeito semântico do achado original",
+      "ownership por manifest: cada entrada registra arquivo, evento, matcher e comando; reinstall atualiza só as nossas, uninstall remove só as nossas",
+      "`codex-hooks-doctor.js`: seis estados distintos, e `ok` nunca é verdadeiro com hook não confiado",
+      "`stop.py`: surrogate isolado deixa de custar a sessão inteira",
+      "wiring legado de `config.toml` removido e limpo no merge, preservando o do usuário",
+    ]),
+    /**
+     * SEGUE PENDING, e agora por uma razão só: ENFORCEMENT OBSERVADO. Escrever o
+     * registro certo não é o mesmo que vê-lo executar — o Codex só roda hook
+     * depois que o usuário confia, e essa aprovação acontece fora daqui.
+     */
+    blockingReason: "O registro passou a ser feito no contrato canônico (`~/.codex/hooks.json`), com ownership, merge não destrutivo e diagnóstico de seis estados. O que falta é ENFORCEMENT OBSERVADO: instalação em máquina limpa, aprovação de trust pelo fluxo real do Codex, reinício, execução observada de CADA evento, upgrade invalidando trust, nova aprovação e uninstall sem resíduo. Escrever o registro certo não prova que ele executa — e `installed_untrusted` é exatamente o estado em que o hook NÃO roda.",
+    title: "Integração de hooks do Codex: wiring legado de config.toml removido e registro canônico em hooks.json entregue com ownership; enforcement em runtime segue não observado",
     proof: null,
+    fixProof: "tests/codex_hooks_json.test.js + tests/codex_hooks_doctor.test.js",
   },
   { id: "P0.1", tier: "P0", sprint: "S48.0", version: "5.29.0", status: "delivered", title: "Baseline pós-PRD47 comprovado por comportamento (readiness/skill governance/Golden Run/Context Delta reais) + 5 controles negativos", proof: "tests/prd48_baseline_contract.test.js" },
   { id: "P1.1", tier: "P1", sprint: "S48.1/S51.7.1", version: "5.85.0", status: "delivered", title: "Primeiro uso fecha harness/modelo — detecção e perfil reais (tests/harness_session_profile.test.js); auth/modelo permanecem 'unknown' por design (nunca fabricado); prompt interativo REAL wired em start.js (PRD51 S51.7.1) — pergunta quando >1 apto, persiste só com consentimento explícito, lembra a preferência (não pergunta de novo)", proof: "tests/start_harness_intake.test.js" },

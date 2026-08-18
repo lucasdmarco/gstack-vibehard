@@ -74,3 +74,41 @@ def emit_permission_decision(inp, decision, reason, event="PreToolUse"):
         }
     sys.stdout.write(json.dumps(output))
     sys.exit(0)
+
+
+# ── Surrogates soltos ──────────────────────────────────────────────────────
+# O transcript pode trazer UTF-16 malformado, e um surrogate isolado (`\ud83d`
+# sem par) NAO e codificavel em UTF-8. Escrever um desses -- em arquivo, stdout
+# ou stderr -- levanta `UnicodeEncodeError: surrogates not allowed`.
+#
+# ISSO JA ACONTECEU, com o hook OFICIAL de Stop rodando: um caractere invalido
+# derrubou o hook e a memoria da sessao INTEIRA foi perdida. Um caractere nao
+# pode custar a sessao.
+#
+# `surrogatepass` -> `replace` e a unica combinacao que atravessa: codifica o
+# surrogate para bytes, e decodifica trocando por U+FFFD. Assim o texto CHEGA,
+# com uma marca visivel de que algo veio corrompido, em vez de sumir.
+SUBSTITUTO = "\ufffd"
+
+
+def sem_surrogates(texto):
+    """Texto codificavel em UTF-8, trocando surrogate solto por U+FFFD."""
+    if not isinstance(texto, str):
+        return texto
+    try:
+        texto.encode("utf-8")
+        return texto
+    except UnicodeEncodeError:
+        return texto.encode("utf-8", "surrogatepass").decode("utf-8", "replace")
+
+
+def escrita_segura(fluxo, texto):
+    """Escreve tolerando surrogate. Nunca levanta -- e o ponto."""
+    try:
+        fluxo.write(sem_surrogates(texto))
+    except Exception:
+        # Ultimo recurso: ASCII puro. Perder acento e melhor que perder a sessao.
+        try:
+            fluxo.write(str(texto).encode("ascii", "replace").decode("ascii"))
+        except Exception:
+            pass

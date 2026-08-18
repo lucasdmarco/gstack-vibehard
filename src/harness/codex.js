@@ -6,6 +6,7 @@ import { execFileSync } from "child_process"
 import { parse as parseToml, stringify as stringifyToml } from "smol-toml"
 import { writeWithBackup, ensureDir } from "../installer/merge.js"
 import { CHAVES_INERTES_ESCRITAS } from "./codex-hook-contract.js"
+import { mergeGstackHooks, stripGstackHooks, itensDeManifest } from "./codex-hooks-json.js"
 
 const HOME = homedir()
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -19,22 +20,70 @@ function resolvePythonCmd() {
   try { execFileSync("python3", ["--version"], { stdio: "pipe", timeout: 3000 }); return "python3" } catch { return "python" }
 }
 
+/**
+ * Escreve `~/.codex/hooks.json` — a UNICA autoridade de hooks do Codex.
+ *
+ * Merge NAO DESTRUTIVO e IDEMPOTENTE: as entradas do usuario ficam, as nossas
+ * antigas sao substituidas em vez de acrescentadas. Reinstalar nao duplica, e
+ * hook duplicado rodaria N vezes.
+ *
+ * `config.toml` NAO participa: `[hooks.state]` de la e ledger de CONFIANCA, do
+ * Codex e do usuario. Escrever a mesma integracao nos dois lugares criaria duas
+ * verdades sobre o mesmo hook.
+ */
+export function writeCodexHooksJson(hooksJsonPath, { hooksDir, pythonCmd, readImpl = readFileSync, writeImpl = writeWithBackup }) {
+  let doc = {}
+  if (existsSync(hooksJsonPath)) {
+    try {
+      doc = JSON.parse(readImpl(hooksJsonPath, "utf-8")) || {}
+    } catch {
+      // `hooks.json` ilegivel do usuario NAO e sobrescrito as cegas: abortar
+      // preserva o arquivo dele, e o doctor reporta o estado.
+      return { ok: false, reason: "hooks_json_ilegivel" }
+    }
+  }
+  const merged = mergeGstackHooks(doc, { hooksDir, pythonCmd })
+  writeImpl(hooksJsonPath, `${JSON.stringify(merged, null, 2)}\n`)
+  return { ok: true, items: itensDeManifest(hooksJsonPath, { hooksDir, pythonCmd }) }
+}
+
+/** Remove SO as entradas do GStack de `hooks.json`. */
+export function removeCodexHooksJson(hooksJsonPath, { hooksDir, readImpl = readFileSync, writeImpl = writeWithBackup }) {
+  if (!existsSync(hooksJsonPath)) return { ok: true, changed: false }
+  let doc
+  try {
+    doc = JSON.parse(readImpl(hooksJsonPath, "utf-8")) || {}
+  } catch {
+    return { ok: false, reason: "hooks_json_ilegivel" }
+  }
+  writeImpl(hooksJsonPath, `${JSON.stringify(stripGstackHooks(doc, { hooksDir }), null, 2)}\n`)
+  return { ok: true, changed: true }
+}
+
+/** Copia os `.py` e registra o wiring em `hooks.json`, com ownership. */
+async function instalarHooksDoCodex({ hooksDir, hooksJson, report }) {
+  const fs = await import("fs")
+  for (const hook of fs.readdirSync(HOOKS_SOURCE).filter((f) => f.endsWith(".py"))) {
+    fs.copyFileSync(join(HOOKS_SOURCE, hook), join(hooksDir, hook))
+    report.added.push(`hook ${hook}`)
+  }
+  const r = writeCodexHooksJson(hooksJson, { hooksDir, pythonCmd: resolvePythonCmd() })
+  if (!r.ok) {
+    report.updated.push(`~/.codex/hooks.json PRESERVADO (${r.reason}) — nada foi sobrescrito`)
+    return
+  }
+  report.updated.push("~/.codex/hooks.json (merge nao-destrutivo dos hooks gstack)")
+  report.codexHookItems = r.items
+}
+
 export async function installCodex(config, report) {
   const hooksDir = join(HOME, ".codex", "hooks")
   const configFile = join(HOME, ".codex", "config.toml")
+  const hooksJson = join(HOME, ".codex", "hooks.json")
 
   ensureDir(hooksDir)
 
-  if (config.hooks) {
-    const fs = await import("fs")
-    const hooks = fs.readdirSync(HOOKS_SOURCE).filter((f) => f.endsWith(".py"))
-    for (const hook of hooks) {
-      const src = join(HOOKS_SOURCE, hook)
-      const dst = join(hooksDir, hook)
-      fs.copyFileSync(src, dst)
-      report.added.push(`hook ${hook}`)
-    }
-  }
+  if (config.hooks) await instalarHooksDoCodex({ hooksDir, hooksJson, report })
 
   if (config.template) {
     mergeCodexConfig(configFile, { mcp: !!config.mcp, mcpServers: config.mcpServers || null })

@@ -3,7 +3,7 @@ import { homedir } from "os"
 import { join, dirname, basename } from "path"
 import { fileURLToPath } from "url"
 import { getInstalledComponents, getInstalledScripts, getInstalledSkills } from "./check.js"
-import { stripGstackFromCodexConfig } from "../harness/codex.js"
+import { stripGstackFromCodexConfig, removeCodexHooksJson } from "../harness/codex.js"
 import { loadManifest, findItems } from "./manifest.js"
 import { restoreBackupsFromManifest } from "./restore.js"
 import { confirm, success, warn, error, info, section } from "../cli/index.js"
@@ -303,9 +303,21 @@ function printUninstallIntro() {
   info("Nao remove: deps globais (bun, uv, Rust, headroom), ~/gstack-vault, ~/.mcp.json")
 }
 
+/**
+ * `hooks.json` e a AUTORIDADE, e sai SELETIVAMENTE: as entradas do usuario ficam
+ * byte a byte, so as nossas somem.
+ */
+function limparHooksJsonDoCodex() {
+  const alvo = join(HOME, ".codex", "hooks.json")
+  const r = removeCodexHooksJson(alvo, { hooksDir: join(HOME, ".codex", "hooks") })
+  if (r.ok && r.changed) success("entradas gstack removidas de ~/.codex/hooks.json")
+  else if (!r.ok) warn(`~/.codex/hooks.json PRESERVADO (${r.reason}) — remova as entradas gstack a mao`)
+}
+
 // Codex config.toml: remove apenas as chaves gstack, preservando a config do usuario.
 function removeCodexKeys(report) {
   try {
+    limparHooksJsonDoCodex()
     const codexConfig = join(HOME, ".codex", "config.toml")
     if (existsSync(codexConfig) && stripGstackFromCodexConfig(codexConfig)) {
       report.removed.push("chaves gstack: ~/.codex/config.toml")

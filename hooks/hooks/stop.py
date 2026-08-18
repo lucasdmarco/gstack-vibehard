@@ -23,6 +23,7 @@ from typing import Optional
 from _output_guard import output_guard, SENSITIVE_PATTERNS, ALLOWED_ROLES_HIERARCHY
 from _redact import redact_secrets, log_redaction_event
 from _paths import chronicle_dir, hook_support_path, migrate_legacy, GSTACK_DIR, is_gstack_project, token_budget
+from _harness import sem_surrogates, escrita_segura
 from _harness import parse_stdin, normalize_input
 from datetime import datetime
 
@@ -44,6 +45,20 @@ def safe_write_text(path: Path, text: str) -> None:
     malformado). Sem isto o hook de Stop morria com UnicodeEncodeError
     ('surrogates not allowed') e a memória era PERDIDA — hook de parada não pode
     cuspir traceback por caractere inválido (revisão pós-PRD25 P1)."""
+    # SANEIA antes de gravar, em vez de so tolerar na codificacao: `errors`
+    # resolve a gravacao, mas o texto seguiria carregando o surrogate para o
+    # proximo consumidor. Normalizar aqui fecha a cadeia inteira.
+    #
+    # AUTOCONTIDA de proposito, sem chamar `_harness.sem_surrogates`: esta funcao
+    # e uma primitiva de seguranca, e o teste de regressao a extrai ISOLADA do
+    # modulo (importar `stop.py` executaria o hook inteiro). Depender de um import
+    # aqui tornaria a propria funcao nao testavel em isolamento -- e foi o que
+    # aconteceu quando tentei reusar. A versao compartilhada segue em `_harness`
+    # para stdout/stderr.
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError:
+        text = text.encode("utf-8", "surrogatepass").decode("utf-8", "replace")
     path.write_text(text, encoding="utf-8", errors="replace")
 
 
@@ -435,11 +450,14 @@ def run_security_gate(root: Path) -> dict:
 def _crash_handler(exc_type, exc_value, exc_tb):
     import traceback
     tb = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
-    sys.stderr.write(tb + "\n")
-    sys.stdout.write(json.dumps({
-        "systemMessage": f"gstack_vibehard stop hook error: {exc_value}",
-        "error": str(exc_value),
-        "traceback": tb,
+    # O PROPRIO relator precisa sobreviver ao surrogate: um traceback que contem
+    # o caractere invalido derrubaria o handler que existe para reportar o erro,
+    # e o hook morreria sem dizer por que.
+    escrita_segura(sys.stderr, tb + "\n")
+    escrita_segura(sys.stdout, json.dumps({
+        "systemMessage": sem_surrogates(f"gstack_vibehard stop hook error: {exc_value}"),
+        "error": sem_surrogates(str(exc_value)),
+        "traceback": sem_surrogates(tb),
         "exitStatus": 1,
     }))
     sys.exit(1)

@@ -119,8 +119,8 @@ test("NEGATIVO: nenhuma regra pode produzir internal_debug sem ativação explí
 test("NEGATIVO (regressão real): escrita FORA do ramo de guarda não vira decisão de segurança", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
-  const p = inv.points.find((x) => x.file.endsWith("stop.py") && x.line === 1227)
-  // `stop.py:1227` ("commit criado") vem DEPOIS do subprocess.run, fora do `if allow_dirty`
+  const p = inv.points.find((x) => x.file.endsWith("stop.py") && x.line === 1245)
+  // `stop.py:1245` ("Commit local criado") vem DEPOIS do subprocess.run, fora do `if allow_dirty`
   // 5 linhas acima. A 1ª versão usava janela de 6 linhas e a classificou como
   // public_security_decision. Janela de linhas não é escopo; em Python, escopo é indentação.
   assert.equal(p.audience, "public_diagnostic", "fluxo normal não pode virar decisão de segurança por proximidade textual")
@@ -139,7 +139,10 @@ test("FATIA FECHADA: stop.py tem ZERO unknown, e cada ponto carrega a regra que 
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
   const pontos = inv.points.filter((x) => x.file.endsWith("stop.py"))
-  assert.ok(pontos.length >= 50, "a fatia é substancial")
+  // 50 -> 48: duas escritas do `_crash_handler` passaram a sair por
+  // `escrita_segura`, e os pontos MIGRARAM para `_harness.py`. Não houve perda
+  // — o total do censo não se moveu, e é ele que guarda isso.
+  assert.ok(pontos.length >= 45, "a fatia é substancial")
   assert.equal(pontos.filter((x) => x.audience === "unknown").length, 0)
   for (const p of pontos) assert.ok(p.audience, `${p.file}:${p.line} classificado`)
 })
