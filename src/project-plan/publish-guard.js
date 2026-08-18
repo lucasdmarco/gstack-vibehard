@@ -4,6 +4,7 @@ import { execFileSync as defaultExec } from "child_process"
 import { checkSourceParity } from "../release/source-parity.js"
 import { contractFor } from "../dream/claim-contract.js"
 import { audit as defaultAudit } from "../dream/auditor.js"
+import { construirMatriz, problemasDaDeclaracao } from "./../release/support-matrix.js"
 import { CORE_EVIDENCE_IDS } from "./golden-workflow-vertical.js"
 
 /**
@@ -83,6 +84,7 @@ const readVersion = (cwd) => {
 }
 const listTags = (git) => (git("tag", "--list") || "").split("\n").map((t) => t.trim()).filter(Boolean)
 const dreamOf = (opts) => (opts.dream ? opts.dream() : safeAudit())
+const supportMatrixOf = (opts, cwd) => (opts.supportMatrix ? opts.supportMatrix() : construirMatriz({ cwd }))
 const capsOf = (opts, cwd) => (opts.capabilityReport ? opts.capabilityReport() : readCapabilityReport(cwd))
 const qgOf = (opts, cwd) => (opts.readQgVersion ? opts.readQgVersion(cwd) : readQgVersion(cwd))
 const goldenWorkflowOf = (opts, cwd) => (opts.goldenWorkflow ? opts.goldenWorkflow() : readGoldenWorkflowReport(cwd))
@@ -103,6 +105,10 @@ function buildChecks({ opts, cwd, exec, git, version, tags }) {
     // PRD47 S47.10 — Golden Workflow (vertical saas-auth-stripe, S47.9): as evidências CORE
     // (offline, sem credencial de terceiro) precisam estar provadas antes de publicar.
     checkGoldenWorkflow(goldenWorkflowOf(opts, cwd)),
+    // PRD52 S52.E (§26.3) — a evidência de suporte é uma MATRIZ. O check aparece
+    // aqui porque é aqui que se decide publicar, e publicar é o ato que
+    // transforma a matriz numa promessa ao usuário.
+    checkSupportMatrix(supportMatrixOf(opts, cwd)),
     checkTagExists(version, tags),
     checkCiGreen(opts, exec, cwd, git),
   ]
@@ -147,6 +153,44 @@ const requiredClaims = (claims) => claims.filter((c) => contractFor(c.id))
 const unprovedDetail = (claims) => requiredClaims(claims)
   .filter((c) => c.status !== "REAL")
   .map((c) => `${c.id}:${c.status}`)
+
+/**
+ * §26.3 — a matriz nunca compra verde, e também não inventa vermelho.
+ *
+ * `not_run` é ausência de execução, e ausência de execução não reprova um
+ * release: reprovar por ela transformaria "ninguém mediu" em "está quebrado".
+ * O que REPROVA é célula que falhou, célula malformada (`pass` sem os quatro
+ * recibos) ou declaração de suporte sem célula verde por baixo.
+ */
+const chavesFalhas = (m) => m.cells.filter((c) => c.verdict === "fail").map((c) => c.key)
+
+/** As três formas de a matriz REPROVAR, em ordem de precedência. */
+const REPROVAS_DA_MATRIZ = Object.freeze([
+  {
+    when: (m) => m.invalidCells.length > 0,
+    detail: (m) => `célula malformada: ${m.invalidCells.map((c) => c.key).join(", ")}`,
+  },
+  {
+    when: (m) => chavesFalhas(m).length > 0,
+    detail: (m) => `célula(s) reprovada(s): ${chavesFalhas(m).join(", ")}`,
+  },
+  {
+    when: (m) => problemasDaDeclaracao(m.declaredSupport, m).length > 0,
+    detail: (m) => problemasDaDeclaracao(m.declaredSupport, m).join("; "),
+  },
+])
+
+function checkSupportMatrix(m) {
+  const id = "support-matrix"
+  if (!m || !Array.isArray(m.cells)) return row(id, "not_applicable", "matriz de suporte indisponível")
+  const reprova = REPROVAS_DA_MATRIZ.find((r) => r.when(m))
+  if (reprova) return row(id, "failed", reprova.detail(m))
+  const total = m.cells.length
+  if (m.proven.length === 0) {
+    return row(id, "not_applicable", `0/${total} células provadas — nada de cross-OS pode ser afirmado ainda`)
+  }
+  return row(id, "passed", `${m.proven.length}/${total} células provadas com recibo`)
+}
 
 function checkDreamRequired(d) {
   const id = "dream-required"
