@@ -29,23 +29,43 @@ export const TEETH_BASELINE = Object.freeze({
   schemaVersion: TEETH_BASELINE_SCHEMA,
   sprint: "S52.B",
   antes: Object.freeze({ regra: "campos truthy (PRD41 S41.9)", comContrato: 24, semContrato: 0 }),
-  depois: Object.freeze({ regra: "verificação executável (PRD52 S52.B)", comDentes: 23, semDentes: 1 }),
+  depois: Object.freeze({ regra: "verificação executável (PRD52 S52.B)", comDentes: 24, semDentes: 0 }),
 
   /**
-   * As claims que a régua nova derruba, com o motivo. NOT_PROVED aqui é estado
-   * honesto: a capacidade existe e tem teste: o que não existe é a prova E2E que
-   * o contrato afirmava ter.
+   * As claims que a régua nova derruba HOJE, com o motivo.
+   *
+   * Está vazio, e o caminho até aqui é o ponto: a única queda foi FECHADA por
+   * trabalho (ver `resolvidas`), nunca por afrouxar a regra. Um `quedas` vazio
+   * obtido relaxando o gate seria indistinguível deste no formato — e é por isso
+   * que o histórico fica gravado ao lado, em vez de sumir quando a conta zera.
    */
-  quedas: Object.freeze({
-    "action-kernel": [
-      "e2e_executavel: o campo declarava `runGovernedAction (task/workflow/delegate)`,",
-      "que é um NOME DE FUNÇÃO, não um comando. O controle negativo",
-      "(tests/action_kernel_governed.test.js) importa o módulo e chama a função",
-      "direto — é teste de módulo, nunca um E2E. A capacidade é real e está",
-      "testada; o que não está provado é o comportamento ponta a ponta que o",
-      "contrato reivindicava. Fabricar um comando aqui só para restaurar o verde",
-      "seria a mentira que o gate existe para impedir.",
-    ].join(" "),
+  quedas: Object.freeze({}),
+
+  /**
+   * As quedas que foram FECHADAS, e como. O registro não some quando a conta
+   * zera: sem ele, o próximo leitor não teria como distinguir "a régua nunca
+   * derrubou nada" de "derrubou e alguém consertou".
+   */
+  resolvidas: Object.freeze({
+    "action-kernel": {
+      sprint: "S52.I",
+      caiuPor: [
+        "e2e_executavel: o campo declarava `runGovernedAction (task/workflow/delegate)`,",
+        "que é um NOME DE FUNÇÃO, não um comando. O controle negativo",
+        "(tests/action_kernel_governed.test.js) importava o módulo e chamava a",
+        "função direto — teste de módulo, nunca um E2E.",
+      ].join(" "),
+      fechadaPor: [
+        "A investigação achou algo pior que o campo mal escrito: `runGovernedAction`",
+        "não tinha UM chamador em código de produto, embora o kernel se descrevesse",
+        "como 'o ponto por onde CLI/hooks/adapters passam'. O `delegate` mandava a",
+        "tarefa direto ao alvo, reimplementando o gate. O S52.I ligou o `delegate`",
+        "ao kernel e escreveu o E2E pelo binário real: tarefa destrutiva é negada e",
+        "o alvo NÃO é invocado; tarefa equivalente sem o gatilho atravessa e chega",
+        "ao alvo. A claim voltou a REAL por capacidade nova, não por régua mais",
+        "frouxa — o gate segue exatamente como estava.",
+      ].join(" "),
+    },
   }),
 
   /**

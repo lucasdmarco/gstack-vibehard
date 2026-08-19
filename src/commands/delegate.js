@@ -4,6 +4,7 @@ import { runDelegation } from "../delegation/opencode.js"
 import { runDevinDelegation } from "../delegation/devin.js"
 import { checkTrackedSecrets } from "../delegation/worktree.js"
 import { recordAction } from "../vfa/provenance.js"
+import { runGovernedAction } from "../skills/action-kernel.js"
 import { runCandidateBridge } from "../harness/candidate-bridge.js"
 import { CODEBUFF } from "../harness/codebuff.js"
 import { FREEBUFF } from "../harness/freebuff.js"
@@ -94,6 +95,43 @@ async function confirmDelegation(target, worktree, flags, opts, doConfirm) {
   if (flags.yes || opts.yes) return true
   if (!process.stdin.isTTY) { error(`Modo não-interativo: confirme com --yes para delegar ao ${target}.`); return false }
   return doConfirm(`Delegar ao ${target}? Roda no ${worktree ? "worktree isolado" : "diretório atual"}.`, false)
+}
+
+/**
+ * PRD52 S52.I — a delegação atravessa o Action Kernel de verdade.
+ *
+ * O kernel se descrevia como "o ponto por onde CLI/hooks/adapters passam —
+ * ninguém reimplementa o gate", e nenhum comando passava por ele:
+ * `runGovernedAction` não tinha UM chamador em código de produto. O `delegate`
+ * tinha os próprios portões de entrada (preflight, modelo, segredo, cloud) e
+ * mandava a tarefa direto ao alvo — exatamente a reimplementação que o kernel
+ * dizia evitar.
+ *
+ * O que muda: a tarefa delegada é o COMANDO da ação, e por isso passa pelas
+ * checagens do kernel (destrutivo, segredo, policy, escopo). Uma tarefa que peça
+ * algo destrutivo é NEGADA e o alvo nunca é invocado — a claim do Action Kernel
+ * ("ação negada NÃO executa") ganha, enfim, um caminho real.
+ */
+const acaoDelegada = (target, task, flags) => ({
+  tool: "delegate",
+  harness: target,
+  // `command` é o campo que as checagens de destrutivo/segredo leem: a tarefa
+  // delegada É o que o alvo vai executar, e tratá-la como outra coisa faria o
+  // gate olhar para o lado errado.
+  command: String(task ?? ""),
+  files: [],
+  writesCode: Boolean(flags.worktree),
+})
+
+const runIdDe = (target) => `delegate-${target}-${Date.now().toString(36)}`
+
+/** A negação é RESULTADO, não exceção: sai com status próprio e motivo legível. */
+function renderBloqueada(target, governed) {
+  const motivos = governed.pre.checks.filter((c) => c.level === "deny").map((c) => `${c.name}: ${c.reason}`)
+  error(`delegate ${target} BLOQUEADO pelo Action Kernel — o alvo não foi invocado.`)
+  for (const m of motivos) info(`      ${m}`)
+  process.exitCode = 1
+  return { status: "blocked_by_kernel", decision: governed.decision, executed: false, reasons: motivos, record: governed.record }
 }
 
 function recordProvenance(cwd, target, task, result, cloud) {
@@ -211,7 +249,17 @@ export async function delegateCommand(args = [], opts = {}) {
   // Candidatos externos têm caminho próprio (bridge com verify final + aceite).
   if (CANDIDATE_RUNNERS[target]) return runCandidateDelegate(target, task, flags, cwd, exec)
 
-  const result = TARGETS[target]({ task, cwd, model: flags.model, maxIterations: flags.maxIterations, worktree: flags.worktree, cloudHandoff: cloud.cloud, exec })
+  const governed = await runGovernedAction({
+    action: acaoDelegada(target, task, flags),
+    ctx: { root: cwd, enforced: true },
+    // O alvo só roda DENTRO do `execute`. Se o kernel negar, esta função nunca
+    // é chamada — é essa a diferença entre governar e avisar.
+    execute: () => TARGETS[target]({ task, cwd, model: flags.model, maxIterations: flags.maxIterations, worktree: flags.worktree, cloudHandoff: cloud.cloud, exec }),
+    root: cwd, runId: runIdDe(target),
+  })
+  if (governed.blocked) return renderBloqueada(target, governed)
+
+  const result = governed.result
   recordProvenance(cwd, target, task, result, cloud.cloud)
   renderResult(result, target)
   return result

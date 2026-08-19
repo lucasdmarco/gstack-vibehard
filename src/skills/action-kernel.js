@@ -261,7 +261,12 @@ export async function runGovernedAction({ action = {}, ctx = {}, execute, root, 
   const post = postAction(action, result)
   const entry = { ...mergePrePost(pre, post), executed: !blocked, enforced, advisory: !enforced }
   const record = persistGoverned({ root, runId, entry, io })
-  return { decision: pre.decision, enforced, executed: !blocked, blocked, receipt: post, record, pre }
+  // PRD52 S52.I: `result` sai junto. O recibo é REDIGIDO (digests e 300 chars de
+  // resumo) e serve ao ledger; quem chamou precisa do retorno bruto da execução
+  // para seguir o próprio fluxo. Sem ele, atravessar o kernel custaria ao
+  // chamador o resultado do que ele mandou executar — e o preço de governar
+  // seria perder a saída.
+  return { decision: pre.decision, enforced, executed: !blocked, blocked, receipt: post, record, pre, result }
 }
 
 /** Grava uma ação no ledger do run (sanitizada: sem campo proibido, redigida). */

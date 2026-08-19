@@ -66,9 +66,15 @@ export const CLAIM_CONTRACTS = Object.freeze({
     evidenceAdapter: "src/skills/visual-gate.js", e2eCommand: "node src/index.js loop observe --run <id> --url <app>",
     negativeControl: "tests/visual_qa_real.test.js — 500/a11y/screenshot ausente falham por motivos distintos", freshness: "por-observação",
   },
+  // PRD52 S52.I — o contrato declarava `runGovernedAction (task/workflow/delegate)`
+  // como comando E2E: um NOME DE FUNCAO, e de uma funcao que nao tinha UM chamador
+  // em codigo de produto. Agora o `delegate` atravessa o kernel de verdade, e o
+  // comando abaixo RODA.
   "action-kernel": {
-    evidenceAdapter: "src/skills/action-kernel.js", e2eCommand: "runGovernedAction (task/workflow/delegate)",
-    negativeControl: "tests/action_kernel_governed.test.js — ação negada NÃO executa", freshness: "por-ação",
+    evidenceAdapter: "src/skills/action-kernel.js",
+    e2eCommand: "node src/index.js delegate opencode --task \"<tarefa>\" --yes",
+    negativeControl: "tests/e2e/action_kernel.e2e.test.js — pelo binario real, em repo limpo: tarefa destrutiva e NEGADA e o alvo nunca e invocado (`executed:false`, exit 126, motivo no ledger); tarefa equivalente SEM o gatilho atravessa e chega ao alvo (`executed:true`) — sem o segundo caso, o primeiro nao provaria nada; e o payload nunca vai cru para o ledger. Cobertura de modulo segue em tests/action_kernel_governed.test.js",
+    freshness: "por-ação",
   },
   "loop-checkpoint": {
     evidenceAdapter: "src/skills/loop-checkpoint.js", e2eCommand: "node src/index.js loop checkpoint/rollback --run <id>",

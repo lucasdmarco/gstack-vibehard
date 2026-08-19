@@ -2,10 +2,11 @@
  * Checklist de Release Candidate do PRD52 (S52.H — fechamento do programa).
  *
  * Espelha `rc-checklist-prd45..51.js`, com uma diferença de fundo que vale
- * declarar: o PRD52 não acrescentou capacidade nova ao produto — ele tirou a
- * folga das afirmações que já existiam. Um checklist que só listasse "entregue"
- * esconderia justamente o resultado do programa, que foi um placar CAINDO por
- * regra endurecida.
+ * declarar: o PRD52 nasceu para tirar a folga das afirmações que já existiam,
+ * não para acrescentar capacidade. Um checklist que só listasse "entregue"
+ * esconderia o resultado do programa, que foi um placar CAINDO por régua
+ * endurecida — e, depois, VOLTANDO por trabalho real (S52.I), que é o desfecho
+ * que um gate honesto deve permitir e um gate frouxo dispensaria.
  *
  * Por isso o `prd52Readiness()` MEDE ao vivo em vez de congelar números: o
  * placar, a reconciliação, a matriz OS×Node e o estado dos hooks do Codex são
@@ -15,8 +16,10 @@
  *
  * PENDÊNCIAS EXTERNAS não são itens de sprint. Elas ficam em
  * `PRD52_EXTERNAL_PENDING`, cada uma com o que falta e quem pode fechá-la;
- * nenhuma delas é dívida técnica, e nenhuma se fecha com trabalho neste
- * repositório.
+ * nenhuma é dívida técnica, e nenhuma se fecha com trabalho neste repositório.
+ * A lista já foi maior: o conflito do `action-kernel` estava nela e SAIU no
+ * S52.I, fechado por código. Pendência que dá para fechar aqui vira item de
+ * sprint — ficar na lista seria transformar trabalho pendente em desculpa.
  */
 import { audit } from "./auditor.js"
 import { reconciliarAudit } from "./claim-reconciler.js"
@@ -72,23 +75,22 @@ export const PRD52_RC_ITEMS = Object.freeze([
     title: "Este checklist, agregado por `prd status` — o programa que audita os outros também se audita",
     proof: "tests/rc_checklist_prd52.test.js",
   },
+  {
+    id: "P1.3", tier: "P1", sprint: "S52.I", version: "5.107.0", commit: null, status: "delivered",
+    title: "Action Kernel ligado ao `delegate` e provado por E2E real — a queda do S52.B fechada por capacidade nova, não por régua mais frouxa",
+    proof: "tests/e2e/action_kernel.e2e.test.js",
+  },
 ])
 
 /**
  * O que o PRD52 NÃO fecha, e por quê.
  *
- * Cada uma exige algo que não existe dentro deste repositório: uma máquina, uma
- * execução de CI, ou uma decisão humana. Declará-las como itens de sprint faria
- * o programa parecer incompleto por trabalho não feito, quando o que falta é
- * evidência que ninguém aqui pode produzir.
+ * Cada uma exige algo que não existe dentro deste repositório: uma máquina limpa
+ * ou uma execução de CI. Declará-las como itens de sprint faria o programa
+ * parecer incompleto por trabalho não feito, quando o que falta é evidência que
+ * ninguém aqui pode produzir.
  */
 export const PRD52_EXTERNAL_PENDING = Object.freeze([
-  {
-    id: "action_kernel_claim_conflict",
-    blockedBy: "human_adjudication",
-    missing: "o auditor rebaixou `action-kernel` para NOT_PROVED (o `e2eCommand` era nome de função) enquanto o recibo mostra a evidência intacta. As duas projeções discordam e nenhuma é autoridade sobre a outra: ou se escreve um E2E real, ou se declara que a capacidade é provada por teste de módulo. Escolher pelo comando seria decidir em silêncio.",
-    owner: "lucas",
-  },
   {
     id: "os_node_matrix_not_run",
     blockedBy: "external_ci_execution",
@@ -138,8 +140,8 @@ export function medicoesAoVivo({ repoRoot = process.cwd(), commit = null } = {})
  * endurecido.
  *
  * `fullyValidated` é o oposto: só é verdadeiro quando NADA depende de fora. Com
- * três pendências externas abertas, ele é `false`, e é assim que tem de ser até
- * a máquina, o CI e a decisão humana existirem.
+ * duas pendências externas abertas, ele é `false`, e é assim que tem de ser até
+ * a máquina limpa e o run de CI existirem.
  */
 export function prd52Readiness(items = PRD52_RC_ITEMS, opts = {}) {
   const medicoes = opts.medicoes || medicoesAoVivo(opts)

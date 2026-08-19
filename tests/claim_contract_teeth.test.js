@@ -112,14 +112,31 @@ test("baseline S52.B: a transição medida É a registrada (nenhuma queda entra 
     "contrato novo que não passa nos dentes precisa ser registrado com motivo, nunca absorvido")
 })
 
-test("baseline S52.B: toda queda registrada tem motivo escrito, não só um código de regra", async () => {
+test("baseline S52.B: toda queda tem motivo escrito, e o histórico não some quando a conta zera", async () => {
   const { TEETH_BASELINE } = await imp("src/dream/teeth-baseline.js")
-  assert.ok(Object.keys(TEETH_BASELINE.quedas).length > 0, "a régua tem de ter derrubado algo, senão não tem dentes")
-  for (const [id, motivo] of Object.entries(TEETH_BASELINE.quedas)) {
-    assert.ok(motivo.length > 120, `'${id}': o motivo precisa explicar, não rotular`)
+  const abertas = Object.entries(TEETH_BASELINE.quedas)
+  const fechadas = Object.entries(TEETH_BASELINE.resolvidas)
+  // A régua PRECISA ter derrubado algo alguma vez, senão não tem dentes. O que
+  // ela não precisa é continuar com a queda ABERTA: fechar por trabalho é o
+  // desfecho desejado, e o registro fica em `resolvidas`.
+  assert.ok(abertas.length + fechadas.length > 0, "uma régua que nunca derrubou nada não é régua")
+  for (const [id, motivo] of abertas) assert.ok(motivo.length > 120, `'${id}': o motivo precisa explicar, não rotular`)
+  for (const [id, r] of fechadas) {
+    assert.ok(r.caiuPor.length > 120, `'${id}': por que caiu precisa explicar`)
+    assert.ok(r.fechadaPor.length > 120, `'${id}': COMO foi fechada é a parte que impede afrouxamento disfarçado`)
+    assert.ok(r.sprint, `'${id}': sem sprint não dá para achar o commit`)
   }
   assert.equal(TEETH_BASELINE.antes.comContrato - TEETH_BASELINE.depois.comDentes,
-    Object.keys(TEETH_BASELINE.quedas).length, "a aritmética antes/depois tem de fechar com as quedas listadas")
+    abertas.length, "a aritmética antes/depois tem de fechar com as quedas ABERTAS")
+})
+
+test("a queda fechada NÃO reaparece: `action-kernel` volta a REAL por E2E real", async () => {
+  const { audit } = await imp("src/dream/auditor.js")
+  const { TEETH_BASELINE } = await imp("src/dream/teeth-baseline.js")
+  assert.ok(TEETH_BASELINE.resolvidas["action-kernel"], "a resolução tem de estar registrada")
+  const claim = audit({ behavioral: true }).claims.find((c) => c.id === "action-kernel")
+  assert.equal(claim.status, "REAL", "com E2E executável e controle negativo ligado, a claim sustenta REAL")
+  assert.ok(!claim.notProved)
 })
 
 test("CONTROLE NEGATIVO do baseline: queda não registrada é acusada", async () => {

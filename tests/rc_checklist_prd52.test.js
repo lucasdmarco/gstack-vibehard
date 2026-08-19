@@ -93,14 +93,19 @@ test("`fullyValidated` é FALSO enquanto houver evidência que só existe fora",
 
 test("cada pendência externa diz o que falta E quem pode fechá-la", async () => {
   const { PRD52_EXTERNAL_PENDING } = await C()
-  assert.ok(PRD52_EXTERNAL_PENDING.length >= 3)
+  assert.ok(PRD52_EXTERNAL_PENDING.length >= 2)
   for (const e of PRD52_EXTERNAL_PENDING) {
     assert.ok(e.id && e.blockedBy && e.owner, `pendência '${e.id}' sem dono ou sem bloqueador`)
     assert.ok(e.missing.length > 80, `'${e.id}': o que falta precisa ser acionável, não um rótulo`)
   }
   const bloqueadores = PRD52_EXTERNAL_PENDING.map((e) => e.blockedBy)
-  assert.ok(bloqueadores.includes("human_adjudication"), "o conflito do action-kernel é decisão humana")
+  assert.ok(bloqueadores.includes("external_ci_execution"), "as células OS×Node exigem o CI rodando")
   assert.ok(bloqueadores.includes("external_clean_machine"), "enforcement do Codex exige máquina limpa")
+  // O `action_kernel_claim_conflict` SAIU daqui no S52.I -- foi fechado escrevendo
+  // o E2E, e uma pendencia fechada por trabalho nao pode continuar listada como
+  // se dependesse de decisao humana.
+  assert.ok(!PRD52_EXTERNAL_PENDING.some((e) => e.id === "action_kernel_claim_conflict"),
+    "pendência fechada por trabalho sai da lista; o registro de como foi fechada vive no teeth-baseline")
 })
 
 test("NENHUMA pendência externa é declarada fechada por trabalho neste repositório", async () => {
