@@ -5,8 +5,10 @@ import { PRD48_RC_ITEMS } from "../dream/rc-checklist-prd48.js"
 import { PRD49_RC_ITEMS } from "../dream/rc-checklist-prd49.js"
 import { PRD50_RC_ITEMS } from "../dream/rc-checklist-prd50.js"
 import { PRD51_RC_ITEMS, prd51Readiness } from "../dream/rc-checklist-prd51.js"
+import { PRD52_RC_ITEMS, prd52Readiness } from "../dream/rc-checklist-prd52.js"
 import { projectPrdLedger } from "../dream/prd-ledger.js"
 import { rcMatrixVerdict } from "../release/rc-matrix.js"
+import { execFileSync } from "node:child_process"
 import { section, info, warn, error } from "../cli/index.js"
 
 /**
@@ -27,6 +29,9 @@ const PROGRAMS = Object.freeze([
   // PRD51 S51.10.1: o programa de FECHAMENTO era o único fora do próprio ledger — quem
   // audita os outros não se auditava.
   { prdId: "PRD51", items: PRD51_RC_ITEMS },
+  // PRD52 S52.H: mesmo motivo do S51.10.1 — o programa que endureceu as réguas
+  // dos outros não pode ficar de fora da régua.
+  { prdId: "PRD52", items: PRD52_RC_ITEMS },
 ])
 
 /** Constrói o ledger de todos os programas conhecidos. Puro/testável (cwd injetável). */
@@ -74,11 +79,33 @@ function renderMatrix(m) {
   for (const d of m.open) warn(`     ${d.id} [${d.status}] ${d.dimension} — ${d.gap}`)
 }
 
-function renderStatus(report, dod, matrix) {
-  section("prd status — ledger unificado (PRD45-PRD51)")
+/**
+ * PRD52 S52.H — as pendências EXTERNAS saem nomeadas.
+ *
+ * Elas não são itens de sprint e não aparecem em `residuals`: nenhuma se fecha
+ * com trabalho neste repositório. Omiti-las por isso faria o ledger mostrar um
+ * programa redondo e calar exatamente o que falta.
+ */
+function renderPrd52(r) {
+  const m = r.measurements
+  info("")
+  info(`  PRD52 (§25/§26): ready=${r.ready} fullyValidated=${r.fullyValidated} — placar ${JSON.stringify(m.scoreboard)}`)
+  info(`     matriz OS×Node ${m.supportMatrix.proven}/${m.supportMatrix.total} provadas · hooks do Codex enforcementObserved=${m.codexHooks.enforcementObserved}`)
+  for (const e of r.externalPending) warn(`     ${e.id} [${e.blockedBy}] — ${e.missing}`)
+}
+
+function renderStatus(report, dod, matrix, prd52) {
+  section("prd status — ledger unificado (PRD45-PRD52)")
   for (const p of report) renderProgram(p)
   renderDoD(dod)
   renderMatrix(matrix)
+  renderPrd52(prd52)
+}
+
+/** HEAD real do repositório auditado. Sem git disponível, `null` honesto. */
+function resolveHeadCommit(root) {
+  try { return String(execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, stdio: "pipe", encoding: "utf-8", timeout: 20000 }) || "").trim() || null }
+  catch { return null }
 }
 
 const SUBCOMMANDS = Object.freeze({ status: true })
@@ -95,7 +122,13 @@ export async function prdCommand(args = [], opts = {}) {
   const report = buildPrdStatusReport(cwd)
   const dod = buildDoDSummary()
   const rcMatrix = rcMatrixVerdict()
-  if (json) { process.stdout.write(JSON.stringify({ schemaVersion: PRD_STATUS_REPORT_SCHEMA, programs: report, dod, rcMatrix }) + "\n"); return { programs: report, dod, rcMatrix } }
-  renderStatus(report, dod, rcMatrix)
-  return { programs: report, dod, rcMatrix }
+  // O HEAD é resolvido pelo COMANDO, nunca pelo checklist — mesma divisão que o
+  // `dream audit` já usa. E não é formalidade: medir sem commit produz recibos
+  // sem proveniência, e o §26.1 recusa TODO registro nesse estado. Foi o que
+  // aconteceu na primeira fiação deste comando — 24 registros inválidos de uma
+  // vez, e `ready:false` por um defeito da medição, não do repositório.
+  const prd52 = prd52Readiness(undefined, { repoRoot: cwd, commit: resolveHeadCommit(cwd) })
+  if (json) { process.stdout.write(JSON.stringify({ schemaVersion: PRD_STATUS_REPORT_SCHEMA, programs: report, dod, rcMatrix, prd52 }) + "\n"); return { programs: report, dod, rcMatrix, prd52 } }
+  renderStatus(report, dod, rcMatrix, prd52)
+  return { programs: report, dod, rcMatrix, prd52 }
 }
