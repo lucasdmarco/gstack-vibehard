@@ -946,8 +946,18 @@ function carregarRegistry(repoRoot) {
 }
 
 /** Lê e valida o arquivo HUMANO, contra o registry já validado. */
-function carregarOverrides(repoRoot, registry) {
-  const ovr = lerJson(join(repoRoot, OVERRIDES_FILE), OVERRIDES_FILE)
+/**
+ * `overridesDoc` permite VALIDAR um documento sem passar pelo disco.
+ *
+ * A validação é a mesma, linha por linha — o que muda é só a origem do JSON. A
+ * costura existe porque os testes de controle negativo precisavam adulterar uma
+ * decisão de provenance, e o único jeito era ESCREVER no arquivo real do repo e
+ * restaurar depois. Sob execução concorrente, qualquer outro teste que lesse o
+ * inventário nessa janela via o estado adulterado e falhava sem culpa própria —
+ * um flake que apareceu duas vezes e sempre em teste alheio.
+ */
+function carregarOverrides(repoRoot, registry, overridesDoc = null) {
+  const ovr = overridesDoc ? { ok: true, data: overridesDoc } : lerJson(join(repoRoot, OVERRIDES_FILE), OVERRIDES_FILE)
   if (!ovr.ok) return ovr
   const problema = validarOverrides(ovr.data, registry)
     || validarDecisoesProvenance(ovr.data, registry, repoRoot)
@@ -955,16 +965,16 @@ function carregarOverrides(repoRoot, registry) {
 }
 
 /** Devolve `{ ok, reg, ovr }` ou o veredito de falha. */
-function carregarPar(repoRoot) {
+function carregarPar(repoRoot, overridesDoc = null) {
   const reg = carregarRegistry(repoRoot)
   if (!reg.ok) return reg
-  const ovr = carregarOverrides(repoRoot, reg.data)
+  const ovr = carregarOverrides(repoRoot, reg.data, overridesDoc)
   if (!ovr.ok) return ovr
   return { ok: true, reg: reg.data, ovr: ovr.data }
 }
 
-export function loadJsRegistry({ repoRoot = process.cwd() } = {}) {
-  const par = carregarPar(repoRoot)
+export function loadJsRegistry({ repoRoot = process.cwd(), overridesDoc = null } = {}) {
+  const par = carregarPar(repoRoot, overridesDoc)
   if (!par.ok) return par
 
   const divergentes = validarFrescor(par.reg, repoRoot)

@@ -5,7 +5,6 @@ import { createHash } from "node:crypto"
 import { execFileSync } from "node:child_process"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { writeFileSync } from "node:fs"
 import { buildInventory } from "../src/meta/i18n-inventory.js"
 import { NONLINGUISTIC_VALUE_CATEGORIES, STRATEGY_BY_KIND, PROVENANCE_STRATEGIES } from "../src/meta/i18n-js-registry-loader.js"
 
@@ -35,21 +34,31 @@ const decisoesDe = (arquivo) => overrides().provenanceDecisions.filter((d) => d.
 const decisoesTodas = () => overrides().provenanceDecisions
 
 /**
- * Consome um conjunto ADULTERADO de decisões pelo caminho REAL.
+ * Consome um conjunto ADULTERADO de decisões pelo caminho REAL — SEM tocar no
+ * arquivo do repo.
  *
- * O consumo acontece dentro de `buildInventory`, que lê do disco; testar por uma
- * função interna provaria a função, não o caminho que roda em produção. O arquivo
- * é restaurado no `finally`, sempre.
+ * O consumo acontece dentro de `buildInventory`, que valida pelo loader de
+ * produção; testar por uma função interna provaria a função, não o caminho que
+ * roda de verdade.
+ *
+ * A versão anterior escrevia em `src/meta/i18n-js-overrides.json` e restaurava
+ * no `finally`. Funcionava sozinha e falhava em companhia: sob
+ * `--test-concurrency`, qualquer teste que lesse o inventário dentro dessa
+ * janela via o estado adulterado e quebrava sem culpa própria. O flake apareceu
+ * duas vezes nesta sessão, sempre em teste alheio e nunca no que o causava.
+ *
+ * Agora o documento é INJETADO. A validação do loader é exatamente a mesma —
+ * muda só a origem do JSON, e some a escrita compartilhada.
+ *
+ * (De quebra: a chamada antiga passava `{ root: repoRoot }`, e o parâmetro se
+ * chama `repoRoot`. O argumento era ignorado e só funcionava porque o default é
+ * `process.cwd()`.)
  */
-const ABS_OVERRIDES = path.join(repoRoot, OVERRIDES)
 async function consumirCom(decisoes) {
-  const intacto = readFileSync(ABS_OVERRIDES, "utf8")
-  try {
-    writeFileSync(ABS_OVERRIDES, `${JSON.stringify({ ...overrides(), provenanceDecisions: decisoes }, null, 2)}\n`)
-    return await buildInventory({ root: repoRoot })
-  } finally {
-    writeFileSync(ABS_OVERRIDES, intacto)
-  }
+  return buildInventory({
+    repoRoot,
+    overridesDoc: { ...overrides(), provenanceDecisions: decisoes },
+  })
 }
 
 // ── As quatro contagens do contrato ─────────────────────────────────────────

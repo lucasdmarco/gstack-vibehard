@@ -1369,15 +1369,15 @@ const semProcedencia = {
 }
 
 /** Veredito utilizável, ou a razão para bloquear. */
-const vereditoDeEntrada = (repoRoot, jsRegistry) => {
-  const v = jsRegistry ?? loadJsRegistry({ repoRoot })
+const vereditoDeEntrada = (repoRoot, jsRegistry, overridesDoc) => {
+  const v = jsRegistry ?? loadJsRegistry({ repoRoot, overridesDoc })
   if (!v.ok) return { bloqueio: v }
   return isValidatedRegistry(v) ? { veredito: v } : { bloqueio: semProcedencia }
 }
 
-export function buildInventory({ repoRoot = process.cwd(), registry = {}, jsRegistry = null } = {}) {
+export function buildInventory({ repoRoot = process.cwd(), registry = {}, jsRegistry = null, overridesDoc = null } = {}) {
   const runtimeScripts = new Set(runtimeReachableScripts(repoRoot))
-  const entrada = vereditoDeEntrada(repoRoot, jsRegistry)
+  const entrada = vereditoDeEntrada(repoRoot, jsRegistry, overridesDoc)
   if (entrada.bloqueio) return inventarioBloqueado(entrada.bloqueio, runtimeScripts)
   const veredito = entrada.veredito
 
