@@ -1,6 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
+import { createHash } from "node:crypto"
 import { execFileSync } from "node:child_process"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -79,12 +80,39 @@ test("`monitor.js` está oficialmente em unknown:0 pelo inventário real", async
  * A decisão anterior foi SOBRESCRITA durante a inserção das nove e recuperada do
  * HEAD. O episódio vira teste: ela precisa continuar byte a byte a que estava
  * versionada, senão a recuperação teria sido aproximada.
+ *
+ * PRD52 S52.H — a guarda foi SEPARADA em duas, porque comparar o objeto inteiro
+ * contra o HEAD misturava duas coisas de naturezas diferentes:
+ *
+ *   o CONTEÚDO da decisão (linha, coluna, estratégia, interpolações, razão,
+ *   dono, evidência) é escrito por um humano e não pode mudar sem revisão;
+ *
+ *   o `expectedFileHash` NÃO é conteúdo — é o ponteiro para a versão do arquivo
+ *   em que a decisão foi tomada. Editar o arquivo ancorado por um motivo alheio
+ *   ao ponto (foi o caso: três strings de `usage` da tabela de help) move o hash
+ *   sem tocar em nada que o humano decidiu.
+ *
+ * Comparar os dois juntos tornava toda edição do arquivo ancorado impossível sem
+ * reescrever este teste — e um teste que se reescreve a cada edição não guarda
+ * nada. A separação é mais estrita, não menos: o conteúdo segue byte a byte, e
+ * o hash passa a ter de bater com o arquivo de AGORA, o que a versão anterior
+ * nunca verificou.
  */
-test("a decisão preexistente de cli/index.js:304 permanece byte a byte", () => {
+const semAncora = (d) => { const { expectedFileHash, ...resto } = d; return resto }
+
+test("o CONTEÚDO da decisão de cli/index.js:304 permanece byte a byte", () => {
   const antiga = execFileSync("git", ["show", "HEAD:src/meta/i18n-js-overrides.json"], { cwd: repoRoot, encoding: "utf8" })
   const original = JSON.parse(antiga).provenanceDecisions.find((d) => d.file === "src/cli/index.js")
   const atual = decisoesDe("src/cli/index.js")[0]
-  assert.deepEqual(atual, original, "a decisão anterior não pode ter sido reescrita nem normalizada")
+  assert.deepEqual(semAncora(atual), semAncora(original),
+    "a decisão anterior não pode ter sido reescrita nem normalizada")
+})
+
+test("a âncora de cli/index.js:304 aponta para o arquivo de AGORA", () => {
+  const d = decisoesDe("src/cli/index.js")[0]
+  const atual = `sha256:${createHash("sha256").update(readFileSync(path.join(repoRoot, d.file))).digest("hex")}`
+  assert.equal(d.expectedFileHash, atual,
+    "âncora que não bate com o arquivo é decisão sobre um passado que não existe mais")
 })
 
 // ── Spillover: o efeito fora de monitor.js é conhecido e benigno ────────────

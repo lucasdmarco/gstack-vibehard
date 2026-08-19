@@ -187,7 +187,7 @@ test("validateRegistry recusa script que NÃO é alcançado pelo runtime (não p
  *
  * ATUALIZE AQUI, e so aqui, a cada arquivo reconciliado no lote JS.
  */
-test("CENSO GLOBAL: 1916 pontos, 0 unknown, 25 arquivos convertidos", async () => {
+test("CENSO GLOBAL: 1920 pontos, 0 unknown, 25 arquivos convertidos", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
 
@@ -238,7 +238,11 @@ test("CENSO GLOBAL: 1916 pontos, 0 unknown, 25 arquivos convertidos", async () =
   // gravado). Sao 10 pontos, todos `public_diagnostic`, e `unknown` continua 0:
   // o inventario media a superficie nova no mesmo instante em que ela nasceu,
   // que e exatamente o que a Fase 1B existe para garantir.
-  assert.equal(inv.total, 1916, "converter nao pode sumir com ponto REAL; falso positivo do regex pode cair")
+  // 1916 -> 1920: superficie nova de novo, e pelo mesmo motivo do salto anterior.
+  // O S52.H acrescentou o bloco do PRD52 ao `prd status` -- as pendencias
+  // EXTERNAS saem nomeadas, uma linha por pendencia. 4 pontos, todos
+  // `public_diagnostic`, `unknown` segue 0.
+  assert.equal(inv.total, 1920, "converter nao pode sumir com ponto REAL; falso positivo do regex pode cair")
 
   // Medicao em movimento: cai a cada arquivo reconciliado. 54 -> 53 com qa.js;
   // 53 -> 52 com secrets.js.
