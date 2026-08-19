@@ -12,6 +12,12 @@ import { layerOf } from "./command-layers.js"
  * um individualmente (como foi feito aqui pelos 3 primeiros), não inventar a
  * partir do nome. `OPERATION_EFFECTS` é o vocabulário fechado; entradas fora
  * dele são erro de dado, não just documentação solta.
+ *
+ * PRD52 S52.H (ADR-006) — os quatro campos que o §14 pedia num registry NOVO
+ * entram aqui, porque a comparação formal mostrou que se trata da mesma
+ * entidade: `handler`, `alias`, `help` e `flags`. São OPCIONAIS e a ausência não
+ * é inferida — um comando sem `handler` declarado não vira "handler pelo nome".
+ * Cada um é verificado contra a CLI real por `operation-registry-fields.js`.
  */
 export const OPERATION_REGISTRY_SCHEMA = "gstack.operation-registry.v1"
 
@@ -25,41 +31,54 @@ export const OPERATION_REGISTRY = Object.freeze([
     command: "plan", subcommand: "run",
     effects: ["write_project_state", "execute"],
     network: false, execution: true, requiresConsent: true, jsonSchema: null,
+    handler: "plan", help: "plan", flags: ["--json", "--dry-run", "--recipe", "--yes"],
   },
   {
     command: "visual", subcommand: "hooks install",
     effects: ["write_project_config"],
     network: false, execution: true, requiresConsent: true, jsonSchema: "gstack.design-hook-projection.v1",
+    handler: "visual", help: "visual", flags: ["--json", "--yes"],
   },
   {
     command: "visual", subcommand: "hooks status",
     effects: ["read"],
     network: false, execution: false, requiresConsent: false, jsonSchema: null,
+    handler: "visual", help: "visual", flags: ["--json"],
   },
   {
     command: "research", subcommand: "skills audit --repo",
     effects: ["network"],
     network: true, execution: false, requiresConsent: true, jsonSchema: "gstack.external-skills-audit.v1",
+    handler: "research", help: "research", flags: ["--repo", "--yes", "--json"],
   },
   {
     command: "research", subcommand: "skills audit --path",
     effects: ["read"],
     network: false, execution: false, requiresConsent: false, jsonSchema: "gstack.external-skills-audit.v1",
+    handler: "research", help: "research", flags: ["--path", "--json"],
   },
   {
     command: "start", subcommand: null,
     effects: ["write_project_state", "write_project_config", "execute"],
     network: false, execution: true, requiresConsent: true, jsonSchema: null,
+    handler: "start", help: "start", flags: ["--skills", "--assume-no-existing-model", "--yes", "--dry-run", "--json"],
   },
   {
     command: "verify", subcommand: null,
     effects: ["execute"],
     network: false, execution: true, requiresConsent: false, jsonSchema: null,
+    handler: "verify", help: "verify",
+    // AUDITADO no fonte: `verify` LÊ nove flags e o help documenta quatro. As
+    // cinco restantes saem declaradas de propósito -- é assim que a lacuna vira
+    // visível em vez de continuar sendo conhecimento de quem leu o codigo.
+    flags: ["--quick", "--profile", "--agentshield", "--json",
+      "--changed-files", "--dry-run", "--harness", "--release", "--tier"],
   },
   {
     command: "prd", subcommand: "status",
     effects: ["read"],
     network: false, execution: false, requiresConsent: false, jsonSchema: "gstack.prd-status-report.v1",
+    handler: "prd", help: "prd", flags: ["--json"],
   },
 ])
 
