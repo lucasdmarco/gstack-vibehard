@@ -27,16 +27,26 @@ import { prd51Readiness } from "./rc-checklist-prd51.js"
 import { construirMatriz } from "../release/support-matrix.js"
 import { statusDosHooksDoCodex } from "../harness/codex-hooks-status.js"
 import { planoDeCertificacao } from "../release/clean-machine-e2e.js"
+import { deriveEngineGates } from "../project-plan/golden-run.js"
+import { percentualDeUso, consumoCumulativo, acaoCobertaPelaLease, leaseAindaVale } from "../meta/mission-schemas.js"
 
 export const PRD53_ENTRY_GATE_SCHEMA = "gstack.prd53.entry-gate.v1"
 
-/** Os estados de um critério. `unproven` é o default e nunca vira `met` por omissão. */
+/**
+ * Os estados de um critério. `unproven` é o default e nunca vira `met` por
+ * omissão.
+ *
+ * `failed` NÃO é sinônimo de `unproven`, e a diferença decide o que alguém faz
+ * a seguir: `unproven` é evidência que falta, `failed` é código que contradiz a
+ * exigência. O primeiro se fecha produzindo prova; o segundo, mudando o produto.
+ */
 export const ESTADOS_DO_CRITERIO = Object.freeze(["met", "unproven", "failed"])
 
 const criterio = (id, source, estado, detalhe) => ({ id, source, state: estado, detail: detalhe })
 
 const met = (id, source, detalhe) => criterio(id, source, "met", detalhe)
 const unproven = (id, source, detalhe) => criterio(id, source, "unproven", detalhe)
+const failed = (id, source, detalhe) => criterio(id, source, "failed", detalhe)
 
 /**
  * Os artefatos que o §19 exige do evidence pack, e que ainda não existem.
@@ -119,6 +129,70 @@ function criterioP0Aberto(prd51) {
       `${abertos.length} P0 aberto(s): ${abertos.map(String).join("; ")}`)
 }
 
+/**
+ * Os QUATRO itens que o §2 manda REEXECUTAR — não citar.
+ *
+ * O texto é explícito: "o Sprint 53.0 apenas reexecuta seus controles negativos
+ * e retorna `blocked` se qualquer prova faltar". Reexecutar é diferente de
+ * apontar o arquivo de teste: um controle citado envelhece calado quando alguém
+ * afrouxa a invariante, e é exatamente o que o PRD53 não quer herdar.
+ *
+ * Então este bloco EXERCITA cada invariante com a entrada adversarial, aqui,
+ * agora. Se alguém enfraquecer qualquer uma delas, o portão vira `failed` na
+ * próxima execução — sem depender de alguém lembrar de rodar a suíte.
+ */
+function controlesDoPrd52() {
+  return [controleDoAceite(), controleDoTokenUsage(), controleDaLease()]
+}
+
+/**
+ * §2: "`acceptanceResolved` derivado de compliance EXECUTADO e fresco, não da
+ * mera existência de um verifier".
+ *
+ * O controle é direto: um aceite COM verifier e SEM compliance executado. Se
+ * `acceptanceResolved` vier `true`, o produto está derivando exatamente do que o
+ * §2 proíbe — e o estado é `failed`, não `unproven`: não falta prova, sobra
+ * contradição.
+ */
+function controleDoAceite() {
+  const id = "acceptance_de_compliance_executado"
+  const src = "golden-run.deriveEngineGates"
+  const comVerifierSemCompliance = [{ id: "feature-behavior", verifier: "tests/x.test.js" }]
+  const g = deriveEngineGates({ acceptance: comVerifierSemCompliance })
+  return g.acceptanceResolved === true
+    ? failed(id, src, "`acceptanceResolved` ficou true com verifier declarado e ZERO compliance executado — é a derivação que o §2 proíbe. `complianceReport` existe em acceptance-verification.js e não está ligado a este portão.")
+    : met(id, src, "aceite com verifier mas sem compliance executado NÃO resolve")
+}
+
+/** §2: "token usage `unknown` nunca convertido em zero quando houver budget ativo". */
+function controleDoTokenUsage() {
+  const id = "token_unknown_nunca_zero"
+  const src = "mission-schemas (§25.3)"
+  const estimado = percentualDeUso({ usageBasis: "estimated", consumed: 5, limit: 10 })
+  const soma = consumoCumulativo([
+    { subject: "mission_budget", usageBasis: "measured", consumed: 5 },
+    { subject: "mission_budget", usageBasis: "unknown" },
+  ])
+  const ok = estimado === null && soma.basis === "lower_bound" && soma.unknownObservations === 1
+  return ok
+    ? met(id, src, "estimativa não vira percentual e `unknown` na soma devolve `lower_bound` — invariante provada aqui, mas sem consumidor no produto (o motor é do PRD54)")
+    : failed(id, src, `invariante enfraquecida: percentual de estimado=${estimado}, basis=${soma.basis}`)
+}
+
+/** §2: "autorização de escrita representada por lease vinculada ao plano e ao escopo". */
+function controleDaLease() {
+  const id = "lease_vinculada_nao_booleano"
+  const src = "mission-schemas (§25.1)"
+  const lease = { planHash: "p1", scopeHash: "s1", policyHash: "pol1", worktreeId: "w1", expiresAt: "2099-01-01T00:00:00Z" }
+  const outroPlano = { ...lease, planHash: "p2" }
+  const foraDoEscopo = acaoCobertaPelaLease({ paths: ["a"], tools: [], commands: [], externalEffects: [] }, { paths: ["b"] })
+  const v = leaseAindaVale(lease, outroPlano, Date.parse("2026-01-01T00:00:00Z"))
+  const ok = foraDoEscopo === false && v.ok === false && String(v.reason).startsWith("fronteira_mudou")
+  return ok
+    ? met(id, src, "path fora da lista não é coberto e plano diferente invalida a lease — invariante provada aqui, sem consumidor no produto (o motor é do PRD54)")
+    : failed(id, src, `invariante enfraquecida: cobertura=${foraDoEscopo}, retomada=${JSON.stringify(v)}`)
+}
+
 /** Artefato exigido que não existe em disco é `unproven`, com o caminho conferido. */
 function criteriosDeArtefato(repoRoot) {
   return ARTEFATOS_DO_EVIDENCE_PACK.map((a) => (existsSync(join(repoRoot, a.path))
@@ -143,6 +217,7 @@ export function prd53EntryGate({ repoRoot = process.cwd(), commit = null, medico
       hooks: statusDosHooksDoCodex(),
       plano: planoDeCertificacao(),
     }),
+    ...controlesDoPrd52(),
     ...criteriosDeArtefato(repoRoot),
   ]
   const faltando = criterios.filter((c) => c.state !== "met")

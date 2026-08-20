@@ -63,19 +63,26 @@ test("nenhum critério nasce `met` por omissão — o default é `unproven`", as
   for (const c of g.criteria) {
     assert.ok(ESTADOS_DO_CRITERIO.includes(c.state), `estado fora do vocabulário: ${c.state}`)
   }
+  // Os artefatos passaram a existir no S53.0.1; o que segue valendo é a regra:
+  // o estado vem da CONFERÊNCIA em disco, nunca de presunção.
   const artefatos = g.criteria.filter((c) => c.source === "disco")
-  assert.ok(artefatos.every((a) => a.state === "unproven"),
-    "artefato ausente em disco tem de ser `unproven`, nunca presumido")
+  assert.ok(artefatos.length > 0)
+  for (const a of artefatos) {
+    assert.equal(a.state === "met", a.detail.includes("presente"),
+      `'${a.id}': o estado tem de refletir a conferência em disco`)
+  }
 })
 
-test("CONTROLE NEGATIVO: mesmo com TODAS as medições verdes, artefato ausente segura a entrada", async () => {
+test("CONTROLE NEGATIVO: medições verdes NÃO abrem o portão — o externo continua faltando", async () => {
   const { prd53EntryGate } = await G()
   const g = prd53EntryGate({ repoRoot, commit: "abc1234", medicoes: MEDICOES_VERDES })
   assert.equal(g.entered, false,
-    "o evidence pack e o seed corpus são exigidos pelo §2/§19 e não existem em disco")
+    "injetar medição verde não produz a evidência externa que o §2 exige")
+  // Com os artefatos já gravados, o que segura são os bloqueios EXTERNOS —
+  // medições verdes injetadas não os alcançam, porque eles não são medição.
   const ids = g.missing.map((m) => m.id)
-  assert.ok(ids.includes("evidence_pack"))
-  assert.ok(ids.includes("seed_corpus"))
+  assert.ok(ids.includes("clean_machine_certificado") || ids.includes("zero_p0_aberto"),
+    "evidência externa não se produz injetando número")
 })
 
 test("CONTROLE NEGATIVO: placar com claim não provada barra a entrada", async () => {
@@ -108,12 +115,29 @@ test("as pendências externas saem separadas por natureza — não viram lista d
   }
 })
 
-test("o portão é READ-ONLY: não declara nada promovido nem escreve artefato", async () => {
+/**
+ * A versão anterior deste teste afirmava que os artefatos NÃO existiam no repo —
+ * uma procuração para "o portão não os cria". A procuração venceu no instante em
+ * que os artefatos passaram a existir de verdade (S53.0.1), e o teste virou
+ * vermelho sem que a propriedade tivesse mudado.
+ *
+ * Agora ele mede a propriedade direto: roda o portão contra uma raiz VAZIA e
+ * exige que continue vazia. Medir não pode fabricar a evidência que se mede.
+ */
+test("o portão é READ-ONLY: rodar contra raiz vazia não cria artefato nenhum", async () => {
   const { prd53EntryGate, ARTEFATOS_DO_EVIDENCE_PACK } = await G()
   const { existsSync } = await import("node:fs")
-  prd53EntryGate({ repoRoot, commit: "abc1234" })
-  for (const a of ARTEFATOS_DO_EVIDENCE_PACK) {
-    assert.equal(existsSync(path.join(repoRoot, a.path)), false,
-      `o portão CRIOU ${a.path} — medir não pode fabricar a evidência que se está medindo`)
-  }
+  const { mkdtemp } = await import("node:fs/promises")
+  const { tmpdir } = await import("node:os")
+  const { cleanupTmp } = await imp("tests/helpers/tmp.js")
+
+  const vazio = await mkdtemp(path.join(tmpdir(), "gstack-gate-ro-"))
+  try {
+    const g = prd53EntryGate({ repoRoot: vazio, commit: "abc1234" })
+    assert.equal(g.entered, false, "raiz vazia jamais entra")
+    for (const a of ARTEFATOS_DO_EVIDENCE_PACK) {
+      assert.equal(existsSync(path.join(vazio, a.path)), false,
+        `o portão CRIOU ${a.path} — medir não pode fabricar a evidência que se está medindo`)
+    }
+  } finally { cleanupTmp(vazio) }
 })

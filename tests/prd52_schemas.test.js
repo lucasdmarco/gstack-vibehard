@@ -398,12 +398,41 @@ test("os consumidores do §26 são exatamente os declarados", async () => {
 })
 
 /**
- * O §25 continua SEM consumidor, e isso é a decisão humana registrada: o PRD52
- * possui os schemas e as invariantes da missão; o motor, o scheduler e o
- * lifecycle são do PRD54. **O PRD52 não implementa loop autônomo** — um
- * consumidor aqui seria o começo silencioso dele.
+ * O §25 não tem MOTOR, e é isso que a decisão humana registrou: o PRD52 possui
+ * os schemas e as invariantes da missão; motor, scheduler e lifecycle são do
+ * PRD54. **O PRD52 não implementa loop autônomo.**
+ *
+ * A primeira versão desta guarda exigia ZERO consumidores — uma procuração para
+ * "zero motor". A procuração quebrou no S53.0.1, quando o portão de entrada do
+ * PRD53 passou a IMPORTAR as invariantes para reexecutá-las: o §2 do PRD53 manda
+ * reexecutar os controles negativos, e reexecutar exige chamar a função.
+ *
+ * Ceder aqui seria fácil e errado. Então a guarda passou a medir o que realmente
+ * importa, em duas partes que se sustentam:
+ *
+ *   1. a lista de consumidores é FECHADA e nomeada — carona continua impossível;
+ *   2. todo consumidor é verificado contra `EXPORTS_DO_PRD54`, a mesma lista que
+ *      o gate de fronteira usa. Um consumidor que exporte capacidade do PRD54
+ *      reprova aqui e lá.
+ *
+ * É mais estrito que antes: a versão anterior nunca olhou o que um consumidor
+ * faria — só contava que não houvesse nenhum.
  */
-test("o §25 (missão) segue sem consumidor: o motor é do PRD54", async () => {
-  assert.deepEqual(consumidoresDe("mission-schemas.js"), [],
-    "schemas de missão sem motor é o combinado; consumi-los aqui antecipa o PRD54")
+const CONSUMIDORES_AUTORIZADOS_DO_25 = Object.freeze([
+  // READ-ONLY. Exercita `percentualDeUso`, `consumoCumulativo`,
+  // `acaoCobertaPelaLease` e `leaseAindaVale` com entradas adversariais para
+  // provar que as invariantes seguem de pé. Não agenda, não executa, não renova
+  // e não revoga — nada do que define o motor.
+  "src/dream/prd53-entry-gate.js",
+])
+
+test("o §25 (missão) segue sem MOTOR: os consumidores são fechados e não exportam capacidade do PRD54", async () => {
+  const consumidores = consumidoresDe("mission-schemas.js")
+  assert.deepEqual(consumidores, CONSUMIDORES_AUTORIZADOS_DO_25,
+    "consumidor do §25 entra por decisão registrada, nunca por carona")
+
+  const { EXPORTS_DO_PRD54, violacoesDaFronteira } = await imp("src/meta/prd52-boundaries.js")
+  assert.ok(EXPORTS_DO_PRD54.length > 0)
+  assert.deepEqual(violacoesDaFronteira(repoRoot), [],
+    "nenhum consumidor do §25 pode exportar motor, scheduler, renovação ou revogação")
 })

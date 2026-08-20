@@ -7,9 +7,15 @@ import { PRD50_RC_ITEMS } from "../dream/rc-checklist-prd50.js"
 import { PRD51_RC_ITEMS, prd51Readiness } from "../dream/rc-checklist-prd51.js"
 import { PRD52_RC_ITEMS, prd52Readiness } from "../dream/rc-checklist-prd52.js"
 import { projectPrdLedger } from "../dream/prd-ledger.js"
+import { buildEvidencePack, problemasDoPack, gravarPack } from "../dream/prd52-evidence-pack.js"
+import { construirSeedCorpus, problemasDoCorpus } from "../dream/prd53-seed-corpus.js"
+import { prd53EntryGate } from "../dream/prd53-entry-gate.js"
 import { rcMatrixVerdict } from "../release/rc-matrix.js"
 import { execFileSync } from "node:child_process"
-import { section, info, warn, error } from "../cli/index.js"
+import { mkdirSync, writeFileSync } from "node:fs"
+import { dirname, join } from "node:path"
+import { createHash } from "node:crypto"
+import { section, info, warn, error, success } from "../cli/index.js"
 
 /**
  * `prd status` — ledger unificado de PRDs (PRD51 S51.3). Agrega os checklists
@@ -102,23 +108,93 @@ function renderStatus(report, dod, matrix, prd52) {
   renderPrd52(prd52)
 }
 
+const SEED_CORPUS_PATH = join(".docs", "RESEARCH", "prd53-seed-corpus.json")
+
+/**
+ * `prd evidence [--write]` — gera o evidence pack do PRD52 e o seed corpus do
+ * PRD53.
+ *
+ * ESCREVE, e por isso a flag é explícita: sem `--write` o comando só mostra o
+ * que geraria. Escrever em `.gstack/` e `.docs/` é `write_project_state` — o
+ * firewall separa isso de editar código-fonte, e nenhuma linha de produto é
+ * tocada aqui.
+ *
+ * Um pack inválido NUNCA é gravado. Gravar primeiro e validar depois deixaria no
+ * disco um artefato que o portão do PRD53 aceitaria pelo caminho e recusaria
+ * pelo conteúdo — pior que não ter artefato nenhum.
+ */
+function evidenceCmd(ctx) {
+  const commit = resolveHeadCommit(ctx.root || ctx.cwd)
+  const pack = buildEvidencePack({ repoRoot: ctx.cwd, commit })
+  const corpus = construirSeedCorpus()
+  const problemas = [
+    ...problemasDoPack(pack).map((x) => `evidence-pack: ${x}`),
+    ...problemasDoCorpus().map((x) => `seed-corpus: ${x}`),
+  ]
+  const escrever = ctx.args.includes("--write") && problemas.length === 0
+  const escritos = escrever ? [gravarPack(pack, { repoRoot: ctx.cwd }), gravarCorpus(corpus, ctx.cwd)] : []
+  if (problemas.length) process.exitCode = 1
+
+  const saida = { schemaVersion: pack.schemaVersion, commit, problems: problemas, written: escritos, pack, corpus }
+  if (ctx.json) { process.stdout.write(JSON.stringify(saida) + "\n"); return saida }
+  renderEvidence(saida, escrever)
+  return saida
+}
+
+function renderEvidence({ problems, written, pack }, escrever) {
+  section("prd evidence — evidence pack do PRD52 + seed corpus do PRD53")
+  for (const x of problems) error(`  ${x}`)
+  if (!problems.length && !escrever) info("  válidos; use --write para gravar.")
+  for (const w of written) success(`  gravado: ${w.path} (${w.sha256.slice(0, 20)}…)`)
+  info(`  placar ${JSON.stringify(pack.scoreboard)} · ${pack.claims.length} claim(s) com recibo`)
+  for (const n of pack.notMeasured) warn(`  NÃO medido: ${n.claim} — ${n.why}`)
+}
+
+function gravarCorpus(corpus, cwd) {
+  const destino = join(cwd, SEED_CORPUS_PATH)
+  mkdirSync(dirname(destino), { recursive: true })
+  const texto = `${JSON.stringify(corpus, null, 2)}\n`
+  writeFileSync(destino, texto)
+  return { path: SEED_CORPUS_PATH, sha256: `sha256:${createHash("sha256").update(texto).digest("hex")}` }
+}
+
+/**
+ * `prd gate` — o portão de entrada do PRD53, read-only.
+ *
+ * Sai com código 1 quando bloqueado: quem chama de script precisa distinguir
+ * "pode começar" de "não pode" sem ler prosa.
+ */
+function gateCmd(ctx) {
+  const g = prd53EntryGate({ repoRoot: ctx.cwd, commit: resolveHeadCommit(ctx.root || ctx.cwd) })
+  if (!g.entered) process.exitCode = 1
+  if (ctx.json) { process.stdout.write(JSON.stringify(g) + "\n"); return g }
+  section(`prd gate — entrada do PRD53 (§2): ${g.status}`)
+  for (const c of g.criteria) {
+    const linha = `  ${c.id} [${c.state}] — ${c.detail}`
+    ;(c.state === "met" ? info : warn)(linha)
+  }
+  info(`  ${g.note}`)
+  return g
+}
+
 /** HEAD real do repositório auditado. Sem git disponível, `null` honesto. */
 function resolveHeadCommit(root) {
   try { return String(execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, stdio: "pipe", encoding: "utf-8", timeout: 20000 }) || "").trim() || null }
   catch { return null }
 }
 
-const SUBCOMMANDS = Object.freeze({ status: true })
+/**
+ * Os subcomandos. Tabela única: o comando virou despachante fino, e cada
+ * subcomando responde por si.
+ *
+ * A versão anterior tinha DUAS listas — um `SUBCOMMANDS` só para dizer "existe"
+ * e o corpo do comando implementando `status` inline. Duas fontes sobre a mesma
+ * coisa é o defeito que este repositório passou o PRD52 inteiro removendo dos
+ * outros lugares.
+ */
+const HANDLERS = Object.freeze({ status: statusCmd, evidence: evidenceCmd, gate: gateCmd })
 
-export async function prdCommand(args = [], opts = {}) {
-  const cwd = opts.cwd || process.cwd()
-  const json = args.includes("--json")
-  const sub = args[0]
-  if (!SUBCOMMANDS[sub]) {
-    if (json) { process.stdout.write(JSON.stringify({ error: "subcomando desconhecido — use `prd status`" }) + "\n"); return { error: true } }
-    error("Subcomando desconhecido. Use: gstack_vibehard prd status [--json]")
-    return { error: true }
-  }
+function statusCmd({ cwd, json }) {
   const report = buildPrdStatusReport(cwd)
   const dod = buildDoDSummary()
   const rcMatrix = rcMatrixVerdict()
@@ -128,7 +204,22 @@ export async function prdCommand(args = [], opts = {}) {
   // aconteceu na primeira fiação deste comando — 24 registros inválidos de uma
   // vez, e `ready:false` por um defeito da medição, não do repositório.
   const prd52 = prd52Readiness(undefined, { repoRoot: cwd, commit: resolveHeadCommit(cwd) })
-  if (json) { process.stdout.write(JSON.stringify({ schemaVersion: PRD_STATUS_REPORT_SCHEMA, programs: report, dod, rcMatrix, prd52 }) + "\n"); return { programs: report, dod, rcMatrix, prd52 } }
+  const saida = { programs: report, dod, rcMatrix, prd52 }
+  if (json) { process.stdout.write(JSON.stringify({ schemaVersion: PRD_STATUS_REPORT_SCHEMA, ...saida }) + "\n"); return saida }
   renderStatus(report, dod, rcMatrix, prd52)
-  return { programs: report, dod, rcMatrix, prd52 }
+  return saida
+}
+
+function subcomandoDesconhecido(json) {
+  if (json) { process.stdout.write(JSON.stringify({ error: "subcomando desconhecido — use `prd status`" }) + "\n"); return { error: true } }
+  error("Subcomando desconhecido. Use: gstack_vibehard prd status|evidence|gate [--json]")
+  return { error: true }
+}
+
+export async function prdCommand(args = [], opts = {}) {
+  const cwd = opts.cwd || process.cwd()
+  const json = args.includes("--json")
+  const ctx = { args, json, cwd, root: opts.root || cwd }
+  const handler = HANDLERS[args[0]]
+  return handler ? handler(ctx) : subcomandoDesconhecido(json)
 }

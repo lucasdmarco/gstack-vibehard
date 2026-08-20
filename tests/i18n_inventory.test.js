@@ -187,7 +187,7 @@ test("validateRegistry recusa script que NÃO é alcançado pelo runtime (não p
  *
  * ATUALIZE AQUI, e so aqui, a cada arquivo reconciliado no lote JS.
  */
-test("CENSO GLOBAL: 1922 pontos, 0 unknown, 25 arquivos convertidos", async () => {
+test("CENSO GLOBAL: 1932 pontos, 0 unknown, 25 arquivos convertidos", async () => {
   const { buildInventory } = await imp()
   const inv = buildInventory({ repoRoot })
 
@@ -246,7 +246,11 @@ test("CENSO GLOBAL: 1922 pontos, 0 unknown, 25 arquivos convertidos", async () =
   // RESULTADO com motivo legivel -- 2 pontos, ambos `public_diagnostic`. Um gate
   // que bloqueia sem dizer por que seria pior que gate nenhum, e dizer custa
   // ponto de mensagem: o censo mede o preco da honestidade, nao um desvio.
-  assert.equal(inv.total, 1922, "converter nao pode sumir com ponto REAL; falso positivo do regex pode cair")
+  // 1922 -> 1932: `prd evidence` e `prd gate` (PRD53 S53.0.1). Sao 10 pontos, e a
+  // maior parte deles e o bloco `NAO medido` do evidence pack -- um pack que
+  // declara o que nao provou custa linha de mensagem, e essa e a linha que
+  // impede o silencio de parecer ausencia de problema.
+  assert.equal(inv.total, 1932, "converter nao pode sumir com ponto REAL; falso positivo do regex pode cair")
 
   // Medicao em movimento: cai a cada arquivo reconciliado. 54 -> 53 com qa.js;
   // 53 -> 52 com secrets.js.
