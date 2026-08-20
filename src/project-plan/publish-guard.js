@@ -36,11 +36,49 @@ const bumpGuide = (version, latest) =>
   (latest.replace(/^v/, "") === version.replace(/^v/, "")
     ? `versão ${version} já tem tag ${latest} — se é NOVA release, bump para a próxima; se é só validação local, use o verify normal (publish é advisory em lib/CLI)`
     : `versão ${version} não está acima da última tag ${latest} — faça o bump antes de publicar`)
-function checkVersionBump(version, tags) {
+/**
+ * A tag desta versão aponta para o commit que está sendo publicado?
+ *
+ * `^{}` desreferencia tag anotada até o commit. Sem isso, uma tag anotada nunca
+ * bateria com `HEAD` e o check reprovaria a release correta.
+ */
+function tagDestaVersaoNoHead(git, version) {
+  if (typeof git !== "function") return false
+  const alvo = git("rev-parse", `v${version}^{}`)
+  const head = git("rev-parse", "HEAD")
+  return Boolean(alvo && head && alvo === head)
+}
+
+/**
+ * Versão bumpada vs última tag semver.
+ *
+ * CORREÇÃO (achado ao usar o guard para publicar a 5.107.0): este check e o
+ * `release-source-parity` codificavam RITUAIS OPOSTOS e se anulavam.
+ *
+ *   `version-bump` assumia tag DEPOIS de publicar — o comentário do
+ *   `tag-exists` diz isso com todas as letras — e reprovava se a versão já
+ *   tivesse tag.
+ *
+ *   `tagParity` (PRD41 S41.0) passou a exigir a tag ANTES, local e no remoto,
+ *   para impedir publicar fonte não auditável.
+ *
+ * Resultado: sem tag, parity reprovava; com tag, bump reprovava. O guard ficou
+ * INSATISFAZÍVEL desde a v4.0.1 — nunca podia dar `pass`, e ninguém percebeu
+ * porque a última publicação foi feita sem ele verde.
+ *
+ * A reconciliação preserva o que cada um protegia: republicar versão já lançada
+ * continua reprovando, e versão atrás da última tag também. O que passa a ser
+ * aceito é o ÚNICO estado que o parity exige — a tag desta versão existindo e
+ * apontando para o commit que se vai publicar.
+ */
+function checkVersionBump(version, tags, git) {
   const semverTags = tags.filter((t) => /^v?\d+\.\d+\.\d+/.test(t))
   if (semverTags.length === 0) return row("version-bump", "passed", "primeira release (sem tags anteriores)")
   const latest = semverTags.reduce((a, b) => (semverGt(b, a) ? b : a))
   if (semverGt(version, latest)) return row("version-bump", "passed", `${version} > ${latest}`)
+  if (latest.replace(/^v/, "") === version.replace(/^v/, "") && tagDestaVersaoNoHead(git, version)) {
+    return row("version-bump", "passed", `v${version} é a tag DESTE commit — estado exigido pelo release-source-parity`)
+  }
   return row("version-bump", "failed", bumpGuide(version, latest))
 }
 // 3. CHANGELOG com entrada da versão
@@ -93,7 +131,7 @@ function buildChecks({ opts, cwd, exec, git, version, tags }) {
   return [
     row("package-version", "passed", version),
     checkTreeClean(git("status", "--porcelain")),
-    checkVersionBump(version, tags),
+    checkVersionBump(version, tags, git),
     checkChangelog(cwd, version),
     checkQgVersion(qgOf(opts, cwd), version),
     // release-source-parity (HARD) — impede publicar commit/árvore não auditável a partir

@@ -75,6 +75,64 @@ test("publish-guard: tudo ok → pass (tag ausente vira warning, não bloqueia)"
   } finally { await rm(cwd, { recursive: true, force: true }) }
 })
 
+/**
+ * PRD52 S52.L — os dois checks se anulavam, e o guard nunca podia dar `pass`.
+ *
+ * `version-bump` assumia tag DEPOIS de publicar e reprovava se a versao ja
+ * tivesse tag; `release-source-parity` (PRD41 S41.0) exigia a tag ANTES, local e
+ * no remoto. Sem tag, um reprovava; com tag, o outro. Insatisfazivel desde a
+ * v4.0.1 -- e ninguem percebeu porque a ultima publicacao foi feita sem o guard
+ * verde. Achado ao usar o guard para publicar a 5.107.0 de verdade.
+ */
+test("version-bump: tag da versao apontando para o HEAD PASSA (estado que o parity exige)", async () => {
+  const cwd = await repo("2.29.0", "## [2.29.0]")
+  try {
+    const { publishGuard } = await imp()
+    // `rev-parse v2.29.0^{}` e `rev-parse HEAD` respondem o MESMO objeto: e a
+    // tag deste commit, exatamente o que o release-source-parity exige. O mock
+    // e explicito aqui em vez de herdar rotas do helper -- o que este teste
+    // mede e a IGUALDADE dos dois, e ela precisa estar visivel no teste.
+    const MESMO = "abc1234000000000000000000000000000000000"
+    const exec = (file, args) => {
+      if (file === "git" && args[0] === "rev-parse") return MESMO
+      return gitExec({ tags: ["v2.29.0"] })(file, args)
+    }
+    const r = publishGuard({ cwd, dream: dreamProvado, exec })
+    const bump = r.checks.find((c) => c.id === "version-bump")
+    assert.equal(bump.status, "passed", `esperava passar, veio: ${bump.detail}`)
+    assert.match(bump.detail, /tag DESTE commit/)
+  } finally { await rm(cwd, { recursive: true, force: true }) }
+})
+
+test("CONTROLE NEGATIVO: versao ja lancada cuja tag aponta para OUTRO commit reprova", async () => {
+  const cwd = await repo("2.29.0", "## [2.29.0]")
+  try {
+    const { publishGuard } = await imp()
+    // A tag existe, mas aponta para outro objeto -> republicacao de commit
+    // diferente com o mesmo numero de versao. Continua sendo o que o check
+    // sempre impediu.
+    const exec = (file, args) => {
+      if (file === "git" && args[0] === "rev-parse" && String(args[1]).includes("^{}")) return "outrocommit000000000000000000000000000"
+      if (file === "git" && args[0] === "rev-parse" && args[1] === "HEAD") return "master"
+      return gitExec({ tags: ["v2.29.0"] })(file, args)
+    }
+    const r = publishGuard({ cwd, dream: dreamProvado, exec })
+    const bump = r.checks.find((c) => c.id === "version-bump")
+    assert.equal(bump.status, "failed", "tag de outro commit nao autoriza republicar")
+  } finally { await rm(cwd, { recursive: true, force: true }) }
+})
+
+test("CONTROLE NEGATIVO: versao ATRAS da ultima tag continua reprovando", async () => {
+  const cwd = await repo("2.28.0", "## [2.28.0]")
+  try {
+    const { publishGuard } = await imp()
+    const r = publishGuard({ cwd, dream: dreamProvado, exec: gitExec({ tags: ["v2.29.0"] }) })
+    const bump = r.checks.find((c) => c.id === "version-bump")
+    assert.equal(bump.status, "failed")
+    assert.match(bump.detail, /nao esta acima|não está acima/)
+  } finally { await rm(cwd, { recursive: true, force: true }) }
+})
+
 test("publish-guard: working tree suja → fail", async () => {
   const cwd = await repo("2.29.0", "## [2.29.0]")
   try {
