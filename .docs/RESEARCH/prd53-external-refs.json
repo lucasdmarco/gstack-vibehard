@@ -1,0 +1,306 @@
+{
+  "schemaVersion": "gstack.prd53.external-refs.v1",
+  "sourceCommit": "49fec2a1682bc6b125c48192b2bbce7333b5f176",
+  "registryPresent": true,
+  "registryPath": ".docs\\RESEARCH\\repository-registry.json",
+  "references": [
+    {
+      "url": "https://github.com/code-yeongyu/oh-my-openagent",
+      "commit": null,
+      "license": null,
+      "maturity": null,
+      "disposition": "active_reference",
+      "role": "opencode_plugin_reference",
+      "origin": "externalReferences",
+      "runtimeDependencyForbidden": true,
+      "missingFields": [
+        "commit",
+        "license",
+        "maturity"
+      ],
+      "sustainsImplementation": false,
+      "vendoringAllowed": false,
+      "vendoringBlockedReason": "licença desconhecida — nem há o que comparar"
+    },
+    {
+      "url": "local:.docs/PLANS/replit arquivos",
+      "commit": null,
+      "license": null,
+      "maturity": null,
+      "disposition": "archived_reference",
+      "role": "replit_workspace_runtime_schema",
+      "origin": "externalReferences",
+      "runtimeDependencyForbidden": true,
+      "missingFields": [
+        "commit",
+        "license",
+        "maturity"
+      ],
+      "sustainsImplementation": false,
+      "vendoringAllowed": false,
+      "vendoringBlockedReason": "licença desconhecida — nem há o que comparar"
+    },
+    {
+      "url": "https://github.com/kulaxyz/self-learning-skills",
+      "commit": null,
+      "license": null,
+      "maturity": null,
+      "disposition": "active_reference",
+      "role": "learning_pipeline_methodology",
+      "origin": "externalReferences",
+      "runtimeDependencyForbidden": true,
+      "missingFields": [
+        "commit",
+        "license",
+        "maturity"
+      ],
+      "sustainsImplementation": false,
+      "vendoringAllowed": false,
+      "vendoringBlockedReason": "licença desconhecida — nem há o que comparar"
+    },
+    {
+      "url": "https://github.com/vercel-labs/skills",
+      "commit": null,
+      "license": null,
+      "maturity": null,
+      "disposition": "active_reference",
+      "role": "skill_discovery_lock_conformance",
+      "origin": "externalReferences",
+      "runtimeDependencyForbidden": true,
+      "missingFields": [
+        "commit",
+        "license",
+        "maturity"
+      ],
+      "sustainsImplementation": false,
+      "vendoringAllowed": false,
+      "vendoringBlockedReason": "licença desconhecida — nem há o que comparar"
+    },
+    {
+      "url": "https://github.com/vercel-labs/agent-skills",
+      "commit": null,
+      "license": null,
+      "maturity": null,
+      "disposition": "active_reference",
+      "role": "skill_marketplace_reference",
+      "origin": "externalReferences",
+      "runtimeDependencyForbidden": true,
+      "missingFields": [
+        "commit",
+        "license",
+        "maturity"
+      ],
+      "sustainsImplementation": false,
+      "vendoringAllowed": false,
+      "vendoringBlockedReason": "licença desconhecida — nem há o que comparar"
+    },
+    {
+      "url": "https://github.com/google-deepmind/superhuman/tree/main/aletheia",
+      "commit": null,
+      "license": null,
+      "maturity": null,
+      "disposition": "active_reference",
+      "role": "epistemic_protocol_reference",
+      "origin": "externalReferences",
+      "runtimeDependencyForbidden": true,
+      "missingFields": [
+        "commit",
+        "license",
+        "maturity"
+      ],
+      "sustainsImplementation": false,
+      "vendoringAllowed": false,
+      "vendoringBlockedReason": "licença desconhecida — nem há o que comparar"
+    },
+    {
+      "url": "https://github.com/mattpocock/skills",
+      "commit": null,
+      "license": null,
+      "maturity": null,
+      "disposition": "active_reference",
+      "role": "agent_engineering_methodology",
+      "origin": "externalReferences",
+      "runtimeDependencyForbidden": true,
+      "missingFields": [
+        "commit",
+        "license",
+        "maturity"
+      ],
+      "sustainsImplementation": false,
+      "vendoringAllowed": false,
+      "vendoringBlockedReason": "licença desconhecida — nem há o que comparar"
+    },
+    {
+      "url": "https://www.aihero.dev/",
+      "commit": null,
+      "license": null,
+      "maturity": null,
+      "disposition": "active_reference",
+      "role": "public_agent_methodology_corpus",
+      "origin": "externalReferences",
+      "runtimeDependencyForbidden": true,
+      "missingFields": [
+        "commit",
+        "license",
+        "maturity"
+      ],
+      "sustainsImplementation": false,
+      "vendoringAllowed": false,
+      "vendoringBlockedReason": "licença desconhecida — nem há o que comparar"
+    },
+    {
+      "url": "https://github.com/happyrobot-ai/livekit-agents",
+      "commit": null,
+      "license": null,
+      "maturity": null,
+      "disposition": "archived_reference",
+      "role": "historical_livekit_agents_snapshot",
+      "origin": "externalReferences",
+      "runtimeDependencyForbidden": true,
+      "missingFields": [
+        "commit",
+        "license",
+        "maturity"
+      ],
+      "sustainsImplementation": false,
+      "vendoringAllowed": false,
+      "vendoringBlockedReason": "licença desconhecida — nem há o que comparar"
+    },
+    {
+      "url": "https://github.com/livekit/agents",
+      "commit": null,
+      "license": null,
+      "maturity": null,
+      "disposition": "active_reference",
+      "role": "agent_runtime_lifecycle_testing_reference",
+      "origin": "externalReferences",
+      "runtimeDependencyForbidden": true,
+      "missingFields": [
+        "commit",
+        "license",
+        "maturity"
+      ],
+      "sustainsImplementation": false,
+      "vendoringAllowed": false,
+      "vendoringBlockedReason": "licença desconhecida — nem há o que comparar"
+    },
+    {
+      "url": "https://github.com/lgsreal/ai-driven-dev",
+      "commit": null,
+      "license": null,
+      "maturity": null,
+      "disposition": "active_reference",
+      "role": "learning_track",
+      "origin": "mandatoryBatches/batch-6-aidd-methodology",
+      "runtimeDependencyForbidden": true,
+      "missingFields": [
+        "commit",
+        "license",
+        "maturity"
+      ],
+      "sustainsImplementation": false,
+      "vendoringAllowed": false,
+      "vendoringBlockedReason": "licença desconhecida — nem há o que comparar"
+    },
+    {
+      "url": "https://github.com/ai-driven-dev/framework",
+      "commit": null,
+      "license": null,
+      "maturity": null,
+      "disposition": "active_reference",
+      "role": "plugin_marketplace_and_sdlc",
+      "origin": "mandatoryBatches/batch-6-aidd-methodology",
+      "runtimeDependencyForbidden": true,
+      "missingFields": [
+        "commit",
+        "license",
+        "maturity"
+      ],
+      "sustainsImplementation": false,
+      "vendoringAllowed": false,
+      "vendoringBlockedReason": "licença desconhecida — nem há o que comparar"
+    },
+    {
+      "url": "https://github.com/ai-driven-dev/manifest",
+      "commit": null,
+      "license": null,
+      "maturity": null,
+      "disposition": "active_reference",
+      "role": "product_manifesto",
+      "origin": "mandatoryBatches/batch-6-aidd-methodology",
+      "runtimeDependencyForbidden": true,
+      "missingFields": [
+        "commit",
+        "license",
+        "maturity"
+      ],
+      "sustainsImplementation": false,
+      "vendoringAllowed": false,
+      "vendoringBlockedReason": "licença desconhecida — nem há o que comparar"
+    },
+    {
+      "url": "https://github.com/ai-driven-dev/prompts",
+      "commit": null,
+      "license": null,
+      "maturity": null,
+      "disposition": "archived_reference",
+      "role": "prompt_template_history",
+      "origin": "mandatoryBatches/batch-6-aidd-methodology",
+      "runtimeDependencyForbidden": true,
+      "missingFields": [
+        "commit",
+        "license",
+        "maturity"
+      ],
+      "sustainsImplementation": false,
+      "vendoringAllowed": false,
+      "vendoringBlockedReason": "licença desconhecida — nem há o que comparar"
+    },
+    {
+      "url": "https://github.com/ai-driven-dev/rules",
+      "commit": null,
+      "license": null,
+      "maturity": null,
+      "disposition": "archived_reference",
+      "role": "short_rules_history",
+      "origin": "mandatoryBatches/batch-6-aidd-methodology",
+      "runtimeDependencyForbidden": true,
+      "missingFields": [
+        "commit",
+        "license",
+        "maturity"
+      ],
+      "sustainsImplementation": false,
+      "vendoringAllowed": false,
+      "vendoringBlockedReason": "licença desconhecida — nem há o que comparar"
+    },
+    {
+      "url": "https://github.com/ai-driven-dev/ai-driven-dev-community",
+      "commit": null,
+      "license": null,
+      "maturity": null,
+      "disposition": "archived_reference",
+      "role": "community_catalog_history",
+      "origin": "mandatoryBatches/batch-6-aidd-methodology",
+      "runtimeDependencyForbidden": true,
+      "missingFields": [
+        "commit",
+        "license",
+        "maturity"
+      ],
+      "sustainsImplementation": false,
+      "vendoringAllowed": false,
+      "vendoringBlockedReason": "licença desconhecida — nem há o que comparar"
+    }
+  ],
+  "counts": {
+    "total": 16,
+    "sustaining": 0,
+    "vendoringAllowed": 0
+  },
+  "doesNotAuthorize": [
+    "nenhuma referência aqui é dependência runtime do GStack",
+    "referência sem commit/licença/disposition não sustenta implementação (§19 DoD)",
+    "vendoring exige revisão explícita de licença — ausência de licença bloqueia"
+  ]
+}

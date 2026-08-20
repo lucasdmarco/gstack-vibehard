@@ -9,6 +9,9 @@ import { PRD52_RC_ITEMS, prd52Readiness } from "../dream/rc-checklist-prd52.js"
 import { projectPrdLedger } from "../dream/prd-ledger.js"
 import { buildEvidencePack, problemasDoPack, gravarPack } from "../dream/prd52-evidence-pack.js"
 import { construirSeedCorpus, problemasDoCorpus } from "../dream/prd53-seed-corpus.js"
+import { construirPendenciasExternas, problemasDasPendencias, gravarPendencias } from "../release/external-pending.js"
+import { inventarioDosManuais, problemasDoInventario } from "../dream/prd53-manual-inventory.js"
+import { manifestDeReferencias, problemasDoManifest } from "../dream/prd53-external-refs.js"
 import { prd53EntryGate } from "../dream/prd53-entry-gate.js"
 import { rcMatrixVerdict } from "../release/rc-matrix.js"
 import { execFileSync } from "node:child_process"
@@ -127,15 +130,33 @@ function evidenceCmd(ctx) {
   const commit = resolveHeadCommit(ctx.root || ctx.cwd)
   const pack = buildEvidencePack({ repoRoot: ctx.cwd, commit })
   const corpus = construirSeedCorpus()
+  // S52.K: o runbook das pendências EXTERNAS sai junto. Elas não fecham aqui, e
+  // por isso mesmo precisam sobreviver à sessão — quem for executar em outra
+  // máquina, noutro dia, não tem esta conversa.
+  const pendencias = construirPendenciasExternas({ cwd: ctx.cwd, commit })
+  // S53.0 (§19): o inventário dos manuais e o manifest de referências externas.
+  // Os dois CATALOGAM e nunca promovem — a regra viaja dentro do artefato.
+  const inventario = inventarioDosManuais({ repoRoot: ctx.cwd, commit })
+  const referencias = manifestDeReferencias({ repoRoot: ctx.cwd, commit })
   const problemas = [
     ...problemasDoPack(pack).map((x) => `evidence-pack: ${x}`),
     ...problemasDoCorpus().map((x) => `seed-corpus: ${x}`),
+    ...problemasDasPendencias(pendencias).map((x) => `external-pending: ${x}`),
+    ...problemasDoInventario(inventario).map((x) => `manual-inventory: ${x}`),
+    ...problemasDoManifest(referencias).map((x) => `external-refs: ${x}`),
   ]
   const escrever = ctx.args.includes("--write") && problemas.length === 0
-  const escritos = escrever ? [gravarPack(pack, { repoRoot: ctx.cwd }), gravarCorpus(corpus, ctx.cwd)] : []
+  const escritos = escrever
+    ? [
+      gravarPack(pack, { repoRoot: ctx.cwd }), gravarCorpus(corpus, ctx.cwd),
+      gravarPendencias(pendencias, { cwd: ctx.cwd }),
+      gravarJson(inventario, join(".docs", "RESEARCH", "prd53-manual-inventory.json"), ctx.cwd),
+      gravarJson(referencias, join(".docs", "RESEARCH", "prd53-external-refs.json"), ctx.cwd),
+    ]
+    : []
   if (problemas.length) process.exitCode = 1
 
-  const saida = { schemaVersion: pack.schemaVersion, commit, problems: problemas, written: escritos, pack, corpus }
+  const saida = { schemaVersion: pack.schemaVersion, commit, problems: problemas, written: escritos, pack, corpus, pendencias, inventario, referencias }
   if (ctx.json) { process.stdout.write(JSON.stringify(saida) + "\n"); return saida }
   renderEvidence(saida, escrever)
   return saida
@@ -150,13 +171,16 @@ function renderEvidence({ problems, written, pack }, escrever) {
   for (const n of pack.notMeasured) warn(`  NÃO medido: ${n.claim} — ${n.why}`)
 }
 
-function gravarCorpus(corpus, cwd) {
-  const destino = join(cwd, SEED_CORPUS_PATH)
+/** Grava um artefato JSON e devolve caminho + hash do que foi escrito. */
+function gravarJson(doc, rel, cwd) {
+  const destino = join(cwd, rel)
   mkdirSync(dirname(destino), { recursive: true })
-  const texto = `${JSON.stringify(corpus, null, 2)}\n`
+  const texto = `${JSON.stringify(doc, null, 2)}\n`
   writeFileSync(destino, texto)
-  return { path: SEED_CORPUS_PATH, sha256: `sha256:${createHash("sha256").update(texto).digest("hex")}` }
+  return { path: rel, sha256: `sha256:${createHash("sha256").update(texto).digest("hex")}` }
 }
+
+const gravarCorpus = (corpus, cwd) => gravarJson(corpus, SEED_CORPUS_PATH, cwd)
 
 /**
  * `prd gate` — o portão de entrada do PRD53, read-only.

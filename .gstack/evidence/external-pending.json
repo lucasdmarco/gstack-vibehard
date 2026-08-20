@@ -1,0 +1,185 @@
+{
+  "schemaVersion": "gstack.external-pending.v1",
+  "sourceCommit": "49fec2a1682bc6b125c48192b2bbce7333b5f176",
+  "generatedAt": "2026-08-20T01:30:23.497Z",
+  "pending": [
+    {
+      "id": "clean_machine_certification",
+      "closes": "clean_machine_certificado",
+      "blockedBy": "external_clean_machine",
+      "requires": "máquina ou imagem SEM GStack instalado (ver `preconditions`)",
+      "verify": "node src/index.js prd gate --json"
+    },
+    {
+      "id": "codex_enforcement",
+      "closes": "zero_p0_aberto",
+      "blockedBy": "external_clean_machine",
+      "requires": "sessão REAL do Codex na máquina limpa, com um comando que o PreToolUse deve negar",
+      "verify": "node src/index.js agents doctor --json  # codexHooks.enforcementObserved"
+    },
+    {
+      "id": "os_node_matrix",
+      "closes": "pacote_cross_os",
+      "blockedBy": "external_ci_execution",
+      "requires": "execução do workflow `runtime-compat.yml` no GitHub (nunca rodou)",
+      "verify": "node src/index.js prd gate --json  # criterio pacote_cross_os"
+    }
+  ],
+  "cleanMachine": {
+    "runnableHere": false,
+    "blockersHere": [
+      {
+        "id": "gstack_home",
+        "path": "C:\\Users\\lucas\\.gstack",
+        "reason": "estado de instalação anterior"
+      },
+      {
+        "id": "codex_hooks",
+        "path": "C:\\Users\\lucas\\.codex\\hooks.json",
+        "reason": "hooks do GStack já registrados"
+      },
+      {
+        "id": "codex_hooks_dir",
+        "path": "C:\\Users\\lucas\\.codex\\hooks",
+        "reason": "scripts de hook já distribuídos"
+      }
+    ],
+    "preconditions": [
+      {
+        "id": "gstack_home",
+        "mustNotExist": "<HOME>\\.gstack",
+        "reason": "estado de instalação anterior"
+      },
+      {
+        "id": "codex_hooks",
+        "mustNotExist": "<HOME>\\.codex\\hooks.json",
+        "reason": "hooks do GStack já registrados"
+      },
+      {
+        "id": "codex_hooks_dir",
+        "mustNotExist": "<HOME>\\.codex\\hooks",
+        "reason": "scripts de hook já distribuídos"
+      },
+      {
+        "id": "claude_agents",
+        "mustNotExist": "<HOME>\\.claude\\agents\\generated",
+        "reason": "adapters já gerados"
+      }
+    ],
+    "steps": [
+      {
+        "id": "install",
+        "comando": "npm i -g <tarball>",
+        "recibo": "installReceiptRef"
+      },
+      {
+        "id": "runtime",
+        "comando": "gstack_vibehard doctor && gstack_vibehard verify --json",
+        "recibo": "runtimeReceiptRef"
+      },
+      {
+        "id": "enforcement",
+        "comando": "provar que um hook REALMENTE bloqueia (comando negado pelo PreToolUse)",
+        "recibo": "runtimeReceiptRef"
+      },
+      {
+        "id": "uninstall",
+        "comando": "gstack_vibehard uninstall --yes && npm rm -g @gstack-vibehard/installer",
+        "recibo": "uninstallReceiptRef"
+      }
+    ],
+    "receiptsExpected": [
+      "packageHash",
+      "installReceiptRef",
+      "runtimeReceiptRef",
+      "uninstallReceiptRef"
+    ]
+  },
+  "codexHooks": {
+    "byState": {
+      "trust_entry_present": 6
+    },
+    "enforcementObserved": false,
+    "closesWith": "provar que um hook REALMENTE bloqueia (comando negado pelo PreToolUse)"
+  },
+  "supportMatrix": {
+    "pendingCells": [
+      {
+        "key": "ubuntu-latest::node18",
+        "os": "ubuntu-latest",
+        "nodeVersion": "18",
+        "verdict": "not_run"
+      },
+      {
+        "key": "ubuntu-latest::node20",
+        "os": "ubuntu-latest",
+        "nodeVersion": "20",
+        "verdict": "not_run"
+      },
+      {
+        "key": "ubuntu-latest::node22",
+        "os": "ubuntu-latest",
+        "nodeVersion": "22",
+        "verdict": "not_run"
+      },
+      {
+        "key": "ubuntu-latest::node24",
+        "os": "ubuntu-latest",
+        "nodeVersion": "24",
+        "verdict": "not_run"
+      },
+      {
+        "key": "windows-latest::node18",
+        "os": "windows-latest",
+        "nodeVersion": "18",
+        "verdict": "not_run"
+      },
+      {
+        "key": "windows-latest::node20",
+        "os": "windows-latest",
+        "nodeVersion": "20",
+        "verdict": "not_run"
+      },
+      {
+        "key": "windows-latest::node22",
+        "os": "windows-latest",
+        "nodeVersion": "22",
+        "verdict": "not_run"
+      },
+      {
+        "key": "windows-latest::node24",
+        "os": "windows-latest",
+        "nodeVersion": "24",
+        "verdict": "not_run"
+      },
+      {
+        "key": "macos-latest::node18",
+        "os": "macos-latest",
+        "nodeVersion": "18",
+        "verdict": "not_run"
+      },
+      {
+        "key": "macos-latest::node20",
+        "os": "macos-latest",
+        "nodeVersion": "20",
+        "verdict": "not_run"
+      },
+      {
+        "key": "macos-latest::node22",
+        "os": "macos-latest",
+        "nodeVersion": "22",
+        "verdict": "not_run"
+      },
+      {
+        "key": "macos-latest::node24",
+        "os": "macos-latest",
+        "nodeVersion": "24",
+        "verdict": "not_run"
+      }
+    ]
+  },
+  "doesNotAuthorize": [
+    "não declara nada certificado — é o que FALTA, não o que foi feito",
+    "não substitui a execução: célula sem recibo continua `not_run`"
+  ]
+}

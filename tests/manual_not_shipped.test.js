@@ -46,6 +46,7 @@ test("a allowlist não usa curinga de raiz que arrastaria `.docs/` junto sem nin
 const REFERENCIADORES_PERMITIDOS = Object.freeze({
   "src/meta/manual-lint.js": "É o linter DO manual (S51.10.3) — precisa nomear o arquivo que audita.",
   "src/dream/rc-checklist-prd51.js": "DOD.22 do §9 é literalmente sobre a baseline do manual; o texto do requisito o cita.",
+  "src/dream/prd53-manual-inventory.js": "É o INVENTÁRIO do manual (PRD53 S53.0, §19): fatia por heading, hasheia e cataloga. Trata o texto como objeto de auditoria — nenhuma seção vira prática, toda disposição sai no piso `human_reference/catalogued/missing`, e há teste provando que o inventário nunca promove. O conteúdo não entra em prompt, decisão de produto nem contexto de agente; no pacote instalado o caminho nem existe, e o módulo devolve `absent: true`.",
 })
 
 test("NENHUM código de runtime carrega o manual — só os referenciadores auditados o citam", () => {

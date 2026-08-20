@@ -1,8 +1,8 @@
 {
   "schemaVersion": "gstack.prd52.evidence-pack.v1",
   "prd": "PRD52",
-  "sourceCommit": "74ff7f10ec7e6b3d62ab2748dbe7be25d16cdf66",
-  "generatedAt": "2026-08-19T21:39:17.812Z",
+  "sourceCommit": "49fec2a1682bc6b125c48192b2bbce7333b5f176",
+  "generatedAt": "2026-08-20T01:30:23.472Z",
   "readiness": {
     "ready": true,
     "programComplete": true,
@@ -33,7 +33,7 @@
       "id": "auto-dream",
       "status": "REAL",
       "receipt": {
-        "sourceCommit": "74ff7f10ec7e6b3d62ab2748dbe7be25d16cdf66",
+        "sourceCommit": "49fec2a1682bc6b125c48192b2bbce7333b5f176",
         "contractHash": "6788dfe85e477c39ade2d5e39d1865b331211714eaa6f1ee69354bdf1ed1b237",
         "evidence": [
           {
@@ -63,7 +63,7 @@
       "id": "output-guard",
       "status": "REAL",
       "receipt": {
-        "sourceCommit": "74ff7f10ec7e6b3d62ab2748dbe7be25d16cdf66",
+        "sourceCommit": "49fec2a1682bc6b125c48192b2bbce7333b5f176",
         "contractHash": "4e143fb28e26ca012fdf3b15c23b7e9f31c47c0a86748596fa130557e86794e8",
         "evidence": [
           {
@@ -88,7 +88,7 @@
       "id": "verify",
       "status": "REAL",
       "receipt": {
-        "sourceCommit": "74ff7f10ec7e6b3d62ab2748dbe7be25d16cdf66",
+        "sourceCommit": "49fec2a1682bc6b125c48192b2bbce7333b5f176",
         "contractHash": "daef45f17227714ea1aa74a4f806bc62b65e152e5a02fed0e983a56cc4ade686",
         "evidence": [
           {
@@ -113,7 +113,7 @@
       "id": "rollback",
       "status": "REAL",
       "receipt": {
-        "sourceCommit": "74ff7f10ec7e6b3d62ab2748dbe7be25d16cdf66",
+        "sourceCommit": "49fec2a1682bc6b125c48192b2bbce7333b5f176",
         "contractHash": "5cae2eb3b1bb02ed6904d13232c87eee92c70edc0abc9e3ef91a25668d53790b",
         "evidence": [
           {
@@ -143,7 +143,7 @@
       "id": "opencode-safe",
       "status": "REAL",
       "receipt": {
-        "sourceCommit": "74ff7f10ec7e6b3d62ab2748dbe7be25d16cdf66",
+        "sourceCommit": "49fec2a1682bc6b125c48192b2bbce7333b5f176",
         "contractHash": "d94b34753fc160aa2a65253b17f8a7a2295d3393563f388e67e8fb0af9aa3805",
         "evidence": [
           {
@@ -168,7 +168,7 @@
       "id": "task-loop",
       "status": "REAL",
       "receipt": {
-        "sourceCommit": "74ff7f10ec7e6b3d62ab2748dbe7be25d16cdf66",
+        "sourceCommit": "49fec2a1682bc6b125c48192b2bbce7333b5f176",
         "contractHash": "21fd008a9d57f41417fd7f1a083075650abc9f330cbae2714abd57620ef5be10",
         "evidence": [
           {
@@ -193,7 +193,7 @@
       "id": "runtime-supervisor",
       "status": "REAL",
       "receipt": {
-        "sourceCommit": "74ff7f10ec7e6b3d62ab2748dbe7be25d16cdf66",
+        "sourceCommit": "49fec2a1682bc6b125c48192b2bbce7333b5f176",
         "contractHash": "6592eb7ef95046b6e0a1ffedeff6badedcecdd9405c65543e61fff92b5364f6c",
         "evidence": [
           {
@@ -218,7 +218,7 @@
       "id": "secrets-broker",
       "status": "REAL",
       "receipt": {
-        "sourceCommit": "74ff7f10ec7e6b3d62ab2748dbe7be25d16cdf66",
+        "sourceCommit": "49fec2a1682bc6b125c48192b2bbce7333b5f176",
         "contractHash": "f523ddc6fcc74b5766196ff34213eccce169d02401ed2caa90ae5c1676271d9d",
         "evidence": [
           {
@@ -243,7 +243,7 @@
       "id": "runtime-manifest",
       "status": "REAL",
       "receipt": {
-        "sourceCommit": "74ff7f10ec7e6b3d62ab2748dbe7be25d16cdf66",
+        "sourceCommit": "49fec2a1682bc6b125c48192b2bbce7333b5f176",
         "contractHash": "a0abc66794d80a5ed95c275a9f06974000c6c858382f84bee137c5ee5688d35a",
         "evidence": [
           {
@@ -268,7 +268,7 @@
       "id": "package-manager",
       "status": "REAL",
       "receipt": {
-        "sourceCommit": "74ff7f10ec7e6b3d62ab2748dbe7be25d16cdf66",
+        "sourceCommit": "49fec2a1682bc6b125c48192b2bbce7333b5f176",
         "contractHash": "3f4a93b8fe1adfeeec64ae057435759b7742e42fb320f4355bae3e7050e24a91",
         "evidence": [
           {
@@ -293,7 +293,7 @@
       "id": "full-contract",
       "status": "REAL",
       "receipt": {
-        "sourceCommit": "74ff7f10ec7e6b3d62ab2748dbe7be25d16cdf66",
+        "sourceCommit": "49fec2a1682bc6b125c48192b2bbce7333b5f176",
         "contractHash": "7a8b72709673edec73c741d263d63ffdd7daff8bdc5f11ca4a4feccca8872b23",
         "evidence": [
           {
@@ -318,7 +318,7 @@
       "id": "agent-factory",
       "status": "REAL",
       "receipt": {
-        "sourceCommit": "74ff7f10ec7e6b3d62ab2748dbe7be25d16cdf66",
+        "sourceCommit": "49fec2a1682bc6b125c48192b2bbce7333b5f176",
         "contractHash": "dcbf95c1638cd7030249d9ef52471071f0a6dd66a403dc633167f52824047c32",
         "evidence": [
           {
@@ -343,7 +343,7 @@
       "id": "agentshield",
       "status": "REAL",
       "receipt": {
-        "sourceCommit": "74ff7f10ec7e6b3d62ab2748dbe7be25d16cdf66",
+        "sourceCommit": "49fec2a1682bc6b125c48192b2bbce7333b5f176",
         "contractHash": "c01f5fb286666b25b7b9555a7de9c620d7fbfa0c59dbc3c5d20709aab7189cb7",
         "evidence": [
           {
@@ -368,7 +368,7 @@
       "id": "adapter-matrix",
       "status": "REAL",
       "receipt": {
-        "sourceCommit": "74ff7f10ec7e6b3d62ab2748dbe7be25d16cdf66",
+        "sourceCommit": "49fec2a1682bc6b125c48192b2bbce7333b5f176",
         "contractHash": "571bec02c1a36445a576adc5fb3358419133531cb044c1f772621fd2a2309c34",
         "evidence": [
           {
@@ -393,7 +393,7 @@
       "id": "qa-multi-lens",
       "status": "REAL",
       "receipt": {
-        "sourceCommit": "74ff7f10ec7e6b3d62ab2748dbe7be25d16cdf66",
+        "sourceCommit": "49fec2a1682bc6b125c48192b2bbce7333b5f176",
         "contractHash": "6df4135e0163729e378bf85d66470aabca2626208e7975b222a92cf0e2dc24ca",
         "evidence": [
           {
@@ -418,7 +418,7 @@
       "id": "vfa-provenance",
       "status": "REAL",
       "receipt": {
-        "sourceCommit": "74ff7f10ec7e6b3d62ab2748dbe7be25d16cdf66",
+        "sourceCommit": "49fec2a1682bc6b125c48192b2bbce7333b5f176",
         "contractHash": "ac15a25d2a9a0c02d6e211573be3cd0d0e1ea9760df96c96792cc656112fd47f",
         "evidence": [
           {
@@ -443,7 +443,7 @@
       "id": "challenge-response",
       "status": "REAL",
       "receipt": {
-        "sourceCommit": "74ff7f10ec7e6b3d62ab2748dbe7be25d16cdf66",
+        "sourceCommit": "49fec2a1682bc6b125c48192b2bbce7333b5f176",
         "contractHash": "b3d46f96b323d55f42a86062457e212b86933220e5deb9ab1b8431b0803266ae",
         "evidence": [
           {
@@ -468,7 +468,7 @@
       "id": "meta-harness",
       "status": "REAL",
       "receipt": {
-        "sourceCommit": "74ff7f10ec7e6b3d62ab2748dbe7be25d16cdf66",
+        "sourceCommit": "49fec2a1682bc6b125c48192b2bbce7333b5f176",
         "contractHash": "7739dcea4b5cb4dda5cd8436f140a2b599397e93bee9afa8184c2972c64703dd",
         "evidence": [
           {
@@ -498,7 +498,7 @@
       "id": "type-coverage",
       "status": "REAL",
       "receipt": {
-        "sourceCommit": "74ff7f10ec7e6b3d62ab2748dbe7be25d16cdf66",
+        "sourceCommit": "49fec2a1682bc6b125c48192b2bbce7333b5f176",
         "contractHash": "a8d8af0ac51a5834a82ca3fdf34ef42730806b317e57560ca9a12b7731f1f7ff",
         "evidence": [
           {
@@ -513,7 +513,7 @@
       "id": "governance",
       "status": "REAL",
       "receipt": {
-        "sourceCommit": "74ff7f10ec7e6b3d62ab2748dbe7be25d16cdf66",
+        "sourceCommit": "49fec2a1682bc6b125c48192b2bbce7333b5f176",
         "contractHash": "062f33ec7c57668f88ad7391ed723dc0c13a18e7a1f6c41e1d335bd6b04fc66a",
         "evidence": [
           {
@@ -528,7 +528,7 @@
       "id": "qa-lens",
       "status": "REAL",
       "receipt": {
-        "sourceCommit": "74ff7f10ec7e6b3d62ab2748dbe7be25d16cdf66",
+        "sourceCommit": "49fec2a1682bc6b125c48192b2bbce7333b5f176",
         "contractHash": "cb9ad414c1e5d5e40da4e461c0fbdca2e1e7536e4108611f8dbd51b837ffb3ab",
         "evidence": [
           {
@@ -553,7 +553,7 @@
       "id": "action-kernel",
       "status": "REAL",
       "receipt": {
-        "sourceCommit": "74ff7f10ec7e6b3d62ab2748dbe7be25d16cdf66",
+        "sourceCommit": "49fec2a1682bc6b125c48192b2bbce7333b5f176",
         "contractHash": "fa22e69ba6f36405f9b722e4c9e5c1dbb8ec5441bf407eb926282e65ca930152",
         "evidence": [
           {
@@ -583,7 +583,7 @@
       "id": "loop-checkpoint",
       "status": "REAL",
       "receipt": {
-        "sourceCommit": "74ff7f10ec7e6b3d62ab2748dbe7be25d16cdf66",
+        "sourceCommit": "49fec2a1682bc6b125c48192b2bbce7333b5f176",
         "contractHash": "d91ef6283df2b4a537837b62f58eb5a6532ae27d0a8560bcc5897d137a37a409",
         "evidence": [
           {
@@ -608,7 +608,7 @@
       "id": "dream-freshness",
       "status": "REAL",
       "receipt": {
-        "sourceCommit": "74ff7f10ec7e6b3d62ab2748dbe7be25d16cdf66",
+        "sourceCommit": "49fec2a1682bc6b125c48192b2bbce7333b5f176",
         "contractHash": "7ec8095adc763de002b6a46879516003ea52fb8b0184c800e95c990b4446e1c3",
         "evidence": [
           {
