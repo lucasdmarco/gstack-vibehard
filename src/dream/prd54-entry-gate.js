@@ -23,6 +23,7 @@ import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { prd53EntryGate } from "./prd53-entry-gate.js"
 import { prd52Readiness } from "./rc-checklist-prd52.js"
+import { ledgerDoP0Runtime, PROVAS_DO_P0 } from "../runtime/lifecycle-proof-ledger.js"
 
 export const PRD54_ENTRY_GATE_SCHEMA = "gstack.prd54.entry-gate.v1"
 
@@ -39,31 +40,38 @@ const unproven = (id, source, d) => criterio(id, source, "unproven", d)
  * quem for fechar o P0 precisa saber o que medir, e "o supervisor funciona" não
  * é mensurável. A lista é o roteiro.
  */
-export const PROVAS_DO_P0_RUNTIME = Object.freeze([
-  "shutdown gracioso bounded",
-  "encerramento da árvore como fallback",
-  "fechamento de stdout/stderr/log/cwd handles",
-  "liberação da porta",
-  "estado preservado enquanto houver processo vivo",
-  "retry idempotente",
-  "recuperação após crash do Manager",
-  "20x sem processo residual em Windows normal, shell restrito e CI",
-])
+/**
+ * DERIVADO do ledger, e não uma segunda lista (S54.2).
+ *
+ * Até aqui as oito provas estavam escritas em dois lugares: aqui, em prosa, e no
+ * ledger, com evidência. Duas fontes sobre a mesma coisa é o defeito que este
+ * repositório passou o PRD52 removendo dos outros lugares — e o modo de falha é
+ * silencioso, porque a lista decorativa continua parecendo certa depois que a
+ * outra muda.
+ */
+export const PROVAS_DO_P0_RUNTIME = Object.freeze(PROVAS_DO_P0.map((p) => p.titulo))
 
 /** O artefato que o §17 exige do Sprint 54.0 — evidence pack do PRD53. */
 export const EVIDENCE_PACK_PRD53 = join(".gstack", "evidence", "prd53-final.json")
 
 /**
- * O P0 do §2.1. SEMPRE `unproven` por leitura: as oito provas são execuções, e
- * três delas (20x em Windows normal, shell restrito e CI) são execuções em
- * ambientes que este processo não controla.
+ * O P0 do §2.1, DERIVADO do ledger de provas (S54.2).
  *
- * O critério carrega o roteiro junto — um bloqueio que não diz o que medir vira
- * bloqueio permanente por desânimo.
+ * Este critério nasceu `unproven` por CONSTANTE, com as oito provas em prosa.
+ * Estava certo enquanto nenhuma existia, e passou a estar errado no instante em
+ * que a primeira fechou: constante não muda quando o produto melhora, só quando
+ * alguém lembra de editá-la — e "alguém lembra" é o mecanismo que o PRD52 passou
+ * um programa inteiro tirando dos gates.
+ *
+ * Agora cada prova aponta para um teste conferido em disco, e o critério só vira
+ * `met` com as OITO `proved`. `external` NÃO conta: as condições de shell
+ * restrito e CI da prova 8 não se inferem da que rodou em Windows normal.
  */
-function criterioP0Runtime() {
-  return unproven("p0_runtime_windows_lifecycle", "prd54 §2.1",
-    `${PROVAS_DO_P0_RUNTIME.length} provas exigidas, nenhuma delas obtenível por leitura de código: ${PROVAS_DO_P0_RUNTIME.join("; ")}. O §2.1 é explícito: \`taskkill /T /F\` isolado NÃO satisfaz o contrato.`)
+function criterioP0Runtime(repoRoot) {
+  const l = ledgerDoP0Runtime({ repoRoot })
+  if (l.complete) return met("p0_runtime_windows_lifecycle", "lifecycle-proof-ledger", `as ${l.total} provas do §2.1 têm evidência executável`)
+  return unproven("p0_runtime_windows_lifecycle", "lifecycle-proof-ledger",
+    `${l.proved.length}/${l.total} provas fechadas. Sem evidência: ${l.unproved.join(", ") || "nenhuma"}. Dependentes de ambiente externo: ${l.external.join(", ") || "nenhuma"}. O §2.1 é explícito: \`taskkill /T /F\` isolado NÃO satisfaz o contrato.`)
 }
 
 /** O P1 do §2.2: run não observa workspace mudando por baixo. */
@@ -102,7 +110,7 @@ function criteriosDosPredecessores({ repoRoot, commit }) {
 export function prd54EntryGate({ repoRoot = process.cwd(), commit = null } = {}) {
   const criterios = [
     ...criteriosDosPredecessores({ repoRoot, commit }),
-    criterioP0Runtime(),
+    criterioP0Runtime(repoRoot),
     criterioP1Workspace(),
   ]
   const faltando = criterios.filter((c) => c.state !== "met")

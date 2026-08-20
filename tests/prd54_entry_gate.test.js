@@ -45,20 +45,52 @@ test("o P0 do §2.1 carrega as OITO provas — bloqueio sem roteiro vira desâni
   assert.deepEqual(g.p0Checklist, PROVAS_DO_P0_RUNTIME)
   const p0 = g.criteria.find((c) => c.id === "p0_runtime_windows_lifecycle")
   assert.equal(p0.state, "unproven")
-  for (const prova of ["shutdown gracioso", "porta", "retry idempotente", "20x"]) {
-    assert.ok(p0.detail.includes(prova), `o roteiro do P0 não menciona '${prova}'`)
-  }
   assert.match(p0.detail, /taskkill .T .F. isolado NÃO satisfaz/,
     "o §2.1 exclui a solução óbvia por escrito, e o critério precisa repetir isso")
 })
 
-test("o P0 NUNCA é `met` por leitura de código — as provas são execuções", async () => {
+/**
+ * S54.2 — a lista do portão é DERIVADA do ledger, e não uma segunda cópia.
+ *
+ * Enquanto eram duas listas, a decorativa continuaria parecendo certa depois que
+ * a outra mudasse. É o modo de falha mais silencioso que existe num gate.
+ */
+test("o roteiro do P0 é o MESMO do ledger — uma fonte, não duas", async () => {
+  const { PROVAS_DO_P0_RUNTIME } = await G()
+  const { PROVAS_DO_P0 } = await import(
+    pathToFileURL(path.join(repoRoot, "src", "runtime", "lifecycle-proof-ledger.js")).href
+  )
+  assert.deepEqual(PROVAS_DO_P0_RUNTIME, PROVAS_DO_P0.map((p) => p.titulo))
+})
+
+/**
+ * O QUE MUDOU NO S54.2, e por que este teste foi reescrito.
+ *
+ * A versão anterior afirmava que o veredito "não pode depender de estado do
+ * repositório, porque nenhuma das oito provas está no repositório". Isso era
+ * verdade quando nenhuma existia e deixou de ser: seis fecharam com teste
+ * executável, e o critério passou a ser DERIVADO da evidência em disco.
+ *
+ * O invariante que sobrevive — e que é o que realmente importa — é outro: o P0
+ * não fecha enquanto houver prova aberta OU externa. `external` não é `proved`,
+ * e é essa recusa que impede o P0 de fechar por conveniência quando o que falta
+ * é uma máquina que ninguém tem.
+ */
+test("o P0 só fecha com as OITO provadas — aberta ou externa bloqueia", async () => {
   const { prd54EntryGate } = await G()
-  // Duas chamadas em contextos diferentes: o veredito não pode depender de
-  // estado do repositório, porque nenhuma das oito provas está no repositório.
-  for (const commit of ["abc1234", "deadbee"]) {
-    const p0 = prd54EntryGate({ repoRoot, commit }).criteria.find((c) => c.id === "p0_runtime_windows_lifecycle")
-    assert.equal(p0.state, "unproven", "o P0 do runtime só fecha com execução medida, nunca com leitura")
+  const { ledgerDoP0Runtime } = await import(
+    pathToFileURL(path.join(repoRoot, "src", "runtime", "lifecycle-proof-ledger.js")).href
+  )
+  const l = ledgerDoP0Runtime({ repoRoot })
+  const p0 = prd54EntryGate({ repoRoot, commit: "abc1234" }).criteria.find((c) => c.id === "p0_runtime_windows_lifecycle")
+
+  assert.equal(l.complete, false, "hoje o ledger não fecha")
+  assert.equal(p0.state, "unproven", "e o critério acompanha o ledger, em vez de afirmar por conta própria")
+  assert.ok(l.proved.length > 0, "o critério agora REFLETE provas reais — não é mais constante")
+  assert.match(p0.detail, new RegExp(`${l.proved.length}/${l.total} provas fechadas`),
+    "o detalhe precisa dizer quanto já fechou, senão o bloqueio não informa progresso")
+  for (const aberta of [...l.unproved, ...l.external]) {
+    assert.ok(p0.detail.includes(aberta), `o critério não nomeia a prova aberta '${aberta}'`)
   }
 })
 
