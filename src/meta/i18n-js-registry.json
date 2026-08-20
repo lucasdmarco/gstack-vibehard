@@ -8775,7 +8775,7 @@
           "calleePath": "console.error",
           "canonicalName": "error",
           "column": 62,
-          "line": 44,
+          "line": 46,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -8792,7 +8792,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 26,
-          "line": 59,
+          "line": 61,
           "provenance": {
             "ids": [
               "label",
@@ -8814,7 +8814,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 29,
-          "line": 63,
+          "line": 65,
           "provenance": {
             "ids": [
               "label"
@@ -8833,7 +8833,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 32,
-          "line": 65,
+          "line": 67,
           "provenance": {
             "ids": [
               "label",
@@ -8854,7 +8854,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 5,
-          "line": 71,
+          "line": 73,
           "provenance": {
             "ids": [
               "label",
@@ -8875,7 +8875,7 @@
           "calleePath": "console.error",
           "canonicalName": "error",
           "column": 17,
-          "line": 90,
+          "line": 92,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -8892,7 +8892,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 98,
+          "line": 100,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -8909,7 +8909,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 59,
-          "line": 101,
+          "line": 103,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -8926,7 +8926,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 19,
-          "line": 104,
+          "line": 106,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -8943,7 +8943,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 10,
-          "line": 105,
+          "line": 107,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -8960,7 +8960,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 17,
-          "line": 106,
+          "line": 108,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -8977,7 +8977,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 20,
-          "line": 110,
+          "line": 112,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -8994,7 +8994,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 5,
-          "line": 113,
+          "line": 115,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9011,7 +9011,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 17,
-          "line": 114,
+          "line": 116,
           "provenance": {
             "ids": [
               "e",
@@ -9031,7 +9031,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 123,
+          "line": 125,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9048,7 +9048,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 16,
-          "line": 128,
+          "line": 130,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9065,7 +9065,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 10,
-          "line": 129,
+          "line": 131,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9082,7 +9082,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 13,
-          "line": 130,
+          "line": 132,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9099,7 +9099,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 47,
-          "line": 136,
+          "line": 138,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9116,7 +9116,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 17,
-          "line": 137,
+          "line": 139,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9133,7 +9133,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 42,
-          "line": 141,
+          "line": 143,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9150,7 +9150,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 12,
-          "line": 142,
+          "line": 144,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9167,7 +9167,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 55,
-          "line": 142,
+          "line": 144,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9184,7 +9184,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 17,
-          "line": 144,
+          "line": 146,
           "provenance": {
             "ids": [
               "e",
@@ -9204,7 +9204,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 42,
-          "line": 149,
+          "line": 151,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9221,7 +9221,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 5,
-          "line": 153,
+          "line": 155,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9238,7 +9238,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 17,
-          "line": 155,
+          "line": 157,
           "provenance": {
             "ids": [
               "e",
@@ -9258,7 +9258,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 17,
-          "line": 168,
+          "line": 170,
           "provenance": {
             "ids": [
               "e",
@@ -9278,7 +9278,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 19,
-          "line": 172,
+          "line": 174,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9295,7 +9295,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 5,
-          "line": 181,
+          "line": 183,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9312,7 +9312,7 @@
           "calleePath": "console.error",
           "canonicalName": "error",
           "column": 47,
-          "line": 186,
+          "line": 188,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9329,7 +9329,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 5,
-          "line": 193,
+          "line": 195,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9346,7 +9346,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 197,
+          "line": 199,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9363,7 +9363,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 48,
-          "line": 200,
+          "line": 202,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9380,7 +9380,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 25,
-          "line": 208,
+          "line": 210,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9397,7 +9397,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 19,
-          "line": 210,
+          "line": 212,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9414,7 +9414,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 51,
-          "line": 213,
+          "line": 215,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9431,7 +9431,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 214,
+          "line": 216,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9448,7 +9448,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 17,
-          "line": 219,
+          "line": 221,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9465,7 +9465,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 88,
-          "line": 227,
+          "line": 229,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9482,7 +9482,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 10,
-          "line": 228,
+          "line": 230,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9499,7 +9499,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 17,
-          "line": 229,
+          "line": 231,
           "provenance": {
             "ids": [
               "e",
@@ -9519,7 +9519,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 79,
-          "line": 229,
+          "line": 231,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9536,7 +9536,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 26,
-          "line": 232,
+          "line": 234,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9553,7 +9553,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 97,
-          "line": 233,
+          "line": 235,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9570,7 +9570,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 15,
-          "line": 234,
+          "line": 236,
           "provenance": {
             "ids": [
               "e",
@@ -9590,7 +9590,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 91,
-          "line": 239,
+          "line": 241,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9607,7 +9607,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 8,
-          "line": 240,
+          "line": 242,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9624,7 +9624,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 3,
-          "line": 245,
+          "line": 247,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9641,7 +9641,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 292,
+          "line": 294,
           "provenance": {
             "ids": [
               "vaultDir"
@@ -9660,7 +9660,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 3,
-          "line": 307,
+          "line": 309,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9677,7 +9677,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 5,
-          "line": 330,
+          "line": 332,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9694,7 +9694,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 5,
-          "line": 344,
+          "line": 346,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9711,7 +9711,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 3,
-          "line": 349,
+          "line": 351,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9728,7 +9728,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 5,
-          "line": 358,
+          "line": 360,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9745,7 +9745,7 @@
           "calleePath": "log",
           "canonicalName": "log",
           "column": 29,
-          "line": 359,
+          "line": 361,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9762,7 +9762,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 5,
-          "line": 375,
+          "line": 377,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9779,7 +9779,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 5,
-          "line": 387,
+          "line": 389,
           "provenance": {
             "ids": [
               "hooks",
@@ -9797,11 +9797,51 @@
           "audience": "public_diagnostic",
           "bindingKind": "import",
           "bindingOrigin": "src/cli/index.js",
+          "callee": "warn",
+          "calleePath": "warn",
+          "canonicalName": "warn",
+          "column": 20,
+          "line": 410,
+          "provenance": {
+            "ids": [
+              "r",
+              "skipped"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 5,
+          "line": 413,
+          "provenance": {
+            "ids": [
+              "o",
+              "file"
+            ],
+            "kind": "interpolated",
+            "resolved": false
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
           "callee": "section",
           "calleePath": "section",
           "canonicalName": "section",
           "column": 3,
-          "line": 441,
+          "line": 467,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9818,7 +9858,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 5,
-          "line": 443,
+          "line": 469,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9835,7 +9875,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 5,
-          "line": 444,
+          "line": 470,
           "provenance": {
             "ids": [
               "c",
@@ -9857,7 +9897,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 31,
-          "line": 445,
+          "line": 471,
           "provenance": {
             "ids": [
               "it",
@@ -9879,7 +9919,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 5,
-          "line": 452,
+          "line": 478,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9896,7 +9936,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 71,
-          "line": 454,
+          "line": 480,
           "provenance": {
             "ids": [
               "c",
@@ -9918,7 +9958,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 5,
-          "line": 463,
+          "line": 489,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9935,7 +9975,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 5,
-          "line": 464,
+          "line": 490,
           "provenance": {
             "ids": [
               "reportPath"
@@ -9954,7 +9994,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 17,
-          "line": 465,
+          "line": 491,
           "provenance": {
             "ids": [
               "e",
@@ -9974,7 +10014,7 @@
           "calleePath": "process.stdout.write",
           "canonicalName": "write",
           "column": 5,
-          "line": 475,
+          "line": 501,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -9991,7 +10031,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 10,
-          "line": 482,
+          "line": 508,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10008,7 +10048,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 20,
-          "line": 482,
+          "line": 508,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10025,7 +10065,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 483,
+          "line": 509,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10042,7 +10082,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 484,
+          "line": 510,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10059,7 +10099,7 @@
           "calleePath": "error",
           "canonicalName": "error",
           "column": 3,
-          "line": 491,
+          "line": 517,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10076,7 +10116,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 492,
+          "line": 518,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10093,7 +10133,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 493,
+          "line": 519,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10110,7 +10150,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 494,
+          "line": 520,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10127,7 +10167,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 495,
+          "line": 521,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10144,7 +10184,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 496,
+          "line": 522,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10161,7 +10201,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 7,
-          "line": 502,
+          "line": 528,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10178,7 +10218,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 7,
-          "line": 503,
+          "line": 529,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10195,7 +10235,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 7,
-          "line": 506,
+          "line": 532,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10212,7 +10252,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 7,
-          "line": 507,
+          "line": 533,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10229,7 +10269,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 512,
+          "line": 538,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10246,7 +10286,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 514,
+          "line": 540,
           "provenance": {
             "ids": [
               "harnesses",
@@ -10270,7 +10310,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 33,
-          "line": 523,
+          "line": 549,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10287,7 +10327,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 24,
-          "line": 524,
+          "line": 550,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10304,7 +10344,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 525,
+          "line": 551,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10321,7 +10361,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 3,
-          "line": 551,
+          "line": 577,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10338,7 +10378,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 30,
-          "line": 552,
+          "line": 578,
           "provenance": {
             "ids": [
               "p",
@@ -10360,7 +10400,7 @@
           "calleePath": "error",
           "canonicalName": "error",
           "column": 3,
-          "line": 555,
+          "line": 581,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10377,7 +10417,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 556,
+          "line": 582,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10394,7 +10434,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 557,
+          "line": 583,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10411,7 +10451,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 558,
+          "line": 584,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10428,7 +10468,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 30,
-          "line": 566,
+          "line": 592,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10445,7 +10485,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 3,
-          "line": 572,
+          "line": 598,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10462,7 +10502,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 27,
-          "line": 573,
+          "line": 599,
           "provenance": {
             "ids": [
               "c",
@@ -10486,74 +10526,6 @@
           "callee": "info",
           "calleePath": "info",
           "canonicalName": "info",
-          "column": 3,
-          "line": 576,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "info",
-          "calleePath": "info",
-          "canonicalName": "info",
-          "column": 3,
-          "line": 577,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "info",
-          "calleePath": "info",
-          "canonicalName": "info",
-          "column": 3,
-          "line": 578,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "info",
-          "calleePath": "info",
-          "canonicalName": "info",
-          "column": 14,
-          "line": 599,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "error",
-          "calleePath": "error",
-          "canonicalName": "error",
           "column": 3,
           "line": 602,
           "provenance": {
@@ -10605,8 +10577,76 @@
           "callee": "info",
           "calleePath": "info",
           "canonicalName": "info",
+          "column": 14,
+          "line": 625,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "error",
+          "calleePath": "error",
+          "canonicalName": "error",
           "column": 3,
-          "line": 605,
+          "line": 628,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 629,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 630,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 631,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10623,7 +10663,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 25,
-          "line": 617,
+          "line": 643,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10640,7 +10680,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 624,
+          "line": 650,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10657,7 +10697,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 625,
+          "line": 651,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10674,7 +10714,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 42,
-          "line": 627,
+          "line": 653,
           "provenance": {
             "ids": [
               "h",
@@ -10694,7 +10734,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 10,
-          "line": 628,
+          "line": 654,
           "provenance": {
             "ids": [
               "h",
@@ -10714,7 +10754,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 14,
-          "line": 637,
+          "line": 663,
           "provenance": {
             "ids": [
               "n"
@@ -10733,7 +10773,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 3,
-          "line": 642,
+          "line": 668,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10750,7 +10790,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 3,
-          "line": 644,
+          "line": 670,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10767,7 +10807,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 3,
-          "line": 646,
+          "line": 672,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10784,7 +10824,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 3,
-          "line": 648,
+          "line": 674,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10801,7 +10841,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 5,
-          "line": 662,
+          "line": 688,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10818,7 +10858,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 24,
-          "line": 671,
+          "line": 697,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10835,7 +10875,7 @@
           "calleePath": "error",
           "canonicalName": "error",
           "column": 32,
-          "line": 680,
+          "line": 706,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10852,7 +10892,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 681,
+          "line": 707,
           "provenance": {
             "ids": [
               "selected",
@@ -10872,7 +10912,7 @@
           "calleePath": "console.error",
           "canonicalName": "error",
           "column": 17,
-          "line": 697,
+          "line": 723,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10889,7 +10929,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 3,
-          "line": 702,
+          "line": 728,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10906,7 +10946,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 42,
-          "line": 706,
+          "line": 732,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10923,7 +10963,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 3,
-          "line": 710,
+          "line": 736,
           "provenance": {
             "ids": [
               "scripts",
@@ -10943,7 +10983,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 3,
-          "line": 720,
+          "line": 746,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10960,7 +11000,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 3,
-          "line": 727,
+          "line": 753,
           "provenance": {
             "ids": [
               "skillDirs",
@@ -10980,7 +11020,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 3,
-          "line": 730,
+          "line": 756,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -10997,7 +11037,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 5,
-          "line": 733,
+          "line": 759,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -11014,7 +11054,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 5,
-          "line": 734,
+          "line": 760,
           "provenance": {
             "ids": [
               "templateSource"
@@ -11033,7 +11073,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 5,
-          "line": 736,
+          "line": 762,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -11050,7 +11090,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 3,
-          "line": 738,
+          "line": 764,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -11067,7 +11107,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 5,
-          "line": 740,
+          "line": 766,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -11084,7 +11124,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 5,
-          "line": 742,
+          "line": 768,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -11101,7 +11141,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 3,
-          "line": 747,
+          "line": 773,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -11118,7 +11158,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 767,
+          "line": 793,
           "provenance": {
             "ids": [
               "dv",
@@ -11142,7 +11182,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 26,
-          "line": 768,
+          "line": 794,
           "provenance": {
             "ids": [
               "dv",
@@ -11163,7 +11203,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 5,
-          "line": 778,
+          "line": 804,
           "provenance": {
             "ids": [
               "harnessId",
@@ -11184,7 +11224,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 5,
-          "line": 780,
+          "line": 806,
           "provenance": {
             "ids": [
               "harnessId"
@@ -11203,7 +11243,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 3,
-          "line": 791,
+          "line": 817,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -11220,7 +11260,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 5,
-          "line": 793,
+          "line": 819,
           "provenance": {
             "ids": [
               "harnessId"
@@ -11239,7 +11279,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 7,
-          "line": 796,
+          "line": 822,
           "provenance": {
             "ids": [
               "harnessId"
@@ -11258,7 +11298,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 69,
-          "line": 797,
+          "line": 823,
           "provenance": {
             "ids": [
               "harnessId",
@@ -11279,108 +11319,6 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 3,
-          "line": 801,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "section",
-          "calleePath": "section",
-          "canonicalName": "section",
-          "column": 3,
-          "line": 803,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "success",
-          "calleePath": "success",
-          "canonicalName": "success",
-          "column": 3,
-          "line": 813,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "section",
-          "calleePath": "section",
-          "canonicalName": "section",
-          "column": 3,
-          "line": 816,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "info",
-          "calleePath": "info",
-          "canonicalName": "info",
-          "column": 5,
-          "line": 819,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "info",
-          "calleePath": "info",
-          "canonicalName": "info",
-          "column": 5,
-          "line": 820,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "info",
-          "calleePath": "info",
-          "canonicalName": "info",
-          "column": 28,
           "line": 827,
           "provenance": {
             "ids": [],
@@ -11398,7 +11336,109 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 3,
-          "line": 828,
+          "line": 829,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "success",
+          "calleePath": "success",
+          "canonicalName": "success",
+          "column": 3,
+          "line": 839,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "section",
+          "calleePath": "section",
+          "canonicalName": "section",
+          "column": 3,
+          "line": 842,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 5,
+          "line": 845,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 5,
+          "line": 846,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 28,
+          "line": 853,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "section",
+          "calleePath": "section",
+          "canonicalName": "section",
+          "column": 3,
+          "line": 854,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -11415,7 +11455,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 37,
-          "line": 836,
+          "line": 862,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -11432,7 +11472,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 837,
+          "line": 863,
           "provenance": {
             "ids": [
               "attempt",
@@ -11452,7 +11492,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 23,
-          "line": 842,
+          "line": 868,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -11469,7 +11509,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 3,
-          "line": 844,
+          "line": 870,
           "provenance": {
             "ids": [
               "chosen"
@@ -11488,7 +11528,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 3,
-          "line": 849,
+          "line": 875,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -11505,7 +11545,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 42,
-          "line": 851,
+          "line": 877,
           "provenance": {
             "ids": [
               "getGlobalObsidianDefault"
@@ -11524,7 +11564,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 36,
-          "line": 852,
+          "line": 878,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -11541,7 +11581,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 3,
-          "line": 871,
+          "line": 897,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -11558,7 +11598,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 30,
-          "line": 872,
+          "line": 898,
           "provenance": {
             "ids": [
               "id",
@@ -11580,7 +11620,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 5,
-          "line": 883,
+          "line": 909,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -11597,7 +11637,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 38,
-          "line": 884,
+          "line": 910,
           "provenance": {
             "ids": [
               "d",
@@ -11619,278 +11659,6 @@
           "calleePath": "error",
           "canonicalName": "error",
           "column": 5,
-          "line": 887,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "warn",
-          "calleePath": "warn",
-          "canonicalName": "warn",
-          "column": 5,
-          "line": 891,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "info",
-          "calleePath": "info",
-          "canonicalName": "info",
-          "column": 5,
-          "line": 892,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "info",
-          "calleePath": "info",
-          "canonicalName": "info",
-          "column": 5,
-          "line": 893,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "info",
-          "calleePath": "info",
-          "canonicalName": "info",
-          "column": 5,
-          "line": 894,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "warn",
-          "calleePath": "warn",
-          "canonicalName": "warn",
-          "column": 50,
-          "line": 899,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "section",
-          "calleePath": "section",
-          "canonicalName": "section",
-          "column": 3,
-          "line": 903,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "section",
-          "calleePath": "section",
-          "canonicalName": "section",
-          "column": 3,
-          "line": 904,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "info",
-          "calleePath": "info",
-          "canonicalName": "info",
-          "column": 3,
-          "line": 905,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "info",
-          "calleePath": "info",
-          "canonicalName": "info",
-          "column": 3,
-          "line": 906,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "info",
-          "calleePath": "info",
-          "canonicalName": "info",
-          "column": 3,
-          "line": 907,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "info",
-          "calleePath": "info",
-          "canonicalName": "info",
-          "column": 3,
-          "line": 908,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "info",
-          "calleePath": "info",
-          "canonicalName": "info",
-          "column": 3,
-          "line": 909,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "info",
-          "calleePath": "info",
-          "canonicalName": "info",
-          "column": 3,
-          "line": 910,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "info",
-          "calleePath": "info",
-          "canonicalName": "info",
-          "column": 3,
-          "line": 911,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "info",
-          "calleePath": "info",
-          "canonicalName": "info",
-          "column": 3,
-          "line": 912,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "info",
-          "calleePath": "info",
-          "canonicalName": "info",
-          "column": 3,
           "line": 913,
           "provenance": {
             "ids": [],
@@ -11904,61 +11672,10 @@
           "audience": "public_diagnostic",
           "bindingKind": "import",
           "bindingOrigin": "src/cli/index.js",
-          "callee": "info",
-          "calleePath": "info",
-          "canonicalName": "info",
-          "column": 3,
-          "line": 914,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "info",
-          "calleePath": "info",
-          "canonicalName": "info",
-          "column": 3,
-          "line": 915,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "info",
-          "calleePath": "info",
-          "canonicalName": "info",
-          "column": 3,
-          "line": 916,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "info",
-          "calleePath": "info",
-          "canonicalName": "info",
-          "column": 3,
+          "callee": "warn",
+          "calleePath": "warn",
+          "canonicalName": "warn",
+          "column": 5,
           "line": 917,
           "provenance": {
             "ids": [],
@@ -11975,7 +11692,7 @@
           "callee": "info",
           "calleePath": "info",
           "canonicalName": "info",
-          "column": 3,
+          "column": 5,
           "line": 918,
           "provenance": {
             "ids": [],
@@ -11992,7 +11709,7 @@
           "callee": "info",
           "calleePath": "info",
           "canonicalName": "info",
-          "column": 3,
+          "column": 5,
           "line": 919,
           "provenance": {
             "ids": [],
@@ -12009,7 +11726,7 @@
           "callee": "info",
           "calleePath": "info",
           "canonicalName": "info",
-          "column": 3,
+          "column": 5,
           "line": 920,
           "provenance": {
             "ids": [],
@@ -12023,78 +11740,10 @@
           "audience": "public_diagnostic",
           "bindingKind": "import",
           "bindingOrigin": "src/cli/index.js",
-          "callee": "info",
-          "calleePath": "info",
-          "canonicalName": "info",
-          "column": 3,
-          "line": 921,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "info",
-          "calleePath": "info",
-          "canonicalName": "info",
-          "column": 3,
-          "line": 922,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "info",
-          "calleePath": "info",
-          "canonicalName": "info",
-          "column": 3,
-          "line": 923,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "info",
-          "calleePath": "info",
-          "canonicalName": "info",
-          "column": 3,
-          "line": 924,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "info",
-          "calleePath": "info",
-          "canonicalName": "info",
-          "column": 3,
+          "callee": "warn",
+          "calleePath": "warn",
+          "canonicalName": "warn",
+          "column": 50,
           "line": 925,
           "provenance": {
             "ids": [],
@@ -12108,11 +11757,402 @@
           "audience": "public_diagnostic",
           "bindingKind": "import",
           "bindingOrigin": "src/cli/index.js",
+          "callee": "section",
+          "calleePath": "section",
+          "canonicalName": "section",
+          "column": 3,
+          "line": 929,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "section",
+          "calleePath": "section",
+          "canonicalName": "section",
+          "column": 3,
+          "line": 930,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
           "callee": "info",
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 926,
+          "line": 931,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 932,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 933,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 934,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 935,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 936,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 937,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 938,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 939,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 940,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 941,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 942,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 943,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 944,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 945,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 946,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 947,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 948,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 949,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 950,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 951,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 952,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -12129,7 +12169,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 5,
-          "line": 928,
+          "line": 954,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -12146,7 +12186,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 5,
-          "line": 929,
+          "line": 955,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -12163,7 +12203,7 @@
           "calleePath": "console.log",
           "canonicalName": "log",
           "column": 3,
-          "line": 931,
+          "line": 957,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -12180,7 +12220,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 70,
-          "line": 935,
+          "line": 961,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -12190,7 +12230,7 @@
           "sink": null
         }
       ],
-      "fileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9"
+      "fileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978"
     },
     "src/plugins/opencode/gstack-session.js": {
       "entries": [

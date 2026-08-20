@@ -19,6 +19,8 @@ import { buildInstallImpact, renderImpactMarkdown } from "./impact.js"
 import { buildSupplyChainReport } from "./supply-chain.js"
 import { checkRemoteDownload } from "./remote-policy.js"
 import { safeCopyDir, safeCopyFile, safeWriteFile, safeAppendBlock } from "./safe-write.js"
+import { podarHooks } from "./hook-prune.js"
+import { loadManifest } from "./manifest.js"
 import { findWorkingBinary, getUvCandidates, getBunCandidates, npxArgv, npmArgv, mergeWindowsPath } from "./deps.js"
 import { probeNpmNpx } from "./node-health.js"
 import { checkAlreadyInstalled } from "./check.js"
@@ -385,6 +387,30 @@ async function refreshHooks(harnessIds, report) {
       report.updated.push(`hook (${target.id}): ${hook}`)
     }
     success(`${hooks.length} hooks atualizados em ${target.dir} (manifest-owned)`)
+  }
+  podarOrfaos(hooksSource, hookTargets, report)
+}
+
+/**
+ * PRD52 S52.N — remove hooks que o pacote DEIXOU de distribuir.
+ *
+ * Sem isto, atualizar acumula: numa máquina com instalação de junho, o
+ * `before_shell.py` (removido no PRD51) sobreviveu ao upgrade para a 5.108.0 e
+ * o `doctor` seguia contando 16 hooks, um deles inexistente no produto.
+ *
+ * A poda é conservadora por construção — só sai o que o MANIFEST diz que nós
+ * instalamos. Arquivo que o usuário pôs na pasta não é nosso e fica.
+ */
+function podarOrfaos(hooksSource, hookTargets, report) {
+  const r = podarHooks({
+    hooksSource,
+    targets: hookTargets.map((t) => t.dir),
+    manifest: loadManifest(HOME),
+  })
+  if (r.skipped) { warn(`poda de hooks pulada: o pacote nao expoe hooks legiveis (${r.skipped})`); return }
+  for (const o of r.pruned) {
+    report.updated.push(`hook orfao removido (${o.dir}): ${o.file}`)
+    info(`  hook orfao removido: ${o.file}`)
   }
 }
 

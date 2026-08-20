@@ -9,7 +9,7 @@ import { cleanupTmp } from "./helpers/tmp.js"
 /**
  * Regra `console-blank-line` — a MENOR regra que descreve `console.log()`.
  *
- * `init.js:241` e `install.js:931` escrevem uma linha em branco entre blocos do
+ * `init.js:241` e `install.js:933` escrevem uma linha em branco entre blocos do
  * relatorio humano. Ficavam `unknown` nao por duvida, mas porque o repositorio
  * tem TRES formas de escrever a mesma linha e so duas eram descritas:
  * `logger.info("")` cai em `canonical-receiver-spacing`, `process.stdout.write`

@@ -2260,9 +2260,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 59,
+      "line": 61,
       "column": 26,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "label",
@@ -2276,9 +2276,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 63,
+      "line": 65,
       "column": 29,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "label"
@@ -2289,9 +2289,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 65,
+      "line": 67,
       "column": 32,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "label",
@@ -2304,9 +2304,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 71,
+      "line": 73,
       "column": 5,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "label",
@@ -2319,9 +2319,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 114,
+      "line": 116,
       "column": 17,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "e",
@@ -2333,9 +2333,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 144,
+      "line": 146,
       "column": 17,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "e",
@@ -2347,9 +2347,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 155,
+      "line": 157,
       "column": 17,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "e",
@@ -2361,9 +2361,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 168,
+      "line": 170,
       "column": 17,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "e",
@@ -2375,9 +2375,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 229,
+      "line": 231,
       "column": 17,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "e",
@@ -2389,9 +2389,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 234,
+      "line": 236,
       "column": 15,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "e",
@@ -2403,9 +2403,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 292,
+      "line": 294,
       "column": 3,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "vaultDir"
@@ -2416,9 +2416,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 387,
+      "line": 389,
       "column": 5,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "hooks",
@@ -2432,9 +2432,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 464,
+      "line": 490,
       "column": 5,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "reportPath"
@@ -2445,9 +2445,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 734,
+      "line": 760,
       "column": 5,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "templateSource"
@@ -2458,9 +2458,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 444,
+      "line": 470,
       "column": 5,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "c",
@@ -2474,9 +2474,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 445,
+      "line": 471,
       "column": 31,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "it",
@@ -2490,9 +2490,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 454,
+      "line": 480,
       "column": 71,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "c",
@@ -2506,9 +2506,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 465,
+      "line": 491,
       "column": 17,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "e",
@@ -2520,9 +2520,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 552,
+      "line": 578,
       "column": 30,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "p",
@@ -2536,9 +2536,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 573,
+      "line": 599,
       "column": 27,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "c",
@@ -2555,9 +2555,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 514,
+      "line": 540,
       "column": 3,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "harnesses",
@@ -2573,9 +2573,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 627,
+      "line": 653,
       "column": 42,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "h",
@@ -2587,9 +2587,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 628,
+      "line": 654,
       "column": 10,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "h",
@@ -2601,9 +2601,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 681,
+      "line": 707,
       "column": 3,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "selected",
@@ -2615,9 +2615,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 778,
+      "line": 804,
       "column": 5,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "harnessId",
@@ -2630,9 +2630,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 780,
+      "line": 806,
       "column": 5,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "harnessId"
@@ -2643,9 +2643,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 793,
+      "line": 819,
       "column": 5,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "harnessId"
@@ -2656,9 +2656,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 796,
+      "line": 822,
       "column": 7,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "harnessId"
@@ -2669,9 +2669,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 797,
+      "line": 823,
       "column": 69,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "harnessId",
@@ -2684,9 +2684,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 637,
+      "line": 663,
       "column": 14,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "n"
@@ -2697,9 +2697,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 710,
+      "line": 736,
       "column": 3,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "scripts",
@@ -2711,9 +2711,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 727,
+      "line": 753,
       "column": 3,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "skillDirs",
@@ -2725,9 +2725,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 767,
+      "line": 793,
       "column": 3,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "dv",
@@ -2743,9 +2743,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 768,
+      "line": 794,
       "column": 26,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "dv",
@@ -2758,9 +2758,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 837,
+      "line": 863,
       "column": 3,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "attempt",
@@ -2772,9 +2772,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 844,
+      "line": 870,
       "column": 3,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "chosen"
@@ -2785,9 +2785,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 851,
+      "line": 877,
       "column": 42,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "getGlobalObsidianDefault"
@@ -2798,9 +2798,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 872,
+      "line": 898,
       "column": 30,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "id",
@@ -2814,9 +2814,9 @@
     },
     {
       "file": "src/installer/install.js",
-      "line": 884,
+      "line": 910,
       "column": 38,
-      "expectedFileHash": "sha256:8f6fe8c2a0b2e0c7e45f37cb813d35de49e622c44231b5e61779e790580c95c9",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "d",
@@ -2827,6 +2827,34 @@
       "reason": "A moldura é ' ✗ ' e os dois-pontos. Os interpolados são o componente degradado e a razão registrada por `trackDegraded` — que é, na origem, a mensagem da ferramenta externa que falhou. Ponto distinto do 552: lá as degradações eram PREVISTAS, aqui são as que de fato ocorreram.",
       "owner": "certificação RC PRD51 (Fase 1B)",
       "evidence": "src/installer/install.js:884 — resumo de degradações no relatório final."
+    },
+    {
+      "file": "src/installer/install.js",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "owner": "S52.N — poda de hooks orfaos",
+      "line": 410,
+      "column": 20,
+      "interpolations": [
+        "r",
+        "skipped"
+      ],
+      "reason": "A moldura carrega a informacao inteira: a poda foi PULADA e por que. O interpolado e `r.skipped`, que desde o S52.N e um CODIGO fechado (`PODA_SEM_ORIGEM`), nao uma frase — `src/installer/hook-prune.js` devolve identificador justamente para que a lingua nasca aqui e nao viaje interpolada. Traduzir a moldura traduz a mensagem toda; o codigo fica, e e o que um log precisa manter estavel.",
+      "evidence": "src/installer/hook-prune.js — `export const PODA_SEM_ORIGEM = \"pacote_sem_hooks_legiveis\"`; o contrato de codigo (e nao de frase) esta provado em tests/installer_hook_prune.test.js, no caso \"origem ilegivel ABORTA a poda em vez de considerar tudo orfao\"."
+    },
+    {
+      "file": "src/installer/install.js",
+      "expectedFileHash": "sha256:80ef21e1b1cbbe0c585fd7ff04261227d07ec35f5955ee9b71258ea74117f978",
+      "strategy": "translate_literal_frame_preserve_interpolations",
+      "owner": "S52.N — poda de hooks orfaos",
+      "line": 413,
+      "column": 5,
+      "interpolations": [
+        "o",
+        "file"
+      ],
+      "reason": "A moldura diz o fato — um hook orfao foi removido — e o interpolado e `o.file`, o NOME do arquivo de hook (`before_shell.py`). Nome de arquivo e identificador: traduzi-lo quebraria a unica coisa que o usuario pode conferir em disco.",
+      "evidence": "src/installer/hook-prune.js:`orfaosDoDiretorio` devolve `{ file, path }` lidos de `readdirSync`, filtrados por `.py` — o valor e sempre um nome de arquivo do disco, nunca texto redigido. Provado em tests/installer_hook_prune.test.js (\"poda remove o hook que saiu do pacote e preserva o que continua nele\")."
     },
     {
       "file": "src/commands/runtime-supervisor.js",

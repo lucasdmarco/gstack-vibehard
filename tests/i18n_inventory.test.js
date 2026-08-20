@@ -250,7 +250,13 @@ test("CENSO GLOBAL: 1932 pontos, 0 unknown, 25 arquivos convertidos", async () =
   // maior parte deles e o bloco `NAO medido` do evidence pack -- um pack que
   // declara o que nao provou custa linha de mensagem, e essa e a linha que
   // impede o silencio de parecer ausencia de problema.
-  assert.equal(inv.total, 1932, "converter nao pode sumir com ponto REAL; falso positivo do regex pode cair")
+  // 1932 -> 1935: a poda de hooks orfaos (S52.N). Sao 3 pontos e cada um diz
+  // uma coisa que o silencio nao dizia: o hook que saiu do pacote e foi
+  // removido, a poda que ABORTOU por origem ilegivel, e o aviso do `doctor` de
+  // que a maquina ainda carrega orfao de versao anterior. O defeito que os
+  // motivou era exatamente um numero sem explicacao -- "16 hooks instalados"
+  // contando um que o produto nao distribui.
+  assert.equal(inv.total, 1935, "converter nao pode sumir com ponto REAL; falso positivo do regex pode cair")
 
   // Medicao em movimento: cai a cada arquivo reconciliado. 54 -> 53 com qa.js;
   // 53 -> 52 com secrets.js.

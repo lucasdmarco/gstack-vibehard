@@ -9,7 +9,7 @@ import { cleanupTmp } from "./helpers/tmp.js"
 /**
  * HELPER DE RENDER RESOLVIDO POR DESESTRUTURAÇÃO DE TABELA LOCAL.
  *
- * `install.js:359` é o caso real, e o callee lá é `log` — que NÃO é
+ * `install.js:361` é o caso real, e o callee lá é `log` — que NÃO é
  * `console.log`:
  *
  *   const groups = [
@@ -196,17 +196,17 @@ test("NEGATIVO: outra POSIÇÃO da mesma tabela não é helper", async (t) => {
 
 // ── Ancorado no repositório real ───────────────────────────────────────────
 
-test("REPO: `install.js:359` fecha, e é o único ponto que a regra alcança ali", async () => {
+test("REPO: `install.js:361` fecha, e é o único ponto que a regra alcança ali", async () => {
   const { analyzeFile, createAnalyzer } = await eng()
   const alvo = path.join(repoRoot, "src", "installer", "install.js")
   const pts = analyzeFile(alvo, createAnalyzer([alvo]), { repoRoot })
 
-  const p = pts.find((x) => x.line === 359)
+  const p = pts.find((x) => x.line === 361)
   assert.ok(p, "se o ponto mudou de linha, a medição mudou")
   assert.equal(p.rule, "render-via-destructured-helper")
   assert.equal(p.audience, "public_diagnostic")
 
-  assert.deepEqual(pts.filter((x) => x.canonicalRenderViaTable).map((x) => x.line), [359],
+  assert.deepEqual(pts.filter((x) => x.canonicalRenderViaTable).map((x) => x.line), [361],
     "a regra é estreita: uma tabela, um ponto")
 })
 

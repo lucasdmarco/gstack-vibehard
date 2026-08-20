@@ -61,7 +61,62 @@ const citaEm = (rel, hook) => existsSync(path.join(repoRoot, rel)) && ler(rel).i
 
 const porEvento = (hook) => TABELAS_DE_HARNESS.filter((rel) => citaEm(rel, hook)).map((rel) => `evento:${rel}`)
 
-const porComando = (hook) => DIRS_DE_COMANDO.flatMap(jsDe).filter((f) => ler(f).includes(hook))
+/**
+ * O CÓDIGO, sem os comentários. Máquina de estados minúscula, e não regex, porque
+ * `//` dentro de string (`"https://..."`) e aspas dentro de comentário derrubam
+ * qualquer aproximação — e derrubariam para o lado errado, escondendo consumidor
+ * real.
+ *
+ * POR QUE ISTO EXISTE: a forma `comando` afirma que código JS EXECUTA ou LÊ o
+ * hook. Substring crua não prova isso — prova menção. Quando o S52.N escreveu a
+ * poda de órfãos, os três arquivos de `src/installer` passaram a citar
+ * `before_shell.py` em comentário, explicando por que ele foi REMOVIDO, e a
+ * regra passou a ver três consumidores para um arquivo que não existe mais. A
+ * mesma frouxidão que os autores já haviam fechado na forma `contrato` ("citar o
+ * nome do arquivo é fácil e acontece o tempo todo — CHANGELOG, comentário, nota
+ * de migração") estava aberta aqui.
+ */
+const ABREM_STRING = new Set(['"', "'", "`"])
+
+/** Uma transicao: para onde vai, o que emite e quantos caracteres a mais consome. */
+const passo = (modo, emitir = "", pular = 0, aspas = "") => ({ modo, emitir, pular, aspas })
+
+const noCodigo = (c, prox) => {
+  if (ABREM_STRING.has(c)) return passo("string", c, 0, c)
+  const dupla = c === "/" ? prox : ""
+  if (dupla === "/") return passo("linha", "", 1)
+  if (dupla === "*") return passo("bloco", "", 1)
+  return passo("codigo", c)
+}
+
+// A barra invertida consome o proximo caractere: sem isto, `"\\""` fecharia a
+// string cedo e o resto do arquivo seria lido como se fosse comentario.
+const naString = (c, prox, aspas) => (c === "\\"
+  ? passo("string", c + (prox ?? ""), 1, aspas)
+  : passo(c === aspas ? "codigo" : "string", c, 0, aspas))
+
+// A quebra de linha e EMITIDA: descartar comentario nao pode juntar duas linhas
+// de codigo numa so.
+const naLinha = (c) => (c === "\n" ? passo("codigo", c) : passo("linha"))
+
+const noBloco = (c, prox) => (c === "*" && prox === "/" ? passo("codigo", "", 1) : passo("bloco"))
+
+const TRANSICAO = { codigo: noCodigo, string: naString, linha: naLinha, bloco: noBloco }
+
+function codigoSemComentarios(src) {
+  let fora = ""
+  let estado = { modo: "codigo", aspas: "" }
+  for (let i = 0; i < src.length; i++) {
+    const t = TRANSICAO[estado.modo](src[i], src[i + 1], estado.aspas)
+    fora += t.emitir
+    i += t.pular
+    estado = { modo: t.modo, aspas: t.aspas || estado.aspas }
+  }
+  return fora
+}
+
+const porComando = (hook) => DIRS_DE_COMANDO.flatMap(jsDe)
+  .filter((f) => codigoSemComentarios(ler(f)).includes(hook))
   .map((f) => `comando:${f}`)
 
 /** O irmão IMPORTA o módulo (`from _paths import …`) ou EXECUTA o arquivo. */
@@ -240,4 +295,23 @@ test("o achado de wiring dos hooks está no ledger, com destino e dono", async (
   assert.match(item.evidence, /permission_request\.py/, "o achado ABERTO precisa ser nomeado")
   assert.match(item.evidence, /before_shell\.py/, "e o fechado, também — é o que dá base ao risco")
   assert.match(item.requires, /manifest EXPL/, "o destino é certificação de wiring, não refactor genérico")
+})
+
+/**
+ * A PORTA `comando` TEM DENTES: menção em prosa não é consumo.
+ *
+ * Sem esta asserção, `codigoSemComentarios` poderia degenerar para
+ * `(s) => s` e o arquivo inteiro voltaria a aceitar comentário como prova —
+ * exatamente o estado em que a regra viu três consumidores para um hook que o
+ * produto não distribui mais.
+ */
+test("PORTA: menção em comentário NÃO é consumo; em código, é", () => {
+  const soComentario = `// roda o antigo before_shell.py\n/* before_shell.py saiu no PRD51 */\nconst x = 1\n`
+  const emCodigo = `const hook = "before_shell.py"\n`
+  const comUrlNaString = `const u = "https://exemplo/before_shell.py"\n`
+
+  assert.equal(codigoSemComentarios(soComentario).includes("before_shell.py"), false)
+  assert.equal(codigoSemComentarios(emCodigo).includes("before_shell.py"), true)
+  assert.equal(codigoSemComentarios(comUrlNaString).includes("before_shell.py"), true,
+    "`//` dentro de string não pode ser lido como comentário — seria falso negativo")
 })

@@ -19,8 +19,15 @@ import { buildConformanceReport } from "../harness/conformance.js"
 import { buildCandidateReport } from "../harness/candidates.js"
 import { buildRufloReport } from "../harness/ruflo.js"
 import { section, success, warn, error, info, confirm } from "../cli/index.js"
+import { podarHooks } from "./hook-prune.js"
+import { loadManifest } from "./manifest.js"
+import { fileURLToPath } from "url"
+import { dirname } from "path"
 
 const HOME = homedir()
+
+// Os hooks que ESTE pacote distribui — a régua para saber o que é órfão.
+const HOOKS_SOURCE = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "hooks", "hooks")
 
 // readdir EPERM/EACCES-safe: null = não deu p/ ler (permissão/ausente), nunca crash.
 function safeReaddir(dir) { try { return readdirSync(dir) } catch { return null } }
@@ -473,11 +480,26 @@ function countDir(dir, filter) {
   if (!existsSync(dir)) return null
   return (safeReaddir(dir) || []).filter(filter)
 }
+/**
+ * Hooks instalados — separando os ÓRFÃOS, que o pacote deixou de distribuir.
+ *
+ * Contar órfão como instalado é o defeito que motivou a poda (S52.N): numa
+ * máquina atualizada desde junho, o `before_shell.py` removido no PRD51 inflava
+ * o total e o diagnóstico afirmava ter mais hooks do que o produto tem.
+ *
+ * O `doctor` DIAGNOSTICA e não apaga — `dryRun` é o ponto. Quem remove é o
+ * `install`, no caminho onde o usuário já autorizou escrita.
+ */
 function reportHooks() {
-  const files = countDir(join(HOME, ".codex", "hooks"), (f) => f.endsWith(".py"))
+  const dir = join(HOME, ".codex", "hooks")
+  const files = countDir(dir, (f) => f.endsWith(".py"))
   if (!files) return warn("Nenhum hook gstack_vibehard instalado")
-  success(`${files.length} hooks Python instalados`)
-  info(`  ${files.join(", ")}`)
+  const orfaos = podarHooks({ hooksSource: HOOKS_SOURCE, targets: [dir], manifest: loadManifest(HOME), dryRun: true }).pruned
+  const nomes = orfaos.map((o) => o.file)
+  const vivos = files.filter((f) => !nomes.includes(f))
+  success(`${vivos.length} hooks Python instalados`)
+  info(`  ${vivos.join(", ")}`)
+  if (nomes.length) warn(`${nomes.length} hook(s) órfão(s) de versão anterior: ${nomes.join(", ")} — \`gstack_vibehard install\` remove`)
 }
 function reportSkills() {
   const skills = countDir(join(HOME, ".agents", "skills"), (f) => f !== "." && f !== "..")
