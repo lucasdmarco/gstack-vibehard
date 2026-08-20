@@ -74,10 +74,16 @@ test("COM --golden-run E acceptance real resolvida (todos os 4 portões verdes):
     const r = runPipeline({
       plan, planDir: path.join(cwd, ".gstack", "plans", plan.id), cwd, goldenRun: true,
       exec: () => {}, verifyRunner: () => ({ status: "ready", usable: true, failed: [] }),
+      // PRD52 S52.J — `gateExec` executa os gates E o verificador `command` do
+      // aceite. Injeta-lo e o teste DECLARANDO que `npm test` rodou e passou;
+      // sem ele o pipeline rodaria `npm test` de verdade no projeto temporario.
+      // O aceite so resolve com execucao, e e essa execucao que o teste fixa.
+      gateExec: () => {},
       acceptance: [{ id: "feature-behavior", verifier: { kind: "command", ref: "npm test" } }],
     })
-    assert.equal(r.goldenRun.status, "completed")
+    assert.equal(r.goldenRun.status, "completed", "compliance EXECUTADO + 4 portoes verdes -> completed continua alcancavel")
     assert.equal(r.status, "done")
+    assert.equal(r.goldenRun.gates.compliance.items[0].status, "compliant")
   } finally { cleanupTmp(cwd) }
 })
 

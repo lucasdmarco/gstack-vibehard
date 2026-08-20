@@ -33,8 +33,8 @@ test("closeout.json reflete o proof REAL (não o proxy verify-gate) quando --gol
     const { startCommand } = await imp("src/commands/start.js")
     const r = await startCommand(["--golden-run"], {
       cwd, objective: "web app", projectName: "app", mode: "lite", designSystem: "none",
-      confirm: async () => true, exec: () => {},
-      verifyRunner: () => ({ status: "ready", usable: true, failed: [] }),
+      confirm: async () => true, exec: () => {}, gateExec: () => {},
+      verifyRunner: () => ({ status: "ready", usable: true, failed: [], steps: [{ id: "lint", status: "passed" }, { id: "qg-l1", status: "passed" }, { id: "qg-l2", status: "passed" }] }),
       journeys: [{ acceptanceId: "feature-behavior", method: "command", ref: "npm test", files: [] }],
       // verify-gate real (usado por closeoutReadiness) diria ready:true; o proof
       // REAL diz ready:false com um blocker — closeout precisa refletir o REAL.
@@ -58,7 +58,7 @@ test("closeout.json NÃO é resincronizado quando proof não rodou (--no-golden-
     const { startCommand } = await imp("src/commands/start.js")
     const r = await startCommand(["--no-golden-run"], {
       cwd, objective: "web app", projectName: "app", mode: "lite", designSystem: "none",
-      confirm: async () => true, exec: () => {},
+      confirm: async () => true, exec: () => {}, gateExec: () => {},
     })
     const closeoutPath = path.join(cwd, ".gstack", "runs", r.pipeline.runId, "closeout.json")
     const closeout = JSON.parse(await readFile(closeoutPath, "utf-8"))

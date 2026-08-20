@@ -16,15 +16,37 @@
  * proof sempre rodar). Sem terminal condition real → NUNCA `completed` falso.
  */
 import { LoopEngine } from "../skills/loop-engine.js"
+import { complianceReport } from "./acceptance-verification.js"
 
 const READY_LIKE = new Set(["ready", "not_applicable"])
 const isReadyLike = (stage) => READY_LIKE.has(stage?.status)
 
-/** Traduz os stages REAIS do pipeline nos 4 portões que o motor exige p/ `completed`. */
-export function deriveEngineGates({ stages = {}, proof = null, acceptance = [] } = {}) {
-  const acceptanceResolved = acceptance.length > 0 && acceptance.every((a) => Boolean(a.verifier) && !a.pending_verifier)
+/**
+ * Traduz os stages REAIS do pipeline nos 4 portões que o motor exige p/
+ * `completed`.
+ *
+ * PRD52 S52.J — `acceptanceResolved` passou a vir de COMPLIANCE EXECUTADO.
+ *
+ * Até aqui a derivação era `acceptance.every((a) => Boolean(a.verifier))`: a
+ * mera existência do verifier. Bastava o brief declarar "este aceite tem um
+ * verificador" para o portão abrir, sem que ninguém tivesse rodado coisa
+ * alguma. O §2 do PRD53 nomeia exatamente esse defeito, e o portão de entrada
+ * do PRD53 o pegou executando o controle: verifier declarado, zero compliance,
+ * `acceptanceResolved: true`.
+ *
+ * Agora quem decide é `complianceReport`, que já existia desde o PRD47 S47.5 e
+ * nunca teve consumidor: um aceite só é `compliant` com verifier real, diff
+ * tocando os arquivos relevantes E resultado de teste correspondente. O
+ * `testResults` vem de `acceptance-runner.js`, que EXECUTA.
+ *
+ * O portão ficou mais difícil de abrir, e é o desenho: ele só abre com execução
+ * por trás. Um `completed` que dependia de declaração era um verde emprestado.
+ */
+export function deriveEngineGates({ stages = {}, proof = null, acceptance = [], changedFiles = [], testResults = null } = {}) {
+  const compliance = complianceReport({ acceptances: acceptance, changedFiles, testResults })
   return {
-    acceptanceResolved,
+    acceptanceResolved: compliance.allCompliant,
+    compliance,
     observationFresh: isReadyLike(stages.test),
     checkpointGreen: isReadyLike(stages.verify),
     proofReady: proof ? proof.ready === true : false,
@@ -35,8 +57,8 @@ export function deriveEngineGates({ stages = {}, proof = null, acceptance = [] }
  * Chama `engine.finalize()` de verdade (deixa de ser dead code) com os gates
  * traduzidos. Retorna o veredito tipado do motor — NUNCA um "done" frouxo.
  */
-export function finalizeGoldenRun(engine, { stages, proof, acceptance, cancelled = false } = {}) {
-  const gates = { ...deriveEngineGates({ stages, proof, acceptance }), cancelled }
+export function finalizeGoldenRun(engine, { stages, proof, acceptance, changedFiles, testResults, cancelled = false } = {}) {
+  const gates = { ...deriveEngineGates({ stages, proof, acceptance, changedFiles, testResults }), cancelled }
   return { ...engine.finalize(gates), gates }
 }
 

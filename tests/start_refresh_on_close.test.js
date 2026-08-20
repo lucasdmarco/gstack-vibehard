@@ -38,8 +38,8 @@ test("--refresh-on-close: refresh injetado roda quando a run fecha 'done', close
     const { startCommand } = await imp("src/commands/start.js")
     const r = await startCommand(["--golden-run", "--refresh-on-close"], {
       cwd, objective: "web app", projectName: "app", mode: "lite", designSystem: "none",
-      confirm: async () => true, exec: () => {},
-      verifyRunner: () => ({ status: "ready", usable: true, failed: [] }),
+      confirm: async () => true, exec: () => {}, gateExec: () => {},
+      verifyRunner: () => ({ status: "ready", usable: true, failed: [], steps: [{ id: "lint", status: "passed" }, { id: "qg-l1", status: "passed" }, { id: "qg-l2", status: "passed" }] }),
       journeys: [{ acceptanceId: "feature-behavior", method: "command", ref: "npm test", files: [] }],
       proofRunner: async () => ({ ready: true, blockers: [] }),
       refreshRunner: () => { called++; return { state: "ok", steps: [{ tool: "graphify", status: "ok" }], provenance: { builtAtCommit: "abc123" } } },
@@ -60,7 +60,7 @@ test("sem --refresh-on-close: toolsRefresh continua 'not_run' (comportamento ori
     const { startCommand } = await imp("src/commands/start.js")
     const r = await startCommand([], {
       cwd, objective: "web app", projectName: "app", mode: "lite", designSystem: "none",
-      confirm: async () => true, exec: () => {},
+      confirm: async () => true, exec: () => {}, gateExec: () => {},
     })
     const closeoutPath = path.join(cwd, ".gstack", "runs", r.pipeline.runId, "closeout.json")
     const closeout = JSON.parse(await readFile(closeoutPath, "utf-8"))
@@ -76,8 +76,8 @@ test("--refresh-on-close SEM 'done' (gate falho -> handoff): refresh NÃO roda (
     // sem journeys/git real -> acceptance não resolve -> gate falho -> handoff, nunca "done"
     const r = await startCommand(["--golden-run", "--refresh-on-close"], {
       cwd, objective: "web app", projectName: "app", mode: "lite", designSystem: "none",
-      confirm: async () => true, exec: () => {},
-      verifyRunner: () => ({ status: "ready", usable: true, failed: [] }),
+      confirm: async () => true, exec: () => {}, gateExec: () => {},
+      verifyRunner: () => ({ status: "ready", usable: true, failed: [], steps: [{ id: "lint", status: "passed" }, { id: "qg-l1", status: "passed" }, { id: "qg-l2", status: "passed" }] }),
       proofRunner: async () => ({ ready: false, blockers: ["release-source-parity: sem remoto"] }),
       refreshRunner: () => { called++; return { state: "ok" } },
     })
@@ -96,8 +96,8 @@ test("GSTACK_REFRESH_ON_CLOSE=1 (env var): mesmo efeito da flag CLI", async () =
     const { startCommand } = await imp("src/commands/start.js")
     const r = await startCommand(["--golden-run"], {
       cwd, objective: "web app", projectName: "app", mode: "lite", designSystem: "none",
-      confirm: async () => true, exec: () => {},
-      verifyRunner: () => ({ status: "ready", usable: true, failed: [] }),
+      confirm: async () => true, exec: () => {}, gateExec: () => {},
+      verifyRunner: () => ({ status: "ready", usable: true, failed: [], steps: [{ id: "lint", status: "passed" }, { id: "qg-l1", status: "passed" }, { id: "qg-l2", status: "passed" }] }),
       journeys: [{ acceptanceId: "feature-behavior", method: "command", ref: "npm test", files: [] }],
       proofRunner: async () => ({ ready: true, blockers: [] }),
       refreshRunner: () => { called++; return { state: "ok" } },

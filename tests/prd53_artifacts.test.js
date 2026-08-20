@@ -112,23 +112,28 @@ test("o portão EXERCITA as invariantes do §2 em vez de citar o arquivo de test
     "lease fail-closed por escopo e invalidada por plano diferente")
 })
 
-test("O ACHADO: `acceptanceResolved` deriva da EXISTÊNCIA do verifier — e o §2 proíbe", async () => {
+/**
+ * O achado que este teste registrava FOI CORRIGIDO no S52.J.
+ *
+ * Ele afirmava o estado defeituoso — `acceptanceResolved` verdadeiro com
+ * verifier apenas declarado — e dizia, por escrito, que fecharia sozinho quando
+ * o produto mudasse. Fechou. O teste agora afirma o inverso, e o critério do
+ * portão o acompanhou sem que ninguém editasse o portão: é o que um controle
+ * VIVO faz e uma citação de arquivo de teste nunca faria.
+ */
+test("o controle vivo do §2 fechou sozinho quando o produto foi corrigido (S52.J)", async () => {
   const { deriveEngineGates } = await imp("src/project-plan/golden-run.js")
   const { prd53EntryGate } = await imp("src/dream/prd53-entry-gate.js")
-  // O controle vivo: verifier declarado, compliance NUNCA executado.
   const g = deriveEngineGates({ acceptance: [{ id: "lint", verifier: { kind: "gate", ref: "lint" } }] })
-  assert.equal(g.acceptanceResolved, true,
-    "estado ATUAL do produto — quando isto virar false, o critério do portão fecha sozinho")
+  assert.equal(g.acceptanceResolved, false, "verifier declarado e nunca executado não resolve o aceite")
 
   const criterio = prd53EntryGate({ repoRoot, commit: "abc1234" })
     .criteria.find((c) => c.id === "acceptance_de_compliance_executado")
-  assert.equal(criterio.state, "failed",
-    "`failed` e não `unproven`: não falta prova, sobra contradição entre o código e o §2")
-  assert.match(criterio.detail, /complianceReport/,
-    "o detalhe aponta o módulo que já existe e não está ligado")
+  assert.equal(criterio.state, "met",
+    "o critério fecha por MEDIÇÃO — ninguém editou o portão para isso acontecer")
 })
 
-test("os artefatos entraram: o portão saiu de 5 para 3 bloqueios de evidência", async () => {
+test("os artefatos entraram: o portão só bloqueia por evidência EXTERNA", async () => {
   const { prd53EntryGate } = await imp("src/dream/prd53-entry-gate.js")
   const g = prd53EntryGate({ repoRoot, commit: "abc1234" })
   const porId = Object.fromEntries(g.criteria.map((c) => [c.id, c]))

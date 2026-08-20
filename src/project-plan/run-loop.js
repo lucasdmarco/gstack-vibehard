@@ -19,6 +19,7 @@ import { LoopEngine } from "../skills/loop-engine.js"
 import { readPlanJournal } from "./journal.js"
 import { detectGoldenPath } from "../dream/detector.js"
 import { finalizeGoldenRun } from "./golden-run.js"
+import { executarVerificadores } from "./acceptance-runner.js"
 import { recordStateEvent } from "../state/store.js"
 import { sessionIdFor, statusForSession, buildSessionRecord } from "../state/session-index.js"
 
@@ -220,6 +221,11 @@ function devStage(ctx, stages) {
 function testStage(ctx, stages) {
   if (!existsSync(ctx.projectDir)) { stages.test = { status: "not_applicable", detail: "projeto não criado" }; return }
   const r = runChangedFilesVerify({ cwd: ctx.projectDir, exec: ctx.gateExec })
+  // PRD52 S52.J — os arquivos alterados JÁ eram computados aqui e morriam no
+  // detalhe do stage. O compliance por aceite precisa deles para saber se o diff
+  // tocou a jornada; guardá-los é o que separa "verifier existe" de "verifier
+  // foi exercitado sobre o que mudou".
+  ctx.changedFiles = r.files || []
   stages.test = r.status === "blocked"
     ? { status: "failed", detail: `changed-files: ${r.failed.join(", ")}` }
     : r.status === "fallback"
@@ -268,6 +274,10 @@ function reviewStage(ctx, stages) {
 function verifyStage(ctx, stages) {
   if (!existsSync(ctx.projectDir)) { stages.verify = { status: "not_applicable", detail: "projeto não criado" }; return null }
   const report = (ctx.verifyRunner || runVerify)({ cwd: ctx.projectDir, profile: ctx.verifyProfile, exec: ctx.gateExec })
+  // O relatório do verify é a EXECUÇÃO dos gates que os aceites de baseline
+  // citam (`lint`, `qg --strict`, `verify --profile scaffold`). Guardá-lo é o
+  // que permite ao compliance responder por resultado, e não por declaração.
+  ctx.verifyReport = report
   stages.verify = report.status === "blocked"
     ? { status: "failed", detail: `gates falharam: ${(report.failed || []).join(", ")}` }
     : { status: report.usable ? "ready" : "pending", detail: `verify: ${report.status}` }
@@ -449,6 +459,26 @@ const statusFromGoldenRun = (goldenRunStatus) => GOLDEN_RUN_STATUS_MAP[goldenRun
 const resolvedStatus = (ctx, legacyStatus, goldenRunStatus) => (ctx.goldenRun ? statusFromGoldenRun(goldenRunStatus) : legacyStatus)
 const failedStageLabel = (failedStage) => failedStage || "golden-run: portões não fechados"
 
+/**
+ * PRD52 S52.J — o veredito do motor com COMPLIANCE EXECUTADO.
+ *
+ * Os verificadores dos aceites rodam AQUI, no fecho, porque só aqui existe tudo
+ * o que eles precisam: o relatório real do `verify` (para os aceites de gate) e
+ * os arquivos que o diff tocou (para as journeys). Rodar antes seria decidir com
+ * meia evidência.
+ */
+function fecharGoldenRun(ctx, stages, legacyStatus) {
+  const acceptance = ctx.engine.acceptance
+  const testResults = executarVerificadores({
+    acceptances: acceptance, verifyReport: ctx.verifyReport, projectDir: ctx.projectDir, exec: ctx.gateExec,
+  })
+  return finalizeGoldenRun(ctx.engine, {
+    stages, proof: closeoutReadiness(stages), acceptance,
+    changedFiles: ctx.changedFiles || [], testResults,
+    cancelled: legacyStatus === "cancelled",
+  })
+}
+
 /** Fecha o run: handoff.md quando aplicável + journal + status.json. */
 function finishPipeline(ctx, stages, legacyStatus, failedStage, diagnosis) {
   // PRD47 S47.1 + PRD51 S51.2.7: o motor (LoopEngine) sempre teve os 4 portões
@@ -457,9 +487,7 @@ function finishPipeline(ctx, stages, legacyStatus, failedStage, diagnosis) {
   // `--golden-run` (§11 do prd51.md — cutover incremental). Sem a flag, `status`
   // continua sendo o critério solto que os call sites sempre calcularam — zero
   // regressão no caminho default.
-  const goldenRun = finalizeGoldenRun(ctx.engine, {
-    stages, proof: closeoutReadiness(stages), acceptance: ctx.engine.acceptance, cancelled: legacyStatus === "cancelled",
-  })
+  const goldenRun = fecharGoldenRun(ctx, stages, legacyStatus)
   const status = resolvedStatus(ctx, legacyStatus, goldenRun.status)
   let handoffPath
   if (status === "handoff") {

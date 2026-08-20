@@ -25,8 +25,17 @@ test("start --journeys <arquivo>: journey real resolve acceptanceResolved (sem j
     const r = await startCommand(["--journeys", journeysPath], {
       cwd, objective: "web app", projectName: "app", mode: "lite", designSystem: "none",
       confirm: async () => true, exec: () => {},
+      // S52.J: o aceite so resolve com o verificador EXECUTADO. `gateExec` e o
+      // exec dos gates, e o verificador `command` do aceite e um gate: injeta-lo
+      // aqui e o teste DECLARANDO que o comando rodou e passou.
+      gateExec: () => {},
     })
-    assert.equal(r.pipeline.goldenRun.gates.acceptanceResolved, true, "journey real do arquivo resolveu o aceite pendente")
+    // S52.J: o que a journey resolve é o ACEITE dela, e é isso que se afirma
+    // aqui. O veredito global depende também dos gates de baseline, que neste
+    // fixture não rodam (o projeto não chega a existir) — e que passaram a dizer
+    // isso em vez de serem presumidos aprovados.
+    const daJourney = r.pipeline.goldenRun.gates.compliance.items.find((i) => i.id === "feature-behavior")
+    assert.equal(daJourney.status, "compliant", "journey real do arquivo resolveu o aceite pendente E executou")
   } finally { await rm(cwd, { recursive: true, force: true, maxRetries: 5 }) }
 })
 
