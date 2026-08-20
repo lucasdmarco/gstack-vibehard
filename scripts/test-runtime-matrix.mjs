@@ -50,7 +50,16 @@ function parseArgs(argv) {
     if (LISTAS[flag]) r[LISTAS[flag]].push(argv[++i])
     else if (UNICOS[flag]) r[UNICOS[flag]] = argv[++i]
     else if (flag === "--json") r.json = true
+    // (o `--tarball` e normalizado para caminho ABSOLUTO no fim desta funcao)
   }
+  // CAMINHO ABSOLUTO, sempre. `npm install a/b` e interpretado como ATALHO DE
+  // GITHUB (`owner/repo`): com `--tarball dist-matrix/pacote.tgz`, o npm tentou
+  // `git ls-remote ssh://git@github.com/dist-matrix/pacote.tgz.git` e saiu com
+  // 128. As 12 linhas da matriz reportaram `npm install falhou (exit 128)` e a
+  // rodada inteira virou `inconclusiva` -- medindo o parser de spec do npm, nao
+  // o Node. Normalizar aqui, e nao no workflow, porque e ESTE script que tem
+  // contrato com o npm; quem chama nao deveria precisar saber disso.
+  if (r.tarball) r.tarball = path.resolve(r.tarball)
   return r
 }
 
