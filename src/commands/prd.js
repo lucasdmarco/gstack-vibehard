@@ -13,6 +13,7 @@ import { construirPendenciasExternas, problemasDasPendencias, gravarPendencias }
 import { inventarioDosManuais, problemasDoInventario } from "../dream/prd53-manual-inventory.js"
 import { manifestDeReferencias, problemasDoManifest } from "../dream/prd53-external-refs.js"
 import { prd53EntryGate } from "../dream/prd53-entry-gate.js"
+import { prd54EntryGate } from "../dream/prd54-entry-gate.js"
 import { rcMatrixVerdict } from "../release/rc-matrix.js"
 import { execFileSync } from "node:child_process"
 import { mkdirSync, writeFileSync } from "node:fs"
@@ -182,23 +183,35 @@ function gravarJson(doc, rel, cwd) {
 
 const gravarCorpus = (corpus, cwd) => gravarJson(corpus, SEED_CORPUS_PATH, cwd)
 
-/**
- * `prd gate` — o portão de entrada do PRD53, read-only.
- *
- * Sai com código 1 quando bloqueado: quem chama de script precisa distinguir
- * "pode começar" de "não pode" sem ler prosa.
- */
-function gateCmd(ctx) {
-  const g = prd53EntryGate({ repoRoot: ctx.cwd, commit: resolveHeadCommit(ctx.root || ctx.cwd) })
-  if (!g.entered) process.exitCode = 1
-  if (ctx.json) { process.stdout.write(JSON.stringify(g) + "\n"); return g }
-  section(`prd gate — entrada do PRD53 (§2): ${g.status}`)
+function renderPortao(rotulo, g) {
+  section(`prd gate — ${rotulo}: ${g.status}`)
   for (const c of g.criteria) {
     const linha = `  ${c.id} [${c.state}] — ${c.detail}`
     ;(c.state === "met" ? info : warn)(linha)
   }
   info(`  ${g.note}`)
-  return g
+}
+
+/**
+ * `prd gate` — os portões de entrada do PRD53 e do PRD54, read-only.
+ *
+ * Os dois saem JUNTOS porque a CADEIA é o que importa: ver só o do PRD53
+ * esconderia que fechá-lo ainda não abre o próximo, e alguém poderia planejar o
+ * PRD54 como se ele estivesse a um passo.
+ *
+ * Sai com código 1 quando qualquer um bloqueia: quem chama de script precisa
+ * distinguir "pode começar" de "não pode" sem ler prosa.
+ */
+function gateCmd(ctx) {
+  const commit = resolveHeadCommit(ctx.root || ctx.cwd)
+  const prd53 = prd53EntryGate({ repoRoot: ctx.cwd, commit })
+  const prd54 = prd54EntryGate({ repoRoot: ctx.cwd, commit })
+  if (!prd53.entered || !prd54.entered) process.exitCode = 1
+  const saida = { schemaVersion: prd53.schemaVersion, prd53, prd54 }
+  if (ctx.json) { process.stdout.write(JSON.stringify(saida) + "\n"); return saida }
+  renderPortao("entrada do PRD53 (§2)", prd53)
+  renderPortao("entrada do PRD54 (§2)", prd54)
+  return saida
 }
 
 /** HEAD real do repositório auditado. Sem git disponível, `null` honesto. */
