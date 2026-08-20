@@ -7,7 +7,7 @@ import { classifyWorkspace } from "../runtime/workspace.js"
 import { routeDefaultOn } from "../tools/headroom-policy.js"
 import { readProjectMarker } from "../project/identity.js"
 import {
-  planStart, stopAll, stopOutcome, pollReadiness, killTreeCommand, isAlive, waitPidsExit,
+  planStart, stopAll, stopAllPhased, stopOutcome, pollReadiness, killTreeCommand, isAlive, waitPidsExit,
   writeServiceState, readAllState, clearState, logsDir,
 } from "../runtime/supervisor.js"
 import { resolveSecrets } from "../secrets/broker.js"
@@ -116,10 +116,11 @@ export function winKillExec(execImpl = execFileSync) {
 // ainda segura a porta/log e o novo nasce unhealthy — race do taskkill).
 async function restartAlive(alive, json) {
   const onWin = process.platform === "win32"
-  const killed = stopAll(alive, onWin ? { exec: winKillExec() } : {})
-  if (!json) killed.forEach((r) => info(`  • reiniciando — parei o antigo ${r.name}: ${r.status}`))
-  // TODOS os pids (não só "stopped"): "already-gone" pode estar em teardown de handles.
-  await waitPidsExit(killed.map((r) => r.pid))
+  // A MESMA ESCADA do `stop` (S54.1). Este caminho também precisa dela: sem a
+  // fase forçada, o default gracioso deixaria o serviço antigo vivo segurando
+  // porta e log, e o novo nasceria unhealthy — o oposto do que `--force` promete.
+  const fases = await stopAllPhased(alive, onWin ? { exec: winKillExec() } : {})
+  if (!json) fases.results.forEach((r) => info(`  • reiniciando — parei o antigo ${r.name}: ${r.status} (${r.resolvedBy})`))
 }
 // idempotência: se já há runtime VIVO, NÃO relança sem --force (senão órfã os
 // antigos). Retorna false → o `dev` deve abortar.
@@ -302,19 +303,24 @@ export async function stopCommand(args = [], opts = {}) {
   const json = args.includes("--json")
   const state = readAllState(cwd)
   if (state.length === 0) return stopNothing(json)
-  const results = stopAll(state, stopExecOpts(opts))
-  // `stop` só reporta "parado" quando os processos MORRERAM de verdade (senão remover
-  // o dir do projeto logo após dá EBUSY no Windows — PRD14 §4.14). Espera TODOS os
-  // pids do state, não só status "stopped": um "already_gone" pode ainda estar em
-  // teardown de handles (cwd/log) — isAlive filtra os já mortos de graça.
-  const stillAlive = await waitPidsExit(results.map((r) => r.pid), { timeoutMs: opts.waitTimeoutMs || 5000 })
+  // PRD54 S54.1 — a ESCADA do §2.1: pede, espera bounded, e só então força a
+  // árvore. `stop` só reporta "parado" quando os processos MORRERAM de verdade
+  // (senão remover o dir do projeto logo após dá EBUSY no Windows — PRD14
+  // §4.14), e a espera de cada fase já vive dentro de `stopAllPhased`.
+  const fases = await stopAllPhased(state, {
+    ...stopExecOpts(opts),
+    gracePeriodMs: opts.gracePeriodMs,
+    forceTimeoutMs: opts.waitTimeoutMs || 5000,
+  })
+  const results = fases.results
+  const stillAlive = fases.stillAlive
   // P0.2: só limpa o state quando NADA ficou pendente (vivo/negado/não-verificado). Apagar
   // com pid vivo era o bug que impedia a 2ª tentativa e deixava órfão/porta/handle presos.
   const outcome = stopOutcome(results, stillAlive)
   if (outcome.clearable) clearState(cwd)
   // S51.1.1: reporta os results RECONCILIADOS (pós-espera), não os da probe imediata.
   // `stopOutcome` sempre devolve `results` (reconciliados) — sem fallback (evita branch extra).
-  if (json) process.stdout.write(JSON.stringify({ stopped: outcome.results, stillAlive, cleared: outcome.clearable, exitCode: outcome.exitCode }) + "\n")
+  if (json) process.stdout.write(JSON.stringify({ stopped: outcome.results, stillAlive, escalated: fases.escalated, cleared: outcome.clearable, exitCode: outcome.exitCode }) + "\n")
   else renderStop(outcome.results, outcome, opts)
   return outcome.exitCode
 }

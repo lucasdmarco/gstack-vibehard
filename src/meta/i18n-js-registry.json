@@ -6292,14 +6292,16 @@
           "callee": "info",
           "calleePath": "info",
           "canonicalName": "info",
-          "column": 36,
-          "line": 120,
+          "column": 43,
+          "line": 123,
           "provenance": {
             "ids": [
               "r",
               "name",
               "r",
-              "status"
+              "status",
+              "r",
+              "resolvedBy"
             ],
             "kind": "interpolated",
             "resolved": false
@@ -6315,7 +6317,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 5,
-          "line": 130,
+          "line": 131,
           "provenance": {
             "ids": [
               "alive",
@@ -6341,7 +6343,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 5,
-          "line": 131,
+          "line": 132,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -6358,7 +6360,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 14,
-          "line": 163,
+          "line": 164,
           "provenance": {
             "ids": [
               "p",
@@ -6379,7 +6381,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 14,
-          "line": 175,
+          "line": 176,
           "provenance": {
             "ids": [
               "p",
@@ -6407,7 +6409,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 70,
-          "line": 206,
+          "line": 207,
           "provenance": {
             "ids": [
               "web",
@@ -6415,23 +6417,6 @@
             ],
             "kind": "interpolated",
             "resolved": false
-          },
-          "rule": "render-via-canonical-helper",
-          "sink": null
-        },
-        {
-          "audience": "public_diagnostic",
-          "bindingKind": "import",
-          "bindingOrigin": "src/cli/index.js",
-          "callee": "info",
-          "calleePath": "info",
-          "canonicalName": "info",
-          "column": 3,
-          "line": 207,
-          "provenance": {
-            "ids": [],
-            "kind": "literal_only",
-            "resolved": true
           },
           "rule": "render-via-canonical-helper",
           "sink": null
@@ -6457,11 +6442,28 @@
           "audience": "public_diagnostic",
           "bindingKind": "import",
           "bindingOrigin": "src/cli/index.js",
+          "callee": "info",
+          "calleePath": "info",
+          "canonicalName": "info",
+          "column": 3,
+          "line": 209,
+          "provenance": {
+            "ids": [],
+            "kind": "literal_only",
+            "resolved": true
+          },
+          "rule": "render-via-canonical-helper",
+          "sink": null
+        },
+        {
+          "audience": "public_diagnostic",
+          "bindingKind": "import",
+          "bindingOrigin": "src/cli/index.js",
           "callee": "section",
           "calleePath": "section",
           "canonicalName": "section",
           "column": 14,
-          "line": 234,
+          "line": 235,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -6478,7 +6480,7 @@
           "calleePath": "process.stdout.write",
           "canonicalName": "write",
           "column": 20,
-          "line": 247,
+          "line": 248,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -6495,7 +6497,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 14,
-          "line": 277,
+          "line": 278,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -6512,7 +6514,7 @@
           "calleePath": "process.stdout.write",
           "canonicalName": "write",
           "column": 8,
-          "line": 278,
+          "line": 279,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -6529,7 +6531,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 3,
-          "line": 289,
+          "line": 290,
           "provenance": {
             "ids": [
               "outcome",
@@ -6556,7 +6558,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 3,
-          "line": 290,
+          "line": 291,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -6573,7 +6575,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 3,
-          "line": 293,
+          "line": 294,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -6590,7 +6592,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 28,
-          "line": 294,
+          "line": 295,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -6607,7 +6609,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 34,
-          "line": 295,
+          "line": 296,
           "provenance": {
             "ids": [
               "opts",
@@ -6630,7 +6632,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 31,
-          "line": 297,
+          "line": 298,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -6647,7 +6649,7 @@
           "calleePath": "process.stdout.write",
           "canonicalName": "write",
           "column": 13,
-          "line": 317,
+          "line": 323,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -6664,7 +6666,7 @@
           "calleePath": "process.stdout.write",
           "canonicalName": "write",
           "column": 39,
-          "line": 346,
+          "line": 352,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -6681,7 +6683,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 33,
-          "line": 383,
+          "line": 389,
           "provenance": {
             "ids": [
               "svc"
@@ -6700,7 +6702,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 3,
-          "line": 384,
+          "line": 390,
           "provenance": {
             "ids": [
               "target",
@@ -6720,7 +6722,7 @@
           "calleePath": "process.stdout.write",
           "canonicalName": "write",
           "column": 27,
-          "line": 389,
+          "line": 395,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -6737,7 +6739,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 391,
+          "line": 397,
           "provenance": {
             "ids": [
               "target",
@@ -6757,7 +6759,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 27,
-          "line": 400,
+          "line": 406,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -6774,7 +6776,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 22,
-          "line": 401,
+          "line": 407,
           "provenance": {
             "ids": [
               "web",
@@ -6794,7 +6796,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 54,
-          "line": 401,
+          "line": 407,
           "provenance": {
             "ids": [
               "web",
@@ -6807,7 +6809,7 @@
           "sink": null
         }
       ],
-      "fileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a"
+      "fileHash": "sha256:0f667a126eabf58f152be77087fdb8946166b974c9392cf49fd1d5611bb9e57b"
     },
     "src/commands/secrets.js": {
       "entries": [

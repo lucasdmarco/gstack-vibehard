@@ -9,7 +9,7 @@ import { cleanupTmp } from "./helpers/tmp.js"
 /**
  * REVISÃO HUMANA ANCORADA — quando NENHUMA regra estrutural pode decidir.
  *
- * Caso concreto: `runtime-supervisor.js:346`. O valor impresso é o log do
+ * Caso concreto: `runtime-supervisor.js:352`. O valor impresso é o log do
  * processo supervisionado, e a cadeia é
  *
  *   followLog → readTail(logPath) → readSync(fd, buffer, …)

@@ -54,10 +54,10 @@
     },
     {
       "file": "src/commands/runtime-supervisor.js",
-      "line": 346,
+      "line": 352,
       "column": 39,
       "audience": "user_content",
-      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "expectedFileHash": "sha256:0f667a126eabf58f152be77087fdb8946166b974c9392cf49fd1d5611bb9e57b",
       "expectedIds": [],
       "structuralResolution": "unresolved",
       "decisionBasis": "anchored_human_review",
@@ -2860,7 +2860,7 @@
       "file": "src/commands/runtime-supervisor.js",
       "line": 53,
       "column": 3,
-      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "expectedFileHash": "sha256:0f667a126eabf58f152be77087fdb8946166b974c9392cf49fd1d5611bb9e57b",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "ws",
@@ -2874,7 +2874,7 @@
       "file": "src/commands/runtime-supervisor.js",
       "line": 59,
       "column": 29,
-      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "expectedFileHash": "sha256:0f667a126eabf58f152be77087fdb8946166b974c9392cf49fd1d5611bb9e57b",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "a"
@@ -2887,7 +2887,7 @@
       "file": "src/commands/runtime-supervisor.js",
       "line": 68,
       "column": 39,
-      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "expectedFileHash": "sha256:0f667a126eabf58f152be77087fdb8946166b974c9392cf49fd1d5611bb9e57b",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "v",
@@ -2903,7 +2903,7 @@
       "file": "src/commands/runtime-supervisor.js",
       "line": 71,
       "column": 5,
-      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "expectedFileHash": "sha256:0f667a126eabf58f152be77087fdb8946166b974c9392cf49fd1d5611bb9e57b",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "verdict",
@@ -2918,7 +2918,7 @@
       "file": "src/commands/runtime-supervisor.js",
       "line": 83,
       "column": 3,
-      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "expectedFileHash": "sha256:0f667a126eabf58f152be77087fdb8946166b974c9392cf49fd1d5611bb9e57b",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "scope",
@@ -2935,7 +2935,7 @@
       "file": "src/commands/runtime-supervisor.js",
       "line": 89,
       "column": 43,
-      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "expectedFileHash": "sha256:0f667a126eabf58f152be77087fdb8946166b974c9392cf49fd1d5611bb9e57b",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "e"
@@ -2948,7 +2948,7 @@
       "file": "src/commands/runtime-supervisor.js",
       "line": 101,
       "column": 41,
-      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "expectedFileHash": "sha256:0f667a126eabf58f152be77087fdb8946166b974c9392cf49fd1d5611bb9e57b",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "v",
@@ -2964,7 +2964,7 @@
       "file": "src/commands/runtime-supervisor.js",
       "line": 105,
       "column": 3,
-      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "expectedFileHash": "sha256:0f667a126eabf58f152be77087fdb8946166b974c9392cf49fd1d5611bb9e57b",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "verdict",
@@ -2977,25 +2977,27 @@
     },
     {
       "file": "src/commands/runtime-supervisor.js",
-      "line": 120,
-      "column": 36,
-      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "line": 123,
+      "column": 43,
+      "expectedFileHash": "sha256:0f667a126eabf58f152be77087fdb8946166b974c9392cf49fd1d5611bb9e57b",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "r",
         "name",
         "r",
-        "status"
+        "status",
+        "r",
+        "resolvedBy"
       ],
-      "reason": "A moldura explica um efeito colateral que confunde: para subir de novo, o antigo foi PARADO. Os interpolados são o nome do serviço e o código de status do encerramento — os mesmos que saem no payload de `stop`.",
-      "owner": "certificação RC PRD51 (Fase 1B)",
-      "evidence": "src/commands/runtime-supervisor.js:120 — reinício, no ramo humano de `dev`."
+      "reason": "A moldura explica um efeito colateral que confunde: para subir de novo, o antigo foi PARADO. Os interpolados sao o nome do servico, o codigo de status do encerramento e -- desde o S54.1 -- a FASE que o resolveu (`graceful` ou `force`). A fase entra porque a escada do §2.1 do PRD54 tornou o encerramento um processo de dois passos, e dizer que o antigo parou sem dizer se ele saiu limpo ou foi forcado esconde justamente a parte que interessa quando a porta nao volta. Os tres sao codigo, nao lingua: `resolvedBy` vem de vocabulario FECHADO em `stopAllPhased`.",
+      "owner": "S54.1 -- escada de encerramento (§2.1 do PRD54)",
+      "evidence": "src/runtime/supervisor.js: `stopAllPhased` marca cada linha com `resolvedBy` de vocabulario fechado (`graceful`|`force`); provado em tests/runtime_phased_shutdown.test.js, nos casos POSIX (pede e escala) e Windows (pula a fase e nomeia a ausencia)."
     },
     {
       "file": "src/commands/runtime-supervisor.js",
-      "line": 130,
+      "line": 131,
       "column": 5,
-      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "expectedFileHash": "sha256:0f667a126eabf58f152be77087fdb8946166b974c9392cf49fd1d5611bb9e57b",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "alive",
@@ -3013,9 +3015,9 @@
     },
     {
       "file": "src/commands/runtime-supervisor.js",
-      "line": 163,
+      "line": 164,
       "column": 14,
-      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "expectedFileHash": "sha256:0f667a126eabf58f152be77087fdb8946166b974c9392cf49fd1d5611bb9e57b",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "p",
@@ -3028,9 +3030,9 @@
     },
     {
       "file": "src/commands/runtime-supervisor.js",
-      "line": 175,
+      "line": 176,
       "column": 14,
-      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "expectedFileHash": "sha256:0f667a126eabf58f152be77087fdb8946166b974c9392cf49fd1d5611bb9e57b",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "p",
@@ -3050,9 +3052,9 @@
     },
     {
       "file": "src/commands/runtime-supervisor.js",
-      "line": 206,
+      "line": 207,
       "column": 70,
-      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "expectedFileHash": "sha256:0f667a126eabf58f152be77087fdb8946166b974c9392cf49fd1d5611bb9e57b",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "web",
@@ -3064,9 +3066,9 @@
     },
     {
       "file": "src/commands/runtime-supervisor.js",
-      "line": 289,
+      "line": 290,
       "column": 3,
-      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "expectedFileHash": "sha256:0f667a126eabf58f152be77087fdb8946166b974c9392cf49fd1d5611bb9e57b",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "outcome",
@@ -3085,9 +3087,9 @@
     },
     {
       "file": "src/commands/runtime-supervisor.js",
-      "line": 295,
+      "line": 296,
       "column": 34,
-      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "expectedFileHash": "sha256:0f667a126eabf58f152be77087fdb8946166b974c9392cf49fd1d5611bb9e57b",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "opts",
@@ -3102,9 +3104,9 @@
     },
     {
       "file": "src/commands/runtime-supervisor.js",
-      "line": 383,
+      "line": 389,
       "column": 33,
-      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "expectedFileHash": "sha256:0f667a126eabf58f152be77087fdb8946166b974c9392cf49fd1d5611bb9e57b",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "svc"
@@ -3115,9 +3117,9 @@
     },
     {
       "file": "src/commands/runtime-supervisor.js",
-      "line": 384,
+      "line": 390,
       "column": 3,
-      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "expectedFileHash": "sha256:0f667a126eabf58f152be77087fdb8946166b974c9392cf49fd1d5611bb9e57b",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "target",
@@ -3129,9 +3131,9 @@
     },
     {
       "file": "src/commands/runtime-supervisor.js",
-      "line": 391,
+      "line": 397,
       "column": 3,
-      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "expectedFileHash": "sha256:0f667a126eabf58f152be77087fdb8946166b974c9392cf49fd1d5611bb9e57b",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "target",
@@ -3143,9 +3145,9 @@
     },
     {
       "file": "src/commands/runtime-supervisor.js",
-      "line": 401,
+      "line": 407,
       "column": 22,
-      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "expectedFileHash": "sha256:0f667a126eabf58f152be77087fdb8946166b974c9392cf49fd1d5611bb9e57b",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "web",
@@ -3157,9 +3159,9 @@
     },
     {
       "file": "src/commands/runtime-supervisor.js",
-      "line": 401,
+      "line": 407,
       "column": 54,
-      "expectedFileHash": "sha256:83c24e63081233861cbc6d4d2e19539be4dd5795b0949cfde6f09cf7e86b4b9a",
+      "expectedFileHash": "sha256:0f667a126eabf58f152be77087fdb8946166b974c9392cf49fd1d5611bb9e57b",
       "strategy": "translate_literal_frame_preserve_interpolations",
       "interpolations": [
         "web",

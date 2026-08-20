@@ -56,10 +56,19 @@ test("planStart: NÃO vaza env arbitrário; só secretRefs declarados chegam ao 
 })
 
 // ── killTreeCommand: árvore por plataforma ──
-test("killTreeCommand: Windows usa taskkill /T /F; POSIX mata o GRUPO (-pid)", async () => {
+/**
+ * PRD54 S54.1 — o comando tem DUAS formas, e o default é a gentil.
+ *
+ * O default ser gracioso não é gosto: no POSIX o comportamento histórico já era
+ * `kill -TERM`, e default forçado teria trocado SIGTERM por SIGKILL em silêncio
+ * para todo chamador existente — consertando o Windows às custas do POSIX.
+ */
+test("killTreeCommand: pede por default e força quando mandado; POSIX mata o GRUPO", async () => {
   const { killTreeCommand } = await imp(supMod)
-  assert.deepEqual(killTreeCommand(123, "win32"), { file: "taskkill", args: ["/PID", "123", "/T", "/F"] })
+  assert.deepEqual(killTreeCommand(123, "win32"), { file: "taskkill", args: ["/PID", "123", "/T"] })
+  assert.deepEqual(killTreeCommand(123, "win32", { force: true }), { file: "taskkill", args: ["/PID", "123", "/T", "/F"] })
   assert.deepEqual(killTreeCommand(123, "linux"), { file: "kill", args: ["-TERM", "-123"] })
+  assert.deepEqual(killTreeCommand(123, "linux", { force: true }), { file: "kill", args: ["-KILL", "-123"] })
 })
 
 // ── stopAll: invoca o kill por serviço, idempotente ──
@@ -68,11 +77,13 @@ test("stopAll: mata cada pid; lida com no-pid e processo já encerrado", async (
   const calls = []
   // taskkill de pid inexistente sai com erro; ESRCH-like ⇒ status tipado already_gone (S45.1).
   const exec = (file, args) => { if (args.includes("999")) throw Object.assign(new Error("not found"), { code: "ESRCH" }); calls.push([file, ...args].join(" ")) }
-  const r = stopAll([{ name: "web", pid: 123 }, { name: "x", pid: null }, { name: "gone", pid: 999 }], { exec, platform: "win32" })
+  const r = stopAll([{ name: "web", pid: 123 }, { name: "x", pid: null }, { name: "gone", pid: 999 }],
+    { exec, platform: "win32", force: true })
   assert.equal(r[0].status, "stopped")
   assert.equal(r[1].status, "no_pid")
   assert.equal(r[2].status, "already_gone")
   assert.deepEqual(calls, ["taskkill /PID 123 /T /F"])
+  assert.equal(r[0].phase, "force", "a linha diz em que fase foi resolvida")
 })
 
 // ── stopAll POSIX: caminho NATIVO mata o GRUPO via process.kill(-pid) ──
