@@ -93,6 +93,52 @@ test("gradeClaimStatus NÃO tem porta dos fundos: sem `io` a verificação conti
   assert.equal(gradeClaimStatus("PARTIAL", null), "PARTIAL", "status não-REAL segue intocado")
 })
 
+/**
+ * PRD52 S52.M — os dentes NAO podem morder a DISTRIBUICAO.
+ *
+ * Achado pelo CI, na primeira vez que a matriz OS x Node conseguiu medir de
+ * verdade: o oraculo do produto reprovou com `REAL=0, esperado > 0` nas 12
+ * linhas. Reproduzido local: no tarball as 24 claims caiam para NOT_PROVED
+ * enquanto eram REAL no repo do MESMO commit.
+ *
+ * Causa: `tests/` nao e distribuido (decisao antiga e correta do
+ * `package.json`), e as regras 3 e 4 exigem o arquivo do controle negativo.
+ * Ausencia por NAO-ENVIO nao e ausencia de prova.
+ */
+test("DISTRIBUICAO: sem `tests/`, o contrato nao e verificavel e a claim mantem o status", async () => {
+  const { ehDistribuicao } = await imp("src/dream/claim-contract-check.js")
+  const { gradeClaimStatus } = await imp("src/dream/claim-contract.js")
+  const semTestes = leitorFalso({ "src/skills/coisa.js": "x", "src/index.js": "y" })
+  assert.equal(ehDistribuicao(semTestes), true, "`tests/` ausente por inteiro = distribuicao")
+  assert.equal(gradeClaimStatus("REAL", CONTRATO_BOM, semTestes), "REAL",
+    "o pacote instalado nao pode reportar que NADA esta provado")
+})
+
+test("CONTROLE NEGATIVO: com `tests/` presente, UM arquivo faltando continua reprovando", async () => {
+  const { ehDistribuicao } = await imp("src/dream/claim-contract-check.js")
+  const { gradeClaimStatus, NOT_PROVED } = await imp("src/dream/claim-contract.js")
+  // `tests/` existe — é repo-fonte. Mas o controle negativo CITADO pelo
+  // contrato (`tests/coisa.test.js`) não está lá: é lacuna real, não distribuição.
+  const io = leitorFalso({
+    "src/skills/coisa.js": "x", "src/index.js": "y",
+    "tests": "dir", "tests/outro.test.js": "z",
+  })
+  assert.equal(ehDistribuicao(io), false, "`tests/` presente = repo-fonte, os dentes valem")
+  assert.equal(gradeClaimStatus("REAL", CONTRATO_BOM, io), NOT_PROVED,
+    "teste citado que sumiu do repo continua sendo defeito real")
+})
+
+test("o audit do PACOTE concorda com o do REPO no mesmo commit", async () => {
+  const { audit } = await imp("src/dream/auditor.js")
+  const { existsSync } = await import("node:fs")
+  const pkg = path.join(repoRoot, ".gstack", "tmp", "pkg", "package")
+  if (!existsSync(pkg)) return // o tarball extraido e opcional; sem ele nao ha o que comparar
+  const noPacote = audit({ root: pkg, behavioral: true })
+  const noRepo = audit({ behavioral: true })
+  assert.equal(noPacote.summary.REAL, noRepo.summary.REAL,
+    "REAL identico repo vs tarball -- agora tambem no modo COMPORTAMENTAL")
+})
+
 // ── O placar real, e o registro da transição ──
 
 test("o auditor real aplica os dentes e explica a queda", async () => {

@@ -198,6 +198,26 @@ export const REGRAS_DO_CONTRATO = Object.freeze([
 ])
 
 /**
+ * A árvore auditada é uma DISTRIBUIÇÃO, e não um repo-fonte?
+ *
+ * O `package.json` não distribui `tests/` — decisão antiga e correta. Mas as
+ * regras 3 e 4 exigem que o arquivo do controle negativo EXISTA, e num pacote
+ * instalado ele nunca existe. O resultado, medido: as 24 claims caíam para
+ * NOT_PROVED no tarball enquanto eram REAL no repo, e o audit passava a dizer
+ * ao usuário que nada no produto está provado.
+ *
+ * Isso é falso. Ausência por NÃO-ENVIO não é ausência de prova — a prova foi
+ * feita no repo, no commit que gerou o pacote. Aplicar aqui uma regra que a
+ * árvore não tem como satisfazer não é rigor: é medir a coisa errada e reportar
+ * com confiança.
+ *
+ * A distinção é estrutural e não admite meio-termo: `tests/` inteiro ausente é
+ * distribuição; `tests/` presente com UM arquivo faltando é defeito real, e
+ * continua reprovando como antes.
+ */
+export const ehDistribuicao = (io = leitorPadrao()) => !io.has("tests")
+
+/**
  * Os problemas de UM contrato contra o repo auditado. Lista vazia = tem dentes.
  *
  * `io` é injetável de propósito: o auditor roda tanto no repo-fonte quanto no

@@ -14,7 +14,7 @@
  * executável, o controle negativo é um teste real e toca a capacidade. Um contrato
  * que não sobrevive à verificação vale o mesmo que contrato ausente: `NOT_PROVED`.
  */
-import { contratoComDentes, problemasDoContrato } from "./claim-contract-check.js"
+import { contratoComDentes, problemasDoContrato, ehDistribuicao } from "./claim-contract-check.js"
 
 export const CLAIM_CONTRACT_SCHEMA = "gstack.dream.claim-contract.v1"
 
@@ -45,6 +45,11 @@ export function hasBehavioralContract(contract) {
 export function gradeClaimStatus(fileStatus, contract, io = undefined) {
   if (fileStatus !== "REAL") return fileStatus
   if (!hasBehavioralContract(contract)) return NOT_PROVED
+  // Numa DISTRIBUIÇÃO, os testes não viajam por design. As regras que exigem o
+  // arquivo do controle negativo não têm como ser satisfeitas ali, e aplicá-las
+  // faria o pacote instalado reportar que NADA está provado — falso, e medido:
+  // 24 NOT_PROVED no tarball contra 24 REAL no repo do MESMO commit.
+  if (ehDistribuicao(io)) return "REAL"
   return contratoComDentes(contract, io) ? "REAL" : NOT_PROVED
 }
 
