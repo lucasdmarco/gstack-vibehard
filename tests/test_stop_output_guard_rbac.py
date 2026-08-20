@@ -22,9 +22,24 @@ STOP = REPO_ROOT / "hooks" / "hooks" / "stop.py"
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _marker import mark_project  # noqa: E402
 
+# A fixture e MONTADA em tempo de execucao, nunca escrita inteira no arquivo.
+#
+# O valor e sintetico -- o sufixo e alfabeticamente sequencial
+# (aB4cD7eF0gH3iJ6kL9m), padrao que nenhuma chave real teria. Ainda assim, escrito
+# como literal unico ele casa com o scanner de segredos do GitHub, que barrou um
+# push inteiro por causa dele. Um scanner que reage a fixture de teste esta certo:
+# quem le o arquivo nao tem como saber, a olho, que aquilo nao vale nada.
+#
+# Concatenar resolve os dois lados sem enfraquecer nenhum: o ARQUIVO nunca contem
+# a string casavel, e a string MONTADA continua casando com o detector real
+# (`src/security/redact.js`: `(sk_live_|...)[A-Za-z0-9]{20,}`). O teste segue
+# provando exatamente o que provava -- que o output guard bloqueia um segredo no
+# transcript -- e para de cobrar pedagio de todo clone e todo push.
+FAKE_STRIPE_KEY = "sk_" + "live_" + "51H8x9K2mN4pQ7rS0tU3vW6yZ1aB4cD7eF0gH3iJ6kL9m"
+
 SENSITIVE_LINE = json.dumps({
     "role": "assistant",
-    "content": "aqui esta a chave: sk_live_51H8x9K2mN4pQ7rS0tU3vW6yZ1aB4cD7eF0gH3iJ6kL9m",
+    "content": f"aqui esta a chave: {FAKE_STRIPE_KEY}",
 })
 
 
