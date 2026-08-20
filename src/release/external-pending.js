@@ -23,6 +23,7 @@ import { mkdirSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { PASSOS, planoDeCertificacao, VESTIGIOS } from "./clean-machine-e2e.js"
 import { construirMatriz, chaveDaCelula } from "./support-matrix.js"
+import { ingerirRelatorios } from "./matrix-intake.js"
 import { statusDosHooksDoCodex } from "../harness/codex-hooks-status.js"
 
 export const EXTERNAL_PENDING_SCHEMA = "gstack.external-pending.v1"
@@ -56,7 +57,18 @@ const PENDENCIAS = Object.freeze([
     id: "os_node_matrix",
     closes: "pacote_cross_os",
     blockedBy: "external_ci_execution",
-    requires: "execução do workflow `runtime-compat.yml` no GitHub (nunca rodou)",
+    // CORRIGIDO NO S52.O. Esta linha dizia "nunca rodou", e virou falsa quando o
+    // workflow rodou 12/12 verde em 2026-08-20 sem que o critério mudasse. A
+    // pendência real nunca foi a execução: era que o runner não media uninstall
+    // (o §26.3 recusa `pass` sem esse recibo) e que ninguém LIA os relatórios.
+    // Uma pendência que nomeia a causa errada manda a pessoa consertar o que não
+    // está quebrado — e essa é a única coisa pior que não ter runbook.
+    requires: "run do `runtime-compat.yml` no commit auditado, com o oráculo de uninstall (S52.O), e os relatórios TRAZIDOS para `.gstack/evidence/runtime-matrix/`",
+    steps: [
+      "gh workflow run runtime-compat.yml --ref master",
+      "gh run download <runId> -D .gstack/evidence/runtime-matrix",
+      "achatar: os artefatos vêm em subdiretório, e a ingestão lê `runtime-matrix-*.json` na raiz do diretório",
+    ],
     verify: "node src/index.js prd gate --json  # criterio pacote_cross_os",
   },
 ])
@@ -76,7 +88,10 @@ const preCondicoes = () => VESTIGIOS.map((v) => ({
 
 /** As células que a execução do CI preencheria, com a chave que o recibo usa. */
 function celulasPendentes(cwd) {
-  const m = construirMatriz({ cwd })
+  // Com os recibos ja ingeridos: sem isto o runbook listaria as 12 celulas como
+  // pendentes mesmo depois de o operador ter trazido os relatorios, e mandaria
+  // repetir trabalho ja feito.
+  const m = construirMatriz({ cwd, receipts: ingerirRelatorios({ cwd }).receipts })
   return m.cells
     .filter((c) => c.verdict === "not_run")
     .map((c) => ({ key: chaveDaCelula(c.os, c.nodeVersion), os: c.os, nodeVersion: c.nodeVersion, verdict: c.verdict }))

@@ -422,7 +422,36 @@ function prepararProjeto(nodeBin, sandbox, tarball, env, offline) {
   return { proj, entry }
 }
 
-/** Roda os nove oraculos do produto, na ordem em que um usuario os encontraria. */
+/**
+ * O pacote SAI da maquina?
+ *
+ * POR QUE ESTE ORACULO EXISTE (PRD52 S52.O): a celula do §26.3 recusa `pass`
+ * sem `uninstallReceiptRef`, e a matriz media instalacao e runtime e parava ali.
+ * O resultado media era um CI verde que nunca poderia pintar uma celula de
+ * verde -- as 12 ficavam `not_run` para sempre, e a leitura facil ("o CI ainda
+ * nao rodou") escondia que faltava MEDICAO, nao execucao.
+ *
+ * A prova e EFEITO em disco, nao exit code: o diretorio do pacote precisa
+ * deixar de existir. Um `npm uninstall` que sai 0 e deixa a arvore no lugar
+ * passaria por qualquer verificacao de status.
+ */
+function oraculoUninstall(nodeBin, env, prep) {
+  const alvo = path.join(prep.proj, "node_modules", "@gstack-vibehard", "installer")
+  if (!existsSync(alvo)) return falhou("uninstall", "pacote ja ausente ANTES do uninstall — nada foi medido")
+  const r = npm(nodeBin, ["uninstall", "--no-audit", "--no-fund", "--silent", "@gstack-vibehard/installer"], {
+    cwd: prep.proj, env, timeout: TIMEOUT_INSTALL,
+  })
+  if (r.status !== 0) return falhou("uninstall", `npm uninstall exit ${r.status}: ${(r.stderr || "").slice(0, 160)}`)
+  if (existsSync(alvo)) return falhou("uninstall", "npm uninstall saiu 0 mas o pacote continua em node_modules")
+  return ok("uninstall", { removido: path.join("node_modules", "@gstack-vibehard", "installer") })
+}
+
+/**
+ * Roda os oraculos do produto, na ordem em que um usuario os encontraria.
+ *
+ * `uninstall` e o ULTIMO por necessidade, nao por estetica: ele apaga o pacote
+ * que todos os outros usam.
+ */
 function rodarOraculos(nodeBin, env, prep, sandbox, versao, tarball) {
   const chamar = (args, cwd = prep.proj) => rodar(nodeBin, [prep.entry, ...args], { cwd, env })
   const ws = path.join(sandbox, "ws")
@@ -440,6 +469,7 @@ function rodarOraculos(nodeBin, env, prep, sandbox, versao, tarball) {
     oraculoProofNegativo(chamar, vazio),
     oraculoProofParcial(chamar, prep.proj),
     oraculoState(chamar, prep.proj),
+    oraculoUninstall(nodeBin, env, prep),
   ]
 }
 

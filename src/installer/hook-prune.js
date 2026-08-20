@@ -97,4 +97,3 @@ export function podarHooks({ hooksSource, targets = [], manifest = null, dryRun 
   }
   return { pruned: removidos, skipped: null }
 }
-

@@ -25,6 +25,7 @@ import { join } from "node:path"
 import { prd52Readiness, PRD52_EXTERNAL_PENDING } from "./rc-checklist-prd52.js"
 import { prd51Readiness } from "./rc-checklist-prd51.js"
 import { construirMatriz } from "../release/support-matrix.js"
+import { ingerirRelatorios, RELATORIOS_DIR } from "../release/matrix-intake.js"
 import { statusDosHooksDoCodex } from "../harness/codex-hooks-status.js"
 import { planoDeCertificacao } from "../release/clean-machine-e2e.js"
 import { deriveEngineGates } from "../project-plan/golden-run.js"
@@ -97,12 +98,29 @@ function criteriosDoPrd52(readiness) {
     : unproven(c.id, c.source, c.nao(readiness))))
 }
 
+/**
+ * Por que a matriz ainda não tem célula verde.
+ *
+ * A mensagem anterior dizia "o CI de runtime-compat nunca rodou" e virou FALSA
+ * quando o workflow rodou 12/12 verde — sem que o critério mudasse, porque
+ * ninguém lia os relatórios (S52.O). Um critério que acusa a causa errada manda
+ * a pessoa consertar o que não está quebrado, então a razão agora é DERIVADA do
+ * que a ingestão mediu: quantos relatórios havia, quantos foram aceitos e o que
+ * os recusou.
+ */
+function razaoDaMatriz(matriz, intake) {
+  if (!intake || intake.read === 0) return `nenhum relatório em \`${RELATORIOS_DIR}\` — o CI pode ter rodado; ninguém trouxe o resultado`
+  if (intake.provenanceProblems.length > 0) return `${intake.read} relatório(s) recusado(s) por procedência: ${intake.provenanceProblems.join("; ")}`
+  if (intake.rejected.length > 0) return `${intake.rejected.length} relatório(s) inválido(s): ${intake.rejected.map((r) => `${r.file} (${r.problems[0]})`).join("; ")}`
+  return `${intake.accepted} relatório(s) aceito(s), e ainda assim nenhuma célula fechou os quatro recibos do §26.3`
+}
+
 /** Os critérios que dependem de evidência EXTERNA — máquina, CI, rotação humana. */
-function criteriosExternos({ matriz, hooks, plano }) {
+function criteriosExternos({ matriz, hooks, plano, intake = null }) {
   return [
     matriz.proven.length > 0
       ? met("pacote_cross_os", "support-matrix", `${matriz.proven.length}/${matriz.cells.length} células provadas`)
-      : unproven("pacote_cross_os", "support-matrix", `0/${matriz.cells.length} células provadas — o CI de runtime-compat nunca rodou`),
+      : unproven("pacote_cross_os", "support-matrix", `0/${matriz.cells.length} células provadas — ${razaoDaMatriz(matriz, intake)}`),
     plano.runnable && hooks.enforcementObserved
       ? met("clean_machine_certificado", "clean-machine-e2e", "certificação executada em máquina limpa")
       : unproven("clean_machine_certificado", "clean-machine-e2e",
@@ -209,13 +227,15 @@ function criteriosDeArtefato(repoRoot) {
  */
 export function prd53EntryGate({ repoRoot = process.cwd(), commit = null, medicoes = null } = {}) {
   const readiness = prd52Readiness(undefined, { repoRoot, commit, medicoes })
+  const entrada = ingerirRelatorios({ cwd: repoRoot, commit })
   const criterios = [
     ...criteriosDoPrd52(readiness),
     criterioP0Aberto(prd51Readiness()),
     ...criteriosExternos({
-      matriz: construirMatriz({ cwd: repoRoot }),
+      matriz: construirMatriz({ cwd: repoRoot, receipts: entrada.receipts }),
       hooks: statusDosHooksDoCodex(),
       plano: planoDeCertificacao(),
+      intake: entrada,
     }),
     ...controlesDoPrd52(),
     ...criteriosDeArtefato(repoRoot),

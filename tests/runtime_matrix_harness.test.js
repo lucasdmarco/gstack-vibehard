@@ -516,3 +516,43 @@ test("`--tarball` nunca reempacota — o Node precisa ser a única variável", (
     "com `--tarball` o script usa o artefato dado; sem ele, empacota uma vez só")
   assert.match(src, /sha256\(tarball\)/, "o relatório carrega o hash do artefato medido")
 })
+
+// ── O ciclo de vida COMPLETO — PRD52 S52.O ──────────────────────────────────
+
+/**
+ * A CÉLULA DO §26.3 E O RUNNER PRECISAM FALAR DA MESMA COISA.
+ *
+ * O defeito que este teste guarda não foi um bug de código: foi um contrato que
+ * ninguém tinha ligado às pontas. A célula recusa `pass` sem
+ * `uninstallReceiptRef`; o runner media instalação e runtime e parava ali. As
+ * duas metades estavam certas e o resultado era um CI 12/12 verde que jamais
+ * poderia pintar uma célula — e a leitura fácil ("o CI ainda não rodou")
+ * escondia que faltava MEDIÇÃO, não execução.
+ *
+ * A asserção é sobre a superfície do runner porque é lá que o buraco existia:
+ * um oráculo que ninguém chama não mede nada, e o relatório não tem como
+ * denunciar a ausência de um oráculo que ninguém escreveu.
+ */
+test("o runner mede o ciclo INTEIRO: instalação, runtime e uninstall", () => {
+  const src = fonte()
+  const bloco = src.slice(src.indexOf("function rodarOraculos"), src.indexOf("function resultadoMedido"))
+
+  assert.match(bloco, /oraculoUninstall\(/, "o uninstall precisa ser CHAMADO, não só existir")
+  assert.match(bloco, /ok\("install"/, "o recibo de install vem do próprio bloco de oráculos")
+  assert.ok(bloco.indexOf("oraculoUninstall(") > bloco.indexOf("oraculoState("),
+    "uninstall apaga o pacote que os outros usam — precisa ser o último")
+})
+
+/**
+ * O oráculo verifica EFEITO, não exit code: um `npm uninstall` que sai 0 e deixa
+ * a árvore no lugar passaria por qualquer verificação de status, e a célula
+ * ficaria verde afirmando um uninstall que não aconteceu.
+ */
+test("o oráculo de uninstall confere o disco, não o exit code", () => {
+  const src = fonte()
+  const corpo = src.slice(src.indexOf("function oraculoUninstall"), src.indexOf("Roda os oraculos do produto"))
+
+  assert.match(corpo, /existsSync\(alvo\)/, "precisa olhar o diretório do pacote")
+  assert.match(corpo, /ja ausente ANTES/, "pacote ausente antes do teste não é uninstall provado — é medição vazia")
+  assert.match(corpo, /continua em node_modules/, "exit 0 com árvore no lugar precisa reprovar")
+})

@@ -391,9 +391,14 @@ function consumidoresDe(modulo) {
  * carona.
  */
 test("os consumidores do §26 são exatamente os declarados", async () => {
+  // `matrix-intake.js` entrou no S52.O, e a revisão é esta linha: ele valida
+  // com `problemasDaCelula` cada célula que constrói a partir de relatório do
+  // CI. É o consumo certo — a célula nasce de dado externo, e o §26.3 é quem
+  // diz o que uma célula precisa ter para ser levada a sério.
   assert.deepEqual(consumidoresDe("prd52-schemas.js"),
     ["src/dream/claim-reconciler.js", "src/release/clean-machine-e2e.js",
-      "src/release/support-matrix.js", "src/tools/readiness-freshness.js"],
+      "src/release/matrix-intake.js", "src/release/support-matrix.js",
+      "src/tools/readiness-freshness.js"],
     "consumidor novo do §26 entra por decisão, não por carona")
 })
 

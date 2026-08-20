@@ -24,6 +24,7 @@
 import { audit } from "./auditor.js"
 import { reconciliarAudit } from "./claim-reconciler.js"
 import { construirMatriz } from "../release/support-matrix.js"
+import { ingerirRelatorios } from "../release/matrix-intake.js"
 import { statusDosHooksDoCodex } from "../harness/codex-hooks-status.js"
 import { relatorioDaFronteira } from "../meta/prd52-boundaries.js"
 
@@ -117,13 +118,22 @@ const isDelivered = (i) => i.status === "delivered"
 export function medicoesAoVivo({ repoRoot = process.cwd(), commit = null } = {}) {
   const a = audit({ behavioral: true, receipts: true, commit })
   const rec = reconciliarAudit(a)
-  const matriz = construirMatriz({ cwd: repoRoot })
+  // S52.O: os relatorios do CI, quando o operador os depositou. Sem isto a
+  // matriz era construida SEM recibo nenhum e as 12 celulas ficavam `not_run`
+  // mesmo com o `runtime-compat` verde -- e o criterio culpava o CI por nao ter
+  // rodado quando o que faltava era alguem LER o que ele produziu.
+  const entrada = ingerirRelatorios({ cwd: repoRoot, commit })
+  const matriz = construirMatriz({ cwd: repoRoot, receipts: entrada.receipts })
   const hooks = statusDosHooksDoCodex()
   const fronteira = relatorioDaFronteira(repoRoot)
   return {
     scoreboard: a.summary,
     reconciliation: rec.byVerdict,
     reconciliationInvalid: rec.invalidRecords.length,
+    matrixIntake: {
+      read: entrada.read, accepted: entrada.accepted,
+      rejected: entrada.rejected, provenanceProblems: entrada.provenanceProblems,
+    },
     supportMatrix: { total: matriz.cells.length, proven: matriz.proven.length, counts: matriz.counts },
     codexHooks: { byState: hooks.byState, enforcementObserved: hooks.enforcementObserved },
     boundaryEnforced: fronteira.enforced,
