@@ -74,7 +74,20 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist-matrix/npm-cache
-          npm cache add "dist-matrix/${{ steps.manifest.outputs.name }}" --cache dist-matrix/npm-cache
+          # O `./` NÃO é decorativo — é o que faz o npm tratar isto como CAMINHO.
+          #
+          # `npm cache add a/b` é interpretado como ATALHO DE GITHUB (`owner/repo`).
+          # Sem o `./`, o npm tentou `git ls-remote
+          # ssh://git@github.com/dist-matrix/<nome>.tgz.git` e morreu com
+          # `Permission denied (publickey)`, exit 128. Como o job `matrix` depende
+          # deste, os 12 consumidores nunca rodaram e os três `aggregate`
+          # quebraram em cascata procurando relatórios que ninguém produziu.
+          #
+          # Foi a PRIMEIRA execução real deste workflow (2026-08-20) e ela não
+          # chegou a medir nada. Reproduzido e corrigido localmente antes de
+          # subir: a forma relativa falha com o mesmo `ls-remote`, e a forma
+          # `./` popula o cache de verdade.
+          npm cache add "./dist-matrix/${{ steps.manifest.outputs.name }}" --cache dist-matrix/npm-cache
           node -e "
             const p=require('./package.json');
             const deps=Object.entries(p.dependencies||{});
