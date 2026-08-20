@@ -9,7 +9,7 @@ import { cleanupTmp } from "./helpers/tmp.js"
 /**
  * ORIGEM DO PARÂMETRO DE UM ARROW, por TODOS os callsites elegíveis.
  *
- * `runtime-supervisor.js:352` e `:395` são a mesma forma — o seam de escrita:
+ * `runtime-supervisor.js:381` e `:424` são a mesma forma — o seam de escrita:
  *
  *   const write = opts.write || ((s) => process.stdout.write(s))
  *   …
@@ -227,7 +227,7 @@ test("REPO: `logsCommand` resolve para leitura de arquivo; `followLog` NÃO", as
   const alvo = path.join(repoRoot, "src", "commands", "runtime-supervisor.js")
   const pts = analyzeFile(alvo, createAnalyzer([alvo]), { repoRoot })
 
-  assert.equal(pts.find((p) => p.line === 395).parameterOrigin, "file_read",
+  assert.equal(pts.find((p) => p.line === 424).parameterOrigin, "file_read",
     "`logsCommand` passa `acumulado`, que é `readFileSync(target.log)` — cadeia inteira visível")
 
   // `followLog` chama `write(readTail(...))`, e `readTail` devolve
@@ -235,7 +235,7 @@ test("REPO: `logsCommand` resolve para leitura de arquivo; `followLog` NÃO", as
   // COLATERAL, e o retorno não guarda vínculo sintático com a leitura. Provar
   // exigiria análise de aliasing que este engine não faz — e não fazer é a
   // decisão certa: fail-closed.
-  assert.equal(pts.find((p) => p.line === 352).parameterOrigin, "unresolved",
+  assert.equal(pts.find((p) => p.line === 381).parameterOrigin, "unresolved",
     "efeito colateral em buffer não é cadeia de valor — o ponto continua na fila")
 })
 

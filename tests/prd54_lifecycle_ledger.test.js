@@ -80,10 +80,24 @@ test("toda condição externa carrega MOTIVO — bloqueio mudo vira permanente",
   }
 })
 
-test("prova sem evidência explica o que falta DESENHAR, não só que falta", () => {
+/**
+ * S54.2b — esta prova SAIU de "sem cenário definido".
+ *
+ * O ledger nasceu dizendo que "crash do Manager" não tinha experimento, com o
+ * raciocínio de que o `dev` sai logo após spawnar. Era análise de menos: o
+ * Manager existe DURANTE o nascimento do serviço, e a janela entre `spawn` e
+ * `writeServiceState` tinha um `await` no meio. O defeito foi reproduzido, a
+ * janela foi fechada, e o que sobra é decisão de produto — não falta de ideia.
+ */
+test("a prova do crash do Manager tem cenário e separa o que FOI feito do que resta", () => {
   const crash = PROVAS_DO_P0.find((p) => p.id === "recuperacao_pos_crash_do_manager")
-  assert.deepEqual(crash.evidence, [], "apontar para os testes de reconciliação seria confortável e errado")
-  assert.match(crash.nota, /desenhado|definido/, "sem experimento definido, a nota tem de dizer isso")
+  assert.ok(crash.evidence.length >= 2, "o cenário existe e tem teste")
+  const janela = crash.condicoes.find((c) => c.id === "janela_de_nascimento")
+  const orfao = crash.condicoes.find((c) => c.id === "orfao_preexistente")
+  assert.equal(janela.estado, "proved", "a janela de nascimento foi fechada e provada")
+  assert.equal(orfao.estado, "external", "matar órfão pré-existente é decisão de produto, não implementação")
+  assert.match(orfao.motivo, /não se prova ser nosso|linha de comando/,
+    "o motivo precisa dizer POR QUE não fazemos, senão parece preguiça")
 })
 
 // ── O ledger inteiro, contra o repositório real ─────────────────────────────
@@ -96,8 +110,8 @@ test("o ledger mede o repositório REAL e não fecha o P0 hoje", () => {
 
   assert.equal(l.complete, false, "o P0 do §2.1 não está fechado, e o ledger não pode dizer que está")
   assert.ok(l.proved.length >= 6, `regressão: só ${l.proved.length} provas fechadas`)
-  assert.deepEqual(l.unproved, ["recuperacao_pos_crash_do_manager"])
-  assert.deepEqual(l.external, ["vinte_execucoes_sem_residual"])
+  assert.deepEqual(l.unproved, [], "nenhuma prova está sem cenário — o que resta depende de ambiente ou de decisão")
+  assert.deepEqual(l.external, ["recuperacao_pos_crash_do_manager", "vinte_execucoes_sem_residual"])
 })
 
 /**

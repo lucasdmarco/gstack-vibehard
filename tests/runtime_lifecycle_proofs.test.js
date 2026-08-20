@@ -258,3 +258,67 @@ test("PROVA 8 (parcial: Windows normal): 20 ciclos, zero residual", { timeout: 3
       "no Windows não há fase graciosa, então nada pode aparecer como ESCALADO")
   } finally { cleanupTmp(dir) }
 })
+
+// ── PROVA 7: o Manager morre no meio do nascimento do serviço ───────────────
+
+/**
+ * PRD54 §2.1, prova 7 — "recuperação após crash do Manager".
+ *
+ * EU TINHA CLASSIFICADO ESTA PROVA COMO "SEM CENÁRIO DEFINIDO", e era análise de
+ * menos. O raciocínio errado foi: o `dev` sai logo após spawnar, então não existe
+ * Manager permanente para crashar. Mas o Manager existe DURANTE o nascimento do
+ * serviço, e é justamente ali que a morte dele faz estrago.
+ *
+ * A janela era real e foi MEDIDA: `spawnServiceChild` → `await awaitSpawn` →
+ * `writeServiceState`. Entre o spawn e o registro havia um `await`. Um processo
+ * `detached` já existia, já sobrevivia ao pai, e não tinha nenhum rastro em
+ * disco. Reproduzido spawnando exatamente como o supervisor spawna e rodando o
+ * `stop` real: `{"stopped":[]}`, exit 0 — e o processo vivo, segurando porta e
+ * log. Silêncio perfeito sobre um vazamento.
+ *
+ * O QUE ESTA PROVA COBRE HOJE: o pid vai para o disco antes de qualquer `await`,
+ * e um registro sem pid vira `possible_orphan` — não-resolvido, state preservado.
+ * O QUE ELA NÃO COBRE: identificar e encerrar um órfão que já exista de uma
+ * versão anterior. Isso exige casar processo por linha de comando, e matar por
+ * semelhança contradiz a regra que este supervisor segue desde o PRD45 — não se
+ * mata o que não se consegue provar que é nosso.
+ */
+test("PROVA 7: processo sem registro é INVISÍVEL ao stop — o defeito, reproduzido", async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "gstack-orfao-"))
+  let pid = null
+  try {
+    const porta = await portaEfemera()
+    const s = await subirServico(dir, porta) // sobe SEM escrever state, como no crash
+    pid = s.pid
+
+    // A escada só alcança quem o state nomeia. Com state vazio, não há o que parar.
+    const r = await stopAllPhased([], { exec: execReal })
+    assert.deepEqual(r.results, [], "sem registro, o stop não tem alvo")
+    assert.equal(vivo(pid), true, "e o processo continua vivo — este É o vazamento")
+  } finally { matarSemDo(pid); cleanupTmp(dir) }
+})
+
+/**
+ * A DEFESA: registro sem pid não é "nada a fazer". É rastro de um spawn cujo
+ * desfecho ninguém confirmou, e o `stop` precisa dizer isso em vez de limpar.
+ */
+test("PROVA 7: registro `spawning` sem pid é `possible_orphan`, e NÃO resolve", async () => {
+  const { stopAll, stopOutcome } = await import("../src/runtime/supervisor.js")
+  const rs = stopAll([{ name: "web", status: "spawning", command: "node server.js", log: "web.log" }], { platform: "win32" })
+
+  assert.equal(rs[0].status, "possible_orphan")
+  assert.equal(rs[0].command, "node server.js", "sem o comando, quem for investigar não tem por onde começar")
+
+  const o = stopOutcome(rs, [])
+  assert.equal(o.clearable, false, "limpar o state trocaria um órfão conhecido por um invisível")
+  assert.equal(o.exitCode, 1)
+  assert.deepEqual(o.unresolved.map((u) => u.status), ["possible_orphan"])
+})
+
+/** CONTROLE NEGATIVO: registro sem pid e sem `spawning` continua `no_pid` resolvido. */
+test("PROVA 7: registro sem pid que NÃO nasceu de spawn segue `no_pid`", async () => {
+  const { stopAll, stopOutcome } = await import("../src/runtime/supervisor.js")
+  const rs = stopAll([{ name: "web", status: "failed" }], { platform: "win32" })
+  assert.equal(rs[0].status, "no_pid")
+  assert.equal(stopOutcome(rs, []).clearable, true, "alargar `possible_orphan` travaria o stop de todo mundo")
+})

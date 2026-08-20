@@ -87,13 +87,25 @@ export const PROVAS_DO_P0 = Object.freeze([
   {
     id: "recuperacao_pos_crash_do_manager",
     titulo: "recuperação após crash do Manager",
-    evidence: [],
-    // Deliberadamente VAZIA. O `dev` sai logo após spawnar (o serviço é
-    // `detached`), então "crash do Manager" precisa primeiro ser DEFINIDO neste
-    // desenho antes de virar experimento. Apontar para os testes de reconciliação
-    // seria confortável e errado: eles provam que o `stop` classifica bem um
-    // state herdado, não que o sistema se recupera de um Manager morto no meio.
-    nota: "sem experimento definido: o `dev` não permanece como Manager (o serviço é detached), então o cenário precisa ser desenhado antes de medido",
+    evidence: [
+      t("runtime_lifecycle_proofs.test.js", "PROVA 7: processo sem registro é INVISÍVEL ao stop — o defeito, reproduzido"),
+      t("runtime_lifecycle_proofs.test.js", "PROVA 7: registro `spawning` sem pid é `possible_orphan`, e NÃO resolve"),
+    ],
+    condicoes: Object.freeze([
+      { id: "janela_de_nascimento", estado: "proved" },
+      {
+        id: "orfao_preexistente",
+        estado: "external",
+        motivo: "encerrar um órfão JÁ existente exige casar processo por linha de comando, e matar por semelhança contradiz a regra do supervisor desde o PRD45 — não se mata o que não se prova ser nosso; é decisão de produto, não de implementação",
+      },
+    ]),
+    // CORRIGIDO no S54.2b. A versão anterior dizia "sem experimento definido",
+    // com o raciocínio de que o `dev` sai logo após spawnar e portanto não há
+    // Manager para crashar. Era análise de menos: o Manager existe DURANTE o
+    // nascimento do serviço, e a janela entre `spawn` e `writeServiceState` era
+    // real — havia um `await` no meio. Reproduzido: processo detached vivo,
+    // `stop --json` devolvendo `{"stopped":[]}` e exit 0.
+    nota: "janela de nascimento FECHADA (pid em disco antes de qualquer `await`) e registro sem pid virou `possible_orphan` não-resolvido; encerrar órfão PRÉ-EXISTENTE segue fora, por decisão de não matar o que não se prova ser nosso",
   },
   {
     id: "vinte_execucoes_sem_residual",

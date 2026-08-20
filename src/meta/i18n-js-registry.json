@@ -6360,7 +6360,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 14,
-          "line": 164,
+          "line": 179,
           "provenance": {
             "ids": [
               "p",
@@ -6381,7 +6381,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 14,
-          "line": 176,
+          "line": 205,
           "provenance": {
             "ids": [
               "p",
@@ -6409,7 +6409,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 70,
-          "line": 207,
+          "line": 236,
           "provenance": {
             "ids": [
               "web",
@@ -6429,7 +6429,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 208,
+          "line": 237,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -6446,7 +6446,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 209,
+          "line": 238,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -6463,7 +6463,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 14,
-          "line": 235,
+          "line": 264,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -6480,7 +6480,7 @@
           "calleePath": "process.stdout.write",
           "canonicalName": "write",
           "column": 20,
-          "line": 248,
+          "line": 277,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -6497,7 +6497,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 14,
-          "line": 278,
+          "line": 307,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -6514,7 +6514,7 @@
           "calleePath": "process.stdout.write",
           "canonicalName": "write",
           "column": 8,
-          "line": 279,
+          "line": 308,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -6531,7 +6531,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 3,
-          "line": 290,
+          "line": 319,
           "provenance": {
             "ids": [
               "outcome",
@@ -6558,7 +6558,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 3,
-          "line": 291,
+          "line": 320,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -6575,7 +6575,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 3,
-          "line": 294,
+          "line": 323,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -6592,7 +6592,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 28,
-          "line": 295,
+          "line": 324,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -6609,7 +6609,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 34,
-          "line": 296,
+          "line": 325,
           "provenance": {
             "ids": [
               "opts",
@@ -6632,7 +6632,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 31,
-          "line": 298,
+          "line": 327,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -6649,7 +6649,7 @@
           "calleePath": "process.stdout.write",
           "canonicalName": "write",
           "column": 13,
-          "line": 323,
+          "line": 352,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -6666,7 +6666,7 @@
           "calleePath": "process.stdout.write",
           "canonicalName": "write",
           "column": 39,
-          "line": 352,
+          "line": 381,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -6683,7 +6683,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 33,
-          "line": 389,
+          "line": 418,
           "provenance": {
             "ids": [
               "svc"
@@ -6702,7 +6702,7 @@
           "calleePath": "section",
           "canonicalName": "section",
           "column": 3,
-          "line": 390,
+          "line": 419,
           "provenance": {
             "ids": [
               "target",
@@ -6722,7 +6722,7 @@
           "calleePath": "process.stdout.write",
           "canonicalName": "write",
           "column": 27,
-          "line": 395,
+          "line": 424,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -6739,7 +6739,7 @@
           "calleePath": "info",
           "canonicalName": "info",
           "column": 3,
-          "line": 397,
+          "line": 426,
           "provenance": {
             "ids": [
               "target",
@@ -6759,7 +6759,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 27,
-          "line": 406,
+          "line": 435,
           "provenance": {
             "ids": [],
             "kind": "literal_only",
@@ -6776,7 +6776,7 @@
           "calleePath": "success",
           "canonicalName": "success",
           "column": 22,
-          "line": 407,
+          "line": 436,
           "provenance": {
             "ids": [
               "web",
@@ -6796,7 +6796,7 @@
           "calleePath": "warn",
           "canonicalName": "warn",
           "column": 54,
-          "line": 407,
+          "line": 436,
           "provenance": {
             "ids": [
               "web",
@@ -6809,7 +6809,7 @@
           "sink": null
         }
       ],
-      "fileHash": "sha256:0f667a126eabf58f152be77087fdb8946166b974c9392cf49fd1d5611bb9e57b"
+      "fileHash": "sha256:9f03cbd846925c44aa8b200be3cefd30d94653faafffe7930af63f5f75a4a296"
     },
     "src/commands/secrets.js": {
       "entries": [

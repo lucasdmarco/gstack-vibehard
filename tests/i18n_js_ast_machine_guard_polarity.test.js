@@ -156,10 +156,10 @@ test("REPO: `runtime-supervisor.js` — a frase humana sai da guarda, o payload 
   const alvo = path.join(repoRoot, "src", "commands", "runtime-supervisor.js")
   const pts = analyzeFile(alvo, createAnalyzer([alvo]), { repoRoot })
 
-  const humano = pts.find((p) => p.line === 278)
+  const humano = pts.find((p) => p.line === 307)
   assert.equal(humano.underMachineGuard, false, '"Nada rodando" roda quando `--json` NAO foi pedido')
 
-  const maquina = pts.find((p) => p.line === 279)
+  const maquina = pts.find((p) => p.line === 308)
   assert.equal(maquina.argForm, "json_document_literal")
   assert.equal(maquina.underMachineGuard, true, "o `{\"stopped\":[]}` vive no `else` de `if (!json)`")
 })

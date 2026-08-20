@@ -159,6 +159,21 @@ function awaitSpawn(child) {
   })
 }
 const spawnDetail = (err) => (err && (err.code || err.message)) || "spawn falhou"
+
+/**
+ * O registro de NASCIMENTO do serviço — gravado antes de qualquer espera.
+ *
+ * Sem `pid` o registro ainda vale: diz que um spawn foi TENTADO e não se sabe o
+ * desfecho. O `stop` trata isso como `possible_orphan` e se recusa a limpar o
+ * state, porque apagar o único rastro de um processo que talvez exista é a pior
+ * saída possível.
+ */
+function registrarNascimento(cwd, p, child, logPath, startedAt) {
+  writeServiceState(cwd, p.name, {
+    name: p.name, pid: child.pid, port: p.port,
+    status: "spawning", log: logPath, command: p.command, startedAt,
+  })
+}
 function failService(cwd, p, logPath, json, detail) {
   writeServiceState(cwd, p.name, { name: p.name, port: p.port, status: "failed", log: logPath, command: p.command, detail })
   if (!json) warn(`  ✗ ${p.name}: falhou ao iniciar — ${detail}`)
@@ -166,12 +181,26 @@ function failService(cwd, p, logPath, json, detail) {
 }
 async function startOneService(p, cwd, json) {
   const logPath = join(logsDir(cwd), `${p.name}.log`)
+  const startedAt = new Date().toISOString()
   const { child, fd } = spawnServiceChild(p, cwd, logPath)
+  // PRD54 S54.2b (§2.1 prova 7) — o PID VAI PARA O DISCO ANTES DE QUALQUER
+  // `await`.
+  //
+  // O `spawn` devolve `child.pid` de forma SÍNCRONA; só o `awaitSpawn` é
+  // assíncrono. A ordem anterior era spawn → await → grava, e nesse intervalo o
+  // processo já existia, já era `detached` e ainda não tinha registro. Se o CLI
+  // morresse ali (Ctrl+C, kill, crash), o filho sobrevivia INVISÍVEL: medido,
+  // com `stop --json` devolvendo `{"stopped":[]}` e exit 0 enquanto o processo
+  // seguia vivo segurando porta e log.
+  //
+  // Gravar antes do `await` reduz a janela a código síncrono. `spawning` é o
+  // estado honesto de "existe, ainda não confirmei que subiu" — as linhas
+  // seguintes o promovem a `starting` ou a `failed`.
+  registrarNascimento(cwd, p, child, logPath, startedAt)
   const outcome = await awaitSpawn(child)
   child.unref()
   try { closeSync(fd) } catch { /* ok */ }
   if (!outcome.ok) return failService(cwd, p, logPath, json, spawnDetail(outcome.err))
-  const startedAt = new Date().toISOString()
   writeServiceState(cwd, p.name, { name: p.name, pid: child.pid, port: p.port, status: "starting", log: logPath, command: p.command, startedAt })
   if (!json) info(`  ▸ ${p.name} (pid ${child.pid})${p.port ? ` :${p.port}` : ""} — ${p.command}`)
   return { name: p.name, pid: child.pid, port: p.port, log: logPath, command: p.command, startedAt, readinessPath: p.readinessPath, readinessTimeout: p.readinessTimeout }

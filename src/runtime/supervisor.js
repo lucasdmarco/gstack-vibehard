@@ -286,9 +286,29 @@ function attemptKill(svc, ctx, own) {
   const fase = { phase: ctx.force ? "force" : "graceful" }
   return { name: svc.name, status, pid: svc.pid, ...fase, ...note, ...detail }
 }
+/**
+ * Registro SEM pid: `no_pid` ou POSSÍVEL ÓRFÃO — e a diferença importa (S54.2b).
+ *
+ * `spawning` sem pid significa que o `dev` chegou a tentar o spawn e não voltou
+ * para dizer o desfecho: o Manager morreu no meio. Pode não haver processo
+ * nenhum, e pode haver um vivo que ninguém consegue nomear.
+ *
+ * Tratar isso como `no_pid` (resolvido) faria o `stop` limpar o state e apagar o
+ * ÚNICO rastro de um processo que talvez exista — trocando um órfão conhecido
+ * por um órfão invisível. `possible_orphan` é não-resolvido de propósito: o
+ * `stop` sai 1, preserva o registro e nomeia o serviço, para que a pessoa possa
+ * agir. Nós não matamos o que não conseguimos identificar.
+ */
+function semPid(svc) {
+  if (svc && svc.status === "spawning") {
+    return { name: svcName(svc), status: "possible_orphan", command: svc.command || null, log: svc.log || null }
+  }
+  return { name: svcName(svc), status: "no_pid" }
+}
+
 // Encerra UM serviço. Idempotente. Não-verificável (fail-closed) e reusado são PULADOS.
 function stopService(svc, ctx) {
-  if (!svc || !svc.pid) return { name: svcName(svc), status: "no_pid" }
+  if (!svc || !svc.pid) return semPid(svc)
   const own = ownershipFor(svc, ctx)
   return skipRow(svc, own) || attemptKill(svc, ctx, own)
 }
@@ -313,7 +333,9 @@ export function stopAll(state, opts = {}) {
 // que torna o retry idempotente possível — apagar cedo era o bug que impedia a 2ª tentativa.
 // PRD51 S51.1: `still_alive` e `handle_not_released` são não-resolvidos — o
 // state nunca pode ser limpo enquanto um deles existir (senão o retry perde o pid).
-const STOP_UNRESOLVED = new Set(["access_denied", "signal_failed", "still_alive", "handle_not_released", "skipped_unverified", "skipped_foreign"])
+// S54.2b: `possible_orphan` entra aqui porque limpar o state apagaria o unico
+// rastro de um processo que o Manager spawnou e nao chegou a registrar.
+const STOP_UNRESOLVED = new Set(["access_denied", "signal_failed", "still_alive", "handle_not_released", "skipped_unverified", "skipped_foreign", "possible_orphan"])
 // PRD51 S51.1.1 (P0b): SÓ o `still_alive` é a race pura — kill SEM erro, mas a probe
 // IMEDIATA de `attemptKill` ainda vê o processo (taskkill /F é assíncrono no Windows).
 // A AUTORIDADE final é a liveness pós-espera (`waitPidsExit`): se o pid morreu durante a
