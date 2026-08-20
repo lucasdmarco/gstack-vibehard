@@ -1,5 +1,35 @@
 # Changelog - gstack-vibehard
 
+## [5.108.0] - 2026-08-20 — PRD52/53/54: portões, compliance executado e o CI que passou a medir
+
+Primeira release publicada desde a 5.59.0. O que mudou entre uma e outra está nos
+PRDs 51, 52 e 53; o que esta entrada registra são os achados das últimas horas,
+todos encontrados USANDO as ferramentas para o fim delas.
+
+- **`start` volta a entregar por prova.** `acceptanceResolved` derivava de
+  `Boolean(a.verifier)` — a mera existência do verificador. Agora deriva de
+  compliance EXECUTADO (`acceptance-runner.js`), e `completed` segue alcançável:
+  há teste provando que 4 portões verdes + execução chegam lá, e que os MESMOS
+  portões sem execução não chegam.
+- **`publish-guard` era INSATISFAZÍVEL.** `version-bump` assumia tag depois de
+  publicar; `release-source-parity` exigia tag antes. Sem tag um reprovava, com
+  tag o outro. Desde a v4.0.1 — e ninguém percebeu porque a última publicação foi
+  feita sem ele verde, que é o que um gate impossível provoca.
+- **`runtime-compat.yml` nunca mediu nada.** Na primeira execução real, `npm cache
+  add dist-matrix/x.tgz` foi lido como atalho de GitHub (`owner/repo`) e morreu em
+  exit 128; `matrix` foi pulado e os `aggregate` quebraram procurando relatórios
+  inexistentes. Corrigido em duas camadas — workflow e `test-runtime-matrix.mjs`.
+- **A matriz OS × Node mediu pela primeira vez: 12/12 verdes.** As três leituras
+  de `declared_degradation` passam em ubuntu, windows e macos; `strict` falha nos
+  três pelo mesmo motivo declarado no PRD51 (`jsonl_fallback` em Node 18/20, sem
+  `node:sqlite`). A decisão `node22_official_only` se sustenta cross-OS.
+- **Os dentes do S52.B faziam o PACOTE INSTALADO reportar 0 REAL.** `tests/` não é
+  distribuído, e as regras exigiam o arquivo do controle negativo. Ausência por
+  não-envio não é ausência de prova. Corrigido; pacote e repo agora concordam em
+  24 REAL no mesmo commit.
+- **Fixture de segredo deixou de ser literal casável.** Uma chave sintética da
+  Stripe em teste barrava o push inteiro pela push protection do GitHub.
+
 ## [5.107.0] - 2026-08-01 — PRD48 P2.1 Fase 1A: extractor de inventário + gate fail-closed
 
 **Fase 1A, NÃO Fase 1.** A infraestrutura do detector é mergeável; a fase **não está
