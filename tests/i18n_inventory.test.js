@@ -256,7 +256,13 @@ test("CENSO GLOBAL: 1932 pontos, 0 unknown, 25 arquivos convertidos", async () =
   // que a maquina ainda carrega orfao de versao anterior. O defeito que os
   // motivou era exatamente um numero sem explicacao -- "16 hooks instalados"
   // contando um que o produto nao distribui.
-  assert.equal(inv.total, 1935, "converter nao pode sumir com ponto REAL; falso positivo do regex pode cair")
+  // 1935 -> 1937: o guard de workspace do S54.3 (PRD54 §2.2). Sao 2 pontos, os
+  // dois do ramo `inconclusive` do `verify` -- um diz QUE o veredito nao vale, o
+  // outro diz POR QUE e o que fazer. Antes desse ramo, um workspace mudado no
+  // meio do run caia na mensagem de "BLOQUEADO -- gates obrigatorios falharam",
+  // acusando os gates de uma falha que nao houve. Dois pontos e o preco de nao
+  // culpar o inocente.
+  assert.equal(inv.total, 1937, "converter nao pode sumir com ponto REAL; falso positivo do regex pode cair")
 
   // Medicao em movimento: cai a cada arquivo reconciliado. 54 -> 53 com qa.js;
   // 53 -> 52 com secrets.js.

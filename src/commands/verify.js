@@ -3,6 +3,7 @@ import { join } from "path"
 import { randomUUID } from "crypto"
 import { execFileSync } from "child_process"
 import { runVerify } from "../project-plan/verify-runner.js"
+import { snapshotDoWorkspace, divergenciaDoWorkspace, motivoParaNaoConcluir, houveVerificacao } from "../runtime/workspace-snapshot.js"
 import { runChangedFilesVerify } from "../project-plan/changed-files.js"
 import { npxArgv } from "../installer/deps.js"
 import { aggregateTier } from "../project-plan/quality-profile.js"
@@ -140,18 +141,37 @@ export function warningCause(report) {
   return causas.length ? causas.join("; ") : "aviso sem causa identificada (verifique `--json`)"
 }
 
-// Mensagem honesta: "PRONTO" só em ready; nunca em pending_product/blocked/timeout.
+/**
+ * A mensagem de cada status. TABELA, e não cadeia de `if`.
+ *
+ * A cadeia terminava num `else` que dizia "BLOQUEADO — gates obrigatórios
+ * falharam", e todo status novo caía nele por omissão. Foi o que quase aconteceu
+ * com `inconclusive` no S54.3: o run teria acusado os gates de uma falha que não
+ * houve, quando o que houve foi a medição perder o objeto. Numa tabela, status
+ * sem entrada é visível; numa cadeia, ele é absorvido.
+ */
+const MENSAGEM_DO_STATUS = Object.freeze({
+  ready: () => success("Projeto PRONTO — todos os gates aplicáveis passaram."),
+  ready_with_warnings: (r) => warn(`Pronto COM AVISOS — ${warningCause(r)}. Não é Zero-Trust completo.`),
+  pending_product: () => warn("NÃO declarado pronto: runtime/preview pendente (o app/preview não roda ainda). Build/testes passaram."),
+  timed_out: (r) => {
+    error(`TIMEOUT — etapa(s) estouraram o tempo: ${(r.timedOut || []).join(", ")}`)
+    warn("Os processos filhos foram encerrados. Investigue a etapa e rode de novo.")
+  },
+  inconclusive: (r) => {
+    warn(`INCONCLUSIVO — ${r.inconclusiveReason}`)
+    warn("O workspace mudou durante o run: o relatório é sobre uma árvore que já não existe. Rode de novo com a árvore parada.")
+  },
+})
+
+// "PRONTO" só em ready; nunca em pending_product/blocked/timeout/inconclusive.
 function renderVerifyStatus(report) {
-  if (report.status === "ready") return success("Projeto PRONTO — todos os gates aplicáveis passaram.")
-  if (report.status === "ready_with_warnings") return warn(`Pronto COM AVISOS — ${warningCause(report)}. Não é Zero-Trust completo.`)
-  if (report.status === "pending_product") return warn("NÃO declarado pronto: runtime/preview pendente (o app/preview não roda ainda). Build/testes passaram.")
-  if (report.status === "timed_out") {
-    error(`TIMEOUT — etapa(s) estouraram o tempo: ${(report.timedOut || []).join(", ")}`)
-    return warn("Os processos filhos foram encerrados. Investigue a etapa e rode de novo.")
-  }
+  const render = MENSAGEM_DO_STATUS[report.status]
+  if (render) return render(report)
   error(`BLOQUEADO — gates obrigatórios falharam: ${report.failed.join(", ")}`)
   warn("Corrija e rode `verify` de novo (ou acione `task`).")
 }
+
 function renderVerify(report, runId) {
   renderVerifyHeader(report)
   renderVerifySteps(report)
@@ -211,13 +231,56 @@ function attachReleaseBaseline(report, cwd, opts) {
 function runFullVerify(args, cwd, opts) {
   const runId = opts.runId || randomUUID().slice(0, 8)
   const dir = join(cwd, ".gstack", "runs", runId)
+  // PRD54 S54.3 (§2.2): o workspace é FIXADO antes do primeiro passo. Ler o
+  // commit só no fim descreve a árvore que sobrou, não a que foi medida.
+  const antes = snapshotDoWorkspace({ cwd })
   const report = runVerify({ cwd, profile: pickProfile(args), harness: pickHarness(args, opts), exec: opts.exec, stepExec: opts.stepExec, home: opts.home, runId, onStep: makeProgressSink(dir, runId) })
   // ECC AgentShield (opt-in): camada de segurança de prompt-injection, advisory.
   if (wantsAgentShield(args)) report.agentShield = runAgentShield(cwd, opts.exec)
   applyTierGate(args, report, opts)
   attachReleaseBaseline(report, cwd, opts)
+  aplicarWorkspaceGuard(report, antes, cwd)
   persistVerify(dir, runId, report)
   return { report, runId }
+}
+
+/**
+ * O CHÃO SE MOVEU DURANTE O RUN? — §2.2 do PRD54.
+ *
+ * Um relatório sobre uma árvore que mudou no meio não é um relatório errado: é
+ * um relatório sobre coisa nenhuma. Aconteceu neste repositório durante o S52.N
+ * — outra sessão reverteu arquivos no meio da suíte, 119 testes falharam, e a
+ * primeira leitura culpou o produto. Nada avisou, porque nada olhava.
+ *
+ * O guard NÃO reprova o run: ele proíbe o run de ser lido como CONCLUSÃO. A
+ * distinção é a do §2.2 — "nunca resultado verde, JSON vazio ou evidência
+ * parcial tratada como conclusão". O que foi medido continua no relatório, com
+ * o aviso de que foi medido em chão instável.
+ */
+function aplicarWorkspaceGuard(report, antes, cwd) {
+  const depois = snapshotDoWorkspace({ cwd })
+  const divergencia = divergenciaDoWorkspace(antes, depois)
+  const motivo = motivoParaNaoConcluir(divergencia)
+  report.workspace = {
+    sourceCommit: antes.sourceCommit,
+    workspaceSnapshotHash: antes.workspaceSnapshotHash,
+    observedPaths: antes.observedPaths.length,
+    truncated: antes.truncated,
+    // `verified` e `stable` são coisas DIFERENTES: sem git não houve verificação
+    // nenhuma, e dizer `stable: true` ali seria afirmar estabilidade que ninguém
+    // observou — o mesmo erro que este guard existe para impedir.
+    verified: houveVerificacao(divergencia),
+    stable: houveVerificacao(divergencia) ? divergencia.changed === false : null,
+    changed: divergencia.changed,
+    kind: divergencia.kind,
+    detail: divergencia.detail,
+    changedPaths: divergencia.paths,
+  }
+  if (motivo === null) return
+  // `ready` some, e não vira `false`: `false` afirmaria que os gates reprovaram.
+  // O que aconteceu foi outra coisa — a medição perdeu o objeto.
+  report.status = "inconclusive"
+  report.inconclusiveReason = motivo
 }
 
 /**
